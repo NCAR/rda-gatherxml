@@ -105,7 +105,7 @@ void parseArgs()
     }
     else if (sp[n] == "-d") {
 	args.dsnum=sp[++n];
-	if (strutils::has_beginning(args.dsnum,"ds")) {
+	if (std::regex_search(args.dsnum,std::regex("^ds"))) {
 	  args.dsnum=args.dsnum.substr(2);
 	}
     }
@@ -165,7 +165,7 @@ void parseArgs()
   }
   n=sp.back().rfind("/");
   args.path=sp.back().substr(0,n);
-  if (!strutils::has_beginning(args.path,"/FS/DSS") && !strutils::has_beginning(args.path,"/DSS") && !strutils::has_beginning(args.path,"https://rda.ucar.edu")) {
+  if (!std::regex_search(args.path,std::regex("^/FS/DSS")) && !std::regex_search(args.path,std::regex("^/DSS")) && !std::regex_search(args.path,std::regex("^https://rda.ucar.edu"))) {
     std::cerr << "Error: bad path" << std::endl;
     exit(1);
   }
@@ -494,7 +494,7 @@ void addGriddedNetCDFParameter(const netCDFStream::Variable& var,const bool& fou
 	else if (var.attrs[n].name == "units") {
 	  units=*(reinterpret_cast<std::string *>(var.attrs[n].values));
 	}
-	else if ((strutils::has_beginning(var.attrs[n].name,"comment") || strutils::has_beginning(var.attrs[n].name,"Comment")) && descr.length() == 0) {
+	else if ((std::regex_search(var.attrs[n].name,std::regex("^comment")) || std::regex_search(var.attrs[n].name,std::regex("^Comment"))) && descr.length() == 0) {
 	  descr=*(reinterpret_cast<std::string *>(var.attrs[n].values));
 	}
 	else if (strutils::to_lower(var.attrs[n].name) == "description" && descr.length() == 0) {
@@ -570,14 +570,15 @@ std::string getGriddedTimeMethod(const netCDFStream::Variable& var,std::string t
   for (m=0; m < var.attrs.size(); ++m) {
     if (var.attrs[m].name == "cell_methods") {
 	cell_methods=*(reinterpret_cast<std::string *>(var.attrs[m].values));
-	while (strutils::contains(cell_methods,"  ")) {
+	auto re=std::regex("  ");
+	while (std::regex_search(cell_methods,re)) {
 	  strutils::replace_all(cell_methods,"  "," ");
 	}
 	strutils::replace_all(cell_methods,"comment: ","");
 	strutils::replace_all(cell_methods,"comments: ","");
 	strutils::replace_all(cell_methods,"comment:","");
 	strutils::replace_all(cell_methods,"comments:","");
-	if (cell_methods.length() > 0 && strutils::contains(cell_methods,timeid+":")) {
+	if (cell_methods.length() > 0 && std::regex_search(cell_methods,std::regex(strutils::substitute(timeid,".","\\.")+":"))) {
 	  idx=cell_methods.find(timeid+":");
 	  if (idx != 0) {
 	    cell_methods=cell_methods.substr(idx);
@@ -679,7 +680,7 @@ void addGriddedParametersToNetCDFLevelEntry(const std::vector<netCDFStream::Vari
 	tr_description=strutils::capitalize(tr_description);
 	if (strutils::has_ending(gentry_key,tr_description)) {
 // check as a zonal mean grid variable
-	  if (strutils::has_beginning(gentry_key,"1<!>1<!>")) {
+	  if (std::regex_search(gentry_key,std::regex("^[12]<!>1<!>"))) {
 	    if (isZonalMeanGridVariable(vars[n],timedimid,levdimid,latdimid)) {
 		param_entry.key="ds"+args.dsnum+":"+vars[n].name;
 		addGriddedNetCDFParameter(vars[n],foundMap,firstValidDateTime,lastValidDateTime,*tre.num_steps,parameterTable,varList,changedVarTable,parameterMap);
@@ -718,7 +719,7 @@ void addGriddedTimeRange(std::string keyStart,std::list<std::string>& gentry_key
   bool foundVarWithNoTimeMethod=false;
 
   for (n=0; n < vars.size(); ++n) {
-    if (!vars[n].is_coord && (isZonalMeanGridVariable(vars[n],timedimid,levdimid,latdimid) || isRegularLatLonGridVariable(vars[n],timedimid,levdimid,latdimid,londimid) || isPolarStereographicGridVariable(vars[n],timedimid,levdimid,latdimid))) {
+    if (!vars[n].is_coord && vars[n].dimids.size() >= 3 && (isZonalMeanGridVariable(vars[n],timedimid,levdimid,latdimid) || isRegularLatLonGridVariable(vars[n],timedimid,levdimid,latdimid,londimid) || isPolarStereographicGridVariable(vars[n],timedimid,levdimid,latdimid))) {
 	time_method=getGriddedTimeMethod(vars[n],timeid);
 	if (time_method.length() == 0) {
 	  foundVarWithNoTimeMethod=true;
@@ -745,15 +746,18 @@ void addGriddedTimeRange(std::string keyStart,std::list<std::string>& gentry_key
 void addGriddedLatLonKeys(std::list<std::string>& gentry_keys,Grid::GridDimensions dim,Grid::GridDefinition def,std::string timeid,size_t timedimid,int levdimid,size_t latdimid,size_t londimid,const metautils::NcTime::TimeRangeEntry& tre,std::vector<netCDFStream::Variable>& vars)
 {
   std::string keyStart;
-
   switch (def.type) {
     case Grid::latitudeLongitudeType:
+    case Grid::gaussianLatitudeLongitudeType:
+    {
 	keyStart=strutils::itos(def.type)+"<!>"+strutils::itos(dim.x)+"<!>"+strutils::itos(dim.y)+"<!>"+strutils::ftos(def.slatitude,3)+"<!>"+strutils::ftos(def.slongitude,3)+"<!>"+strutils::ftos(def.elatitude,3)+"<!>"+strutils::ftos(def.elongitude,3)+"<!>"+strutils::ftos(def.loincrement,3)+"<!>"+strutils::ftos(def.laincrement,3)+"<!>";
 	addGriddedTimeRange(keyStart,gentry_keys,timeid,timedimid,levdimid,latdimid,londimid,tre,vars);
 	keyStart=strutils::itos(def.type)+"<!>1<!>"+strutils::itos(dim.y)+"<!>"+strutils::ftos(def.slatitude,3)+"<!>0<!>"+strutils::ftos(def.elatitude,3)+"<!>360<!>"+strutils::ftos(def.laincrement,3)+"<!>"+strutils::ftos(def.laincrement,3)+"<!>";
 	addGriddedTimeRange(keyStart,gentry_keys,timeid,timedimid,levdimid,latdimid,londimid,tre,vars);
 	break;
+    }
     case Grid::polarStereographicType:
+    {
 	keyStart=strutils::itos(def.type)+"<!>"+strutils::itos(dim.x)+"<!>"+strutils::itos(dim.y)+"<!>"+strutils::ftos(def.slatitude,3)+"<!>"+strutils::ftos(def.slongitude,3)+"<!>"+strutils::ftos(def.llatitude,3)+"<!>"+strutils::ftos(def.olongitude,3)+"<!>"+strutils::ftos(def.dx,3)+"<!>"+strutils::ftos(def.dy,3)+"<!>";
 	if (def.projection_flag == 0) {
 	  keyStart+="N";
@@ -764,10 +768,13 @@ void addGriddedLatLonKeys(std::list<std::string>& gentry_keys,Grid::GridDimensio
 	keyStart+="<!>";
 	addGriddedTimeRange(keyStart,gentry_keys,timeid,timedimid,levdimid,latdimid,londimid,tre,vars);
 	break;
+    }
     case Grid::mercatorType:
+    {
 	keyStart=strutils::itos(def.type)+"<!>"+strutils::itos(dim.x)+"<!>"+strutils::itos(dim.y)+"<!>"+strutils::ftos(def.slatitude,3)+"<!>"+strutils::ftos(def.slongitude,3)+"<!>"+strutils::ftos(def.elatitude,3)+"<!>"+strutils::ftos(def.elongitude,3)+"<!>"+strutils::ftos(def.dx,3)+"<!>"+strutils::ftos(def.dy,3)+"<!>"+strutils::ftos(def.stdparallel1,3)+"<!>";
 	addGriddedTimeRange(keyStart,gentry_keys,timeid,timedimid,levdimid,latdimid,londimid,tre,vars);
 	break;
+    }
   }
 }
 
@@ -854,7 +861,7 @@ void processUnitsAttribute(const netCDFStream::Attribute& attr,const netCDFStrea
 {
   auto u=*(reinterpret_cast<std::string *>(attr.values));
   u=strutils::to_lower(u);
-  if (strutils::contains(u,"since")) {
+  if (std::regex_search(u,std::regex("since"))) {
     if (dgd.indexes.time_var != 0xffffffff) {
 	metautils::logError("processUnitsAttribute returned error: time was already identified - don't know what to do with variable: "+var.name,"nc2xml",user,args.argsString);
     }
@@ -2314,7 +2321,7 @@ void scanCFGridNetCDFFile(InputNetCDFStream& istream,bool& foundMap,ParameterMap
 	  else {
 	    sdum="";
 	  }
-	  if (vars[n].attrs[m].nc_type == netCDFStream::NcType::CHAR && (vars[n].attrs[m].name == "units" || strutils::contains(sdum,"hybrid_sigma"))) {
+	  if (vars[n].attrs[m].nc_type == netCDFStream::NcType::CHAR && (vars[n].attrs[m].name == "units" || std::regex_search(sdum,std::regex("hybrid_sigma")))) {
 	    if (vars[n].attrs[m].name == "units") {
 		sdum=*(reinterpret_cast<std::string *>(vars[n].attrs[m].values));
 	    }
@@ -2322,7 +2329,7 @@ void scanCFGridNetCDFFile(InputNetCDFStream& istream,bool& foundMap,ParameterMap
 		sdum="";
 	    }
 	    sdum=strutils::to_lower(sdum);
-	    if (strutils::contains(sdum,"since")) {
+	    if (std::regex_search(sdum,std::regex("since"))) {
 		if (foundTime) {
 		  metautils::logError("time was already identified - don't know what to do with variable: "+vars[n].name,"nc2xml",user,args.argsString);
 		}
@@ -2751,6 +2758,11 @@ else {
 	def.slatitude=var_data.front();
 	def.elatitude=var_data.back();
 	def.laincrement=fabs((def.elatitude-def.slatitude)/(var_data.size()-1));
+// check for gaussian lat-lon
+	if (!myequalf(fabs(var_data[1]-var_data[0]),def.laincrement,0.001) && myequalf(var_data.size()/2.,var_data.size()/2,0.00000000001)) {
+	  def.type=Grid::gaussianLatitudeLongitudeType;
+	  def.laincrement=var_data.size()/2;
+	}
 // get the longitude range
 	if (lontype != netCDFStream::NcType::_NULL) {
 	  istream.variable_data(lonid,var_data);
@@ -3054,7 +3066,7 @@ void scanWRFSimulationNetCDFFile(InputNetCDFStream& istream,bool& foundMap,std::
 	  if (vars[n].attrs[m].nc_type == netCDFStream::NcType::CHAR && vars[n].attrs[m].name == "description") {
 	    sdum=*(reinterpret_cast<std::string *>(vars[n].attrs[m].values));
 	    sdum=strutils::to_lower(sdum);
-	    if (strutils::contains(sdum,"since")) {
+	    if (std::regex_search(sdum,std::regex("since"))) {
 		if (foundTime) {
 		  metautils::logError("time was already identified - don't know what to do with variable: "+vars[n].name,"nc2xml",user,args.argsString);
 		}
@@ -3471,14 +3483,14 @@ void scanRAFAircraftNetCDFFile(InputNetCDFStream& istream,bool& foundMap,std::st
 	    long_name=sdum;
 	  }
 	  sdum=strutils::to_lower(sdum);
-	  if (strutils::contains(sdum,"time")) {
+	  if (std::regex_search(sdum,std::regex("time"))) {
 	    timevarname=vars[n].name;
 	    istream.variable_data(vars[n].name,var_data);
 	    ientry.data->nsteps=var_data.size();
 	    a=var_data.front();
 	    b=var_data.back();
 	  }
-	  else if (strutils::contains(sdum,"latitude") || strutils::contains(sdum,"longitude") || strutils::contains(sdum,"altitude")) {
+	  else if (std::regex_search(sdum,std::regex("latitude")) || std::regex_search(sdum,std::regex("longitude")) || std::regex_search(sdum,std::regex("altitude"))) {
 	    ignoreAsDataType=true;
 	  }
 	}
@@ -3508,21 +3520,21 @@ void scanRAFAircraftNetCDFFile(InputNetCDFStream& istream,bool& foundMap,std::st
 	}
     }
     sdum=strutils::to_lower(vars[n].name);
-    if (strutils::contains(sdum,"lat") && coordsTable.found(vars[n].name,se)) {
+    if (std::regex_search(sdum,std::regex("lat")) && coordsTable.found(vars[n].name,se)) {
 	istream.variable_data(vars[n].name,var_data);
 	lats=new double[var_data.size()];
 	for (m=0; m < static_cast<size_t>(var_data.size()); ++m) {
 	   lats[m]=var_data[m];
 	}
     }
-    else if (strutils::contains(sdum,"lon") && coordsTable.found(vars[n].name,se)) {
+    else if (std::regex_search(sdum,std::regex("lon")) && coordsTable.found(vars[n].name,se)) {
 	istream.variable_data(vars[n].name,var_data);
 	lons=new double[var_data.size()];
 	for (m=0; m < static_cast<size_t>(var_data.size()); ++m) {
 	  lons[m]=var_data[m];
 	}
     }
-    else if (strutils::contains(sdum,"alt") && coordsTable.found(vars[n].name,se)) {
+    else if (std::regex_search(sdum,std::regex("alt")) && coordsTable.found(vars[n].name,se)) {
 	for (m=0; m < vars[n].attrs.size(); ++m) {
 	  if (vars[n].attrs[m].name == "units") {
 	    vunits=*(reinterpret_cast<std::string *>(vars[n].attrs[m].values));
@@ -3701,7 +3713,7 @@ void scanPREPBUFRNetCDFFile(InputNetCDFStream& istream,bool& foundMap,std::strin
     }
     else if (attrs[n].name == "FileOrigins") {
 	sdum=*(reinterpret_cast<std::string *>(attrs[n].values));
-	if (strutils::contains(sdum,"PB2NC tool")) {
+	if (std::regex_search(sdum,std::regex("PB2NC tool"))) {
 	  sdum="pb2nc";
 	}
 	else {
@@ -3887,7 +3899,7 @@ void scanIDDMETARNetCDFFile(InputNetCDFStream& istream,bool foundMap,DataTypeMap
     if (verbose_operation) {
 	std::cout << "  netCDF variable: '" << vars[n].name << "'" << std::endl;
     }
-    if (strutils::has_beginning(vars[n].name,"time_obs")) {
+    if (std::regex_search(vars[n].name,std::regex("^time_obs"))) {
 	if (verbose_operation) {
 	  std::cout << "  - time variable is '" << vars[n].name << "'" << std::endl;
 	}
@@ -3903,7 +3915,7 @@ void scanIDDMETARNetCDFFile(InputNetCDFStream& istream,bool foundMap,DataTypeMap
 	  }
 	}
     }
-    else if (vars[n].is_rec && vars[n].name != "parent_index" && vars[n].name != "prevChild" && !strutils::has_beginning(vars[n].name,"report") && vars[n].name != "rep_type" && vars[n].name != "stn_name" && vars[n].name != "wmo_id" && vars[n].name != "lat" && vars[n].name != "lon" && vars[n].name != "elev" && !strutils::has_beginning(vars[n].name,"ob_") && !strutils::has_beginning(vars[n].name,"time") && vars[n].name != "xfields" && vars[n].name != "remarks") {
+    else if (vars[n].is_rec && vars[n].name != "parent_index" && vars[n].name != "prevChild" && !std::regex_search(vars[n].name,std::regex("^report")) && vars[n].name != "rep_type" && vars[n].name != "stn_name" && vars[n].name != "wmo_id" && vars[n].name != "lat" && vars[n].name != "lon" && vars[n].name != "elev" && !std::regex_search(vars[n].name,std::regex("^ob\\_")) && !std::regex_search(vars[n].name,std::regex("^time")) && vars[n].name != "xfields" && vars[n].name != "remarks") {
 	if (istream.variable_data(vars[n].name,var_data) == netCDFStream::NcType::_NULL) {
 	  metautils::logError("scanIDDMETARNetCDFFile returned error: unable to get data for variable '"+vars[n].name+"'","nc2xml",user,args.argsString);
 	}
@@ -3996,7 +4008,7 @@ void scanIDDBuoyNetCDFFile(InputNetCDFStream& istream,bool foundMap,DataTypeMap&
 	  }
 	}
     }
-    else if (vars[n].is_rec && vars[n].name != "rep_type" && vars[n].name != "zone" && vars[n].name != "buoy" && vars[n].name != "ship" && !strutils::has_beginning(vars[n].name,"time") && vars[n].name != "Lat" && vars[n].name != "Lon" && vars[n].name != "stnType" && vars[n].name != "report") {
+    else if (vars[n].is_rec && vars[n].name != "rep_type" && vars[n].name != "zone" && vars[n].name != "buoy" && vars[n].name != "ship" && !std::regex_search(vars[n].name,std::regex("^time")) && vars[n].name != "Lat" && vars[n].name != "Lon" && vars[n].name != "stnType" && vars[n].name != "report") {
 	if (istream.variable_data(vars[n].name,var_data) == netCDFStream::NcType::_NULL) {
 	  metautils::logError("scanIDDBuoyNetCDFFile returned error: unable to get data for variable '"+vars[n].name+"'","nc2xml",user,args.argsString);
 	}
@@ -4082,7 +4094,7 @@ void scanIDDSurfaceSynopticNetCDFFile(InputNetCDFStream& istream,bool foundMap,D
 	  }
 	}
     }
-    else if (vars[n].is_rec && vars[n].name != "rep_type" && vars[n].name != "wmoId" && vars[n].name != "stnName" && !strutils::has_beginning(vars[n].name,"time") && vars[n].name != "Lat" && vars[n].name != "Lon" && vars[n].name != "elev" && vars[n].name != "stnType" && vars[n].name != "report") {
+    else if (vars[n].is_rec && vars[n].name != "rep_type" && vars[n].name != "wmoId" && vars[n].name != "stnName" && !std::regex_search(vars[n].name,std::regex("^time")) && vars[n].name != "Lat" && vars[n].name != "Lon" && vars[n].name != "elev" && vars[n].name != "stnType" && vars[n].name != "report") {
 	if (istream.variable_data(vars[n].name,var_data) == netCDFStream::NcType::_NULL) {
 	  metautils::logError("scanIDDSurfaceSynopticNetCDFFile returned error: unable to get data for variable '"+vars[n].name+"'","nc2xml",user,args.argsString);
 	}
@@ -4298,7 +4310,7 @@ void scanSAMOSNetCDFFile(InputNetCDFStream& istream,DataTypeMap& dataTypeMap,boo
     for (size_t m=0; m < vars[n].attrs.size(); ++m) {
 	if (vars[n].attrs[m].nc_type == netCDFStream::NcType::CHAR && vars[n].attrs[m].name == "units") {
 	  std::string sdum=strutils::to_lower(*(reinterpret_cast<std::string *>(vars[n].attrs[m].values)));
-	  if (vars[n].is_coord && strutils::contains(sdum,"since")) {
+	  if (vars[n].is_coord && std::regex_search(sdum,std::regex("since"))) {
 	    if (found_time) {
 		metautils::logError("scanSAMOSNetCDFFile returned error: time was already identified - don't know what to do with variable: "+vars[n].name,"nc2xml",user,args.argsString);
 	    }
@@ -4590,7 +4602,7 @@ void scanFile()
     else {
 	no_write=false;
 	for (const auto& line : map_contents) {
-	  if (strutils::contains(line," code=\"")) {
+	  if (std::regex_search(line,std::regex(" code=\""))) {
 	    sp=strutils::split(line,"\"");
 	    se.key=sp[1];
 	    if (changedVarTable.found(se.key,se)) {
@@ -4600,7 +4612,7 @@ void scanFile()
 	  if (!no_write) {
 	    ofs << line << std::endl;
 	  }
-	  if (strutils::contains(line,"</"+map_type+">")) {
+	  if (std::regex_search(line,std::regex("</"+map_type+">"))) {
 	    no_write=false;
 	  }
 	}
@@ -4706,7 +4718,7 @@ int main(int argc,char **argv)
   metautils::readConfig("nc2xml",user,args.argsString);
   parseArgs();
   flags="-f";
-  if (!args.inventoryOnly && strutils::has_beginning(args.path,"https://rda.ucar.edu")) {
+  if (!args.inventoryOnly && std::regex_search(args.path,std::regex("^https://rda.ucar.edu"))) {
     flags="-wf";
   }
   atexit(cleanUp);
