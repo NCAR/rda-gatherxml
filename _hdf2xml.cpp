@@ -1399,11 +1399,11 @@ bool parameter_matches_dimensions(InputHDF5Stream& istream,InputHDF5Stream::Attr
   std::stringstream ss[3];
   bool parameter_matches=false;
 
-  off=1+attr.value.precision;
+  off=8+attr.value.precision;
   for (n=1; n < static_cast<int>(attr.value.dim_sizes[0]); n++) {
-    if (!istream.getReferenceTablePointer()->found(HDF5::getValue(&(reinterpret_cast<unsigned char *>(attr.value.value))[off],attr.value.precision),re[n-1]))
+    if (!istream.getReferenceTablePointer()->found(HDF5::getValue(&attr.value.vlen.buffer[off],attr.value.precision),re[n-1]))
 	metautils::logError("unable to dereference dimension reference","hdf2xml",user,args.argsString);
-    off+=attr.value.precision;
+    off+=attr.value.precision+4;
   }
   switch (attr.value.dim_sizes[0]) {
     case 3:
@@ -1472,7 +1472,7 @@ void add_gridded_parameters_to_netCDF_level_entry(InputHDF5Stream& istream,std::
   vars=istream.getDatasetsWithAttribute("DIMENSION_LIST");
   for (const auto& var : vars) {
     var.dataset->attributes.found("DIMENSION_LIST",attr);
-    if (attr.value.class_ == 9 && attr.value.dim_sizes.size() == 1 && attr.value.dim_sizes[0] > 2 && (reinterpret_cast<unsigned char *>(attr.value.value))[0] == 7 && parameter_matches_dimensions(istream,attr,timeid,latid,lonid,levid)) {
+    if (attr.value.class_ == 9 && attr.value.dim_sizes.size() == 1 && attr.value.dim_sizes[0] > 2 && attr.value.vlen.class_ == 7 && parameter_matches_dimensions(istream,attr,timeid,latid,lonid,levid)) {
 	time_method=get_gridded_time_method(var.dataset,timeid);
 	if (time_method.length() == 0 || (myequalf(time_bounds.t1,0,0.0001) && myequalf(time_bounds.t1,time_bounds.t2,0.0001))) {
 	  time_range.first_valid_datetime=tre.instantaneous->first_valid_datetime;
@@ -1517,7 +1517,7 @@ void update_level_entry(InputHDF5Stream& istream,const metautils::NcTime::TimeRa
   vars=istream.getDatasetsWithAttribute("DIMENSION_LIST");
   for (const auto& var : vars) {
     var.dataset->attributes.found("DIMENSION_LIST",attr);
-    if (attr.value.class_ == 9 && attr.value.dim_sizes.size() == 1 && attr.value.dim_sizes[0] > 2 && (reinterpret_cast<unsigned char *>(attr.value.value))[0] == 7 && parameter_matches_dimensions(istream,attr,timeid,latid,lonid,levid)) {
+    if (attr.value.class_ == 9 && attr.value.dim_sizes.size() == 1 && attr.value.dim_sizes[0] > 2 && attr.value.vlen.class_ == 7 && parameter_matches_dimensions(istream,attr,timeid,latid,lonid,levid)) {
 	param_entry->key="ds"+args.dsnum+":"+var.key;
 	time_method=get_gridded_time_method(var.dataset,timeid);
 	time_method=strutils::capitalize(time_method);
@@ -1840,7 +1840,7 @@ void scan_HDF5_netCDF4_file(InputHDF5Stream& istream,ScanData& scan_data)
   my::map<metautils::NcTime::TimeRangeEntry> time_range_table;
   metautils::NcTime::TimeRangeEntry tre;
   HDF5::DataArray data_array,time_array,lat_array,lon_array,fcst_ref_time_array,bnds_array;
-  int n,m,l,num_levels;
+  int m,l,num_levels;
   Grid::GridDimensions dim;
   Grid::GridDefinition def;
   std::list<std::string> map_contents;
@@ -2138,7 +2138,7 @@ void scan_HDF5_netCDF4_file(InputHDF5Stream& istream,ScanData& scan_data)
     if (latid.size() != lonid.size()) {
 	metautils::logError("unequal number of latitude and longitude coordinate variables","hdf2xml",user,args.argsString);
     }
-    for (n=0; n < static_cast<int>(latid.size()); ++n) {
+    for (size_t n=0; n < latid.size(); ++n) {
 	if ( (lats=istream.getDataset("/"+latid[n])) == NULL) {
 	  metautils::logError("unable to access the /"+latid[n]+" dataset for the latitudes","hdf2xml",user,args.argsString);
 	}
@@ -2149,9 +2149,10 @@ void scan_HDF5_netCDF4_file(InputHDF5Stream& istream,ScanData& scan_data)
 	lon_array.fill(istream,*lons);
 	def.slatitude=data_array_value(lat_array,0,lats);
 	def.slongitude=data_array_value(lon_array,0,lons);
-	if (lats->attributes.found("DIMENSION_LIST",attr) && attr.value.dim_sizes.size() == 1 && attr.value.dim_sizes[0] == 2 && attr.value.class_ == 9 && lons->attributes.found("DIMENSION_LIST",attr2) && attr2.value.dim_sizes.size() == 1 && attr2.value.dim_sizes[0] == 2 && attr2.value.class_ == 9) {
-	  if ( (reinterpret_cast<unsigned char *>(attr.value.value))[0] == 7 && (reinterpret_cast<unsigned char *>(attr2.value.value))[0] == 7) {
-	    if (istream.getReferenceTablePointer()->found(HDF5::getValue(&(reinterpret_cast<unsigned char *>(attr.value.value))[1],attr.value.precision),re) && istream.getReferenceTablePointer()->found(HDF5::getValue(&(reinterpret_cast<unsigned char *>(attr2.value.value))[1],attr2.value.precision),re2) && re.name == re2.name && istream.getReferenceTablePointer()->found(HDF5::getValue(&(reinterpret_cast<unsigned char *>(attr.value.value))[1+attr.value.precision],attr.value.precision),re2) && istream.getReferenceTablePointer()->found(HDF5::getValue(&(reinterpret_cast<unsigned char *>(attr2.value.value))[1+attr2.value.precision],attr2.value.precision),re3) && re2.name == re3.name) {
+	InputHDF5Stream::Attribute lat_attr,lon_attr;
+	if (lats->attributes.found("DIMENSION_LIST",lat_attr) && lat_attr.value.dim_sizes.size() == 1 && lat_attr.value.dim_sizes[0] == 2 && lat_attr.value.class_ == 9 && lons->attributes.found("DIMENSION_LIST",lon_attr) && lon_attr.value.dim_sizes.size() == 1 && lon_attr.value.dim_sizes[0] == 2 && lon_attr.value.class_ == 9) {
+	  if (lat_attr.value.vlen.class_ == 7 && lon_attr.value.vlen.class_ == 7) {
+	    if (istream.getReferenceTablePointer()->found(HDF5::getValue(&lat_attr.value.vlen.buffer[4],lat_attr.value.precision),re) && istream.getReferenceTablePointer()->found(HDF5::getValue(&lon_attr.value.vlen.buffer[4],lon_attr.value.precision),re2) && re.name == re2.name && istream.getReferenceTablePointer()->found(HDF5::getValue(&lat_attr.value.vlen.buffer[8+lat_attr.value.precision],lat_attr.value.precision),re2) && istream.getReferenceTablePointer()->found(HDF5::getValue(&lon_attr.value.vlen.buffer[8+lon_attr.value.precision],lon_attr.value.precision),re3) && re2.name == re3.name) {
 		if ( (ds=istream.getDataset("/"+re.name)) == NULL || !ds->attributes.found("NAME",attr) || attr.value.class_ != 3) {
 		  metautils::logError("(1)unable to determine grid definition from '"+latid[n]+"' and '"+lonid[n]+"'","hdf2xml",user,args.argsString);
 		}
@@ -2261,11 +2262,11 @@ std::cerr << myequalf(data_array_value(lat_array,center_y*lon_array.dimensions[1
 	  def.elongitude=data_array_value(lon_array,dim.x-1,lons);
 	  def.loincrement=fabs((def.elongitude-def.slongitude)/(dim.x-1));
 	}
-	for (m=0; m < static_cast<int>(level_info.ID.size()); ++m) {
+	for (size_t m=0; m < level_info.ID.size(); ++m) {
 	  gentry_table.clear();
 	  levid=level_info.ID[m];
 	  bnds_ds=nullptr;
-	  if (m == static_cast<int>(level_info.ID.size()-1) && levid == "sfc") {
+	  if (m == (level_info.ID.size()-1) && levid == "sfc") {
 	    num_levels=1;
 	    ds=nullptr;
 	  }
