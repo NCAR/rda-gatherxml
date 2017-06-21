@@ -3,6 +3,7 @@
 #include <memory>
 #include <deque>
 #include <regex>
+#include <unordered_set>
 #include <sstream>
 #include <stdlib.h>
 #include <unistd.h>
@@ -40,7 +41,7 @@ metadata::GrML::LevelEntry *lentry;
 metadata::GrML::ParameterEntry *param_entry;
 my::map<metadata::ObML::IDEntry> **ID_table=nullptr;
 my::map<metadata::ObML::PlatformEntry> *platform_table;
-my::map<metautils::StringEntry> unique_observation_table(999999),unique_data_type_observation_table(999999);
+std::unordered_set<std::string> unique_observation_table,unique_data_type_observation_set;
 metadata::ObML::DataTypeEntry de;
 size_t num_not_missing=0;
 std::string cmd_type="";
@@ -568,14 +569,14 @@ void update_ID_table(size_t obs_type_index,metadata::ObML::IDEntry& ientry,float
     ientry.data->min_lon_bitmap[n]=ientry.data->max_lon_bitmap[n]=lon;
     ientry.data->start=dt;
     ientry.data->end=dt;
-    unique_observation_table.insert(se);
+    unique_observation_table.emplace(se.key);
     ientry.data->nsteps=1;
     de.data.reset(new metadata::ObML::DataTypeEntry::Data);
     de.data->nsteps=1;
     ientry.data->data_types_table.insert(de);
     ID_table[obs_type_index]->insert(ientry);
     se.key+=":"+de.key;
-    unique_data_type_observation_table.insert(se);
+    unique_data_type_observation_set.emplace(se.key);
   }
   else {
     if (lat < ientry.data->S_lat) {
@@ -609,18 +610,18 @@ void update_ID_table(size_t obs_type_index,metadata::ObML::IDEntry& ientry,float
     if (dt > ientry.data->end) {
 	ientry.data->end=dt;
     }
-    if (!unique_observation_table.found(se.key,se)) {
+    if (unique_observation_table.find(se.key) == unique_observation_table.end()) {
 	++(ientry.data->nsteps);
-	unique_observation_table.insert(se);
+	unique_observation_table.emplace(se.key);
     }
-    se.key+=":"+de.key;
     if (!ientry.data->data_types_table.found(de.key,de)) {
 	de.data.reset(new metadata::ObML::DataTypeEntry::Data);
 	ientry.data->data_types_table.insert(de);
     }
-    if (!unique_data_type_observation_table.found(se.key,se)) {
-        ++(de.data->nsteps);
-        unique_data_type_observation_table.insert(se);
+    se.key+=":"+de.key;
+    if (unique_data_type_observation_set.find(se.key) == unique_data_type_observation_set.end()) {
+	++(de.data->nsteps);
+	unique_data_type_observation_set.emplace(se.key);
     }
   }
 }
@@ -1660,7 +1661,7 @@ void process_units_attribute(const InputHDF5Stream::DatasetEntry& ds_entry,Discr
   std::string attr_val(reinterpret_cast<char *>(attr.value.get()),attr.value.size);
   if (std::regex_search(attr_val,std::regex("since"))) {
     if (!dgd.indexes.time_var.empty()) {
-	metautils::logError("process_units_attribute() returned error: time was already identified - don't know what to do with variable: "+ds_entry.key,"hdf2xml",user,args.argsString);
+	metautils::logError("processed_units_attribute() returned error: time was already identified - don't know what to do with variable: "+ds_entry.key,"hdf2xml",user,args.argsString);
     }
     metautils::CF::fill_NcTimeData(attr_val,time_data,user);
     dgd.indexes.time_var=ds_entry.key;
@@ -1685,8 +1686,23 @@ void scan_CF_point_HDF5_netCDF4_file(InputHDF5Stream& istream,ScanData& scan_dat
   for (const auto& ds_entry : ds_entry_list) {
     process_units_attribute(ds_entry,dgd);
   }
+  ds_entry_list=istream.getDatasetsWithAttribute("coordinates");
+// look for a "station ID"
+  for (const auto& ds_entry : ds_entry_list) {
+    if (ds_entry.dataset->datatype.class_ == 3) {
+	InputHDF5Stream::Attribute attr;
+	if (ds_entry.dataset->attributes.found("long_name",attr) && attr.value.class_ == 3) {
+	  std::string aval(reinterpret_cast<char *>(attr.value.get()),attr.value.size);
+	  if (std::regex_search(aval,std::regex("ID")) || std::regex_search(aval,std::regex("ident",std::regex::icase))) {
+	    dgd.indexes.stn_id_var=ds_entry.key;
+	  }
+	}
+    }
+    if (!dgd.indexes.stn_id_var.empty()) {
+	break;
+    }
+  }
   HDF5::DataArray time_vals;
-  double time_missing_value=1.e33;
   if (dgd.indexes.time_var.empty()) {
     metautils::logError("scan_CF_point_HDF5_netCDF4_file() returned error: unable to determine time variable","hdf2xml",user,args.argsString);
   }
@@ -1700,7 +1716,6 @@ void scan_CF_point_HDF5_netCDF4_file(InputHDF5Stream& istream,ScanData& scan_dat
       time_data.calendar.assign(reinterpret_cast<char *>(attr.value.get()),attr.value.size);
     }
     time_vals.fill(istream,*ds);
-    time_missing_value=HDF5::decode_data_value(ds->datatype,ds->fillvalue.bytes,time_missing_value);
   }
   HDF5::DataArray lat_vals;
   if (dgd.indexes.lat_var.empty()) {
@@ -1724,14 +1739,29 @@ void scan_CF_point_HDF5_netCDF4_file(InputHDF5Stream& istream,ScanData& scan_dat
     }
     lon_vals.fill(istream,*ds);
   }
+  HDF5::DataArray ID_vals;
+  if (dgd.indexes.stn_id_var.empty()) {
+    metautils::logError("scan_CF_point_HDF5_netCDF4_file() returned error: unable to determine report ID variable","hdf2xml",user,args.argsString);
+  }
+  else {
+    auto ds=istream.getDataset("/"+dgd.indexes.stn_id_var);
+    if (ds == nullptr) {
+	metautils::logError("scan_CF_point_HDF5_netCDF4_file() returned error: unable to access report ID variable","hdf2xml",user,args.argsString);
+    }
+    ID_vals.fill(istream,*ds);
+  }
   scan_data.map_name=getRemoteWebFile("https://rda.ucar.edu/metadata/ParameterTables/HDF5.ds"+args.dsnum+".xml",tdir->name());
   scan_data.found_map=!scan_data.map_name.empty();
   std::vector<DateTime> date_times;
+  date_times.reserve(time_vals.num_values);
   std::vector<std::string> IDs;
+  IDs.reserve(time_vals.num_values);
   std::vector<float> lats,lons;
-  ds_entry_list=istream.getDatasetsWithAttribute("DIMENSION_LIST");
+  lats.reserve(time_vals.num_values);
+  lons.reserve(time_vals.num_values);
   for (const auto& ds_entry : ds_entry_list) {
-    if (ds_entry.key != dgd.indexes.time_var && ds_entry.key != dgd.indexes.lat_var && ds_entry.key != dgd.indexes.lon_var) {
+    if (ds_entry.key != dgd.indexes.time_var && ds_entry.key != dgd.indexes.lat_var && ds_entry.key != dgd.indexes.lon_var && ds_entry.key != dgd.indexes.stn_id_var) {
+	unique_data_type_observation_set.clear();
 	de.key=ds_entry.key;
 	auto ds=istream.getDataset("/"+ds_entry.key);
 	std::string descr,units;
@@ -1765,67 +1795,42 @@ void scan_CF_point_HDF5_netCDF4_file(InputHDF5Stream& istream,ScanData& scan_dat
 	  if (n == IDs.size()) {
 	    auto lat_val=lat_vals.value(n);
 	    lats.emplace_back(lat_val);
-	    auto lat=strutils::ftos(fabs(lat_val),4);
-	    if (lat_val < 0.) {
-		lat+="S";
-	    }
-	    else {
-		lat+="N";
-	    }
 	    auto lon_val=lon_vals.value(n);
 	    if (lon_val > 180.) {
 		lon_val-=360.;
 	    }
 	    lons.emplace_back(lon_val);
-	    auto lon=strutils::ftos(fabs(lon_val),4);
-	    if (lon_val < 0.) {
-		lon+="W";
+	    auto id_val=ID_vals.string_value(n);
+	    for (auto c=id_val.begin(); c != id_val.end(); ) {
+		if (*c < 32 || *c > 126) {
+		  id_val.erase(c);
+		}
+		else {
+		  ++c;
+		}
 	    }
-	    else {
-		lon+="E";
+	    if (!id_val.empty()) {
+		strutils::trim(id_val);
 	    }
-	    IDs.emplace_back(lat+lon);
+	    IDs.emplace_back(id_val);
 	  }
-	  if (time_vals.value(n) != time_missing_value && var_data.value(n) != var_missing_value) {
+	  if (!IDs[n].empty() && var_data.value(n) != var_missing_value) {
 	    metadata::ObML::PlatformEntry pentry;
 	    pentry.key="unknown";
 	    update_platform_table(1,pentry,lats[n],lons[n]);
 	    metadata::ObML::IDEntry ientry;
-	    ientry.key=pentry.key+"[!]latlon[!]"+IDs[n];
+	    ientry.key=pentry.key+"[!]unknown[!]"+IDs[n];
 	    update_ID_table(1,ientry,lats[n],lons[n],date_times[n],time_vals.value(n));
 	    ++num_not_missing;
 	  }
 	}
+	ds->free();
     }
   }
   write_type=ObML_type;
 }
 
-void scan_CF_HDF5_netCDF4_file(InputHDF5Stream& istream,ScanData& scan_data)
-{
-  InputHDF5Stream::Dataset *ds=istream.getDataset("/");
-  if (ds == nullptr) {
-    myerror="unable to access global attributes";
-    exit(1);
-  }
-  InputHDF5Stream::Attribute attr;
-  if (ds->attributes.found("featureType",attr)) {
-    std::string feature_type=reinterpret_cast<char *>(attr.value.value);
-    if (feature_type == "point") {
-	scan_CF_point_HDF5_netCDF4_file(istream,scan_data);
-    }
-    else {
-	myerror="featureType '"+feature_type+"' not recognized";
-	exit(1);
-    }
-  }
-  else {
-    myerror="featureType was not found in the global attributes";
-    exit(1);
-  }
-}
-
-void scan_HDF5_netCDF4_file(InputHDF5Stream& istream,ScanData& scan_data)
+void scan_gridded_HDF5_netCDF4_file(InputHDF5Stream& istream,ScanData& scan_data)
 {
   std::list<InputHDF5Stream::DatasetEntry> vars;
   InputHDF5Stream::Dataset *ds,*times=nullptr,*lats,*lons,*fcst_ref_time_ds,*bnds_ds;
@@ -2409,6 +2414,29 @@ inv_R_table.insert(ie);
 }
 }
 
+void scan_HDF5_netCDF4_file(InputHDF5Stream& istream,ScanData& scan_data)
+{
+  InputHDF5Stream::Dataset *ds=istream.getDataset("/");
+  if (ds == nullptr) {
+    myerror="unable to access global attributes";
+    exit(1);
+  }
+  InputHDF5Stream::Attribute attr;
+  if (ds->attributes.found("featureType",attr)) {
+    std::string feature_type=reinterpret_cast<char *>(attr.value.value);
+    if (feature_type == "point") {
+	scan_CF_point_HDF5_netCDF4_file(istream,scan_data);
+    }
+    else {
+	myerror="featureType '"+feature_type+"' not recognized";
+	exit(1);
+    }
+  }
+  else {
+    scan_gridded_HDF5_netCDF4_file(istream,scan_data);
+  }
+}
+
 void scan_HDF5_file(std::list<std::string>& filelist,ScanData& scan_data)
 {
   InputHDF5Stream istream;
@@ -2421,9 +2449,6 @@ void scan_HDF5_file(std::list<std::string>& filelist,ScanData& scan_data)
     }
     if (args.format == "ispdhdf5") {
 	scan_ISPD_HDF5_file(istream);
-    }
-    else if (args.format == "cfhdf5nc4") {
-	scan_CF_HDF5_netCDF4_file(istream,scan_data);
     }
     else if (args.format == "hdf5nc4") {
 	scan_HDF5_netCDF4_file(istream,scan_data);
@@ -2511,7 +2536,6 @@ int main(int argc,char **argv)
     std::cerr << "HDF5 formats:" << std::endl;
     std::cerr << "-f ispdhdf5       NOAA International Surface Pressure Databank HDF5" << std::endl;
     std::cerr << "-f hdf5nc4        NetCDF4 with HDF5 storage" << std::endl;
-    std::cerr << "-f cfhdf5nc4      CF-compliant NetCDF4 with HDF5 storage" << std::endl;
     std::cerr << "-f usarrthdf5     EarthScope USArray Transportable Array Pressure Observations" << std::endl;
     std::cerr << "\nrequired:" << std::endl;
     std::cerr << "-d <nnn.n>       nnn.n is the dataset number to which the data file belongs" << std::endl;
