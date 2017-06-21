@@ -1,6 +1,10 @@
 # rda-gatherxml
 Codes to support the RDA metadata gathering utilities.
 
+- _gatherxml.cpp
+
+   code that runs when the command "gatherxml" is executed
+
 - _hdf2xml.cpp
 
    code that scans HDF4 and HDF5 files
