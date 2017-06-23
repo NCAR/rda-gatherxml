@@ -4,6 +4,10 @@ Codes to support the RDA metadata gathering utilities.
 - _gatherxml.cpp
 
    code that runs when the command "gatherxml" is executed
+   
+- _ascii2xml.cpp
+
+   code that scans proprietary ASCII data files
 
 - _hdf2xml.cpp
 
