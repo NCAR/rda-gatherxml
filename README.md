@@ -15,7 +15,7 @@ Codes to support the RDA metadata gathering utilities.
    
 - \_grid2xml.cpp
 
-   code that scans gridded data files that are not in netCDF (see \_nc2xml.cpp) or HDF (see \_hdf2xml.cpp) (e.g. WMO GRIB1, GRIB2, DSS binary formats, other proprietary formats)
+   code that scans gridded data files (e.g. WMO GRIB1, GRIB2, DSS binary formats, other proprietary formats) that are not in netCDF (see \_nc2xml.cpp) or HDF (see \_hdf2xml.cpp)
 
 - \_hdf2xml.cpp
 
@@ -27,4 +27,4 @@ Codes to support the RDA metadata gathering utilities.
    
 - \_obs2xml.cpp
 
-   code that scans observations data files that are not in netCDF (see \_nc2xml.cpp) or HDF (see \_hdf2xml.cpp) (e.g. DSS binary formats, NCDC ASCII formats, etc.)
+   code that scans observations data files (e.g. DSS binary formats, NCDC ASCII formats, etc.) that are not in netCDF (see \_nc2xml.cpp) or HDF (see \_hdf2xml.cpp)
