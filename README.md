@@ -24,3 +24,7 @@ Codes to support the RDA metadata gathering utilities.
 - \_nc2xml.cpp
 
    code that scans netCDF-3 data files (for netCDF-4 wrapped in HDF5, use \_hdf2xml.cpp)
+   
+- \_obs2xml.cpp
+
+   code that scans observations data files that are not in netCDF (see \_nc2xml.cpp) or HDF (see \_hdf2xml.cpp) (e.g. DSS binary formats, NCDC ASCII formats, etc.)
