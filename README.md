@@ -3,7 +3,7 @@ Codes to support the RDA metadata gathering utilities.
 
 - \_gatherxml.cpp
 
-   code that runs when the command _gatherxml_ is executed
+   code that runs when the command _gatherxml_ is executed - scans a data file and extracts content metadata
    
    the following are called by _gatherxml_, depending on the format indicated by _gatherxml's_ -f flag (these should not be executed explicitly; users should only execute _gatherxml_):
    
@@ -30,3 +30,7 @@ Codes to support the RDA metadata gathering utilities.
    - \_obs2xml.cpp
 
       code that scans observations data files (e.g. DSS binary formats, NCDC ASCII formats, etc.) that are not in netCDF (see \_nc2xml.cpp) or HDF (see \_hdf2xml.cpp)
+      
+- \_dcm.cpp
+
+   code that runs when the command _dcm_ is executed - deletes data file content metadata from the database
