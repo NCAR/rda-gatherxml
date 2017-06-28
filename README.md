@@ -14,6 +14,10 @@ Codes to support the RDA metadata gathering utilities.
    - \_bufr2xml.cpp
 
       code that scans WMO BUFR data files
+      
+   - \_fix2xml.cpp
+   
+      code that scans "cyclone fix" data files (e.g. CXML, HURDAT, etc.)
    
    - \_grid2xml.cpp
 
@@ -34,3 +38,11 @@ Codes to support the RDA metadata gathering utilities.
 - \_dcm.cpp
 
    code that runs when the command _dcm_ is executed - deletes data file content metadata from the database
+   
+- \_rcm.cpp
+
+   code that runs when the command _rcm_ is executed - renames content metadata when the data file is renamed
+   
+- \_scm.cpp
+
+   code that runs when the command _scm_ is executed - summarizes content metadata for a file and/or a dataset
