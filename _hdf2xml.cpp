@@ -1759,8 +1759,13 @@ void scan_CF_point_HDF5_netCDF4_file(InputHDF5Stream& istream,ScanData& scan_dat
   std::vector<float> lats,lons;
   lats.reserve(time_vals.num_values);
   lons.reserve(time_vals.num_values);
+  metadata::ObML::PlatformEntry pentry;
+  pentry.key="unknown";
+  metadata::ObML::IDEntry ientry;
+  ientry.key.reserve(32768);
   for (const auto& ds_entry : ds_entry_list) {
     if (ds_entry.key != dgd.indexes.time_var && ds_entry.key != dgd.indexes.lat_var && ds_entry.key != dgd.indexes.lon_var && ds_entry.key != dgd.indexes.stn_id_var) {
+std::cerr << ds_entry.key << std::endl;
 	unique_data_type_observation_set.clear();
 	de.key=ds_entry.key;
 	auto ds=istream.getDataset("/"+ds_entry.key);
@@ -1815,10 +1820,7 @@ void scan_CF_point_HDF5_netCDF4_file(InputHDF5Stream& istream,ScanData& scan_dat
 	    IDs.emplace_back(id_val);
 	  }
 	  if (!IDs[n].empty() && var_data.value(n) != var_missing_value) {
-	    metadata::ObML::PlatformEntry pentry;
-	    pentry.key="unknown";
 	    update_platform_table(1,pentry,lats[n],lons[n]);
-	    metadata::ObML::IDEntry ientry;
 	    ientry.key=pentry.key+"[!]unknown[!]"+IDs[n];
 	    update_ID_table(1,ientry,lats[n],lons[n],date_times[n],time_vals.value(n));
 	    ++num_not_missing;
@@ -2147,10 +2149,10 @@ void scan_gridded_HDF5_netCDF4_file(InputHDF5Stream& istream,ScanData& scan_data
 	if ( (lats=istream.getDataset("/"+latid[n])) == NULL) {
 	  metautils::logError("unable to access the /"+latid[n]+" dataset for the latitudes","hdf2xml",user,args.argsString);
 	}
+	lat_array.fill(istream,*lats);
 	if ( (lons=istream.getDataset("/"+lonid[n])) == NULL) {
 	  metautils::logError("unable to access the /"+lonid[n]+" dataset for the latitudes","hdf2xml",user,args.argsString);
 	}
-	lat_array.fill(istream,*lats);
 	lon_array.fill(istream,*lons);
 	def.slatitude=data_array_value(lat_array,0,lats);
 	def.slongitude=data_array_value(lon_array,0,lons);
@@ -2248,8 +2250,8 @@ std::cerr.precision(10);
 std::cerr << data_array_value(lon_array,ym*lon_array.dimensions[1]+center_x,lons) << std::endl;
 std::cerr << data_array_value(lon_array,(center_y+1)*lon_array.dimensions[1]+center_x,lons) << std::endl;
 std::cerr << myequalf(data_array_value(lon_array,ym*lon_array.dimensions[1]+center_x,lons),data_array_value(lon_array,(center_y+1)*lon_array.dimensions[1]+center_x,lons),0.00001) << std::endl;
-std::cerr << data_array_value(lat_array,center_y*lon_array.dimensions[1]+xm,lats) << std::endl;
-std::cerr << data_array_value(lat_array,center_y*lon_array.dimensions[1]+center_x+1,lats) << std::endl;
+std::cerr << data_array_value(lat_array,center_y*lon_array.dimensions[1]+xm,lats) << " " << center_y << " " << lon_array.dimensions[1] << " " << xm << std::endl;
+std::cerr << data_array_value(lat_array,center_y*lon_array.dimensions[1]+center_x+1,lats) << " " << center_y << " " << lon_array.dimensions[1] << " " << center_x+1 << std::endl;
 std::cerr << myequalf(data_array_value(lat_array,center_y*lon_array.dimensions[1]+xm,lats),data_array_value(lat_array,center_y*lon_array.dimensions[1]+center_x+1,lats),0.00001) << std::endl;
 		metautils::logError("(6)unable to determine grid definition from '"+latid[n]+"' and '"+lonid[n]+"'","hdf2xml",user,args.argsString);
 	    }
