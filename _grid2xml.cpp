@@ -806,7 +806,7 @@ sdum=strutils::lltos((reinterpret_cast<InputGRIBStream *>(istream))->getCurrentR
   }
   istream->close();
   if (grid_table.size() == 0) {
-    std::cerr << "Error: No grids found - no content metadata will be generated" << std::endl;
+    std::cerr << "Terminating - no grids found so no content metadata will be generated" << std::endl;
     exit(1);
   }
   if (inv_lines.size() > 0) {
