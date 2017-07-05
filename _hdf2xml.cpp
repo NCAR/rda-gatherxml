@@ -22,12 +22,12 @@ TempDir *tdir=NULL;
 TempFile *inv_file=nullptr;
 std::ofstream inv;
 struct ScanData {
-  ScanData() : map_name(),varlist(),var_changes_table(),found_map(false) {}
+  ScanData() : map_name(),varlist(),var_changes_table(),found_map(false),convert_IDs_to_upper_case(false) {}
 
   std::string map_name;
   std::list<std::string> varlist;
   my::map<metautils::StringEntry> var_changes_table;
-  bool found_map;
+  bool found_map,convert_IDs_to_upper_case;
 };
 struct ParameterData {
   ParameterData() : table(),map() {}
@@ -1765,7 +1765,6 @@ void scan_CF_point_HDF5_netCDF4_file(InputHDF5Stream& istream,ScanData& scan_dat
   ientry.key.reserve(32768);
   for (const auto& ds_entry : ds_entry_list) {
     if (ds_entry.key != dgd.indexes.time_var && ds_entry.key != dgd.indexes.lat_var && ds_entry.key != dgd.indexes.lon_var && ds_entry.key != dgd.indexes.stn_id_var) {
-std::cerr << ds_entry.key << std::endl;
 	unique_data_type_observation_set.clear();
 	de.key=ds_entry.key;
 	auto ds=istream.getDataset("/"+ds_entry.key);
@@ -1817,7 +1816,12 @@ std::cerr << ds_entry.key << std::endl;
 	    if (!id_val.empty()) {
 		strutils::trim(id_val);
 	    }
-	    IDs.emplace_back(id_val);
+	    if (scan_data.convert_IDs_to_upper_case) {
+		IDs.emplace_back(strutils::to_upper(id_val));
+	    }
+	    else {
+		IDs.emplace_back(id_val);
+	    }
 	  }
 	  if (!IDs[n].empty() && var_data.value(n) != var_missing_value) {
 	    update_platform_table(1,pentry,lats[n],lons[n]);
@@ -2426,6 +2430,13 @@ void scan_HDF5_netCDF4_file(InputHDF5Stream& istream,ScanData& scan_data)
   InputHDF5Stream::Attribute attr;
   if (ds->attributes.found("featureType",attr)) {
     std::string feature_type=reinterpret_cast<char *>(attr.value.value);
+// patch for ICOADS netCDF4 IDs, which may be a mix, so ignore case
+    if (ds->attributes.found("product_version",attr)) {
+	std::string product_version=reinterpret_cast<char *>(attr.value.value);
+	if (std::regex_search(product_version,std::regex("ICOADS")) && std::regex_search(product_version,std::regex("netCDF4"))) {
+	  scan_data.convert_IDs_to_upper_case=true;
+	}
+    }
     if (feature_type == "point") {
 	scan_CF_point_HDF5_netCDF4_file(istream,scan_data);
     }
