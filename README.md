@@ -5,6 +5,8 @@ Codes to support the RDA metadata gathering utilities.
 
    code that runs when the command _gatherxml_ is executed - scans a data file and extracts content metadata
    
+   needs _gatherxml.conf_ to run
+   
    the following are called by _gatherxml_, depending on the format indicated by _gatherxml's_ -f flag (these should not be executed explicitly; users should only execute _gatherxml_):
    
    - \_ascii2xml.cpp
