@@ -6,6 +6,7 @@
 #include <signal.h>
 #include <pthread.h>
 #include <sstream>
+#include <regex>
 #include <mymap.hpp>
 #include <strutils.hpp>
 #include <utils.hpp>
@@ -112,13 +113,13 @@ void parseArgs()
   std::deque<std::string> sp=strutils::split(args.argsString,":");
   for (size_t n=0; n < sp.size(); n++) {
     if (sp[n] == "-a") {
-	if (local_args.file.length() > 0) {
+	if (!local_args.file.empty()) {
 	  std::cerr << "Error: specify only one of -a or -wa or -f or -wf" << std::endl;
 	  exit(1);
 	}
 	else {
 	  local_args.summarizeAll=true;
-	  if ((n+1) < sp.size() && !strutils::has_beginning(sp[n+1],"-")) {
+	  if ((n+1) < sp.size() && sp[n+1][0] != '-') {
 	    local_args.summ_type=sp[++n];
 	  }
 	  local_args.cmd_directory="fmd";
@@ -127,13 +128,13 @@ void parseArgs()
 //    else if (sp[n] == "-wa") {
 // patch because dsarch calls with -wa way too often
 else if (sp[n] == "-WA") {
-	if (local_args.file.length() > 0) {
+	if (!local_args.file.empty()) {
 	  std::cerr << "Error: specify only one of -a or -wa or -f or -wf" << std::endl;
 	  exit(1);
 	}
 	else {
 	  local_args.summarizeAll=true;
-	  if ((n+1) < sp.size() && !strutils::has_beginning(sp[n+1],"-")) {
+	  if ((n+1) < sp.size() && sp[n+1][0] != '-') {
 	    local_args.summ_type=sp[++n];
 	  }
 	  local_args.cmd_directory="wfmd";
@@ -141,7 +142,7 @@ else if (sp[n] == "-WA") {
     }
     else if (sp[n] == "-d") {
 	args.dsnum=sp[++n];
-	if (strutils::has_beginning(args.dsnum,"ds")) {
+	if (std::regex_search(args.dsnum,std::regex("^ds"))) {
 	  args.dsnum=args.dsnum.substr(2);
 	 }
 	local_args.dsnum2=strutils::substitute(args.dsnum,".","");
@@ -236,7 +237,7 @@ exit(1);
 	exit(1);
     }
   }
-  if (args.dsnum.length() == 0) {
+  if (args.dsnum.empty()) {
     std::cerr << "Error: no dataset number specified" << std::endl;
     exit(1);
   }
@@ -270,14 +271,14 @@ void getFromAncillaryTable(MySQL::Server& srv,std::string tableName,std::string 
 	}
 	auto sdum=sp2[0];
 	strutils::trim(sdum);
-	if (columns.length() > 0) {
+	if (!columns.empty()) {
 	  columns+=",";
 	}
 	columns+=sdum;
 	sdum=sp2[1];
 	strutils::trim(sdum);
 	strutils::replace_all(sdum," &eq; "," = ");
-	if (values.length() > 0) {
+	if (!values.empty()) {
 	  values+=",";
 	}
 	values+=sdum;
@@ -288,7 +289,7 @@ void getFromAncillaryTable(MySQL::Server& srv,std::string tableName,std::string 
     }
     if (srv.insert(tableName,columns,values,"") < 0) {
 	error=srv.error();
-	if (!strutils::has_beginning(error,"Duplicate entry")) {
+	if (!std::regex_search(error,std::regex("^Duplicate entry"))) {
 	  metautils::logError("getFromAncillaryTable srv error: "+error+" while inserting ("+columns+") values("+values+") into "+tableName,"scm",user,args.argsString);
 	}
     }
@@ -304,17 +305,15 @@ void getFromAncillaryTable(MySQL::Server& srv,std::string tableName,std::string 
 
 void openXMLFile(XMLDocument& xdoc,std::string filename)
 {
-  std::string sdum;
+  auto file=getRemoteWebFile("https://rda.ucar.edu"+filename+".gz",temp_dir.name());
   struct stat buf;
-
-  sdum=getRemoteWebFile("https://rda.ucar.edu"+filename+".gz",temp_dir.name());
-  if (stat(sdum.c_str(),&buf) == 0) {
-    system(("gunzip "+sdum).c_str());
-    strutils::chop(sdum,3);
+  if (stat(file.c_str(),&buf) == 0) {
+    system(("gunzip "+file).c_str());
+    strutils::chop(file,3);
   }
-  if (!xdoc.open(sdum)) {
-    sdum=getRemoteWebFile("https://rda.ucar.edu"+filename,temp_dir.name());
-    if (!xdoc.open(sdum)) {
+  if (!xdoc.open(file)) {
+    file=getRemoteWebFile("https://rda.ucar.edu"+filename,temp_dir.name());
+    if (!xdoc.open(file)) {
 	metautils::logError("unable to open "+filename,"scm",user,args.argsString);
     }
   }
@@ -385,7 +384,7 @@ void summarizeGrML()
     }
     e=xdoc.element("GrML");
     fname.name=e.attribute_value("uri");
-    if (strutils::has_beginning(fname.name,"file://MSS:/FS/DSS") || strutils::has_beginning(fname.name,"file://MSS:/DSS")) {
+    if (std::regex_search(fname.name,std::regex("^file://MSS:(/FS){0,1}/DSS"))) {
 	strutils::replace_all(fname.name,"file://MSS:","");
 	query2.set("tindex","dssdb.mssfile","mssfile = '"+fname.name+"'");
 	if (query2.submit(server) < 0) {
@@ -406,7 +405,7 @@ void summarizeGrML()
 	  }
 	}
     }
-    else if (strutils::has_beginning(fname.name,"https://rda.ucar.edu") || strutils::has_beginning(fname.name,"http://dss.ucar.edu")) {
+    else if (std::regex_search(fname.name,std::regex("^http(s){0,1}://rda\\.ucar\\.edu")) || std::regex_search(fname.name,std::regex("^http://dss\\.ucar\\.edu"))) {
 	fname.name=metautils::getRelativeWebFilename(fname.name);
 	query2.set("tindex","dssdb.wfile","wfile = '"+fname.name+"'");
 	if (query2.submit(server) < 0) {
@@ -428,7 +427,7 @@ void summarizeGrML()
 	}
     }
     format=e.attribute_value("format");
-    if (format.length() == 0) {
+    if (format.empty()) {
 	metautils::logError("summarizeGrML returned error: missing "+database+" format attribute","scm",user,args.argsString);
     }
     else {
@@ -440,7 +439,7 @@ void summarizeGrML()
 	    }
 	  }
 	}
-	if (local_args.data_format.length() == 0) {
+	if (local_args.data_format.empty()) {
 	  local_args.data_format=format;
 	}
 	else if (format != local_args.data_format) {
@@ -543,7 +542,7 @@ void summarizeGrML()
 	  for (const auto& attribute : attribute_list) {
 	    aname=attribute.name;
 	    if (aname != "timeRange" && aname != "definition") {
-		if (defParams.length() > 0) {
+		if (!defParams.empty()) {
 		  defParams+=":";
 		}
 		defParams+=grid.attribute_value(aname);
@@ -602,7 +601,7 @@ void summarizeGrML()
 		  }
 		}
 		sdum=(grid_element.p)->attribute_value("size");
-		if (sdum.length() == 0) {
+		if (sdum.empty()) {
 		  sdum="0";
 		}
 		if (server.insert(database+".ds"+local_args.dsnum2+"_ensembles",fileID_code+","+timeRange_code+","+gridDefinition_code+",'"+(grid_element.p)->attribute_value("type")+"','"+(grid_element.p)->attribute_value("ID")+"',"+sdum) < 0) {
@@ -616,7 +615,7 @@ void summarizeGrML()
 		map=(grid_element.p)->attribute_value("map");
 		levelType=(grid_element.p)->attribute_value("type");
 		value=(grid_element.p)->attribute_value("value");
-		if (value.length() == 0) {
+		if (value.empty()) {
 		  value=(grid_element.p)->attribute_value("bottom")+","+(grid_element.p)->attribute_value("top");
 		}
 		entry.key=map+":"+levelType+":"+value;
@@ -656,7 +655,7 @@ void summarizeGrML()
 		    end=sdum;
 		  }
 		  entry.key=map+":"+value+"@"+levelType;
-		  if (strutils::has_beginning(entry.key,":")) {
+		  if (entry.key[0] == ':') {
 		    entry.key=entry.key.substr(1);
 		  }
 		  if (!parameter_table.found(entry.key,entry)) {
@@ -796,86 +795,103 @@ void summarizeGrML()
 void getObsPer(std::string observationTypeValue,size_t numObs,DateTime start,DateTime end,double& obsper,std::string& unit)
 {
   size_t num_days[]={0,31,28,31,30,31,30,31,31,30,31,30,31};
-  const double TOLERANCE=0.15;
-  size_t idx;
-  int nyrs,climo_len,nper;
-  std::string sdum;
-
-  numObs--;
+  --numObs;
   if (numObs < 2) {
     unit="";
     return;
   }
   if (strutils::contains(observationTypeValue,"climatology")) {
-    idx=observationTypeValue.find("year")-1;
-    while (idx != std::string::npos && observationTypeValue[idx] != '_')
-	idx--;
-    sdum=observationTypeValue.substr(idx+1);
-    sdum=sdum.substr(0,sdum.find("-year"));
-    climo_len=std::stoi(sdum);
-    nyrs=end.getYear()-start.getYear();
+    auto idx=observationTypeValue.find("year")-1;
+    while (idx != std::string::npos && observationTypeValue[idx] != '_') {
+	--idx;
+    }
+    auto len_s=observationTypeValue.substr(idx+1);
+    len_s=len_s.substr(0,len_s.find("-year"));
+    auto climo_len=std::stoi(len_s);
+    auto nyrs=end.getYear()-start.getYear();
     if (nyrs >= climo_len) {
-	if (climo_len == 30)
+	int nper;
+	if (climo_len == 30) {
 	  nper=((nyrs % climo_len)/10)+1;
-	else
+	}
+	else {
 	  nper=nyrs/climo_len;
+	}
 	obsper=numObs/static_cast<float>(nper);
-	if (static_cast<int>(numObs) == nper)
+	if (static_cast<int>(numObs) == nper) {
 	  unit="year";
-	else if (numObs/nper == 4)
+	}
+	else if (numObs/nper == 4) {
 	  unit="season";
-	else if (numObs/nper == 12)
+	}
+	else if (numObs/nper == 12) {
 	  unit="month";
+	}
 	else if (nper > 1 && start.getMonth() != end.getMonth()) {
 	  nper=(nper-1)*12+12-start.getMonth()+1;
-	  if (static_cast<int>(numObs) == nper)
+	  if (static_cast<int>(numObs) == nper) {
 	    unit="month";
-	  else
+	  }
+	  else {
 	    unit="";
+	  }
 	}
-	else
+	else {
 	  unit="";
+	}
     }
     else {
-	if ((end.getMonth()-start.getMonth()) == static_cast<int>(numObs))
+	if ((end.getMonth()-start.getMonth()) == static_cast<int>(numObs)) {
 	  unit="month";
-	else
+	}
+	else {
 	  unit="";
+	}
     }
     obsper=-climo_len;
   }
   else {
-    if (isLeapYear(end.getYear()))
+    if (isLeapYear(end.getYear())) {
 	num_days[2]=29;
+    }
     obsper=numObs/static_cast<float>(end.getSecondsSince(start));
-    if ((obsper+TOLERANCE) > 1.)
+    const double TOLERANCE=0.15;
+    if ((obsper+TOLERANCE) > 1.) {
 	unit="second";
+    }
     else {
 	obsper*=60.;
-	if ((obsper+TOLERANCE) > 1.)
+	if ((obsper+TOLERANCE) > 1.) {
 	  unit="minute";
+	}
 	else {
 	  obsper*=60;
-	  if ((obsper+TOLERANCE) > 1.)
+	  if ((obsper+TOLERANCE) > 1.) {
 	    unit="hour";
+	  }
 	  else {
 	    obsper*=24;
-	    if ((obsper+TOLERANCE) > 1.)
+	    if ((obsper+TOLERANCE) > 1.) {
 		unit="day";
+	    }
 	    else {
 		obsper*=7;
-		if ((obsper+TOLERANCE) > 1.)
+		if ((obsper+TOLERANCE) > 1.) {
 		  unit="week";
+		}
 		else {
 		  obsper*=(num_days[end.getMonth()]/7.);
-		  if ((obsper+TOLERANCE) > 1.)
+		  if ((obsper+TOLERANCE) > 1.) {
 		    unit="month";
+		  }
 		  else {
 		    obsper*=12;
-		    if ((obsper+TOLERANCE) > 1.)
+		    if ((obsper+TOLERANCE) > 1.) {
 			unit="year";
-		    else
+		    }
+		    else {
 			unit="";
+		    }
 		  }
 		}
 	    }
@@ -939,7 +955,7 @@ extern "C" void *summarizeIDs(void *ts)
 	strutils::replace_all(ID," = "," &eq; ");
 	sdum=e.attribute_value("lat");
 	std::string sw_lat,sw_lon,ne_lat,ne_lon;
-	if (sdum.length() > 0) {
+	if (!sdum.empty()) {
 	  sw_lat=strutils::ftos(std::stof(sdum)*10000.,0);
 	  sw_lon=strutils::ftos(std::stof(e.attribute_value("lon"))*10000.,0);
 	  ne_lat=sw_lat;
@@ -987,7 +1003,7 @@ extern "C" void *summarizeIDs(void *ts)
 	while (strutils::occurs(sdum," ") > 1) {
 	  auto idx=sdum.rfind(" ");
 	  tz=sdum.substr(idx+1);
-	  if (strutils::has_beginning(tz,"+")) {
+	  if (tz[0] == '+') {
 	    tz=tz.substr(1);
 	  }
 	  if (tz == "LST") {
@@ -1023,7 +1039,7 @@ extern "C" void *summarizeIDs(void *ts)
 	    auto num_obs_data_type=element.attribute_value("numObs");
 // backward compatibility for content metadata that was generated before the
 //   number of observations by data type was captured
-	    if (num_obs_data_type.length() == 0) {
+	    if (num_obs_data_type.empty()) {
 		num_obs_data_type=num_obs;
 	    }
 	    auto nobs=std::stoi(num_obs_data_type);
@@ -1208,7 +1224,7 @@ extern "C" void *summarizeFileIDLocations(void *ts)
 	  db_bitmap=bitmap;
 	}
 	insertString=fileID_code+","+t->strings[2];
-	if (t->strings[3].length() > 0) {
+	if (!t->strings[3].empty()) {
 	  insertString+=","+t->strings[3];
 	}
 	insertString+=","+t->strings[4]+","+t->strings[5]+","+reference.attribute_value("row")+",'"+db_bitmap+"'";
@@ -1251,7 +1267,7 @@ extern "C" void *summarizeFileIDLocations(void *ts)
 	  if (pl.matched_table != NULL) {
 	    if (pl.matched_table->size() > (pl.children_table->size()/2)) {
 		strutils::replace_all(pl.key,"'","\\'");
-		if (t->strings[3].length() > 0) {
+		if (!t->strings[3].empty()) {
 		  insertString=fileID_code+","+t->strings[2]+","+t->strings[3]+",'"+pl.key+"','Y'";
 		}
 		else {
@@ -1264,7 +1280,7 @@ extern "C" void *summarizeFileIDLocations(void *ts)
 		  e.key=key;
 		  strutils::replace_all(e.key,"'","\\'");
 		  if (!pl.matched_table->found(e.key,e) && !pl.consolidated_parent_table->found(e.key,e)) {
-		    if (t->strings[3].length() > 0) {
+		    if (!t->strings[3].empty()) {
 			insertString=fileID_code+","+t->strings[2]+","+t->strings[3]+",'"+e.key+"','N'";
 		    }
 		    else {
@@ -1280,7 +1296,7 @@ extern "C" void *summarizeFileIDLocations(void *ts)
 		for (const auto& key : pl.matched_table->keys()) {
 		  sdum=key;
 		  strutils::replace_all(sdum,"'","\\'");
-		  if (t->strings[3].length() > 0) {
+		  if (!t->strings[3].empty()) {
 		    insertString=fileID_code+","+t->strings[2]+","+t->strings[3]+",'"+sdum+"','Y'";
 		  }
 		  else {
@@ -1543,7 +1559,7 @@ void summarizeObML(std::list<KMLData>& kml_list)
     }
     e=xdoc.element("ObML");
     fname.name=e.attribute_value("uri");
-    if (strutils::has_beginning(fname.name,"file://MSS:/FS/DSS") || strutils::has_beginning(fname.name,"file://MSS:/DSS")) {
+    if (std::regex_search(fname.name,std::regex("^file://MSS:(/FS){0,1}/DSS"))) {
 	strutils::replace_all(fname.name,"file://MSS:","");
 	query2.set("gindex","dssdb.mssfile","mssfile = '"+fname.name+"'");
 	if (query2.submit(server) < 0) {
@@ -1564,7 +1580,7 @@ void summarizeObML(std::list<KMLData>& kml_list)
 	  }
 	}
     }
-    else if (strutils::has_beginning(fname.name,"https://rda.ucar.edu")) {
+    else if (std::regex_search(fname.name,std::regex("^http(s){0,1}://rda\\.ucar\\.edu"))) {
 	fname.name=metautils::getRelativeWebFilename(fname.name);
 	query2.set("tindex","dssdb.wfile","wfile = '"+fname.name+"'");
 	if (query2.submit(server) < 0) {
@@ -1583,7 +1599,7 @@ void summarizeObML(std::list<KMLData>& kml_list)
 	}
     }
     format=e.attribute_value("format");
-    if (format.length() == 0) {
+    if (format.empty()) {
 	metautils::logError("summarizeObML returned error: missing "+database+" format attribute","scm",user,args.argsString);
     }
     else {
@@ -1595,7 +1611,7 @@ void summarizeObML(std::list<KMLData>& kml_list)
 	    }
 	  }
 	}
-	if (local_args.data_format.length() == 0) {
+	if (local_args.data_format.empty()) {
 	  local_args.data_format=format;
 	}
 	else if (format != local_args.data_format) {
@@ -1757,7 +1773,7 @@ void summarizeObML(std::list<KMLData>& kml_list)
 	    data_type_list=(platform.p)->element_list("dataType");
 	    for (const auto& data_type : data_type_list) {
 		auto dataType=data_type.attribute_value("map");
-		if (dataType.length() > 0) {
+		if (!dataType.empty()) {
 		  dataType+=":";
 		}
 		dataType+=data_type.attribute_value("value");
@@ -1894,7 +1910,7 @@ void summarizeSatML()
     }
     e=xdoc.element("SatML");
     fname.name=e.attribute_value("uri");
-    if (strutils::has_beginning(fname.name,"file://MSS:/FS/DSS") || strutils::has_beginning(fname.name,"file://MSS:/DSS")) {
+    if (std::regex_search(fname.name,std::regex("^file://MSS:(/FS){0,1}/DSS"))) {
 	strutils::replace_all(fname.name,"file://MSS:","");
 	fname.isMssFile=true;
 	local_args.summarizedHPSSFile=true;
@@ -1905,7 +1921,7 @@ void summarizeSatML()
 	  metautils::logError("summarizeSatML returned error: "+server.error(),"scm",user,args.argsString);
     }
     entry.key=e.attribute_value("format");
-    if (entry.key.length() == 0) {
+    if (entry.key.empty()) {
 	std::cerr << "Error: missing SatML format attribute" << std::endl;
 	exit(1);
     }
@@ -2063,7 +2079,7 @@ void summarizeFixML()
     classification_table_keys.clear();
     e=xdoc.element("FixML");
     fname.name=e.attribute_value("uri");
-    if (strutils::has_beginning(fname.name,"file://MSS:/FS/DSS") || strutils::has_beginning(fname.name,"file://MSS:/DSS")) {
+    if (std::regex_search(fname.name,std::regex("^file://MSS:(/FS){0,1}/DSS"))) {
 	strutils::replace_all(fname.name,"file://MSS:","");
 	query2.set("gindex","dssdb.mssfile","mssfile = '"+fname.name+"'");
 	if (query2.submit(server) < 0) {
@@ -2084,7 +2100,7 @@ void summarizeFixML()
 	  }
 	}
     }
-    else if (strutils::has_beginning(fname.name,"https://rda.ucar.edu")) {
+    else if (std::regex_search(fname.name,std::regex("^http(s){0,1}://rda\\.ucar\\.edu"))) {
 	fname.name=metautils::getRelativeWebFilename(fname.name);
 	query2.set("tindex","dssdb.wfile","wfile = '"+fname.name+"'");
 	if (query2.submit(server) < 0) {
@@ -2101,7 +2117,7 @@ void summarizeFixML()
 	  local_args.gindexList.emplace_back(row[0]);
     }
     format=e.attribute_value("format");
-    if (format.length() == 0)
+    if (format.empty())
       metautils::logError("summarizeFixML returned error: missing "+database+" format attribute","scm",user,args.argsString);
     else {
 	if (database == "FixML") {
@@ -2111,10 +2127,12 @@ void summarizeFixML()
 	      metautils::logError("summarizeFixML returned error: "+error+" while inserting into search.formats","scm",user,args.argsString);
 	  }
 	}
-	if (local_args.data_format.length() == 0)
+	if (local_args.data_format.empty()) {
 	  local_args.data_format=format;
-	else if (format != local_args.data_format)
+	}
+	else if (format != local_args.data_format) {
 	  local_args.data_format="all";
+	}
     }
     if (!formatTable.found(format,entry)) {
 	getFromAncillaryTable(server,database+".formats","format = '"+format+"'",query);
@@ -2392,7 +2410,7 @@ extern "C" void *thread_summarizeFixData(void *)
 extern "C" void *thread_indexVariables(void *)
 {
   auto error=indexVariables(args.dsnum);
-  if (error.length() > 0) {
+  if (!error.empty()) {
     metautils::logError("thread_indexVariables returned error: "+error,"scm",user,args.argsString);
   }
   return NULL;
@@ -2400,11 +2418,10 @@ extern "C" void *thread_indexVariables(void *)
 
 extern "C" void *thread_indexLocations(void *)
 {
-  std::string error;
-
-  error=indexLocations(args.dsnum);
-  if (error.length() > 0)
+  auto error=indexLocations(args.dsnum);
+  if (!error.empty()) {
     metautils::logError("thread_indexLocations returned error: "+error,"scm",user,args.argsString);
+  }
   return NULL;
 }
 
@@ -2521,7 +2538,7 @@ int main(int argc,char **argv)
 	else if (strutils::has_ending(sp[n],"FixML"))
 	  FixMLFileList.emplace_back(f);
     }
-    if ((local_args.summ_type.length() == 0 || local_args.summ_type == "GrML") && GrMLFileList.size() > 0) {
+    if ((local_args.summ_type.empty() || local_args.summ_type == "GrML") && GrMLFileList.size() > 0) {
 	if (local_args.cmd_directory == "fmd")
 	  server._delete("GrML.summary","dsid = '"+args.dsnum+"'");
 	else if (local_args.cmd_directory == "wfmd")
@@ -2529,7 +2546,7 @@ int main(int argc,char **argv)
 	summarizeGrML();
 	GrMLFileList.clear();
     }
-    if ((local_args.summ_type.length() == 0 || local_args.summ_type == "ObML") && ObMLFileList.size() > 0) {
+    if ((local_args.summ_type.empty() || local_args.summ_type == "ObML") && ObMLFileList.size() > 0) {
 	summarizeObML(kml_list);
 	ObMLFileList.clear();
 	if (local_args.summarizedHPSSFile && local_args.doDBUpdate) {
@@ -2539,11 +2556,11 @@ int main(int argc,char **argv)
 	  tid_list.emplace_back(ts.tid);
 	}
     }
-    if ((local_args.summ_type.length() == 0 || local_args.summ_type == "SatML") && SatMLFileList.size() > 0) {
+    if ((local_args.summ_type.empty() || local_args.summ_type == "SatML") && SatMLFileList.size() > 0) {
 	summarizeSatML();
 	SatMLFileList.clear();
     }
-    if ((local_args.summ_type.length() == 0 || local_args.summ_type == "FixML") && FixMLFileList.size() > 0) {
+    if ((local_args.summ_type.empty() || local_args.summ_type == "FixML") && FixMLFileList.size() > 0) {
 	summarizeFixML();
 	FixMLFileList.clear();
 	if (local_args.doDBUpdate) {
@@ -2554,7 +2571,7 @@ int main(int argc,char **argv)
 	}
     }
   }
-  else if (local_args.file.length() > 0) {
+  else if (!local_args.file.empty()) {
     if (local_args.isHPSSFile) {
 	f.path="/datasets/ds"+args.dsnum+"/metadata/fmd/"+local_args.file;
 	f.metaname=f.path.substr(f.path.find("/fmd/")+5);
