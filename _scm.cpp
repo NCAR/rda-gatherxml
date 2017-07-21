@@ -2621,7 +2621,7 @@ int main(int argc,char **argv)
     }
   }
   else if (local_args.refreshHPSS) {
-    if (local_args.gindexList.size() > 0) {
+    if (local_args.gindexList.size() > 0 && local_args.gindexList.front() != "all") {
 	query.set("gidx","dssdb.dsgroup","dsid = 'ds"+args.dsnum+"' and gindex = "+local_args.gindexList.front()+" and pindex = 0");
 	if (query.submit(server) < 0) {
 	  metautils::logError("group check failed","scm",user,args.argsString);
