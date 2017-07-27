@@ -110,7 +110,7 @@ void parseArgs()
   local_args.isHPSSFile=false;
   local_args.isWebFile=false;
   local_args.notify=false;
-  std::deque<std::string> sp=strutils::split(args.argsString,":");
+  std::deque<std::string> sp=strutils::split(args.argsString,"`");
   for (size_t n=0; n < sp.size(); n++) {
     if (sp[n] == "-a") {
 	if (!local_args.file.empty()) {
@@ -1593,6 +1593,19 @@ void summarizeObML(std::list<KMLData>& kml_list)
 	  metautils::logError("summarizeObML returned error: '"+server.error()+"' while trying to update wfile","scm",user,args.argsString);
 	}
     }
+    else if (std::regex_search(fname.name,std::regex("file://web:"))) {
+	fname.name=fname.name.substr(11);
+	query2.set("tindex","dssdb.wfile","wfile = '"+fname.name+"'");
+	if (query2.submit(server) < 0) {
+	  error=query2.error();
+	}
+	fname.isWebFile=true;
+	database="WObML";
+	local_args.summarizedWebFile=true;
+	if (server_d.update("wfile","meta_link = 'Ob'","dsid = 'ds"+args.dsnum+"' and wfile = '"+fname.name+"'") < 0) {
+	  metautils::logError("summarizeObML returned error: '"+server.error()+"' while trying to update wfile","scm",user,args.argsString);
+	}
+    }
     if (query2.fetch_row(row)) {
 	if (row[0] != "0") {
 	  local_args.gindexList.emplace_back(row[0]);
@@ -2506,7 +2519,7 @@ int main(int argc,char **argv)
   signal(SIGSEGV,segv_handler);
   local_args.summarizedHPSSFile=false;
   local_args.summarizedWebFile=false;
-  args.argsString=getUnixArgsString(argc,argv);
+  args.argsString=getUnixArgsString(argc,argv,'`');
   metautils::readConfig("scm",user,args.argsString);
   parseArgs();
   metautils::connectToMetadataServer(server);
