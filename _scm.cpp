@@ -431,13 +431,8 @@ void summarizeGrML()
 	metautils::logError("summarizeGrML returned error: missing "+database+" format attribute","scm",user,args.argsString);
     }
     else {
-	if (database == "GrML") {
-	  if (server.insert("search.formats","keyword,vocabulary,dsid","'"+format+"','GrML','"+args.dsnum+"'","") < 0) {
-	    error=server.error();
-	    if (!strutils::contains(error,"Duplicate entry")) {
-		metautils::logError("summarizeGrML returned error: "+error+" while inserting into search.formats","scm",user,args.argsString);
-	    }
-	  }
+	if (server.insert("search.formats","keyword,vocabulary,dsid","'"+format+"','"+database+"','"+args.dsnum+"'","update dsid = values(dsid)") < 0) {
+	  metautils::logError("summarizeGrML returned error: "+server.error()+" while inserting into search.formats","scm",user,args.argsString);
 	}
 	if (local_args.data_format.empty()) {
 	  local_args.data_format=format;
@@ -1616,13 +1611,8 @@ void summarizeObML(std::list<KMLData>& kml_list)
 	metautils::logError("summarizeObML returned error: missing "+database+" format attribute","scm",user,args.argsString);
     }
     else {
-	if (database == "ObML") {
-	  if (server.insert("search.formats","keyword,vocabulary,dsid","'"+format+"','ObML','"+args.dsnum+"'","") < 0) {
-	    error=server.error();
-	    if (!strutils::contains(error,"Duplicate entry")) {
-		metautils::logError("summarizeObML returned error: "+error+" while inserting into search.formats","scm",user,args.argsString);
-	    }
-	  }
+	if (server.insert("search.formats","keyword,vocabulary,dsid","'"+format+"','"+database+"','"+args.dsnum+"'","update dsid = values(dsid)") < 0) {
+	  metautils::logError("summarizeObML returned error: "+server.error()+" while inserting into search.formats","scm",user,args.argsString);
 	}
 	if (local_args.data_format.empty()) {
 	  local_args.data_format=format;
@@ -2133,12 +2123,8 @@ void summarizeFixML()
     if (format.empty())
       metautils::logError("summarizeFixML returned error: missing "+database+" format attribute","scm",user,args.argsString);
     else {
-	if (database == "FixML") {
-	  if (server.insert("search.formats","keyword,vocabulary,dsid","'"+format+"','FixML','"+args.dsnum+"'","") < 0) {
-	    error=server.error();
-	    if (!strutils::contains(error,"Duplicate entry"))
-	      metautils::logError("summarizeFixML returned error: "+error+" while inserting into search.formats","scm",user,args.argsString);
-	  }
+	if (server.insert("search.formats","keyword,vocabulary,dsid","'"+format+"','FixML','"+args.dsnum+"'","update dsid = values(dsid)") < 0) {
+	  metautils::logError("summarizeFixML returned error: "+server.error()+" while inserting into search.formats","scm",user,args.argsString);
 	}
 	if (local_args.data_format.empty()) {
 	  local_args.data_format=format;
