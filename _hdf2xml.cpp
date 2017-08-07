@@ -1880,9 +1880,16 @@ void scan_gridded_HDF5_netCDF4_file(InputHDF5Stream& istream,ScanData& scan_data
   }
   vars=istream.getDatasetsWithAttribute("CLASS=DIMENSION_SCALE");
   for (const auto& var : vars) {
-    if (var.dataset->attributes.found("units",attr) && attr.value.class_ == 3) {
-	sdum=reinterpret_cast<char *>(attr.value.value);
-	if (std::regex_search(sdum,std::regex("since"))) {
+    if (var.dataset->attributes.found("units",attr) && (attr.value.class_ == 3 || (attr.value.class_ == 9 && attr.value.vlen.class_ == 3))) {
+	std::string units_value;
+	if (attr.value.class_ == 3) {
+	  units_value=reinterpret_cast<char *>(attr.value.value);
+	}
+	else {
+	  int len=(attr.value.vlen.buffer[0] << 24)+(attr.value.vlen.buffer[1] << 16)+(attr.value.vlen.buffer[2] << 8)+attr.value.vlen.buffer[3];
+	  units_value=std::string(reinterpret_cast<char *>(&attr.value.vlen.buffer[4]),len);
+	}
+	if (std::regex_search(units_value,std::regex("since"))) {
 	  if (found_time) {
 	    metautils::logError("time was already identified - don't know what to do with variable: "+var.key,"hdf2xml",user,args.argsString);
 	  }
@@ -1899,16 +1906,16 @@ void scan_gridded_HDF5_netCDF4_file(InputHDF5Stream& istream,ScanData& scan_data
 		}
 	    }
 	  }
-	  time_data.units=sdum.substr(0,sdum.find("since"));
+	  time_data.units=units_value.substr(0,units_value.find("since"));
 	  strutils::trim(time_data.units);
 	  timeid=var.key;
-	  sdum=sdum.substr(sdum.find("since")+5);
-	  strutils::replace_all(sdum,"T"," ");
-	  strutils::trim(sdum);
-	  if (std::regex_search(sdum,std::regex("Z$"))) {
-	    strutils::chop(sdum);
+	  units_value=units_value.substr(units_value.find("since")+5);
+	  strutils::replace_all(units_value,"T"," ");
+	  strutils::trim(units_value);
+	  if (std::regex_search(units_value,std::regex("Z$"))) {
+	    strutils::chop(units_value);
 	  }
-	  sp=strutils::split(sdum);
+	  sp=strutils::split(units_value);
 	  sp2=strutils::split(sp[0],"-");
 	  if (sp2.size() != 3) {
 	    metautils::logError("bad netcdf date in units for time","hdf2xml",user,args.argsString);
@@ -1927,10 +1934,10 @@ void scan_gridded_HDF5_netCDF4_file(InputHDF5Stream& istream,ScanData& scan_data
 	  time_data.reference.set(dt);
 	  found_time=true;
 	}
-	else if (sdum == "degrees_north") {
+	else if (units_value == "degrees_north") {
 	  latid.push_back(var.key);
 	}
-	else if (sdum == "degrees_east") {
+	else if (units_value == "degrees_east") {
 	  lonid.push_back(var.key);
 	}
 	else if (!unique_level_ID_table.found(var.key,se)) {
@@ -1938,7 +1945,7 @@ void scan_gridded_HDF5_netCDF4_file(InputHDF5Stream& istream,ScanData& scan_data
 	  if (var.dataset->attributes.found("long_name",attr) && attr.value.class_ == 3) {
 	    level_info.description.push_back(reinterpret_cast<char *>(attr.value.value));
 	  }
-	  level_info.units.push_back(sdum);
+	  level_info.units.push_back(units_value);
 	  level_info.write.push_back(0);
 	  se.key=var.key;
 	  unique_level_ID_table.insert(se);
