@@ -239,8 +239,8 @@ void processTCVitals(Cyclone *c)
     fe.data->altID=tcvc->getID();
     featureTable.insert(fe);
   }
+  ce.key="tropical";
   if (fe.data->classificationList.size() == 0) {
-    ce.key="tropical";
     ce.start_datetime=ce.end_datetime=fd(0).datetime;
     ce.start_lat=ce.end_lat=ce.min_lat=ce.max_lat=fd(0).latitude;
     ce.start_lon=ce.end_lon=ce.min_lon=ce.max_lon=fd(0).longitude;
@@ -289,6 +289,46 @@ void processTCVitals(Cyclone *c)
 	b.max_speed=fd(0).max_wind;
     }
     ++b.nfixes;
+  }
+  if (!stageTable.found(ce.key,sentry)) {
+    sentry.key=ce.key;
+    sentry.data.reset(new metadata::FixML::StageEntry::Data);
+    sentry.data->boxflags.initialize(361,180,0,0);
+    if (fd(0).latitude == -90.) {
+	sentry.data->boxflags.spole=1;
+    }
+    else if (fd(0).latitude == 90.) {
+	sentry.data->boxflags.npole=1;
+    }
+    else {
+	size_t l,k;
+	convertLatLonToBox(1,fd(0).latitude,fd(0).longitude,l,k);
+	sentry.data->boxflags.flags[l-1][k]=1;
+	sentry.data->boxflags.flags[l-1][360]=1;
+    }
+    sentry.data->start=fd(0).datetime;
+    sentry.data->end=fd(0).datetime;
+    stageTable.insert(sentry);
+  }
+  else {
+    if (fd(0).latitude == -90.) {
+	sentry.data->boxflags.spole=1;
+    }
+    else if (fd(0).latitude == 90.) {
+	sentry.data->boxflags.npole=1;
+    }
+    else {
+	size_t l,k;
+	convertLatLonToBox(1,fd(0).latitude,fd(0).longitude,l,k);
+	sentry.data->boxflags.flags[l-1][k]=1;
+	sentry.data->boxflags.flags[l-1][360]=1;
+    }
+    if (fd(0).datetime < sentry.data->start) {
+	sentry.data->start=fd(0).datetime;
+    }
+    if (fd(0).datetime > sentry.data->end) {
+	sentry.data->end=fd(0).datetime;
+    }
   }
 }
 
@@ -536,7 +576,7 @@ void scanFile()
     if (filelist.size() == 0) {
 	filelist.emplace_back(tfile->name());
     }
-    for (auto& file : filelist) {
+    for (const auto& file : filelist) {
 	if (!xdoc.open(file)) {
 	  if (args.dsnum != "330.3")
 	    std::cerr << "Error: scanFile was unable to parse " << file << std::endl;
@@ -546,14 +586,33 @@ void scanFile()
 	xdoc.close();
     }
   }
+  else if (args.format == "tcvitals") {
+    if (!primaryMetadata::prepareFileForMetadataScanning(*tfile,*tdir,&filelist,file_format,error)) {
+	metautils::logError("prepareFileForMetadataScanning() returned '"+error+"'","fix2xml",user,args.argsString);
+    }
+    if (filelist.size() == 0) {
+	filelist.emplace_back(tfile->name());
+    }
+    istream=new InputTCVitalsCycloneStream;
+    c=new TCVitalsCyclone;
+    for (const auto& file : filelist) {
+	if (!primaryMetadata::openFileForMetadataScanning(istream,file,error)) {
+	  metautils::logError("openFileForMetadataScanning() returned '"+error+"'","fix2xml",user,args.argsString);
+	}
+	while ( (status=istream->read(buffer,BUF_LEN)) > 0) {
+	  c->fill(buffer,Cyclone::full_report);
+	  processTCVitals(c);
+	}
+	istream->close();
+	if (status == bfstream::error) {
+	  metautils::logError("read error","fix2xml",user,args.argsString);
+	}
+    }
+  }
   else {
     if (args.format == "hurdat") {
 	istream=new InputHURDATCycloneStream;
 	c=new HURDATCyclone;
-    }
-    else if (args.format == "tcvitals") {
-	istream=new InputTCVitalsCycloneStream;
-	c=new TCVitalsCyclone;
     }
     else {
 	metautils::logError("format "+args.format+" not recognized","fix2xml",user,args.argsString);
@@ -569,9 +628,6 @@ void scanFile()
 	  c->fill(buffer,Cyclone::full_report);
 	  if (args.format == "hurdat") {
 	    processHURDAT(c);
-	  }
-	  else if (args.format == "tcvitals") {
-	    processTCVitals(c);
 	  }
 	}
 	istream->close();
@@ -609,6 +665,7 @@ int main(int argc,char **argv)
     std::cerr << "required (choose one):" << std::endl;
     std::cerr << "-f cxml     TIGGE Tropical Cyclone XML format" << std::endl;
     std::cerr << "-f hurdat   NHC HURDAT format" << std::endl;
+    std::cerr << "-f tcvitals NCEP Tropical Cyclone Vital Statistics Records format" << std::endl;
     std::cerr << std::endl;
     std::cerr << "required:" << std::endl;
     std::cerr << "-d <nnn.n>  nnn.n is the dataset number to which the data file belongs" << std::endl;
