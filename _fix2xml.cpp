@@ -638,7 +638,7 @@ void scanFile()
   }
   if (featureTable.size() == 0) {
     if (args.dsnum != "330.3") {
-	std::cerr << "Error: scanFile returned: no fix data found in file" << std::endl;
+	std::cerr << "Terminating - no fix data found in file" << std::endl;
     }
     exit(1);
   }
