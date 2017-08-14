@@ -26,7 +26,7 @@ bool verifiedNewFileIsArchived(std::string& error)
   std::deque<std::string> sp;
 
   metautils::connectToRDAServer(server);
-  if (strutils::has_beginning(old_name,"/FS/DSS/") || strutils::has_beginning(old_name,"/DSS/")) {
+  if (std::regex_search(old_name,std::regex("^(/FS){0,1}/DSS"))) {
     column="mssid";
     if (std::regex_search(new_name,std::regex("\\.\\.m\\.\\."))) {
 	sp=strutils::split(new_name,"..m..");
@@ -36,7 +36,7 @@ bool verifiedNewFileIsArchived(std::string& error)
 	qstring="select mssid from mssfile where dsid = 'ds"+new_dsnum+"' and mssfile = '"+new_name+"' and type = 'P' and status = 'P'";
     }
   }
-  else if (strutils::has_beginning(old_name,"http://rda.ucar.edu/") || strutils::has_beginning(old_name,"http://dss.ucar.edu/")) {
+  else if (std::regex_search(old_name,std::regex("^http(s){0,1}://(rda|dss)\\.ucar\\.edu/"))) {
     column="wfile";
     nname=metautils::getRelativeWebFilename(new_name);
     qstring="select wfile from wfile where dsid = 'ds"+new_dsnum+"' and wfile = '"+nname+"' and type = 'D' and status = 'P'";
@@ -64,11 +64,13 @@ void replaceURI(std::string& sline,std::string cmdir,std::string member_name = "
 {
   auto sline2=sline.substr(0,sline.find("\"")+1);
   if (cmdir == "fmd") {
-    sline2+="file://MSS:";
+    sline2+="file://MSS:"+new_name;
+    if (!member_name.empty()) {
+	sline2+="..m.."+member_name;
+    }
   }
-  sline2+=new_name;
-  if (member_name.length() > 0) {
-    sline2+="..m.."+member_name;
+  else if (cmdir == "wfmd") {
+    sline2+="file://web:"+metautils::getRelativeWebFilename(new_name);
   }
   sline2+=sline.substr(sline.find("\" format"));
   sline=sline2;
@@ -99,7 +101,7 @@ void rewriteURIinCMDFile(std::string db)
   if (!tdir.create("/glade2/scratch2/rdadata")) {
     metautils::logError("unable to create temporary directory in /glade2/scratch2/rdadata","rcm",user,args.argsString);
   }
-  if (strutils::has_beginning(old_name,"/FS/DSS/") || strutils::has_beginning(old_name,"/DSS/")) {
+  if (std::regex_search(old_name,std::regex("^(/FS){0,1}/DSS"))) {
     cmdir="fmd";
     db_prefix="";
     strutils::replace_all(oname,"/FS/DSS/","");
@@ -107,7 +109,7 @@ void rewriteURIinCMDFile(std::string db)
     strutils::replace_all(nname,"/FS/DSS/","");
     strutils::replace_all(nname,"/DSS/","");
   }
-  else if (strutils::has_beginning(old_name,"http://rda.ucar.edu/") || strutils::has_beginning(old_name,"http://dss.ucar.edu/")) {
+  else if (std::regex_search(old_name,std::regex("^http(s){0,1}://(rda|dss)\\.ucar\\.edu/"))) {
     cmdir="wfmd";
     db_prefix="W";
     if (old_web_home.length() > 0) {
@@ -122,7 +124,7 @@ void rewriteURIinCMDFile(std::string db)
   }
   strutils::replace_all(oname,"/","%");
   strutils::replace_all(nname,"/","%");
-  if (strutils::has_ending(strutils::to_lower(oname),".htar")) {
+  if (std::regex_search(strutils::to_lower(oname),std::regex("\\.htar$"))) {
     metautils::connectToRDAServer(server);
     query.set("select h.hfile from mssfile as m left join htarfile as h on h.mssid = m.mssid where m.dsid = 'ds"+args.dsnum+"' and mssfile = '"+new_name+"'");
     if (query.submit(server) < 0) {
@@ -347,7 +349,7 @@ bool renamedCMD()
 
   metautils::connectToMetadataServer(server);
   metautils::connectToRDAServer(server_d);
-  if (strutils::has_beginning(old_name,"/FS/DSS/") || strutils::has_beginning(old_name,"/DSS/")) {
+  if (std::regex_search(old_name,std::regex("^(/FS){0,1}/DSS"))) {
     filetable="_primaries";
     column="mssID";
     dcolumn="mssfile";
@@ -356,7 +358,7 @@ bool renamedCMD()
     cmd_dir="fmd";
     scm_flag="-f";
   }
-  else if (strutils::has_beginning(old_name,"http://rda.ucar.edu/") || strutils::has_beginning(old_name,"http://dss.ucar.edu/")) {
+  else if (std::regex_search(old_name,std::regex("^http(s){0,1}://(rda|dss)\\.ucar\\.edu/"))) {
     filetable="_webfiles";
     column="webID";
     dcolumn="wfile";
@@ -384,7 +386,7 @@ bool renamedCMD()
   for (const auto& db : databases) {
     tableNames=MySQL::table_names(server,db,"ds"+dsnum2+filetable,error);
     for (const auto& table : tableNames) {
-	if (strutils::has_ending(strutils::to_lower(oname),".htar")) {
+	if (std::regex_search(strutils::to_lower(oname),std::regex("\\.htar$"))) {
 	  query.set("code,"+column,db+"."+table,column+" like '"+oname+"..m..%'");
 	}
 	else {
@@ -394,7 +396,7 @@ bool renamedCMD()
 	  metautils::logError("renamedCMD returned error: "+query.error(),"rcm",user,args.argsString);
 	}
 	if (query.num_rows() > 0) {
-	  if (strutils::has_ending(strutils::to_lower(oname),".htar")) {
+	  if (std::regex_search(strutils::to_lower(oname),std::regex("\\.htar$"))) {
 	    query2.set("code",db+"."+strutils::substitute(table,dsnum2,new_dsnum2),"binary "+column+" like '"+nname+"..m..%'");
 	  }
 	  else {
@@ -437,7 +439,7 @@ bool renamedCMD()
 		if (mysystem2(directives.localRoot+"/bin/scm -d "+new_dsnum+" "+scm_flag+" "+strutils::substitute(strutils::substitute(strutils::substitute(strutils::substitute(nname,"/FS/DSS/",""),"/DSS/",""),"/","%")+"."+db,"W"+db,db),oss,ess) < 0) {
 		  std::cerr << ess.str() << std::endl;
 		}
-		if (!strutils::has_beginning(nname,"/FS/DSS/") && !strutils::has_beginning(nname,"/DSS/") && db == "WGrML") {
+		if (!std::regex_search(nname,std::regex("^/FS/DSS")) && db == "WGrML") {
 // insert the inventory into the new dataset tables
 		  mysystem2(directives.localRoot+"/bin/iinv -d "+new_dsnum+" -f "+strutils::substitute(nname,"/","%")+".GrML_inv",oss,ess);
 		  server.update("WGrML.ds"+strutils::substitute(new_dsnum,".","")+"_webfiles","inv = 'Y'","webID = '"+nname+"'");
@@ -454,7 +456,7 @@ bool renamedCMD()
 	  }
 	  sdum=db;
 	  strutils::replace_all(sdum,"ML","");
-	  if (strutils::has_beginning(sdum,"W")) {
+	  if (sdum[0] == 'W') {
 	    sdum=sdum.substr(1);
 	  }
 	  if (server_d.update(dcolumn,"meta_link = '"+sdum+"'","dsid = 'ds"+args.dsnum+"' and "+dcolumn+" = '"+nname+"'") < 0) {
@@ -498,50 +500,58 @@ int main(int argc,char **argv)
   metautils::readConfig("rcm",user,args.argsString);
   sp=strutils::split(args.argsString,"%");
   for (n=0; n < sp.size()-2; n++) {
-    if (sp[n] == "-C")
+    if (sp[n] == "-C") {
 	no_cache=true;
-    else if (sp[n] == "-d")
+    }
+    else if (sp[n] == "-d") {
 	args.dsnum=sp[++n];
-    else if (sp[n] == "-nd")
+    }
+    else if (sp[n] == "-nd") {
 	new_dsnum=sp[++n];
+    }
     else if (sp[n] == "-o") {
 	old_web_home=sp[++n];
 	strutils::replace_all(old_web_home,"/huron/ftp","");
-	if (strutils::has_ending(old_web_home,"/"))
+	if (std::regex_search(old_web_home,std::regex("/$"))) {
 	  strutils::chop(old_web_home);
+	}
     }
   }
-  if (strutils::has_beginning(args.dsnum,"ds"))
+  if (std::regex_search(args.dsnum,std::regex("^ds"))) {
     args.dsnum=args.dsnum.substr(2);
-  if (new_dsnum.length() == 0)
+  }
+  if (new_dsnum.empty()) {
     new_dsnum=args.dsnum;
-  else if (strutils::has_beginning(new_dsnum,"ds"))
+  }
+  else if (std::regex_search(new_dsnum,std::regex("^ds"))) {
     new_dsnum=new_dsnum.substr(2);
+  }
   old_name=sp[sp.size()-2];
   new_name=sp[sp.size()-1];
-  if (!strutils::has_beginning(old_name,"/FS/DSS/") && !strutils::has_beginning(old_name,"/DSS/") && !strutils::has_beginning(old_name,"http://rda.ucar.edu/") && !strutils::has_beginning(old_name,"http://dss.ucar.edu/")) {
-    std::cerr << "Error: old_name must begin with '/FS/DSS', '/DSS', 'http://rda.ucar.edu', or 'http://dss.ucar.edu'" << std::endl;
+  if (!std::regex_search(old_name,std::regex("^(/FS){0,1}/DSS")) && !std::regex_search(old_name,std::regex("^http(s){0,1}://(rda|dss)\\.ucar\\.edu/"))) {
+    std::cerr << "Error: old_name must begin with '/FS/DSS', '/DSS', 'https://rda.ucar.edu', or 'http://dss.ucar.edu'" << std::endl;
     exit(1);
   }
-  if (strutils::has_beginning(old_name,"/FS/DSS/") || strutils::has_beginning(old_name,"/DSS/"))
+  if (std::regex_search(old_name,std::regex("^(/FS){0,1}/DSS"))) {
     cmd_dir="fmd";
-  else if (strutils::has_beginning(old_name,"http://rda.ucar.edu/"))
+  }
+  else if (std::regex_search(old_name,std::regex("^http(s){0,1}://(rda|dss)\\.ucar\\.edu/"))) {
     cmd_dir="wfmd";
+  }
   if (!existsOnRDAWebServer("rda.ucar.edu","/SERVER_ROOT/web/datasets/ds"+args.dsnum+"/metadata/"+cmd_dir,buf)) {
     std::cerr << "Error: metadata directory not found for ds"+args.dsnum << std::endl;
     exit(1);
   }
-  if (!strutils::has_beginning(new_name,"/FS/DSS/") && !strutils::has_beginning(new_name,"/DSS/") && !strutils::has_beginning(new_name,"http://rda.ucar.edu/")) {
-    std::cerr << "Error: new_name must begin with '/FS/DSS', '/DSS', or 'http://rda.ucar.edu'" << std::endl;
+  if (!std::regex_search(new_name,std::regex("^(/FS){0,1}/DSS")) && !std::regex_search(new_name,std::regex("^https://rda.ucar.edu/"))) {
+    std::cerr << "Error: new_name must begin with '/FS/DSS', '/DSS', or 'https://rda.ucar.edu'" << std::endl;
     exit(1);
   }
   if (new_name == old_name && new_dsnum == args.dsnum) {
     std::cerr << "Error: new_name must be different from old_name" << std::endl;
     exit(1);
   }
-  if (((strutils::has_beginning(old_name,"/FS/DSS/") || strutils::has_beginning(old_name,"/DSS/")) && !strutils::has_beginning(new_name,"/FS/DSS/") && !strutils::has_beginning(new_name,"/DSS/")) || (strutils::has_beginning(old_name,"http://rda.ucar.edu/") && !strutils::has_beginning(new_name,"http://rda.ucar.edu/"))) {
-    std::cerr << "Error: you can only rename content metadata for MSS files OR for web files, but" << std::endl;
-    std::cerr << " not from one to the other" << std::endl;
+  if ((std::regex_search(old_name,std::regex("^(/FS){0,1}/DSS")) && !std::regex_search(new_name,std::regex("^(/FS){0,1}/DSS"))) || (std::regex_search(old_name,std::regex("^http(s){0,1}://(rda|dss)\\.ucar\\.edu/")) && !std::regex_search(new_name,std::regex("^https://rda\\.ucar\\.edu/")))) {
+    std::cerr << "Error: you can only rename content metadata for MSS files OR for web files, but not from one to the other" << std::endl;
     exit(1);
   }
   args.path=old_name;
@@ -550,13 +560,16 @@ int main(int argc,char **argv)
   if (!verifiedNewFileIsArchived(error))
     metautils::logError("rcm main returned error: "+error,"rcm",user,args.argsString);
   else {
-    if (!renamedCMD())
+    if (!renamedCMD()) {
 	metautils::logError("rcm main retured error: No content metadata were found for "+old_name,"rcm",user,args.argsString);
+    }
     if (!no_cache) {
-	if (strutils::has_beginning(new_name,"/FS/DSS/") || strutils::has_beginning(new_name,"/DSS/"))
+	if (std::regex_search(new_name,std::regex("^(/FS){0,1}/DSS"))) {
 	  summarizeMetadata::createFileListCache("MSS","rcm",user,"-d:"+args.dsnum+":"+old_name+":"+new_name);
-	else
+	}
+	else {
 	  summarizeMetadata::createFileListCache("Web","rcm",user,"-d:"+args.dsnum+":"+old_name+":"+new_name);
+	}
     }
     return 0;
   }
