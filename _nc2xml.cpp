@@ -294,8 +294,6 @@ void updateIDTable(size_t obsTypeIndex,float lat,float lon,DateTime& datetime,do
 
 void updatePlatformTable(size_t obsTypeIndex,float lat,float lon)
 {
-  size_t n,m;
-
   if (!platform_table[obsTypeIndex].found(pentry.key,pentry)) {
     pentry.boxflags.reset(new summarizeMetadata::BoxFlags);
     pentry.boxflags->initialize(361,180,0,0);
@@ -308,6 +306,7 @@ void updatePlatformTable(size_t obsTypeIndex,float lat,float lon)
     pentry.boxflags->npole=1;
   }
   else {
+    size_t n,m;
     convertLatLonToBox(1,lat,lon,n,m);
     pentry.boxflags->flags[n-1][m]=1;
     pentry.boxflags->flags[n-1][360]=1;
@@ -626,7 +625,8 @@ void addLevelToInventory(std::string lentryKey,std::string gentry_key,size_t tim
   auto dims=istream.dimensions();
   auto vars=istream.variables();
   for (size_t n=0; n < vars.size(); ++n) {
-    if (!vars[n].is_coord && vars[n].dimids[0] == timedimid && ((vars[n].dimids.size() == 4 && levdimid >= 0 && static_cast<int>(vars[n].dimids[1]) == levdimid && vars[n].dimids[2] == latdimid && vars[n].dimids[3] == londimid) || (vars[n].dimids.size() == 3 && levdimid < 0 && vars[n].dimids[1] == latdimid && vars[n].dimids[2] == londimid))) {
+    auto key="ds"+args.dsnum+":"+vars[n].name;
+    if (vars[n].dimids.size() > 0 && !vars[n].is_coord && vars[n].dimids[0] == timedimid && P_map.find(key) != P_map.end() && ((vars[n].dimids.size() == 4 && levdimid >= 0 && static_cast<int>(vars[n].dimids[1]) == levdimid && vars[n].dimids[2] == latdimid && vars[n].dimids[3] == londimid) || (vars[n].dimids.size() == 3 && levdimid < 0 && vars[n].dimids[1] == latdimid && vars[n].dimids[2] == londimid))) {
 	auto R_key=strutils::itos(static_cast<int>(vars[n].nc_type));
 	if (R_map.find(R_key) == R_map.end()) {
 	  R_map.emplace(R_key,std::make_pair(R_map.size(),""));
@@ -638,7 +638,7 @@ void addLevelToInventory(std::string lentryKey,std::string gentry_key,size_t tim
 	long long off=vars[n].offset;
 	for (size_t m=0; m < time_s.num_times; ++m) {
 	  std::string error;
-	  inv_lines.emplace_back(strutils::lltos(off)+"|"+strutils::itos(var_size)+"|"+metautils::NcTime::getActualDateTime(time_s.times[m],time_data,error).toString("%Y%m%d%H%MM")+sdum+"|"+strutils::itos(P_map["ds"+args.dsnum+":"+vars[n].name].first)+"|"+strutils::itos(R_map[R_key].first));
+	  inv_lines.emplace_back(strutils::lltos(off)+"|"+strutils::itos(var_size)+"|"+metautils::NcTime::getActualDateTime(time_s.times[m],time_data,error).toString("%Y%m%d%H%MM")+sdum+"|"+strutils::itos(P_map[key].first)+"|"+strutils::itos(R_map[R_key].first));
 	  if (error.length() > 0) {
 	    metautils::logError(error,"nc2xml",user,args.argsString);
 	  }
@@ -1548,32 +1548,35 @@ void scanCFOrthogonalProfileNetCDFFile(InputNetCDFStream& istream,DiscreteGeomet
 		ientry.key+=std::string(&(reinterpret_cast<char *>(ids.get()))[n*id_len],id_len);
 	    }
 	    updateIDTable(obs_type_index,lats[n],lons[n],dt,times[n]);
+	    if (de.data->vdata == nullptr) {
+		de.data->vdata.reset(new metadata::ObML::DataTypeEntry::Data::VerticalData);
+	    }
 	    if (dgd.z_pos == "down") {
-		if (de.data->min_altitude > 1.e37) {
-		  de.data->min_altitude=-de.data->min_altitude;
+		if (de.data->vdata->min_altitude > 1.e37) {
+		  de.data->vdata->min_altitude=-de.data->vdata->min_altitude;
 		}
-		if (de.data->max_altitude < -1.e37) {
-		  de.data->max_altitude=-de.data->max_altitude;
+		if (de.data->vdata->max_altitude < -1.e37) {
+		  de.data->vdata->max_altitude=-de.data->vdata->max_altitude;
 		}
-		if (max > de.data->min_altitude) {
-		  de.data->min_altitude=max;
+		if (max > de.data->vdata->min_altitude) {
+		  de.data->vdata->min_altitude=max;
 		}
-		if (min < de.data->max_altitude) {
-		  de.data->max_altitude=min;
+		if (min < de.data->vdata->max_altitude) {
+		  de.data->vdata->max_altitude=min;
 		}
 	    }
 	    else {
-		if (min < de.data->min_altitude) {
-		  de.data->min_altitude=min;
+		if (min < de.data->vdata->min_altitude) {
+		  de.data->vdata->min_altitude=min;
 		}
-		if (max > de.data->max_altitude) {
-		  de.data->max_altitude=max;
+		if (max > de.data->vdata->max_altitude) {
+		  de.data->vdata->max_altitude=max;
 		}
 	    }
-	    de.data->vunits=dgd.z_units;
-	    de.data->avg_nlev+=nlvls;
-	    de.data->avg_vres+=(avg_vres/(nlvls-1));
-	    ++de.data->vres_cnt;
+	    de.data->vdata->units=dgd.z_units;
+	    de.data->vdata->avg_nlev+=nlvls;
+	    de.data->vdata->avg_res+=(avg_vres/(nlvls-1));
+	    ++de.data->vdata->res_cnt;
 	    ++total_num_not_missing;
 	  }
 	}
@@ -1612,38 +1615,41 @@ void getVerticalResolutionData(std::vector<double>& lvls,std::string z_pos,std::
 	max=lvls[n];
     }
   }
+  if (de.data->vdata == nullptr) {
+    de.data->vdata.reset(new metadata::ObML::DataTypeEntry::Data::VerticalData);
+  }
   if (z_pos == "down") {
     std::sort(lvls.begin(),lvls.end(),compareZDown);
-    if (de.data->min_altitude > 1.e37) {
-	de.data->min_altitude=-de.data->min_altitude;
+    if (de.data->vdata->min_altitude > 1.e37) {
+	de.data->vdata->min_altitude=-de.data->vdata->min_altitude;
     }
-    if (de.data->max_altitude < -1.e37) {
-	de.data->max_altitude=-de.data->max_altitude;
+    if (de.data->vdata->max_altitude < -1.e37) {
+	de.data->vdata->max_altitude=-de.data->vdata->max_altitude;
     }
-    if (max > de.data->min_altitude) {
-	de.data->min_altitude=max;
+    if (max > de.data->vdata->min_altitude) {
+	de.data->vdata->min_altitude=max;
     }
-    if (min < de.data->max_altitude) {
-	de.data->max_altitude=min;
+    if (min < de.data->vdata->max_altitude) {
+	de.data->vdata->max_altitude=min;
     }
   }
   else {
     std::sort(lvls.begin(),lvls.end(),compareZUp);
-    if (min < de.data->min_altitude) {
-	de.data->min_altitude=min;
+    if (min < de.data->vdata->min_altitude) {
+	de.data->vdata->min_altitude=min;
     }
-    if (max > de.data->max_altitude) {
-	de.data->max_altitude=max;
+    if (max > de.data->vdata->max_altitude) {
+	de.data->vdata->max_altitude=max;
     }
   }
-  de.data->vunits=z_units;
-  de.data->avg_nlev+=lvls.size();
+  de.data->vdata->units=z_units;
+  de.data->vdata->avg_nlev+=lvls.size();
   auto avg_vres=0.;
   for (size_t n=1; n < lvls.size(); ++n) {
     avg_vres+=fabs(lvls[n]-lvls[n-1]);
   }
-  de.data->avg_vres+=(avg_vres/(lvls.size()-1));
-  ++de.data->vres_cnt;
+  de.data->vdata->avg_res+=(avg_vres/(lvls.size()-1));
+  ++de.data->vdata->res_cnt;
 }
 
 void scanCFNonOrthogonalProfileNetCDFFile(InputNetCDFStream& istream,DiscreteGeometriesData& dgd,size_t obs_type_index)
@@ -3360,7 +3366,7 @@ void scanCFNetCDFFile(InputNetCDFStream& istream,bool& foundMap,std::string& map
   }
 // rename the parameter map so that it is not overwritten by the level map,
 //   which has the same name
-  if (mapName.length() > 0) {
+  if (!mapName.empty()) {
     std::stringstream oss,ess;
     mysystem2("/bin/mv "+mapName+" "+mapName+".p",oss,ess);
     if (ess.str().length() > 0) {
@@ -3632,24 +3638,27 @@ void scanRAFAircraftNetCDFFile(InputNetCDFStream& istream,bool& foundMap,std::st
     if (!ientry.data->data_types_table.found(de.key,de)) {
 	de.data.reset(new metadata::ObML::DataTypeEntry::Data);
 	if (!ignoreAltitude) {
-	  de.data->max_altitude=-99999.;
-	  de.data->min_altitude=999999.;
-	  de.data->avg_nlev=0;
-	  de.data->avg_vres=0.;
-	  de.data->vres_cnt=1;
+	  if (de.data->vdata == nullptr) {
+	    de.data->vdata.reset(new metadata::ObML::DataTypeEntry::Data::VerticalData);
+	  }
+	  de.data->vdata->max_altitude=-99999.;
+	  de.data->vdata->min_altitude=999999.;
+	  de.data->vdata->avg_nlev=0;
+	  de.data->vdata->avg_res=0.;
+	  de.data->vdata->res_cnt=1;
 	}
 	ientry.data->data_types_table.insert(de);
     }
     de.data->nsteps+=ientry.data->nsteps;
     if (!ignoreAltitude) {
-	if (max_altitude > de.data->max_altitude) {
-	  de.data->max_altitude=max_altitude;
+	if (max_altitude > de.data->vdata->max_altitude) {
+	  de.data->vdata->max_altitude=max_altitude;
 	}
-	if (min_altitude < de.data->min_altitude) {
-	  de.data->min_altitude=min_altitude;
+	if (min_altitude < de.data->vdata->min_altitude) {
+	  de.data->vdata->min_altitude=min_altitude;
 	}
-	de.data->avg_nlev+=ientry.data->nsteps;
-	de.data->vunits=vunits;
+	de.data->vdata->avg_nlev+=ientry.data->nsteps;
+	de.data->vdata->units=vunits;
     }
     sdum=dataTypeMap.getDescription(de.key);
     if (!foundMap || sdum.length() == 0) {
