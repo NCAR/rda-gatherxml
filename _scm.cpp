@@ -110,7 +110,7 @@ void parseArgs()
   local_args.isHPSSFile=false;
   local_args.isWebFile=false;
   local_args.notify=false;
-  std::deque<std::string> sp=strutils::split(args.argsString,"`");
+  auto sp=strutils::split(args.argsString,"`");
   for (size_t n=0; n < sp.size(); n++) {
     if (sp[n] == "-a") {
 	if (!local_args.file.empty()) {
@@ -2457,15 +2457,10 @@ extern "C" void segv_handler(int)
 
 int main(int argc,char **argv)
 {
-  std::stringstream output,error;
-  std::deque<std::string> sp;
-  FileEntry f;
-  ThreadStruct *tkml=NULL,ts,agg,det,flist;
+  ThreadStruct agg,det,flist,flist_i;
   std::list<KMLData> kml_list;
-  KMLData kmld;
   MySQL::LocalQuery query;
   MySQL::Row row;
-  std::vector<pthread_t> tid_list;
 
   if (argc < 3) {
     std::cerr << "usage: scm -d [ds]nnn.n [options...] {-a|-wa <type> | -f|-wf file | -rm|-rw|-ri <tindex|all>}" << std::endl;
@@ -2515,27 +2510,34 @@ int main(int argc,char **argv)
   if (!temp_dir.create(directives.tempPath)) {
     metautils::logError("unable to create temporary directory","scm",user,args.argsString);
   }
+  std::vector<pthread_t> tid_list;
   auto t1=std::time(nullptr);
   if (local_args.summarizeAll) {
+    std::stringstream output,error;
     if (mysystem2("/bin/tcsh -c \"wget -q -O - --post-data='authKey=qGNlKijgo9DJ7MN&cmd=listfiles&value=/SERVER_ROOT/web/datasets/ds"+args.dsnum+"/metadata/"+local_args.cmd_directory+"' https://rda.ucar.edu/cgi-bin/dss/remoteRDAServerUtils\"",output,error) < 0) {
 	metautils::logError("unable to get metadata file listing","scm",user,args.argsString);
     }
-    sp=strutils::split(output.str(),"\n");
-    for (size_t n=0; n < sp.size(); ++n) {
-	f.path=sp[n].substr(sp[n].find("/datasets"));
+    auto lines=strutils::split(output.str(),"\n");
+    for (const auto& line : lines) {
+	FileEntry f;
+	f.path=line.substr(line.find("/datasets"));
 	f.metaname=f.path.substr(f.path.find("/"+local_args.cmd_directory+"/")+local_args.cmd_directory.length()+2);
 	f.start.set(3000,12,31,2359);
 	f.end.set(1000,1,1,0);
 	f.isMssFile=false;
 	f.isWebFile=false;
-	if (strutils::has_ending(sp[n],"GrML"))
+	if (strutils::has_ending(line,"GrML")) {
 	  GrMLFileList.emplace_back(f);
-	else if (strutils::has_ending(sp[n],"ObML"))
+	}
+	else if (strutils::has_ending(line,"ObML")) {
 	  ObMLFileList.emplace_back(f);
-	else if (strutils::has_ending(sp[n],"SatML"))
+	}
+	else if (strutils::has_ending(line,"SatML")) {
 	  SatMLFileList.emplace_back(f);
-	else if (strutils::has_ending(sp[n],"FixML"))
+	}
+	else if (strutils::has_ending(line,"FixML")) {
 	  FixMLFileList.emplace_back(f);
+	}
     }
     if ((local_args.summ_type.empty() || local_args.summ_type == "GrML") && GrMLFileList.size() > 0) {
 	if (local_args.cmd_directory == "fmd")
@@ -2549,6 +2551,7 @@ int main(int argc,char **argv)
 	summarizeObML(kml_list);
 	ObMLFileList.clear();
 	if (local_args.summarizedHPSSFile && local_args.doDBUpdate) {
+	  ThreadStruct ts;
 	  pthread_create(&ts.tid,NULL,thread_summarizeObsData,NULL);
 	  tid_list.emplace_back(ts.tid);
 	  pthread_create(&ts.tid,NULL,thread_indexLocations,NULL);
@@ -2563,6 +2566,7 @@ int main(int argc,char **argv)
 	summarizeFixML();
 	FixMLFileList.clear();
 	if (local_args.doDBUpdate) {
+	  ThreadStruct ts;
 	  pthread_create(&ts.tid,NULL,thread_summarizeFixData,NULL);
 	  tid_list.emplace_back(ts.tid);
 	  pthread_create(&ts.tid,NULL,thread_indexLocations,NULL);
@@ -2571,6 +2575,7 @@ int main(int argc,char **argv)
     }
   }
   else if (!local_args.file.empty()) {
+    FileEntry f;
     if (local_args.isHPSSFile) {
 	f.path="/datasets/ds"+args.dsnum+"/metadata/fmd/"+local_args.file;
 	f.metaname=f.path.substr(f.path.find("/fmd/")+5);
@@ -2593,6 +2598,7 @@ int main(int argc,char **argv)
 	summarizeObML(kml_list);
 	ObMLFileList.clear();
 	if (local_args.summarizedHPSSFile && local_args.doDBUpdate) {
+	  ThreadStruct ts;
 	  pthread_create(&ts.tid,NULL,thread_summarizeObsData,NULL);
 	  tid_list.emplace_back(ts.tid);
 	  pthread_create(&ts.tid,NULL,thread_indexLocations,NULL);
@@ -2609,6 +2615,7 @@ int main(int argc,char **argv)
 	summarizeFixML();
 	FixMLFileList.clear();
 	if (local_args.summarizedHPSSFile && local_args.doDBUpdate) {
+	  ThreadStruct ts;
 	  pthread_create(&ts.tid,NULL,thread_summarizeFixData,NULL);
 	  tid_list.emplace_back(ts.tid);
 	  pthread_create(&ts.tid,NULL,thread_indexLocations,NULL);
@@ -2636,6 +2643,7 @@ int main(int argc,char **argv)
 	pthread_create(&agg.tid,nullptr,thread_aggregateGrids,&agg);
 	tid_list.emplace_back(agg.tid);
     }
+    ThreadStruct ts;
     pthread_create(&ts.tid,NULL,thread_summarizeFrequencies,NULL);
     tid_list.emplace_back(ts.tid);
     if (local_args.createKML) {
@@ -2643,6 +2651,7 @@ int main(int argc,char **argv)
 	if (query.submit(server) == 0) {
 	  while (query.fetch_row(row)) {
 	    if (row[3] == "automated_gauge" || row[3] == "CMAN_station" || row[3] == "coastal_station" || row[3] == "land_station" || row[3] == "moored_buoy" || row[3] == "fixed_ship" || row[3] == "wind_profiler") {
+		KMLData kmld;
 		kmld.observationType_code=row[0];
 		kmld.observationType=row[1];
 		kmld.platformType_code=row[2];
@@ -2654,6 +2663,7 @@ int main(int argc,char **argv)
     }
   }
   if (local_args.summarizedHPSSFile && local_args.addedVariable) {
+    ThreadStruct ts;
     pthread_create(&ts.tid,NULL,thread_indexVariables,NULL);
     tid_list.emplace_back(ts.tid);
   }
@@ -2673,6 +2683,7 @@ int main(int argc,char **argv)
 	}
 	if (local_args.doGraphics) {
 	  for (const auto& gindex : local_args.gindexList) {
+	    std::stringstream output,error;
 	    mysystem2(directives.localRoot+"/bin/gsi -g "+gindex+" "+args.dsnum,output,error);
 	  }
 	}
@@ -2682,6 +2693,7 @@ int main(int argc,char **argv)
 	det.strings.emplace_back("MSS");
 	pthread_create(&det.tid,NULL,thread_generateDetailedMetadataView,&det);
 	tid_list.emplace_back(det.tid);
+	ThreadStruct ts;
 	pthread_create(&ts.tid,NULL,thread_summarizeDates,NULL);
 	tid_list.emplace_back(ts.tid);
 	pthread_create(&ts.tid,NULL,thread_summarizeFormats,NULL);
@@ -2712,6 +2724,7 @@ int main(int argc,char **argv)
 	}
 	if (local_args.doGraphics) {
 	  for (const auto& gindex : local_args.gindexList) {
+	    std::stringstream output,error;
 	    mysystem2(directives.localRoot+"/bin/wgsi -g "+gindex+" "+args.dsnum,output,error);
 	  }
 	}
@@ -2728,7 +2741,12 @@ int main(int argc,char **argv)
 	flist.strings.emplace_back("");
 	pthread_create(&flist.tid,NULL,thread_createFileListCache,&flist);
 	tid_list.emplace_back(flist.tid);
-//server.insert("WGrML.createFileListCache","'"+args.dsnum+"',''");
+	if (!local_args.summarizedWebFile) {
+	  flist_i.strings.emplace_back("inv");
+	  flist_i.strings.emplace_back("");
+	  pthread_create(&flist_i.tid,NULL,thread_createFileListCache,&flist_i);
+	  tid_list.emplace_back(flist_i.tid);
+	}
     }
     else if (local_args.refreshInv) {
 	if (local_args.refreshInv && local_args.gindexList.size() == 1) {
@@ -2750,6 +2768,7 @@ query.set("select distinct tindex from dssdb.wfile where dsid = 'ds"+args.dsnum+
 	summarizeMetadata::createFileListCache("inv","scm",user,args.argsString);
     }
   }
+  ThreadStruct *tkml=nullptr;
   if (kml_list.size() > 0) {
     tkml=new ThreadStruct[kml_list.size()];
     size_t n=0;
@@ -2775,6 +2794,7 @@ query.set("select distinct tindex from dssdb.wfile where dsid = 'ds"+args.dsnum+
     delete[] tkml;
   }
   if (args.regenerate && (local_args.summarizedHPSSFile || !local_args.summarizedWebFile)) {
+    std::stringstream output,error;
     mysystem2(directives.localRoot+"/bin/dsgen "+args.dsnum,output,error);
   }
   if (local_args.notify) {
