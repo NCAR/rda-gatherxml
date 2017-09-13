@@ -65,12 +65,8 @@ void parse_args()
 	if (std::regex_search(*arg,std::regex("^/FS/DSS/")) || std::regex_search(*arg,std::regex("^/DSS/"))) {
 	  cmd="fmd";
 	}
-	else if (std::regex_search(*arg,std::regex("^https://rda.ucar.edu"))) {
-	  cmd="wfmd";
-	}
 	else {
-	  std::cerr << "Error: file names must begin with \"/FS/DSS/\", \"/DSS/\", or \"https://rda.ucar.edu\"" << std::endl;
-	  exit(1);
+	  cmd="wfmd";
 	}
 	cmd_set.emplace(cmd);
 	if (std::regex_search(strutils::to_lower(*arg),std::regex("\\.htar$"))) {
