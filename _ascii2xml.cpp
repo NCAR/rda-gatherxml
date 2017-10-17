@@ -23,7 +23,7 @@ enum {GrML_type=1,ObML_type};
 int write_type=-1;
 std::string myerror="";
 
-extern "C" void cleanUp()
+extern "C" void clean_up()
 {
   if (tfile != nullptr) {
     delete tfile;
@@ -33,34 +33,34 @@ extern "C" void cleanUp()
   }
   if (myerror.length() > 0) {
     std::cerr << "Error: " << myerror << std::endl;
-    metautils::logError(myerror,"ascii2xml",user,args.argsString);
+    metautils::log_error(myerror,"ascii2xml",user,args.args_string);
   }
 }
 
 extern "C" void segv_handler(int)
 {
-  cleanUp();
+  clean_up();
   metautils::cmd_unregister();
-  metautils::logError("core dump","ascii2xml",user,args.argsString);
+  metautils::log_error("core dump","ascii2xml",user,args.args_string);
 }
 
 extern "C" void int_handler(int)
 {
-  cleanUp();
+  clean_up();
   metautils::cmd_unregister();
 }
 
-void parseArgs()
+void parse_args()
 {
   std::deque<std::string> sp;
   size_t n;
   int idx;
 
-  args.overridePrimaryCheck=false;
-  args.updateDB=true;
-  args.updateSummary=true;
+  args.override_primary_check=false;
+  args.update_DB=true;
+  args.update_summary=true;
   args.regenerate=true;
-  sp=strutils::split(args.argsString,"!");
+  sp=strutils::split(args.args_string,"!");
   for (n=0; n < sp.size(); ++n) {
     if (sp[n] == "-d") {
 	args.dsnum=sp[++n];
@@ -78,21 +78,21 @@ void parseArgs()
 	args.member_name=sp[++n];
     }
   }
-  if (args.format.length() == 0) {
+  if (args.format.empty()) {
     std::cerr << "Error: no format specified" << std::endl;
     exit(1);
   }
   else {
     args.format=strutils::to_lower(args.format);
   }
-  if (args.dsnum.length() == 0) {
+  if (args.dsnum.empty()) {
     std::cerr << "Error: no dataset number specified" << std::endl;
     exit(1);
   }
   if (args.dsnum == "999.9") {
-    args.overridePrimaryCheck=true;
-    args.updateDB=false;
-    args.updateSummary=false;
+    args.override_primary_check=true;
+    args.update_DB=false;
+    args.update_summary=false;
     args.regenerate=false;
   }
   args.path=sp.back();
@@ -131,7 +131,7 @@ void update_ID_table(size_t obs_type_index,float lat,float lon,DateTime *datetim
         ientry.data->min_lon_bitmap[n]=ientry.data->max_lon_bitmap[n]=999.;
     }
     size_t n,m;
-    convertLatLonToBox(1,0.,lon,n,m);
+    convert_lat_lon_to_box(1,0.,lon,n,m);
     ientry.data->min_lon_bitmap[m]=ientry.data->max_lon_bitmap[m]=lon;
     if (min_datetime == nullptr) {
 	ientry.data->start=*datetime;
@@ -163,7 +163,7 @@ void update_ID_table(size_t obs_type_index,float lat,float lon,DateTime *datetim
 	  ientry.data->E_lon=lon;
 	}
 	size_t n,m;
-	convertLatLonToBox(1,0.,lon,n,m);
+	convert_lat_lon_to_box(1,0.,lon,n,m);
 	if (ientry.data->min_lon_bitmap[m] > 900.) {
 	  ientry.data->min_lon_bitmap[m]=ientry.data->max_lon_bitmap[m]=lon;
 	}
@@ -220,7 +220,7 @@ void update_platform_table(size_t obs_type_index,float lat,float lon)
   }
   else {
     size_t n,m;
-    convertLatLonToBox(1,lat,lon,n,m);
+    convert_lat_lon_to_box(1,lat,lon,n,m);
     pentry.boxflags->flags[n-1][m]=1;
     pentry.boxflags->flags[n-1][360]=1;
   }
@@ -228,46 +228,36 @@ void update_platform_table(size_t obs_type_index,float lat,float lon)
 
 void scanGHCNV3File(std::list<std::string>& filelist)
 {
-  std::ifstream ifs;
-  char line[32768];
-  size_t n;
-  MySQL::Server server;
-  MySQL::Query query;
-  MySQL::Row row;
-  my::map<InvEntry> inv_table(9999);
-  InvEntry ie;
-  std::string sdum,sdum2;
   TempDir tdir;
-  metadata::ObML::DataTypeEntry de;
-  int off;
-  bool add_platform_entry;
-
   tdir.create("/glade/scratch/rdadata");
   initialize_for_observations();
 // load the station inventory
-  metautils::connectToRDAServer(server);
+  MySQL::Server server;
+  metautils::connect_to_RDADB_server(server);
   if (!server) {
-    metautils::logError("scanGHCNV3File returned error: '"+server.error()+"' while trying to connect to RDADB","ascii2xml",user,args.argsString);
+    metautils::log_error("scanGHCNV3File returned error: '"+server.error()+"' while trying to connect to RDADB","ascii2xml",user,args.args_string);
   }
-  query.set("select wfile from dssdb.wfile where dsid = 'ds564.1' and type = 'O' and wfile like '%qcu.inv'");
+  MySQL::Query query("select wfile from dssdb.wfile where dsid = 'ds564.1' and type = 'O' and wfile like '%qcu.inv'");
   if (query.submit(server) < 0) {
-    metautils::logError("scanGHCNV3File returned error: '"+query.error()+"' while trying to query for station inventory name","ascii2xml",user,args.argsString);
+    metautils::log_error("scanGHCNV3File returned error: '"+query.error()+"' while trying to query for station inventory name","ascii2xml",user,args.args_string);
   }
+  MySQL::Row row;
   if (!query.fetch_row(row)) {
-    metautils::logError("scanGHCNV3File unable to get station inventory name","ascii2xml",user,args.argsString);
+    metautils::log_error("scanGHCNV3File unable to get station inventory name","ascii2xml",user,args.args_string);
   }
-  sdum=getRemoteWebFile("https://rda.ucar.edu/datasets/ds564.1/docs/"+row[0],tdir.name());
-  ifs.open(sdum.c_str());
+  auto ghcn_inventory=remote_web_file("https://rda.ucar.edu/datasets/ds564.1/docs/"+row[0],tdir.name());
+  std::ifstream ifs(ghcn_inventory.c_str());
   if (!ifs.is_open()) {
-    metautils::logError("scanGHCNV3File unable to open station inventory file","ascii2xml",user,args.argsString);
+    metautils::log_error("scanGHCNV3File unable to open station inventory file","ascii2xml",user,args.args_string);
   }
+  my::map<InvEntry> inv_table(9999);
+  char line[32768];
   ifs.getline(line,32768);
   while (!ifs.eof()) {
+    InvEntry ie;
     ie.key.assign(line,11);
-    sdum.assign(&line[12],8);
-    ie.lat=std::stof(sdum);
-    sdum.assign(&line[21],9);
-    ie.lon=std::stof(sdum);
+    ie.lat=std::stof(std::string(&line[12],8));
+    ie.lon=std::stof(std::string(&line[21],9));
     if (ie.key.substr(0,3) < "800") {
 	ie.plat_type=0;
     }
@@ -287,6 +277,7 @@ void scanGHCNV3File(std::list<std::string>& filelist)
     }
     ifs.getline(line,32768);
     while (!ifs.eof()) {
+	InvEntry ie;
 	ie.key.assign(line,11);
 	inv_table.found(ie.key,ie);
 	if (ie.plat_type == 0) {
@@ -296,18 +287,17 @@ void scanGHCNV3File(std::list<std::string>& filelist)
 	  pentry.key="fixed_ship";
 	}
 	ientry.key=pentry.key+"[!]GHCNV3[!]"+ie.key;
-	sdum.assign(&line[11],4);
-	off=19;
-	add_platform_entry=false;
-	for (n=0; n < 12; ++n) {
-	  sdum2.assign(&line[off],5);
-	  if (sdum2 != "-9999") {
+	auto year=std::stoi(std::string(&line[11],4));
+	auto off=19;
+	auto add_platform_entry=false;
+	for (size_t n=0; n < 12; ++n) {
+	  if (std::string(&line[off],5) != "-9999") {
 	    DateTime min_datetime,max_datetime;
-	    auto year=std::stoi(sdum);
 	    auto month=n+1;
 	    min_datetime.set(year,month,1,0);
-	    max_datetime.set(year,month,getDaysInMonth(year,month),235959);
+	    max_datetime.set(year,month,days_in_month(year,month),235959);
 	    update_ID_table(1,ie.lat,ie.lon,nullptr,&min_datetime,&max_datetime);
+	    metadata::ObML::DataTypeEntry de;
 	    de.key.assign(&line[15],4);
 	    if (!ientry.data->data_types_table.found(de.key,de)) {
 		de.data.reset(new metadata::ObML::DataTypeEntry::Data);
@@ -467,15 +457,15 @@ void scanLITTLE_RFile(std::list<std::string>& filelist)
 		}
 		default:
 		{
-		  metautils::logError("scanLITTLE_RFile() encountered an undocumented platform code: "+strutils::itos(obs.platform_code()),"ascii2xml",user,args.argsString);
+		  metautils::log_error("scanLITTLE_RFile() encountered an undocumented platform code: "+strutils::itos(obs.platform_code()),"ascii2xml",user,args.args_string);
 		}
 	    }
-	    update_platform_table(obs_type_index,obs.getLocation().latitude,obs.getLocation().longitude);
+	    update_platform_table(obs_type_index,obs.location().latitude,obs.location().longitude);
 	    size_t j,i;
-	    convertLatLonToBox(1,obs.getLocation().latitude,obs.getLocation().longitude,j,i);
+	    convert_lat_lon_to_box(1,obs.location().latitude,obs.location().longitude,j,i);
 	    ientry.key=pentry.key+"[!]latlonbox1[!]"+strutils::ftos((j-1)*360+1+i,5,0,'0');
-	    auto date_time=obs.getDateTime();
-	    update_ID_table(obs_type_index,obs.getLocation().latitude,obs.getLocation().longitude,date_time);
+	    auto date_time=obs.date_time();
+	    update_ID_table(obs_type_index,obs.location().latitude,obs.location().longitude,date_time);
 	    for (size_t n=0; n < data_present.size(); ++n) {
 		if (data_present[n] == 1) {
 		  metadata::ObML::DataTypeEntry de;
@@ -504,11 +494,11 @@ void scanFile()
   std::list<std::string> filelist;
 
   tfile=new TempFile;
-  tfile->open(directives.tempPath);
+  tfile->open(directives.temp_path);
   tdir=new TempDir;
-  tdir->create(directives.tempPath);
-  if (!primaryMetadata::prepareFileForMetadataScanning(*tfile,*tdir,&filelist,file_format,error)) {
-    metautils::logError("prepareFileForMetadataScanning() returned '"+error+"'","ascii2xml",user,args.argsString);
+  tdir->create(directives.temp_path);
+  if (!primaryMetadata::prepare_file_for_metadata_scanning(*tfile,*tdir,&filelist,file_format,error)) {
+    metautils::log_error("prepare_file_for_metadata_scanning() returned '"+error+"'","ascii2xml",user,args.args_string);
   }
   if (filelist.size() == 0) {
     filelist.emplace_back(tfile->name());
@@ -540,14 +530,14 @@ int main(int argc,char **argv)
   }
   signal(SIGSEGV,segv_handler);
   signal(SIGINT,int_handler);
-  args.argsString=getUnixArgsString(argc,argv,'!');
-  metautils::readConfig("ascii2xml",user,args.argsString);
-  parseArgs();
+  args.args_string=unix_args_string(argc,argv,'!');
+  metautils::read_config("ascii2xml",user,args.args_string);
+  parse_args();
   std::string flags="-f";
   if (std::regex_search(args.path,std::regex("^https://rda.ucar.edu"))) {
     flags="-wf";
   }
-  atexit(cleanUp);
+  atexit(clean_up);
   metautils::cmd_register("ascii2xml",user);
   scanFile();
   std::string ext;
@@ -557,22 +547,22 @@ int main(int argc,char **argv)
   else if (write_type == ObML_type) {
     ext="ObML";
     if (total_num_not_missing > 0) {
-	metadata::ObML::writeObML(ID_table,platformTable,"ascii2xml",user);
+	metadata::ObML::write_ObML(ID_table,platformTable,"ascii2xml",user);
     }
     else {
 	std::cerr << "All stations have missing location information - no usable data found; no content metadata will be saved for this file" << std::endl;
 	exit(1);
     }
   }
-  if (args.updateDB) {
+  if (args.update_DB) {
     if (!args.regenerate) {
 	flags="-R "+flags;
     }
-    if (!args.updateSummary) {
+    if (!args.update_summary) {
 	flags="-S "+flags;
     }
     std::stringstream oss,ess;
-    if (mysystem2(directives.localRoot+"/bin/scm -d "+args.dsnum+" "+flags+" "+args.filename+"."+ext,oss,ess) < 0) {
+    if (mysystem2(directives.local_root+"/bin/scm -d "+args.dsnum+" "+flags+" "+args.filename+"."+ext,oss,ess) < 0) {
 	std::cerr << ess.str() << std::endl;
     }
   }

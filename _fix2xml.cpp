@@ -16,15 +16,15 @@
 
 metautils::Directives directives;
 metautils::Args args;
-my::map<metadata::FixML::FeatureEntry> featureTable;
+my::map<metadata::FixML::FeatureEntry> feature_table;
 std::string user=getenv("USER");
 TempFile *tfile=NULL;
 TempDir *tdir=NULL;
-my::map<metadata::FixML::StageEntry> stageTable;
+my::map<metadata::FixML::StageEntry> stage_table;
 metadata::FixML::StageEntry sentry;
 std::string myerror="";
 
-extern "C" void cleanUp()
+extern "C" void clean_up()
 {
   if (tfile != NULL)
     delete tfile;
@@ -32,18 +32,18 @@ extern "C" void cleanUp()
     delete tdir;
 }
 
-void parseArgs()
+void parse_args()
 {
   std::deque<std::string> sp;
   size_t n;
 
-  args.updateDB=true;
-  args.updateSummary=true;
-  args.updateGraphics=true;
-  args.overridePrimaryCheck=false;
-  args.overwriteOnly=false;
-  args.temp_loc=directives.tempPath;
-  sp=strutils::split(args.argsString,"%");
+  args.update_DB=true;
+  args.update_summary=true;
+  args.update_graphics=true;
+  args.override_primary_check=false;
+  args.overwrite_only=false;
+  args.temp_loc=directives.temp_path;
+  sp=strutils::split(args.args_string,"%");
   for (n=0; n < sp.size()-1; n++) {
     if (sp[n] == "-f") {
 	args.format=sp[++n];
@@ -64,13 +64,13 @@ void parseArgs()
 	args.member_name=sp[++n];
     }
     else if (sp[n] == "-G") {
-	args.updateGraphics=false;
+	args.update_graphics=false;
     }
     else if (sp[n] == "-S") {
-	args.updateSummary=false;
+	args.update_summary=false;
     }
     else if (sp[n] == "-OO") {
-        args.overwriteOnly=true;
+        args.overwrite_only=true;
     }
   }
   if (args.format.length() == 0) {
@@ -85,9 +85,9 @@ void parseArgs()
     exit(1);
   }
   if (args.dsnum == "999.9") {
-    args.overridePrimaryCheck=true;
-    args.updateDB=false;
-    args.updateSummary=false;
+    args.override_primary_check=true;
+    args.update_DB=false;
+    args.update_summary=false;
     args.regenerate=false;
   }
   args.path=sp[sp.size()-1];
@@ -99,113 +99,112 @@ void parseArgs()
   args.path=args.path.substr(0,n);
 }
 
-void processHURDAT(Cyclone *c)
+void process_HURDAT(Cyclone *c)
 {
   HURDATCyclone *hc=reinterpret_cast<HURDATCyclone *>(c);
-  Array<Cyclone::FixData> fd;
   metadata::FixML::FeatureEntry fe;
   metadata::FixML::ClassificationEntry ce;
-  size_t n,l,k;
+  size_t l,k;
   float elon,min_elon=99999.,max_elon=-99999.;
 
-  fd=hc->getFixData();
-  if (hc->getLatitudeHemisphere() == 'S') {
-    if (fd[0].datetime.getMonth() >= 7) {
-	fe.key=strutils::itos(fd[0].datetime.getYear()+1)+"-"+hc->getID();
+  auto fd=hc->fix_data();
+  if (hc->latitude_hemisphere() == 'S') {
+    if (fd[0].datetime.month() >= 7) {
+	fe.key=strutils::itos(fd[0].datetime.year()+1)+"-"+hc->ID();
     }
     else {
-	fe.key=strutils::itos(fd[0].datetime.getYear())+"-"+hc->getID();
+	fe.key=strutils::itos(fd[0].datetime.year())+"-"+hc->ID();
     }
   }
   else {
-    fe.key=strutils::itos(fd[0].datetime.getYear())+"-"+hc->getID();
+    fe.key=strutils::itos(fd[0].datetime.year())+"-"+hc->ID();
   }
   fe.data.reset(new metadata::FixML::FeatureEntry::Data);
   ce.key="";
   ce.pres_units="mbar";
   ce.wind_units="kt";
-  for (n=0; n < fd.length(); ++n) {
-    if (fd(n).classification != ce.key) {
+  for (const auto& fix : fd) {
+    if (fix.classification != ce.key) {
 	if (ce.key.length() > 0) {
-	  fe.data->classificationList.emplace_back(ce);
+	  fe.data->classification_list.emplace_back(ce);
 	}
-	ce.key=fd(n).classification;
-	ce.start_datetime=fd(n).datetime;
-	ce.start_lat=fd(n).latitude;
-	ce.start_lon=fd(n).longitude;
-	ce.min_lat=ce.max_lat=fd(n).latitude;
-	ce.min_lon=ce.max_lon=elon=fd(n).longitude;
+	ce.key=fix.classification;
+	ce.start_datetime=fix.datetime;
+	ce.start_lat=fix.latitude;
+	ce.start_lon=fix.longitude;
+	ce.min_lat=ce.max_lat=fix.latitude;
+	ce.min_lon=ce.max_lon=elon=fix.longitude;
 	if (elon < 0.) {
 	  elon+=360.;
 	}
 	min_elon=max_elon=elon;
-	ce.min_pres=ce.max_pres=fd(n).min_pres;
-	ce.min_speed=ce.max_speed=fd(n).max_wind;
+	ce.min_pres=ce.max_pres=fix.min_pres;
+	ce.min_speed=ce.max_speed=fix.max_wind;
 	ce.nfixes=0;
     }
-    ce.end_datetime=fd(n).datetime;
-    ce.end_lat=fd(n).latitude;
-    ce.end_lon=fd(n).longitude;
-    elon=fd(n).longitude;
+    ce.end_datetime=fix.datetime;
+    ce.end_lat=fix.latitude;
+    ce.end_lon=fix.longitude;
+    elon=fix.longitude;
     if (elon < 0.)
 	elon+=360.;
-    if (fd(n).latitude < ce.min_lat)
-	ce.min_lat=fd(n).latitude;
-    if (fd(n).latitude > ce.max_lat)
-	ce.max_lat=fd(n).latitude;
-    if (fd(n).longitude < ce.min_lon)
-	ce.min_lon=fd(n).longitude;
-    if (fd(n).longitude > ce.max_lon)
-	ce.max_lon=fd(n).longitude;
+    if (fix.latitude < ce.min_lat)
+	ce.min_lat=fix.latitude;
+    if (fix.latitude > ce.max_lat)
+	ce.max_lat=fix.latitude;
+    if (fix.longitude < ce.min_lon)
+	ce.min_lon=fix.longitude;
+    if (fix.longitude > ce.max_lon)
+	ce.max_lon=fix.longitude;
     if (elon < min_elon)
 	min_elon=elon;
     if (elon > max_elon)
 	max_elon=elon;
-    if (fd(n).min_pres < ce.min_pres)
-	ce.min_pres=fd(n).min_pres;
-    if (fd(n).min_pres > ce.max_pres)
-	ce.max_pres=fd(n).min_pres;
-    if (fd(n).max_wind < ce.min_speed)
-	ce.min_speed=fd(n).max_wind;
-    if (fd(n).max_wind > ce.max_speed)
-	ce.max_speed=fd(n).max_wind;
+    if (fix.min_pres < ce.min_pres)
+	ce.min_pres=fix.min_pres;
+    if (fix.min_pres > ce.max_pres)
+	ce.max_pres=fix.min_pres;
+    if (fix.max_wind < ce.min_speed)
+	ce.min_speed=fix.max_wind;
+    if (fix.max_wind > ce.max_speed)
+	ce.max_speed=fix.max_wind;
     ce.nfixes++;
-    if (!stageTable.found(ce.key,sentry)) {
+    if (!stage_table.found(ce.key,sentry)) {
 	sentry.key=ce.key;
 	sentry.data.reset(new metadata::FixML::StageEntry::Data);
 	sentry.data->boxflags.initialize(361,180,0,0);
-	if (fd(n).latitude == -90.) {
+	if (fix.latitude == -90.) {
 	  sentry.data->boxflags.spole=1;
 	}
-	else if (fd(n).latitude == 90.) {
+	else if (fix.latitude == 90.) {
 	  sentry.data->boxflags.npole=1;
 	}
 	else {
-	  convertLatLonToBox(1,fd(n).latitude,fd(n).longitude,l,k);
+	  convert_lat_lon_to_box(1,fix.latitude,fix.longitude,l,k);
 	  sentry.data->boxflags.flags[l-1][k]=1;
 	  sentry.data->boxflags.flags[l-1][360]=1;
 	}
-	sentry.data->start=fd(n).datetime;
-	sentry.data->end=fd(n).datetime;
-	stageTable.insert(sentry);
+	sentry.data->start=fix.datetime;
+	sentry.data->end=fix.datetime;
+	stage_table.insert(sentry);
     }
     else {
-	if (fd(n).latitude == -90.) {
+	if (fix.latitude == -90.) {
 	  sentry.data->boxflags.spole=1;
 	}
-	else if (fd(n).latitude == 90.) {
+	else if (fix.latitude == 90.) {
 	  sentry.data->boxflags.npole=1;
 	}
 	else {
-	  convertLatLonToBox(1,fd(n).latitude,fd(n).longitude,l,k);
+	  convert_lat_lon_to_box(1,fix.latitude,fix.longitude,l,k);
 	  sentry.data->boxflags.flags[l-1][k]=1;
 	  sentry.data->boxflags.flags[l-1][360]=1;
 	}
-	if (fd(n).datetime < sentry.data->start) {
-	  sentry.data->start=fd(n).datetime;
+	if (fix.datetime < sentry.data->start) {
+	  sentry.data->start=fix.datetime;
 	}
-	if (fd(n).datetime > sentry.data->end) {
-	  sentry.data->end=fd(n).datetime;
+	if (fix.datetime > sentry.data->end) {
+	  sentry.data->end=fix.datetime;
 	}
     }
   }
@@ -219,123 +218,122 @@ void processHURDAT(Cyclone *c)
 	ce.max_lon-=360.;
     }
   }
-  fe.data->classificationList.emplace_back(ce);
-  featureTable.insert(fe);
+  fe.data->classification_list.emplace_back(ce);
+  feature_table.insert(fe);
 }
 
-void processTCVitals(Cyclone *c)
+void process_TC_vitals(Cyclone *c)
 {
   TCVitalsCyclone *tcvc=reinterpret_cast<TCVitalsCyclone *>(c);
   metadata::FixML::FeatureEntry fe;
   metadata::FixML::ClassificationEntry ce;
-  Array<Cyclone::FixData> fd;
 
-  fd=tcvc->getFixData();
+  auto fd=tcvc->fix_data();
   std::stringstream fe_key;
-  fe_key << fd(0).datetime.getYear() << "-" << tcvc->getStormNumber() << tcvc->getBasinID();
-  if (!featureTable.found(fe_key.str(),fe)) {
+  fe_key << fd[0].datetime.year() << "-" << tcvc->storm_number() << tcvc->basin_ID();
+  if (!feature_table.found(fe_key.str(),fe)) {
     fe.key=fe_key.str();
     fe.data.reset(new metadata::FixML::FeatureEntry::Data);
-    fe.data->altID=tcvc->getID();
-    featureTable.insert(fe);
+    fe.data->alt_ID=tcvc->ID();
+    feature_table.insert(fe);
   }
   ce.key="tropical";
-  if (fe.data->classificationList.size() == 0) {
-    ce.start_datetime=ce.end_datetime=fd(0).datetime;
-    ce.start_lat=ce.end_lat=ce.min_lat=ce.max_lat=fd(0).latitude;
-    ce.start_lon=ce.end_lon=ce.min_lon=ce.max_lon=fd(0).longitude;
-    ce.min_pres=ce.max_pres=fd(0).min_pres;
+  if (fe.data->classification_list.size() == 0) {
+    ce.start_datetime=ce.end_datetime=fd[0].datetime;
+    ce.start_lat=ce.end_lat=ce.min_lat=ce.max_lat=fd[0].latitude;
+    ce.start_lon=ce.end_lon=ce.min_lon=ce.max_lon=fd[0].longitude;
+    ce.min_pres=ce.max_pres=fd[0].min_pres;
     ce.pres_units="mbar";
-    ce.min_speed=ce.max_speed=fd(0).max_wind;
+    ce.min_speed=ce.max_speed=fd[0].max_wind;
     ce.wind_units="m s-1";
     ce.nfixes=1;
-    fe.data->classificationList.emplace_back(ce);
+    fe.data->classification_list.emplace_back(ce);
   }
   else {
-    metadata::FixML::ClassificationEntry &b=fe.data->classificationList.back();
-    if (fd(0).datetime < b.start_datetime) {
-	b.start_datetime=fd(0).datetime;
-	b.start_lat=fd(0).latitude;
-	b.start_lon=fd(0).longitude;
+    metadata::FixML::ClassificationEntry &b=fe.data->classification_list.back();
+    if (fd[0].datetime < b.start_datetime) {
+	b.start_datetime=fd[0].datetime;
+	b.start_lat=fd[0].latitude;
+	b.start_lon=fd[0].longitude;
     }
-    if (fd(0).datetime > b.end_datetime) {
-	fe.data->altID=tcvc->getID();
-	b.end_datetime=fd(0).datetime;
-	b.end_lat=fd(0).latitude;
-	b.end_lon=fd(0).longitude;
+    if (fd[0].datetime > b.end_datetime) {
+	fe.data->alt_ID=tcvc->ID();
+	b.end_datetime=fd[0].datetime;
+	b.end_lat=fd[0].latitude;
+	b.end_lon=fd[0].longitude;
     }
-    if (fd(0).latitude < b.min_lat) {
-	b.min_lat=fd(0).latitude;
+    if (fd[0].latitude < b.min_lat) {
+	b.min_lat=fd[0].latitude;
     }
-    if (fd(0).latitude > b.max_lat) {
-	b.max_lat=fd(0).latitude;
+    if (fd[0].latitude > b.max_lat) {
+	b.max_lat=fd[0].latitude;
     }
-    if (fd(0).longitude < b.min_lon) {
-	b.min_lon=fd(0).longitude;
+    if (fd[0].longitude < b.min_lon) {
+	b.min_lon=fd[0].longitude;
     }
-    if (fd(0).longitude > b.max_lon) {
-	b.max_lon=fd(0).longitude;
+    if (fd[0].longitude > b.max_lon) {
+	b.max_lon=fd[0].longitude;
     }
-    if (fd(0).min_pres < b.min_pres) {
-	b.min_pres=fd(0).min_pres;
+    if (fd[0].min_pres < b.min_pres) {
+	b.min_pres=fd[0].min_pres;
     }
-    if (fd(0).min_pres > b.max_pres) {
-	b.max_pres=fd(0).min_pres;
+    if (fd[0].min_pres > b.max_pres) {
+	b.max_pres=fd[0].min_pres;
     }
-    if (fd(0).max_wind < b.min_speed) {
-	b.min_speed=fd(0).max_wind;
+    if (fd[0].max_wind < b.min_speed) {
+	b.min_speed=fd[0].max_wind;
     }
-    if (fd(0).max_wind > b.max_speed) {
-	b.max_speed=fd(0).max_wind;
+    if (fd[0].max_wind > b.max_speed) {
+	b.max_speed=fd[0].max_wind;
     }
     ++b.nfixes;
   }
-  if (!stageTable.found(ce.key,sentry)) {
+  if (!stage_table.found(ce.key,sentry)) {
     sentry.key=ce.key;
     sentry.data.reset(new metadata::FixML::StageEntry::Data);
     sentry.data->boxflags.initialize(361,180,0,0);
-    if (fd(0).latitude == -90.) {
+    if (fd[0].latitude == -90.) {
 	sentry.data->boxflags.spole=1;
     }
-    else if (fd(0).latitude == 90.) {
+    else if (fd[0].latitude == 90.) {
 	sentry.data->boxflags.npole=1;
     }
     else {
 	size_t l,k;
-	convertLatLonToBox(1,fd(0).latitude,fd(0).longitude,l,k);
+	convert_lat_lon_to_box(1,fd[0].latitude,fd[0].longitude,l,k);
 	sentry.data->boxflags.flags[l-1][k]=1;
 	sentry.data->boxflags.flags[l-1][360]=1;
     }
-    sentry.data->start=fd(0).datetime;
-    sentry.data->end=fd(0).datetime;
-    stageTable.insert(sentry);
+    sentry.data->start=fd[0].datetime;
+    sentry.data->end=fd[0].datetime;
+    stage_table.insert(sentry);
   }
   else {
-    if (fd(0).latitude == -90.) {
+    if (fd[0].latitude == -90.) {
 	sentry.data->boxflags.spole=1;
     }
-    else if (fd(0).latitude == 90.) {
+    else if (fd[0].latitude == 90.) {
 	sentry.data->boxflags.npole=1;
     }
     else {
 	size_t l,k;
-	convertLatLonToBox(1,fd(0).latitude,fd(0).longitude,l,k);
+	convert_lat_lon_to_box(1,fd[0].latitude,fd[0].longitude,l,k);
 	sentry.data->boxflags.flags[l-1][k]=1;
 	sentry.data->boxflags.flags[l-1][360]=1;
     }
-    if (fd(0).datetime < sentry.data->start) {
-	sentry.data->start=fd(0).datetime;
+    if (fd[0].datetime < sentry.data->start) {
+	sentry.data->start=fd[0].datetime;
     }
-    if (fd(0).datetime > sentry.data->end) {
-	sentry.data->end=fd(0).datetime;
+    if (fd[0].datetime > sentry.data->end) {
+	sentry.data->end=fd[0].datetime;
     }
   }
 }
 
-void processCXML(XMLDocument& xdoc)
+void process_CXML(XMLDocument& xdoc)
 {
   XMLElement e;
-  std::list<XMLElement> elist,disturbanceList,fixList;
+  std::list<XMLElement> elist;
   metadata::FixML::FeatureEntry fe;
   metadata::FixML::ClassificationEntry ce;
   std::string src,sdum;
@@ -358,10 +356,10 @@ void processCXML(XMLDocument& xdoc)
   }
   elist=xdoc.element_list("cxml/data");
   for (auto& ele : elist) {
-    disturbanceList=ele.element_list("disturbance");
-    for (auto& dist : disturbanceList) {
-	fixList=dist.element_list("fix");
-	ce.nfixes=fixList.size();
+    auto disturbance_list=ele.element_list("disturbance");
+    for (auto& dist : disturbance_list) {
+	auto fix_list=dist.element_list("fix");
+	ce.nfixes=fix_list.size();
 	if (ce.nfixes > 0) {
 	  fe.key=dist.attribute_value("ID");
 	  e=dist.element("cycloneName");
@@ -372,9 +370,9 @@ void processCXML(XMLDocument& xdoc)
 	  else {
 	    ce.key="extratropical";
 	  }
-	  if (!featureTable.found(fe.key,fe)) {
+	  if (!feature_table.found(fe.key,fe)) {
 	    fe.data.reset(new metadata::FixML::FeatureEntry::Data);
-	    featureTable.insert(fe);
+	    feature_table.insert(fe);
 	  }
 	  sdum=ele.attribute_value("type");
 	  ce.src=src+"_"+sdum;
@@ -382,7 +380,7 @@ void processCXML(XMLDocument& xdoc)
 	  if (sdum.length() > 0) {
 	    ce.src+="_member_"+sdum;
 	  }
-	  ce.start_datetime.setYear(1000);
+	  ce.start_datetime.set_year(1000);
 	  ce.start_lat=-99.;
 	  ce.start_lon=-199.;
 	  ce.min_lat=99.;
@@ -395,7 +393,7 @@ void processCXML(XMLDocument& xdoc)
 	  ce.max_pres=-99999.;
 	  ce.min_speed=99999.;
 	  ce.max_speed=-99999.;
-	  for (auto& fix : fixList) {
+	  for (const auto& fix : fix_list) {
 	    e=fix.element("validTime");
 	    if (e.name().length() > 0) {
 		sdum=e.content();
@@ -403,7 +401,7 @@ void processCXML(XMLDocument& xdoc)
 		strutils::replace_all(sdum,"T","");
 		strutils::replace_all(sdum,":","");
 		strutils::replace_all(sdum,"Z","");
-		if (ce.start_datetime.getYear() == 1000) {
+		if (ce.start_datetime.year() == 1000) {
 		  ce.start_datetime.set(std::stoll(sdum));
 		}
 		ce.end_datetime.set(std::stoll(sdum));
@@ -422,7 +420,7 @@ void processCXML(XMLDocument& xdoc)
 		  }
 		}
 		else {
-		  std::cerr << "Terminating - processCXML found an empty latitude element" << std::endl;
+		  std::cerr << "Terminating - process_CXML() found an empty latitude element" << std::endl;
 		  exit(1);
 		}
 	    }
@@ -443,7 +441,7 @@ void processCXML(XMLDocument& xdoc)
 		  }
 		}
 		else {
-		  std::cerr << "Terminating - processCXML found an empty longitude element" << std::endl;
+		  std::cerr << "Terminating - process_CXML() found an empty longitude element" << std::endl;
 		  exit(1);
 		}
 	    }
@@ -476,7 +474,7 @@ void processCXML(XMLDocument& xdoc)
 		if (elon > max_elon) {
 		  max_elon=elon;
 		}
-		if (!stageTable.found(ce.key,sentry)) {
+		if (!stage_table.found(ce.key,sentry)) {
 		  sentry.key=ce.key;
 		  sentry.data.reset(new metadata::FixML::StageEntry::Data);
 		  sentry.data->boxflags.initialize(361,180,0,0);
@@ -487,13 +485,13 @@ void processCXML(XMLDocument& xdoc)
 		    sentry.data->boxflags.npole=1;
 		  }
 		  else {
-		    convertLatLonToBox(1,lat,lon,l,k);
+		    convert_lat_lon_to_box(1,lat,lon,l,k);
 		    sentry.data->boxflags.flags[l-1][k]=1;
 		    sentry.data->boxflags.flags[l-1][360]=1;
 		  }
 		  sentry.data->start=ce.end_datetime;
 		  sentry.data->end=ce.end_datetime;
-		  stageTable.insert(sentry);
+		  stage_table.insert(sentry);
 		}
 		else {
 		  if (lat == -90.) {
@@ -503,7 +501,7 @@ void processCXML(XMLDocument& xdoc)
 		    sentry.data->boxflags.npole=1;
 		  }
 		  else {
-		    convertLatLonToBox(1,lat,lon,l,k);
+		    convert_lat_lon_to_box(1,lat,lon,l,k);
 		    sentry.data->boxflags.flags[l-1][k]=1;
 		    sentry.data->boxflags.flags[l-1][360]=1;
 		  }
@@ -548,13 +546,13 @@ void processCXML(XMLDocument& xdoc)
 		ce.max_lon-=360.;
 	    }
 	  }
-	  fe.data->classificationList.emplace_back(ce);
+	  fe.data->classification_list.emplace_back(ce);
 	}
     }
   }
 }
 
-void scanFile()
+void scan_file()
 {
   idstream *istream=NULL;
   Cyclone *c=NULL;
@@ -570,8 +568,8 @@ void scanFile()
   tfile->open(args.temp_loc);
   tdir->create(args.temp_loc);
   if (args.format == "cxml") {
-    if (!primaryMetadata::prepareFileForMetadataScanning(*tfile,*tdir,&filelist,file_format,error)) {
-	metautils::logError("prepareFileForMetadataScanning() returned '"+error+"'","fix2xml",user,args.argsString);
+    if (!primaryMetadata::prepare_file_for_metadata_scanning(*tfile,*tdir,&filelist,file_format,error)) {
+	metautils::log_error("prepare_file_for_metadata_scanning() returned '"+error+"'","fix2xml",user,args.args_string);
     }
     if (filelist.size() == 0) {
 	filelist.emplace_back(tfile->name());
@@ -579,16 +577,16 @@ void scanFile()
     for (const auto& file : filelist) {
 	if (!xdoc.open(file)) {
 	  if (args.dsnum != "330.3")
-	    std::cerr << "Error: scanFile was unable to parse " << file << std::endl;
+	    std::cerr << "Error: scan_file() was unable to parse " << file << std::endl;
 	  exit(1);
 	}
-	processCXML(xdoc);
+	process_CXML(xdoc);
 	xdoc.close();
     }
   }
   else if (args.format == "tcvitals") {
-    if (!primaryMetadata::prepareFileForMetadataScanning(*tfile,*tdir,&filelist,file_format,error)) {
-	metautils::logError("prepareFileForMetadataScanning() returned '"+error+"'","fix2xml",user,args.argsString);
+    if (!primaryMetadata::prepare_file_for_metadata_scanning(*tfile,*tdir,&filelist,file_format,error)) {
+	metautils::log_error("prepare_file_for_metadata_scanning() returned '"+error+"'","fix2xml",user,args.args_string);
     }
     if (filelist.size() == 0) {
 	filelist.emplace_back(tfile->name());
@@ -596,16 +594,16 @@ void scanFile()
     istream=new InputTCVitalsCycloneStream;
     c=new TCVitalsCyclone;
     for (const auto& file : filelist) {
-	if (!primaryMetadata::openFileForMetadataScanning(istream,file,error)) {
-	  metautils::logError("openFileForMetadataScanning() returned '"+error+"'","fix2xml",user,args.argsString);
+	if (!primaryMetadata::open_file_for_metadata_scanning(istream,file,error)) {
+	  metautils::log_error("open_file_for_metadata_scanning() returned '"+error+"'","fix2xml",user,args.args_string);
 	}
 	while ( (status=istream->read(buffer,BUF_LEN)) > 0) {
 	  c->fill(buffer,Cyclone::full_report);
-	  processTCVitals(c);
+	  process_TC_vitals(c);
 	}
 	istream->close();
 	if (status == bfstream::error) {
-	  metautils::logError("read error","fix2xml",user,args.argsString);
+	  metautils::log_error("read error","fix2xml",user,args.args_string);
 	}
     }
   }
@@ -615,28 +613,28 @@ void scanFile()
 	c=new HURDATCyclone;
     }
     else {
-	metautils::logError("format "+args.format+" not recognized","fix2xml",user,args.argsString);
+	metautils::log_error("format "+args.format+" not recognized","fix2xml",user,args.args_string);
     }
-    if (!primaryMetadata::prepareFileForMetadataScanning(*tfile,*tdir,nullptr,file_format,error)) {
-	metautils::logError("prepareFileForMetadataScanning() returned '"+error+"'","fix2xml",user,args.argsString);
+    if (!primaryMetadata::prepare_file_for_metadata_scanning(*tfile,*tdir,nullptr,file_format,error)) {
+	metautils::log_error("prepare_file_for_metadata_scanning() returned '"+error+"'","fix2xml",user,args.args_string);
     }
-    if (!primaryMetadata::openFileForMetadataScanning(istream,tfile->name(),error)) {
-	metautils::logError("openFileForMetadataScanning() returned '"+error+"'","fix2xml",user,args.argsString);
+    if (!primaryMetadata::open_file_for_metadata_scanning(istream,tfile->name(),error)) {
+	metautils::log_error("open_file_for_metadata_scanning() returned '"+error+"'","fix2xml",user,args.args_string);
     }
     if (istream != NULL) {
 	while ( (status=istream->read(buffer,BUF_LEN)) > 0) {
 	  c->fill(buffer,Cyclone::full_report);
 	  if (args.format == "hurdat") {
-	    processHURDAT(c);
+	    process_HURDAT(c);
 	  }
 	}
 	istream->close();
 	if (status == bfstream::error) {
-	  metautils::logError("read error","fix2xml",user,args.argsString);
+	  metautils::log_error("read error","fix2xml",user,args.args_string);
 	}
     }
   }
-  if (featureTable.size() == 0) {
+  if (feature_table.size() == 0) {
     if (args.dsnum != "330.3") {
 	std::cerr << "Terminating - no fix data found in file" << std::endl;
     }
@@ -646,14 +644,14 @@ void scanFile()
 
 extern "C" void segv_handler(int)
 {
-  cleanUp();
+  clean_up();
   metautils::cmd_unregister();
-  metautils::logError("core dump","fix2xml",user,args.argsString);
+  metautils::log_error("core dump","fix2xml",user,args.args_string);
 }
 
 extern "C" void int_handler(int)
 {
-  cleanUp();
+  clean_up();
   metautils::cmd_unregister();
 }
 
@@ -683,29 +681,29 @@ int main(int argc,char **argv)
   }
   signal(SIGSEGV,segv_handler);
   signal(SIGINT,int_handler);
-  args.argsString=getUnixArgsString(argc,argv,'%');
-  metautils::readConfig("fix2xml",user,args.argsString);
-  parseArgs();
+  args.args_string=unix_args_string(argc,argv,'%');
+  metautils::read_config("fix2xml",user,args.args_string);
+  parse_args();
   std::string flags="-f";
   if (strutils::has_beginning(args.path,"https://rda.ucar.edu")) {
     flags="-wf";
   }
-  atexit(cleanUp);
+  atexit(clean_up);
   metautils::cmd_register("fix2xml",user);
-  if (!args.overwriteOnly) {
-    metautils::checkForExistingCMD("FixML");
+  if (!args.overwrite_only) {
+    metautils::check_for_existing_CMD("FixML");
   }
-  scanFile();
-  metadata::FixML::writeFixML(featureTable,stageTable,"fix2xml",user);
-  if (args.updateDB) {
-    if (!args.updateGraphics) {
+  scan_file();
+  metadata::FixML::write_FixML(feature_table,stage_table,"fix2xml",user);
+  if (args.update_DB) {
+    if (!args.update_graphics) {
 	flags="-G "+flags;
     }
-    if (!args.updateSummary) {
+    if (!args.update_summary) {
 	flags="-S "+flags;
     }
     std::stringstream oss,ess;
-    if (mysystem2(directives.localRoot+"/bin/scm -d "+args.dsnum+" "+flags+" "+args.filename+".FixML",oss,ess) < 0) {
+    if (mysystem2(directives.local_root+"/bin/scm -d "+args.dsnum+" "+flags+" "+args.filename+".FixML",oss,ess) < 0) {
 	std::cerr << ess.str() << std::endl;
     }
   }

@@ -18,9 +18,9 @@ metautils::Directives directives;
 metautils::Args args;
 std::string user=getenv("USER");
 TempFile *tfile=NULL;
-TempDir *tdir=NULL;
-TempFile *inv_file=nullptr;
-std::ofstream inv;
+std::string inv_file;
+TempDir *tdir=nullptr,*inv_dir=nullptr;
+std::ofstream inv_stream;
 struct ScanData {
   ScanData() : map_name(),varlist(),var_changes_table(),found_map(false),convert_IDs_to_upper_case(false) {}
 
@@ -61,7 +61,7 @@ std::list<std::string> inv_lines;
 std::string myerror="";
 std::stringstream wss;
 
-extern "C" void cleanUp()
+extern "C" void clean_up()
 {
   if (tfile != NULL) {
     delete tfile;
@@ -70,20 +70,20 @@ extern "C" void cleanUp()
     delete tdir;
   }
   if (wss.str().length() > 0) {
-    metautils::logWarning(wss.str(),"hdf2xml",user,args.argsString);
+    metautils::log_warning(wss.str(),"hdf2xml",user,args.args_string);
   }
   if (myerror.length() > 0) {
-    metautils::logError(myerror,"hdf2xml",user,args.argsString);
+    metautils::log_error(myerror,"hdf2xml",user,args.args_string);
   }
 }
 
 void parse_args()
 {
-  args.overridePrimaryCheck=false;
-  args.updateDB=true;
-  args.updateSummary=true;
+  args.override_primary_check=false;
+  args.update_DB=true;
+  args.update_summary=true;
   args.regenerate=true;
-  std::deque<std::string> sp=strutils::split(args.argsString,"%");
+  std::deque<std::string> sp=strutils::split(args.args_string,"%");
   for (size_t n=0; n < sp.size(); ++n) {
     if (sp[n] == "-d") {
 	args.dsnum=sp[++n];
@@ -101,14 +101,14 @@ void parse_args()
 	args.member_name=sp[++n];
     }
     else if (sp[n] == "-I") {
-	args.inventoryOnly=true;
-	args.updateDB=false;
+	args.inventory_only=true;
+	args.update_DB=false;
     }
     else if (sp[n] == "-R") {
 	args.regenerate=false;
     }
     else if (sp[n] == "-S") {
-	args.updateSummary=false;
+	args.update_summary=false;
     }
   }
   if (args.format.length() == 0) {
@@ -123,9 +123,9 @@ void parse_args()
     exit(1);
   }
   if (args.dsnum == "999.9") {
-    args.overridePrimaryCheck=true;
-    args.updateDB=false;
-    args.updateSummary=false;
+    args.override_primary_check=true;
+    args.update_DB=false;
+    args.update_summary=false;
     args.regenerate=false;
   }
   args.path=sp[sp.size()-1];
@@ -139,14 +139,14 @@ void parse_args()
 
 extern "C" void segv_handler(int)
 {
-  cleanUp();
+  clean_up();
   metautils::cmd_unregister();
-  metautils::logError("core dump","hdf2xml",user,args.argsString);
+  metautils::log_error("core dump","hdf2xml",user,args.args_string);
 }
 
 extern "C" void int_handler(int)
 {
-  cleanUp();
+  clean_up();
   metautils::cmd_unregister();
 }
 
@@ -190,7 +190,7 @@ void obs_finalize()
 
 void scan_QuikSCAT_HDF4_file(InputHDF4Stream& istream)
 {
-istream.printDataDescriptors(1965);
+istream.print_data_descriptors(1965);
 }
 
 void scan_HDF4_file(std::list<std::string>& filelist,ScanData& scan_data)
@@ -362,14 +362,14 @@ std::string get_ISPD_HDF5_platform_type(const LibEntry& le)
 	    }
 	  }
 	  else {
-//	    metautils::logWarning("unknown platform type (1) for station '"+le.data->ID+"' "+strutils::ftos(le.data->lat,4)+" "+strutils::ftos(le.data->lon,4)+" "+le.data->ISPD_ID+" "+strutils::itos(le.data->plat_type)+" "+strutils::itos(le.data->isrc)+" '"+std::string(1,le.data->csrc)+"'","hdf2xml",user,args.argsString);
+//	    metautils::log_warning("unknown platform type (1) for station '"+le.data->ID+"' "+strutils::ftos(le.data->lat,4)+" "+strutils::ftos(le.data->lon,4)+" "+le.data->ISPD_ID+" "+strutils::itos(le.data->plat_type)+" "+strutils::itos(le.data->isrc)+" '"+std::string(1,le.data->csrc)+"'","hdf2xml",user,args.args_string);
 wss << "unknown platform type (1) for station '"+le.data->ID+"' "+strutils::ftos(le.data->lat,4)+" "+strutils::ftos(le.data->lon,4)+" "+le.data->ISPD_ID+" "+strutils::itos(le.data->plat_type)+" "+strutils::itos(le.data->isrc)+" '"+std::string(1,le.data->csrc)+"'" << std::endl;
 	    return "";
 	  }
 	}
 	default:
 	{
-//	  metautils::logWarning("unknown platform type (2) for station '"+le.data->ID+"' "+strutils::ftos(le.data->lat,4)+" "+strutils::ftos(le.data->lon,4)+" "+le.data->ISPD_ID+" "+strutils::itos(le.data->plat_type)+" "+strutils::itos(le.data->isrc)+" '"+std::string(1,le.data->csrc)+"'","hdf2xml",user,args.argsString);
+//	  metautils::log_warning("unknown platform type (2) for station '"+le.data->ID+"' "+strutils::ftos(le.data->lat,4)+" "+strutils::ftos(le.data->lon,4)+" "+le.data->ISPD_ID+" "+strutils::itos(le.data->plat_type)+" "+strutils::itos(le.data->isrc)+" '"+std::string(1,le.data->csrc)+"'","hdf2xml",user,args.args_string);
 wss << "unknown platform type (2) for station '"+le.data->ID+"' "+strutils::ftos(le.data->lat,4)+" "+strutils::ftos(le.data->lon,4)+" "+le.data->ISPD_ID+" "+strutils::itos(le.data->plat_type)+" "+strutils::itos(le.data->isrc)+" '"+std::string(1,le.data->csrc)+"'" << std::endl;
 	  return "";
 	}
@@ -419,13 +419,13 @@ std::string get_ISPD_HDF5_ID_entry(LibEntry& le,std::string pentry_key,DateTime&
 	    ientry_key=pentry_key+"[!]WBAN[!]"+sp[1];
 	  }
 	  else {
-//	    metautils::logWarning("unknown ID type (1) for station '"+le.data->ID+"' "+strutils::ftos(le.data->lat,4)+" "+strutils::ftos(le.data->lon,4)+" "+le.data->ISPD_ID+" "+strutils::itos(le.data->plat_type)+" "+strutils::itos(le.data->isrc)+" '"+std::string(1,le.data->csrc)+"'","hdf2xml",user,args.argsString);
+//	    metautils::log_warning("unknown ID type (1) for station '"+le.data->ID+"' "+strutils::ftos(le.data->lat,4)+" "+strutils::ftos(le.data->lon,4)+" "+le.data->ISPD_ID+" "+strutils::itos(le.data->plat_type)+" "+strutils::itos(le.data->isrc)+" '"+std::string(1,le.data->csrc)+"'","hdf2xml",user,args.args_string);
 wss << "unknown ID type (1) for station '"+le.data->ID+"' "+strutils::ftos(le.data->lat,4)+" "+strutils::ftos(le.data->lon,4)+" "+le.data->ISPD_ID+" "+strutils::itos(le.data->plat_type)+" "+strutils::itos(le.data->isrc)+" '"+std::string(1,le.data->csrc)+"'" << std::endl;
 	  }
 	}
     }
     else {
-//	metautils::logWarning("unknown ID type (2) for station '"+le.data->ID+"' "+strutils::ftos(le.data->lat,4)+" "+strutils::ftos(le.data->lon,4)+" "+le.data->ISPD_ID+" "+strutils::itos(le.data->plat_type)+" "+strutils::itos(le.data->isrc)+" '"+std::string(1,le.data->csrc)+"'","hdf2xml",user,args.argsString);
+//	metautils::log_warning("unknown ID type (2) for station '"+le.data->ID+"' "+strutils::ftos(le.data->lat,4)+" "+strutils::ftos(le.data->lon,4)+" "+le.data->ISPD_ID+" "+strutils::itos(le.data->plat_type)+" "+strutils::itos(le.data->isrc)+" '"+std::string(1,le.data->csrc)+"'","hdf2xml",user,args.args_string);
 wss << "unknown ID type (2) for station '"+le.data->ID+"' "+strutils::ftos(le.data->lat,4)+" "+strutils::ftos(le.data->lon,4)+" "+le.data->ISPD_ID+" "+strutils::itos(le.data->plat_type)+" "+strutils::itos(le.data->isrc)+" '"+std::string(1,le.data->csrc)+"'" << std::endl;
     }
   }
@@ -463,7 +463,7 @@ wss << "unknown ID type (2) for station '"+le.data->ID+"' "+strutils::ftos(le.da
   else if (le.data->ISPD_ID == "002001") {
     if (strutils::is_numeric(le.data->ID)) {
 	if (le.data->ID.length() == 5) {
-	  if (dt.getYear() <= 1948) {
+	  if (dt.year() <= 1948) {
 	    ientry_key=pentry_key+"[!]WBAN[!]"+le.data->ID;
 	  }
 	  else {
@@ -545,7 +545,7 @@ wss << "unknown ID type (2) for station '"+le.data->ID+"' "+strutils::ftos(le.da
     ientry_key=pentry_key+"[!]unknown[!]"+le.data->ID;
   }
   if (ientry_key.length() == 0) {
-//    metautils::logWarning("unknown ID type (3) for station '"+le.data->ID+"' "+strutils::ftos(le.data->lat,4)+" "+strutils::ftos(le.data->lon,4)+" "+le.data->ISPD_ID+" "+strutils::itos(le.data->plat_type)+" "+strutils::itos(le.data->isrc)+" '"+std::string(1,le.data->csrc)+"'","hdf2xml",user,args.argsString);
+//    metautils::log_warning("unknown ID type (3) for station '"+le.data->ID+"' "+strutils::ftos(le.data->lat,4)+" "+strutils::ftos(le.data->lon,4)+" "+le.data->ISPD_ID+" "+strutils::itos(le.data->plat_type)+" "+strutils::itos(le.data->isrc)+" '"+std::string(1,le.data->csrc)+"'","hdf2xml",user,args.args_string);
 wss << "unknown ID type (3) for station '"+le.data->ID+"' "+strutils::ftos(le.data->lat,4)+" "+strutils::ftos(le.data->lon,4)+" "+le.data->ISPD_ID+" "+strutils::itos(le.data->plat_type)+" "+strutils::itos(le.data->isrc)+" '"+std::string(1,le.data->csrc)+"'" << std::endl;
   }
   return ientry_key;
@@ -565,7 +565,7 @@ void update_ID_table(size_t obs_type_index,metadata::ObML::IDEntry& ientry,float
     ientry.data->S_lat=ientry.data->N_lat=lat;
     ientry.data->W_lon=ientry.data->E_lon=lon;
     size_t n,m;
-    convertLatLonToBox(1,0.,lon,n,m);
+    convert_lat_lon_to_box(1,0.,lon,n,m);
     ientry.data->min_lon_bitmap[n]=ientry.data->max_lon_bitmap[n]=lon;
     ientry.data->start=dt;
     ientry.data->end=dt;
@@ -592,7 +592,7 @@ void update_ID_table(size_t obs_type_index,metadata::ObML::IDEntry& ientry,float
 	ientry.data->E_lon=lon;
     }
     size_t n,m;
-    convertLatLonToBox(1,0.,lon,n,m);
+    convert_lat_lon_to_box(1,0.,lon,n,m);
     if (ientry.data->min_lon_bitmap[m] > 900.) {
 	ientry.data->min_lon_bitmap[m]=ientry.data->max_lon_bitmap[m]=lon;
     }
@@ -641,7 +641,7 @@ void update_platform_table(size_t obs_type_index,metadata::ObML::PlatformEntry& 
   }
   else {
     size_t n,m;
-    convertLatLonToBox(1,lat,lon,n,m);
+    convert_lat_lon_to_box(1,lat,lon,n,m);
     pentry.boxflags->flags[n-1][m]=1;
     pentry.boxflags->flags[n-1][360]=1;
   }
@@ -664,16 +664,16 @@ void scan_ISPD_HDF5_file(InputHDF5Stream& istream)
 
   obs_initialize();
 // load the station library
-  if ( (ds=istream.getDataset("/Data/SpatialTemporalLocation/SpatialTemporalLocation")) == NULL || ds->datatype.class_ != 6) {
+  if ( (ds=istream.dataset("/Data/SpatialTemporalLocation/SpatialTemporalLocation")) == NULL || ds->datatype.class_ != 6) {
     myerror="unable to locate spatial/temporal information";
     exit(1);
   }
-  HDF5::decodeCompoundDatatype(ds->datatype,cpd,istream.debugIsOn());
+  HDF5::decode_compound_datatype(ds->datatype,cpd,istream.debug_is_on());
   for (const auto& chunk : ds->data.chunks) {
     for (m=0,l=0; m < ds->data.sizes.front(); m++) {
-	dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[0].byte_offset],istream.getSizeOfOffsets(),istream.getSizeOfLengths(),cpd.members[0].datatype,ds->dataspace,istream.debugIsOn());
+	dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[0].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[0].datatype,ds->dataspace,istream.debug_is_on());
 	le.key=reinterpret_cast<char *>(dv.get());
-	dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[1].byte_offset],istream.getSizeOfOffsets(),istream.getSizeOfLengths(),cpd.members[1].datatype,ds->dataspace,istream.debugIsOn());
+	dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[1].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[1].datatype,ds->dataspace,istream.debug_is_on());
 	le.key+=std::string(reinterpret_cast<char *>(dv.get()));
 	if (le.key.length() > 0 && !stn_library.found(le.key,le)) {
 	  le.data.reset(new LibEntry::Data);
@@ -681,12 +681,12 @@ void scan_ISPD_HDF5_file(InputHDF5Stream& istream)
 	  le.data->isrc=-1;
 	  le.data->csrc='9';
 	  le.data->already_counted=false;
-	  dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[2].byte_offset],istream.getSizeOfOffsets(),istream.getSizeOfLengths(),cpd.members[2].datatype,ds->dataspace,istream.debugIsOn());
+	  dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[2].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[2].datatype,ds->dataspace,istream.debug_is_on());
 	  le.data->ID=reinterpret_cast<char *>(dv.get());
 	  strutils::trim(le.data->ID);
-	  dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[13].byte_offset],istream.getSizeOfOffsets(),istream.getSizeOfLengths(),cpd.members[13].datatype,ds->dataspace,istream.debugIsOn());
+	  dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[13].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[13].datatype,ds->dataspace,istream.debug_is_on());
 	  le.data->lat=*(reinterpret_cast<float *>(dv.get()));
-	  dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[14].byte_offset],istream.getSizeOfOffsets(),istream.getSizeOfLengths(),cpd.members[14].datatype,ds->dataspace,istream.debugIsOn());
+	  dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[14].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[14].datatype,ds->dataspace,istream.debug_is_on());
 	  le.data->lon=*(reinterpret_cast<float *>(dv.get()));
 	  if (le.data->lon > 180.) {
 	    le.data->lon-=360.;
@@ -697,23 +697,23 @@ void scan_ISPD_HDF5_file(InputHDF5Stream& istream)
     }
   }
 // load the ICOADS platform types
-  if ( (ds=istream.getDataset("/SupplementalData/Tracking/ICOADS/TrackingICOADS")) != NULL && ds->datatype.class_ == 6) {
-    HDF5::decodeCompoundDatatype(ds->datatype,cpd,istream.debugIsOn());
+  if ( (ds=istream.dataset("/SupplementalData/Tracking/ICOADS/TrackingICOADS")) != NULL && ds->datatype.class_ == 6) {
+    HDF5::decode_compound_datatype(ds->datatype,cpd,istream.debug_is_on());
     for (const auto& chunk : ds->data.chunks) {
 	for (m=0,l=0; m < ds->data.sizes.front(); ++m) {
-	  dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[0].byte_offset],istream.getSizeOfOffsets(),istream.getSizeOfLengths(),cpd.members[0].datatype,ds->dataspace,istream.debugIsOn());
+	  dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[0].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[0].datatype,ds->dataspace,istream.debug_is_on());
 	  le.key=reinterpret_cast<char *>(dv.get());
 	  if (le.key.length() > 0) {
-	    dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[1].byte_offset],istream.getSizeOfOffsets(),istream.getSizeOfLengths(),cpd.members[1].datatype,ds->dataspace,istream.debugIsOn());
+	    dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[1].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[1].datatype,ds->dataspace,istream.debug_is_on());
 	    le.key+=std::string(reinterpret_cast<char *>(dv.get()));
 	    if (stn_library.found(le.key,le)) {
-		dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[2].byte_offset],istream.getSizeOfOffsets(),istream.getSizeOfLengths(),cpd.members[2].datatype,ds->dataspace,istream.debugIsOn());
+		dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[2].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[2].datatype,ds->dataspace,istream.debug_is_on());
 		le.data->isrc=*(reinterpret_cast<int *>(dv.get()));
-		dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[4].byte_offset],istream.getSizeOfOffsets(),istream.getSizeOfLengths(),cpd.members[4].datatype,ds->dataspace,istream.debugIsOn());
+		dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[4].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[4].datatype,ds->dataspace,istream.debug_is_on());
 		le.data->plat_type=*(reinterpret_cast<int *>(dv.get()));
 	    }
 	    else {
-		metautils::logError("no entry for '"+le.key+"' in station library","hdf2xml",user,args.argsString);
+		metautils::log_error("no entry for '"+le.key+"' in station library","hdf2xml",user,args.args_string);
 	    }
 	  }
 	  l+=ds->data.size_of_element;
@@ -721,45 +721,45 @@ void scan_ISPD_HDF5_file(InputHDF5Stream& istream)
     }
   }
 // load observation types for IDs that don't already have a platform type
-  if ( (ds=istream.getDataset("/Data/Observations/ObservationTypes")) != NULL && ds->datatype.class_ == 6) {
-    HDF5::decodeCompoundDatatype(ds->datatype,cpd,istream.debugIsOn());
+  if ( (ds=istream.dataset("/Data/Observations/ObservationTypes")) != NULL && ds->datatype.class_ == 6) {
+    HDF5::decode_compound_datatype(ds->datatype,cpd,istream.debug_is_on());
     for (const auto& chunk : ds->data.chunks) {
 	for (m=0,l=0; m < ds->data.sizes.front(); ++m) {
-	  dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[0].byte_offset],istream.getSizeOfOffsets(),istream.getSizeOfLengths(),cpd.members[0].datatype,ds->dataspace,istream.debugIsOn());
+	  dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[0].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[0].datatype,ds->dataspace,istream.debug_is_on());
 	  le.key=reinterpret_cast<char *>(dv.get());
 	  if (le.key.length() > 0) {
-	    dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[1].byte_offset],istream.getSizeOfOffsets(),istream.getSizeOfLengths(),cpd.members[1].datatype,ds->dataspace,istream.debugIsOn());
+	    dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[1].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[1].datatype,ds->dataspace,istream.debug_is_on());
 	    le.key+=std::string(reinterpret_cast<char *>(dv.get()));
 	    if (stn_library.found(le.key,le)) {
 		if (le.data->plat_type < 0) {
-		  dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[2].byte_offset],istream.getSizeOfOffsets(),istream.getSizeOfLengths(),cpd.members[2].datatype,ds->dataspace,istream.debugIsOn());
+		  dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[2].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[2].datatype,ds->dataspace,istream.debug_is_on());
 		  le.data->plat_type=1000+*(reinterpret_cast<int *>(dv.get()));
 		}
-		dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[4].byte_offset],istream.getSizeOfOffsets(),istream.getSizeOfLengths(),cpd.members[4].datatype,ds->dataspace,istream.debugIsOn());
+		dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[4].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[4].datatype,ds->dataspace,istream.debug_is_on());
 		le.data->ISPD_ID=reinterpret_cast<char *>(dv.get());
 		strutils::replace_all(le.data->ISPD_ID," ","0");
 	    }
 	    else {
-		metautils::logError("no entry for '"+le.key+"' in station library","hdf2xml",user,args.argsString);
+		metautils::log_error("no entry for '"+le.key+"' in station library","hdf2xml",user,args.args_string);
 	    }
 	  }
 	  l+=ds->data.size_of_element;
 	}
     }
   }
-  if ( (ds=istream.getDataset("/SupplementalData/Tracking/Land/TrackingLand")) != NULL && ds->datatype.class_ == 6) {
-    HDF5::decodeCompoundDatatype(ds->datatype,cpd,istream.debugIsOn());
+  if ( (ds=istream.dataset("/SupplementalData/Tracking/Land/TrackingLand")) != NULL && ds->datatype.class_ == 6) {
+    HDF5::decode_compound_datatype(ds->datatype,cpd,istream.debug_is_on());
     for (const auto& chunk : ds->data.chunks) {
 	for (m=0,l=0; m < ds->data.sizes.front(); ++m) {
-	  dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[0].byte_offset],istream.getSizeOfOffsets(),istream.getSizeOfLengths(),cpd.members[0].datatype,ds->dataspace,istream.debugIsOn());
+	  dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[0].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[0].datatype,ds->dataspace,istream.debug_is_on());
 	  le.key=reinterpret_cast<char *>(dv.get());
 	  if (le.key.length() > 0) {
-	    dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[1].byte_offset],istream.getSizeOfOffsets(),istream.getSizeOfLengths(),cpd.members[1].datatype,ds->dataspace,istream.debugIsOn());
+	    dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[1].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[1].datatype,ds->dataspace,istream.debug_is_on());
 	    le.key+=std::string(reinterpret_cast<char *>(dv.get()));
 	    if (stn_library.found(le.key,le)) {
-		dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[2].byte_offset],istream.getSizeOfOffsets(),istream.getSizeOfLengths(),cpd.members[2].datatype,ds->dataspace,istream.debugIsOn());
+		dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[2].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[2].datatype,ds->dataspace,istream.debug_is_on());
 		le.data->csrc=(reinterpret_cast<char *>(dv.get()))[0];
-		dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[3].byte_offset],istream.getSizeOfOffsets(),istream.getSizeOfLengths(),cpd.members[3].datatype,ds->dataspace,istream.debugIsOn());
+		dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[3].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[3].datatype,ds->dataspace,istream.debug_is_on());
 		sdum=reinterpret_cast<char *>(dv.get());
 		if (sdum == "FM-12") {
 		  le.data->plat_type=2001;
@@ -820,7 +820,7 @@ void scan_ISPD_HDF5_file(InputHDF5Stream& istream)
 		}
 	    }
 	    else {
-		metautils::logError("no entry for '"+le.key+"' in station library","hdf2xml",user,args.argsString);
+		metautils::log_error("no entry for '"+le.key+"' in station library","hdf2xml",user,args.args_string);
 	    }
 	  }
 	  l+=ds->data.size_of_element;
@@ -828,22 +828,22 @@ void scan_ISPD_HDF5_file(InputHDF5Stream& istream)
     }
   }
 // load tropical storm IDs
-  if ( (ds=istream.getDataset("/SupplementalData/Misc/TropicalStorms/StormID")) != NULL && ds->datatype.class_ == 6) {
-    HDF5::decodeCompoundDatatype(ds->datatype,cpd,istream.debugIsOn());
+  if ( (ds=istream.dataset("/SupplementalData/Misc/TropicalStorms/StormID")) != NULL && ds->datatype.class_ == 6) {
+    HDF5::decode_compound_datatype(ds->datatype,cpd,istream.debug_is_on());
     for (const auto& chunk : ds->data.chunks) {
 	for (m=0,l=0; m < ds->data.sizes.front(); ++m) {
-	  dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[0].byte_offset],istream.getSizeOfOffsets(),istream.getSizeOfLengths(),cpd.members[0].datatype,ds->dataspace,istream.debugIsOn());
+	  dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[0].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[0].datatype,ds->dataspace,istream.debug_is_on());
 	  le.key=reinterpret_cast<char *>(dv.get());
 	  if (le.key.length() > 0) {
-	    dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[1].byte_offset],istream.getSizeOfOffsets(),istream.getSizeOfLengths(),cpd.members[1].datatype,ds->dataspace,istream.debugIsOn());
+	    dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[1].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[1].datatype,ds->dataspace,istream.debug_is_on());
 	    le.key+=std::string(reinterpret_cast<char *>(dv.get()));
 	    if (stn_library.found(le.key,le)) {
-		dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[2].byte_offset],istream.getSizeOfOffsets(),istream.getSizeOfLengths(),cpd.members[2].datatype,ds->dataspace,istream.debugIsOn());
+		dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[2].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[2].datatype,ds->dataspace,istream.debug_is_on());
 		le.data->ID=reinterpret_cast<char *>(dv.get());
 		strutils::trim(le.data->ID);
 	    }
 	    else {
-		metautils::logError("no entry for '"+le.key+"' in station library","hdf2xml",user,args.argsString);
+		metautils::log_error("no entry for '"+le.key+"' in station library","hdf2xml",user,args.args_string);
 	    }
 	  }
 	  l+=ds->data.size_of_element;
@@ -851,19 +851,19 @@ void scan_ISPD_HDF5_file(InputHDF5Stream& istream)
     }
   }
 // scan the observations
-  if ( (ds=istream.getDataset("/Data/Observations/Observations")) == NULL || ds->datatype.class_ != 6) {
+  if ( (ds=istream.dataset("/Data/Observations/Observations")) == NULL || ds->datatype.class_ != 6) {
     myerror="unable to locate observations";
     exit(1);
   }
-  HDF5::decodeCompoundDatatype(ds->datatype,cpd,istream.debugIsOn());
+  HDF5::decode_compound_datatype(ds->datatype,cpd,istream.debug_is_on());
   for (const auto& chunk : ds->data.chunks) {
     for (m=0,l=0; m < ds->data.sizes.front(); ++m) {
-	dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[0].byte_offset],istream.getSizeOfOffsets(),istream.getSizeOfLengths(),cpd.members[0].datatype,ds->dataspace,istream.debugIsOn());
+	dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[0].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[0].datatype,ds->dataspace,istream.debug_is_on());
 	timestamp=reinterpret_cast<char *>(dv.get());
 	strutils::trim(timestamp);
 	if (timestamp.length() > 0) {
 	  le.key=timestamp;
-	  dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[1].byte_offset],istream.getSizeOfOffsets(),istream.getSizeOfLengths(),cpd.members[1].datatype,ds->dataspace,istream.debugIsOn());
+	  dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[1].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[1].datatype,ds->dataspace,istream.debug_is_on());
 	  le.key+=std::string(reinterpret_cast<char *>(dv.get()));
 	  if (stn_library.found(le.key,le)) {
 	    if (timestamp.length() > 0) {
@@ -882,32 +882,32 @@ void scan_ISPD_HDF5_file(InputHDF5Stream& istream)
 		  ientry.key=get_ISPD_HDF5_ID_entry(le,pentry.key,dt);
 		  if (ientry.key.length() > 0) {
 // SLP
-		    dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[2].byte_offset],istream.getSizeOfOffsets(),istream.getSizeOfLengths(),cpd.members[2].datatype,ds->dataspace,istream.debugIsOn());
-		    if (dv.class_ != 1) {
-			metautils::logError("observed SLP is not a floating point number for '"+ientry.key+"'","hdf2xml",user,args.argsString);
+		    dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[2].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[2].datatype,ds->dataspace,istream.debug_is_on());
+		    if (dv._class_ != 1) {
+			metautils::log_error("observed SLP is not a floating point number for '"+ientry.key+"'","hdf2xml",user,args.args_string);
 		    }
-		    if (dv.precision == 32) {
+		    if (dv.precision_ == 32) {
 			v[0]=*(reinterpret_cast<float *>(dv.get()));
 		    }
-		    else if (dv.precision == 64) {
+		    else if (dv.precision_ == 64) {
 			v[0]=*(reinterpret_cast<double *>(dv.get()));
 		    }
 		    else {
-			metautils::logError("bad precision ("+strutils::itos(dv.precision)+") for SLP","hdf2xml",user,args.argsString);
+			metautils::log_error("bad precision ("+strutils::itos(dv.precision_)+") for SLP","hdf2xml",user,args.args_string);
 		    }
 // STN P
-		    dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[5].byte_offset],istream.getSizeOfOffsets(),istream.getSizeOfLengths(),cpd.members[5].datatype,ds->dataspace,istream.debugIsOn());
-		    if (dv.class_ != 1) {
-			metautils::logError("observed STN P is not a floating point number for '"+ientry.key+"'","hdf2xml",user,args.argsString);
+		    dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[5].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[5].datatype,ds->dataspace,istream.debug_is_on());
+		    if (dv._class_ != 1) {
+			metautils::log_error("observed STN P is not a floating point number for '"+ientry.key+"'","hdf2xml",user,args.args_string);
 		    }
-		    if (dv.precision == 32) {
+		    if (dv.precision_ == 32) {
 			v[1]=*(reinterpret_cast<float *>(dv.get()));
 		    }
-		    else if (dv.precision == 64) {
+		    else if (dv.precision_ == 64) {
 			v[1]=*(reinterpret_cast<double *>(dv.get()));
 		    }
 		    else {
-			metautils::logError("bad precision ("+strutils::itos(dv.precision)+") for SLP","hdf2xml",user,args.argsString);
+			metautils::log_error("bad precision ("+strutils::itos(dv.precision_)+") for SLP","hdf2xml",user,args.args_string);
 		    }
 		    if ((v[0] >= 860. && v[0] <= 1090.) || (v[1] >= 400. && v[1] <= 1090.)) {
 			update_ID_table(1,ientry,le.data->lat,le.data->lon,dt,std::stoll(timestamp));
@@ -942,25 +942,25 @@ void scan_ISPD_HDF5_file(InputHDF5Stream& istream)
 	    }
 	  }
 	  else {
-	    metautils::logError("no entry for '"+le.key+"' in station library","hdf2xml",user,args.argsString);
+	    metautils::log_error("no entry for '"+le.key+"' in station library","hdf2xml",user,args.args_string);
 	  }
 	}
 	l+=ds->data.size_of_element;
     }
   }
 // scan for feedback information
-  if ( (ds=istream.getDataset("/Data/AssimilationFeedback/AssimilationFeedback")) == NULL)
-    ds=istream.getDataset("/Data/AssimilationFeedback/AssimilationFeedBack");
+  if ( (ds=istream.dataset("/Data/AssimilationFeedback/AssimilationFeedback")) == NULL)
+    ds=istream.dataset("/Data/AssimilationFeedback/AssimilationFeedBack");
   if (ds != NULL && ds->datatype.class_ == 6) {
-    HDF5::decodeCompoundDatatype(ds->datatype,cpd,istream.debugIsOn());
+    HDF5::decode_compound_datatype(ds->datatype,cpd,istream.debug_is_on());
     for (const auto& chunk : ds->data.chunks) {
 	for (m=0,l=0; m < ds->data.sizes.front(); ++m) {
-	  dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[0].byte_offset],istream.getSizeOfOffsets(),istream.getSizeOfLengths(),cpd.members[0].datatype,ds->dataspace,istream.debugIsOn());
+	  dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[0].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[0].datatype,ds->dataspace,istream.debug_is_on());
 	  timestamp=reinterpret_cast<char *>(dv.get());
 	  strutils::trim(timestamp);
 	  if (timestamp.length() > 0) {
 	    le.key=timestamp;
-	    dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[1].byte_offset],istream.getSizeOfOffsets(),istream.getSizeOfOffsets(),cpd.members[1].datatype,ds->dataspace,istream.debugIsOn());
+	    dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[1].byte_offset],istream.size_of_offsets(),istream.size_of_offsets(),cpd.members[1].datatype,ds->dataspace,istream.debug_is_on());
 	    le.key+=std::string(reinterpret_cast<char *>(dv.get()));
 	    if (stn_library.found(le.key,le)) {
 		if (timestamp.length() > 0) {
@@ -973,44 +973,44 @@ void scan_ISPD_HDF5_file(InputHDF5Stream& istream)
 		  if (pentry.key.length() > 0) {
 		    ientry.key=get_ISPD_HDF5_ID_entry(le,pentry.key,dt);
 		    if (ientry.key.length() > 0) {
-			dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[2].byte_offset],istream.getSizeOfOffsets(),istream.getSizeOfLengths(),cpd.members[2].datatype,ds->dataspace,istream.debugIsOn());
-			if (dv.class_ != 1) {
-			  metautils::logError("modified observed pressure is not a floating point number for '"+ientry.key+"'","hdf2xml",user,args.argsString);
+			dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[2].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[2].datatype,ds->dataspace,istream.debug_is_on());
+			if (dv._class_ != 1) {
+			  metautils::log_error("modified observed pressure is not a floating point number for '"+ientry.key+"'","hdf2xml",user,args.args_string);
 			}
-			if (dv.precision == 32) {
+			if (dv.precision_ == 32) {
 			  v[0]=*(reinterpret_cast<float *>(dv.get()));
 			}
-			else if (dv.precision == 64) {
+			else if (dv.precision_ == 64) {
 			  v[0]=*(reinterpret_cast<double *>(dv.get()));
 			}
 			else {
-			  metautils::logError("bad precision ("+strutils::itos(dv.precision)+") for modified observed pressure","hdf2xml",user,args.argsString);
+			  metautils::log_error("bad precision ("+strutils::itos(dv.precision_)+") for modified observed pressure","hdf2xml",user,args.args_string);
 			}
-			dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[11].byte_offset],istream.getSizeOfOffsets(),istream.getSizeOfLengths(),cpd.members[11].datatype,ds->dataspace,istream.debugIsOn());
-			if (dv.class_ != 1) {
-			  metautils::logError("ensemble first guess pressure is not a floating point number for '"+ientry.key+"'","hdf2xml",user,args.argsString);
+			dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[11].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[11].datatype,ds->dataspace,istream.debug_is_on());
+			if (dv._class_ != 1) {
+			  metautils::log_error("ensemble first guess pressure is not a floating point number for '"+ientry.key+"'","hdf2xml",user,args.args_string);
 			}
-			if (dv.precision == 32) {
+			if (dv.precision_ == 32) {
 			  v[1]=*(reinterpret_cast<float *>(dv.get()));
 			}
-			else if (dv.precision == 64) {
+			else if (dv.precision_ == 64) {
 			  v[1]=*(reinterpret_cast<double *>(dv.get()));
 			}
 			else {
-			  metautils::logError("bad precision ("+strutils::itos(dv.precision)+") for ensemble first guess pressure","hdf2xml",user,args.argsString);
+			  metautils::log_error("bad precision ("+strutils::itos(dv.precision_)+") for ensemble first guess pressure","hdf2xml",user,args.args_string);
 			}
-			dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[14].byte_offset],istream.getSizeOfOffsets(),istream.getSizeOfLengths(),cpd.members[14].datatype,ds->dataspace,istream.debugIsOn());
-			if (dv.class_ != 1) {
-			  metautils::logError("ensemble analysis pressure is not a floating point number for '"+ientry.key+"'","hdf2xml",user,args.argsString);
+			dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[14].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[14].datatype,ds->dataspace,istream.debug_is_on());
+			if (dv._class_ != 1) {
+			  metautils::log_error("ensemble analysis pressure is not a floating point number for '"+ientry.key+"'","hdf2xml",user,args.args_string);
 			}
-			if (dv.precision == 32) {
+			if (dv.precision_ == 32) {
 			  v[2]=*(reinterpret_cast<float *>(dv.get()));
 			}
-			else if (dv.precision == 64) {
+			else if (dv.precision_ == 64) {
 			  v[2]=*(reinterpret_cast<double *>(dv.get()));
 			}
 			else {
-			  metautils::logError("bad precision ("+strutils::itos(dv.precision)+") for ensemble analysis pressure","hdf2xml",user,args.argsString);
+			  metautils::log_error("bad precision ("+strutils::itos(dv.precision_)+") for ensemble analysis pressure","hdf2xml",user,args.args_string);
 			}
 			if ((v[0] >= 400. && v[0] <= 1090.) || (v[1] >= 400. && v[1] <= 1090.) || (v[2] >= 400. && v[2] <= 1090.)) {
 			  update_ID_table(1,ientry,le.data->lat,le.data->lon,dt,std::stoll(timestamp));
@@ -1048,26 +1048,26 @@ void scan_US_Array_Transportable_HDF5_file(InputHDF5Stream& istream,ScanData& sc
   obs_initialize();
 // load the pressure dataset
   InputHDF5Stream::Dataset *ds;
-  if ( (ds=istream.getDataset("/obsdata/presdata")) == nullptr || ds->datatype.class_ != 6) {
+  if ( (ds=istream.dataset("/obsdata/presdata")) == nullptr || ds->datatype.class_ != 6) {
     myerror="unable to locate the pressure dataset";
     exit(1);
   }
   HDF5::DataArray times,stnids,pres;
   times.fill(istream,*ds,0);
   if (times.type != HDF5::DataArray::long_long_) {
-     metautils::logError("expected the timestamps to be 'long long' but got "+strutils::itos(times.type),"hdf2xml",user,args.argsString);
+     metautils::log_error("expected the timestamps to be 'long long' but got "+strutils::itos(times.type),"hdf2xml",user,args.args_string);
   }
   stnids.fill(istream,*ds,1);
   if (stnids.type != HDF5::DataArray::short_) {
-     metautils::logError("expected the numeric station IDs to be 'short' but got "+strutils::itos(stnids.type),"hdf2xml",user,args.argsString);
+     metautils::log_error("expected the numeric station IDs to be 'short' but got "+strutils::itos(stnids.type),"hdf2xml",user,args.args_string);
   }
   pres.fill(istream,*ds,2);
   if (pres.type != HDF5::DataArray::float_) {
-     metautils::logError("expected the pressures to be 'float' but got "+strutils::itos(pres.type),"hdf2xml",user,args.argsString);
+     metautils::log_error("expected the pressures to be 'float' but got "+strutils::itos(pres.type),"hdf2xml",user,args.args_string);
   }
   int num_values=0;
   float pres_miss_val=3.e48;
-  short nID=-1;
+  short numeric_ID=-1;
   metadata::ObML::IDEntry ientry;
   metadata::ObML::PlatformEntry pentry;
   metadata::ObML::DataTypeEntry de;
@@ -1089,14 +1089,14 @@ void scan_US_Array_Transportable_HDF5_file(InputHDF5Stream& istream,ScanData& sc
 	  }
 	}
 	else {
-	  metautils::logError("found latitude but no station ID","hdf2xml",user,args.argsString);
+	  metautils::log_error("found latitude but no station ID","hdf2xml",user,args.args_string);
 	}
     }
     else if (key == "LONGITUDE_DDEG") {
 	if (ID_table[1]->size() == 1) {
 	  ientry.data->W_lon=ientry.data->E_lon=*(reinterpret_cast<float *>(attr.value.value));
 	  size_t n,m;
-	  convertLatLonToBox(1,ientry.data->S_lat,ientry.data->W_lon,n,m);
+	  convert_lat_lon_to_box(1,ientry.data->S_lat,ientry.data->W_lon,n,m);
 	  ientry.data->min_lon_bitmap[m]=ientry.data->max_lon_bitmap[m]=ientry.data->W_lon;
 	  if (pentry.boxflags->spole == 0 && pentry.boxflags->npole == 0) {
 	    pentry.boxflags->flags[n-1][m]=1;
@@ -1104,7 +1104,7 @@ void scan_US_Array_Transportable_HDF5_file(InputHDF5Stream& istream,ScanData& sc
 	  }
 	}
 	else {
-	  metautils::logError("found longitude but no station ID","hdf2xml",user,args.argsString);
+	  metautils::log_error("found longitude but no station ID","hdf2xml",user,args.args_string);
 	}
     }
     else if (key == "CHAR_STATION_ID") {
@@ -1128,11 +1128,11 @@ void scan_US_Array_Transportable_HDF5_file(InputHDF5Stream& istream,ScanData& sc
 	  platform_table[1].insert(pentry);
 	}
 	else {
-	  metautils::logError("multiple station IDs not expected","hdf2xml",user,args.argsString);
+	  metautils::log_error("multiple station IDs not expected","hdf2xml",user,args.args_string);
 	}
     }
     else if (key == "NUMERIC_STATION_ID") {
-	nID=*(reinterpret_cast<short *>(attr.value.value));
+	numeric_ID=*(reinterpret_cast<short *>(attr.value.value));
     }
     else if (key == "FIELD_2_NAME") {
 	de.key.assign(reinterpret_cast<char *>(attr.value.value));
@@ -1145,10 +1145,10 @@ void scan_US_Array_Transportable_HDF5_file(InputHDF5Stream& istream,ScanData& sc
     }
   }
   if (se.key.length() == 0) {
-    metautils::logError("unable to get title for the data value","hdf2xml",user,args.argsString);
+    metautils::log_error("unable to get title for the data value","hdf2xml",user,args.args_string);
   }
   if (de.key.length() == 0) {
-    metautils::logError("unable to get the name of the data value","hdf2xml",user,args.argsString);
+    metautils::log_error("unable to get the name of the data value","hdf2xml",user,args.args_string);
   }
   else {
     de.data.reset(new metadata::ObML::DataTypeEntry::Data);
@@ -1157,13 +1157,13 @@ void scan_US_Array_Transportable_HDF5_file(InputHDF5Stream& istream,ScanData& sc
   }
   DateTime epoch(1970,1,1,0,0);
   for (auto n=0; n < num_values; ++n) {
-    if (stnids.short_value(n) != nID) {
-	metautils::logError("unexpected change in the numeric station ID","hdf2xml",user,args.argsString);
+    if (stnids.short_value(n) != numeric_ID) {
+	metautils::log_error("unexpected change in the numeric station ID","hdf2xml",user,args.args_string);
     }
     if (pres.float_value(n) != pres_miss_val) {
 	++(ientry.data->nsteps);
 	++(de.data->nsteps);
-	DateTime dt=epoch.secondsAdded(times.long_long_value(n));
+	DateTime dt=epoch.seconds_added(times.long_long_value(n));
 	if (dt < ientry.data->start) {
 	  ientry.data->start=dt;
 	}
@@ -1172,7 +1172,7 @@ void scan_US_Array_Transportable_HDF5_file(InputHDF5Stream& istream,ScanData& sc
 	}
     }
   }
-  scan_data.map_name=getRemoteWebFile("https://rda.ucar.edu/metadata/ParameterTables/HDF5.ds"+args.dsnum+".xml",tdir->name());
+  scan_data.map_name=remote_web_file("https://rda.ucar.edu/metadata/ParameterTables/HDF5.ds"+args.dsnum+".xml",tdir->name());
   scan_data.found_map=(scan_data.map_name.length() > 0);
   se.key=de.key+"<!>"+se.key+"<!>Hz";
   scan_data.varlist.emplace_back(se.key);
@@ -1188,10 +1188,10 @@ std::string get_gridded_time_method(const std::shared_ptr<InputHDF5Stream::Datas
   InputHDF5Stream::Attribute attr;
   std::string time_method;
 
-  if (ds->attributes.found("cell_methods",attr) && attr.value.class_ == 3) {
-    time_method=metautils::NcTime::getTimeMethodFromCellMethods(reinterpret_cast<char *>(attr.value.value),timeid);
+  if (ds->attributes.found("cell_methods",attr) && attr.value._class_ == 3) {
+    time_method=metautils::NcTime::time_method_from_cell_methods(reinterpret_cast<char *>(attr.value.value),timeid);
     if (time_method[0] == '!') {
-	metautils::logError("cell method '"+time_method.substr(1)+"' is not valid CF","hdf2xml",user,args.argsString);
+	metautils::log_error("cell method '"+time_method.substr(1)+"' is not valid CF","hdf2xml",user,args.args_string);
     }
     else {
 	return time_method;
@@ -1209,18 +1209,18 @@ void add_gridded_time_range(std::string key_start,my::map<metautils::StringEntry
   InvEntry ie;
   bool found_no_method=false;
 
-  vars=istream.getDatasetsWithAttribute("DIMENSION_LIST");
+  vars=istream.datasets_with_attribute("DIMENSION_LIST");
   for (const auto& var : vars) {
     var.dataset->attributes.found("DIMENSION_LIST",attr);
-    if (attr.value.class_ == 9 && attr.value.dim_sizes.size() == 1 && attr.value.dim_sizes[0] > 2) {
+    if (attr.value._class_ == 9 && attr.value.dim_sizes.size() == 1 && attr.value.dim_sizes[0] > 2) {
 	time_method=get_gridded_time_method(var.dataset,timeid);
 	if (time_method.length() == 0) {
 	  found_no_method=true;
 	}
 	else {
-	  ie.key=metautils::NcTime::getGriddedNetCDFTimeRangeDescription(tre,time_data,strutils::capitalize(time_method),error);
+	  ie.key=metautils::NcTime::gridded_NetCDF_time_range_description(tre,time_data,strutils::capitalize(time_method),error);
 	  if (error.length() > 0) {
-	    metautils::logError(error,"hdf2xml",user,args.argsString);
+	    metautils::log_error(error,"hdf2xml",user,args.args_string);
 	  }
 	  gentry_key=key_start+ie.key;
 	  if (!gentry_table.found(gentry_key,se)) {
@@ -1231,9 +1231,9 @@ void add_gridded_time_range(std::string key_start,my::map<metautils::StringEntry
     }
   }
   if (found_no_method) {
-    ie.key=metautils::NcTime::getGriddedNetCDFTimeRangeDescription(tre,time_data,"",error);
+    ie.key=metautils::NcTime::gridded_NetCDF_time_range_description(tre,time_data,"",error);
     if (error.length() > 0) {
-	metautils::logError(error,"hdf2xml",user,args.argsString);
+	metautils::log_error(error,"hdf2xml",user,args.args_string);
     }
     gentry_key=key_start+ie.key;
     if (!gentry_table.found(gentry_key,se)) {
@@ -1241,7 +1241,7 @@ void add_gridded_time_range(std::string key_start,my::map<metautils::StringEntry
 	gentry_table.insert(se);
     }
   }
-  if (inv.is_open() && !inv_U_table.found(ie.key,ie)) {
+  if (inv_stream.is_open() && !inv_U_table.found(ie.key,ie)) {
     ie.num=inv_U_table.size();
     inv_U_table.insert(ie);
   }
@@ -1288,7 +1288,7 @@ void add_gridded_lat_lon_keys(my::map<metautils::StringEntry>& gentry_table,Grid
   InvEntry ie;
   ie.key=strutils::substitute(key_start,"<!>",",");
   strutils::chop(ie.key);
-  if (inv.is_open() && !inv_G_table.found(ie.key,ie)) {
+  if (inv_stream.is_open() && !inv_G_table.found(ie.key,ie)) {
     ie.num=inv_G_table.size();
     inv_G_table.insert(ie);
   }
@@ -1308,7 +1308,7 @@ double data_array_value(const HDF5::DataArray& data_array,size_t index,const Inp
 	  }
 	  default:
 	  {
-	    metautils::logError("unable to get value for fixed-point size "+strutils::itos(ds->data.size_of_element),"hdf2xml",user,args.argsString);
+	    metautils::log_error("unable to get value for fixed-point size "+strutils::itos(ds->data.size_of_element),"hdf2xml",user,args.args_string);
 	  }
 	}
 	break;
@@ -1328,20 +1328,20 @@ double data_array_value(const HDF5::DataArray& data_array,size_t index,const Inp
 	  }
 	  default:
 	  {
-	    metautils::logError("unable to get value for floating-point size "+strutils::itos(ds->data.size_of_element),"hdf2xml",user,args.argsString);
+	    metautils::log_error("unable to get value for floating-point size "+strutils::itos(ds->data.size_of_element),"hdf2xml",user,args.args_string);
 	  }
 	}
 	break;
     }
     default:
     {
-	metautils::logError("unable to decode time from datatype class "+strutils::itos(ds->datatype.class_),"hdf2xml",user,args.argsString);
+	metautils::log_error("unable to decode time from datatype class "+strutils::itos(ds->datatype.class_),"hdf2xml",user,args.args_string);
     }
   }
   return value;
 }
 
-void add_gridded_netCDF_parameter(const InputHDF5Stream::DatasetEntry& var,ScanData& scan_data,const metautils::NcTime::TimeRange& time_range,ParameterData& parameter_data,int num_steps)
+void add_gridded_NetCDF_parameter(const InputHDF5Stream::DatasetEntry& var,ScanData& scan_data,const metautils::NcTime::TimeRange& time_range,ParameterData& parameter_data,int num_steps)
 {
   std::string description,units,standard_name,sdum;
   InputHDF5Stream::Attribute attr;
@@ -1349,21 +1349,21 @@ void add_gridded_netCDF_parameter(const InputHDF5Stream::DatasetEntry& var,ScanD
 
   description="";
   units="";
-  if (var.dataset->attributes.found("units",attr) && attr.value.class_ == 3) {
+  if (var.dataset->attributes.found("units",attr) && attr.value._class_ == 3) {
     units=reinterpret_cast<char *>(attr.value.value);
   }
   if (description.length() == 0) {
-    if ((var.dataset->attributes.found("description",attr) || var.dataset->attributes.found("Description",attr)) && attr.value.class_ == 3) {
+    if ((var.dataset->attributes.found("description",attr) || var.dataset->attributes.found("Description",attr)) && attr.value._class_ == 3) {
 	description=reinterpret_cast<char *>(attr.value.value);
     }
-    else if ((var.dataset->attributes.found("comment",attr) || var.dataset->attributes.found("Comment",attr)) && attr.value.class_ == 3) {
+    else if ((var.dataset->attributes.found("comment",attr) || var.dataset->attributes.found("Comment",attr)) && attr.value._class_ == 3) {
 	description=reinterpret_cast<char *>(attr.value.value);
     }
-    else if (var.dataset->attributes.found("long_name",attr) && attr.value.class_ == 3) {
+    else if (var.dataset->attributes.found("long_name",attr) && attr.value._class_ == 3) {
 	description=reinterpret_cast<char *>(attr.value.value);
     }
   }
-  if (var.dataset->attributes.found("standard_name",attr) && attr.value.class_ == 3) {
+  if (var.dataset->attributes.found("standard_name",attr) && attr.value._class_ == 3) {
     standard_name=reinterpret_cast<char *>(attr.value.value);
   }
   sdum=var.key;
@@ -1373,7 +1373,7 @@ void add_gridded_netCDF_parameter(const InputHDF5Stream::DatasetEntry& var,ScanD
   strutils::trim(standard_name);
   se.key=sdum+"<!>"+description+"<!>"+units+"<!>"+standard_name;
   if (!parameter_data.table.found(se.key,se)) {
-    sdum=parameter_data.map.getShortName(var.key);
+    sdum=parameter_data.map.short_name(var.key);
     if (!scan_data.found_map || sdum.length() == 0) {
 	parameter_data.table.insert(se);
 	scan_data.varlist.push_back(se.key);
@@ -1385,9 +1385,9 @@ void add_gridded_netCDF_parameter(const InputHDF5Stream::DatasetEntry& var,ScanD
 	scan_data.var_changes_table.insert(se);
     }
   }
-  param_entry->startDateTime=time_range.first_valid_datetime;
-  param_entry->endDateTime=time_range.last_valid_datetime;
-  param_entry->numTimeSteps=num_steps;
+  param_entry->start_date_time=time_range.first_valid_datetime;
+  param_entry->end_date_time=time_range.last_valid_datetime;
+  param_entry->num_time_steps=num_steps;
   lentry->parameter_code_table.insert(*param_entry);
 }
 
@@ -1400,11 +1400,11 @@ bool parameter_matches_dimensions(InputHDF5Stream& istream,InputHDF5Stream::Attr
   std::stringstream ss[3];
   bool parameter_matches=false;
 
-  off=8+attr.value.precision;
+  off=8+attr.value.precision_;
   for (n=1; n < static_cast<int>(attr.value.dim_sizes[0]); n++) {
-    if (!istream.getReferenceTablePointer()->found(HDF5::getValue(&attr.value.vlen.buffer[off],attr.value.precision),re[n-1]))
-	metautils::logError("unable to dereference dimension reference","hdf2xml",user,args.argsString);
-    off+=attr.value.precision+4;
+    if (!istream.reference_table_pointer()->found(HDF5::value(&attr.value.vlen.buffer[off],attr.value.precision_),re[n-1]))
+	metautils::log_error("unable to dereference dimension reference","hdf2xml",user,args.args_string);
+    off+=attr.value.precision_+4;
   }
   switch (attr.value.dim_sizes[0]) {
     case 3:
@@ -1414,11 +1414,11 @@ bool parameter_matches_dimensions(InputHDF5Stream& istream,InputHDF5Stream::Attr
 	    parameter_matches=true;
 	  }
 	  else if (re[0].name != latid && re[1].name != lonid) {
-	    if ( (ds[0]=istream.getDataset("/"+latid)) != nullptr && (ds[1]=istream.getDataset("/"+lonid)) != nullptr) {
+	    if ( (ds[0]=istream.dataset("/"+latid)) != nullptr && (ds[1]=istream.dataset("/"+lonid)) != nullptr) {
 		ds[0]->attributes.found("DIMENSION_LIST",at[0]);
-		at[0].value.print(ss[0],istream.getReferenceTablePointer());
+		at[0].value.print(ss[0],istream.reference_table_pointer());
 		ds[1]->attributes.found("DIMENSION_LIST",at[1]);
-		at[1].value.print(ss[1],istream.getReferenceTablePointer());
+		at[1].value.print(ss[1],istream.reference_table_pointer());
 		std::string sdum="["+re[0].name+", "+re[1].name+"]";
 		if (ss[0].str() == sdum && ss[1].str() == sdum) {
 		  parameter_matches=true;
@@ -1435,21 +1435,21 @@ bool parameter_matches_dimensions(InputHDF5Stream& istream,InputHDF5Stream::Attr
 	}
 	else {
 	  auto can_continue=true;
-	  if (re[0].name != levid && (ds[0]=istream.getDataset("/"+levid)) != nullptr) {
+	  if (re[0].name != levid && (ds[0]=istream.dataset("/"+levid)) != nullptr) {
 	    can_continue=false;
 	    ds[0]->attributes.found("DIMENSION_LIST",at[0]);
-	    at[0].value.print(ss[0],istream.getReferenceTablePointer());
+	    at[0].value.print(ss[0],istream.reference_table_pointer());
 	    if (ss[0].str() == "["+re[0].name+"]") {
 		can_continue=true;
 		ds[0]=nullptr;
 		ss[0].str("");
 	    }
 	  }
-	  if (can_continue && (ds[0]=istream.getDataset("/"+latid)) != nullptr && (ds[1]=istream.getDataset("/"+lonid)) != nullptr) {
+	  if (can_continue && (ds[0]=istream.dataset("/"+latid)) != nullptr && (ds[1]=istream.dataset("/"+lonid)) != nullptr) {
 	    ds[0]->attributes.found("DIMENSION_LIST",at[0]);
-	    at[0].value.print(ss[0],istream.getReferenceTablePointer());
+	    at[0].value.print(ss[0],istream.reference_table_pointer());
 	    ds[1]->attributes.found("DIMENSION_LIST",at[1]);
-	    at[1].value.print(ss[1],istream.getReferenceTablePointer());
+	    at[1].value.print(ss[1],istream.reference_table_pointer());
 	    std::string sdum="["+re[1].name+", "+re[2].name+"]";
 	    if (ss[0].str() == sdum && ss[1].str() == sdum) {
 		parameter_matches=true;
@@ -1462,7 +1462,7 @@ bool parameter_matches_dimensions(InputHDF5Stream& istream,InputHDF5Stream::Attr
   return parameter_matches;
 }
 
-void add_gridded_parameters_to_netCDF_level_entry(InputHDF5Stream& istream,std::string& gentry_key,std::string timeid,std::string latid,std::string lonid,std::string levid,ScanData& scan_data,const metautils::NcTime::TimeRangeEntry& tre,ParameterData& parameter_data)
+void add_gridded_parameters_to_NetCDF_level_entry(InputHDF5Stream& istream,std::string& gentry_key,std::string timeid,std::string latid,std::string lonid,std::string levid,ScanData& scan_data,const metautils::NcTime::TimeRangeEntry& tre,ParameterData& parameter_data)
 {
   std::list<InputHDF5Stream::DatasetEntry> vars;
   InputHDF5Stream::Attribute attr;
@@ -1470,10 +1470,10 @@ void add_gridded_parameters_to_netCDF_level_entry(InputHDF5Stream& istream,std::
   metautils::NcTime::TimeRange time_range;
 
 // find all of the variables
-  vars=istream.getDatasetsWithAttribute("DIMENSION_LIST");
+  vars=istream.datasets_with_attribute("DIMENSION_LIST");
   for (const auto& var : vars) {
     var.dataset->attributes.found("DIMENSION_LIST",attr);
-    if (attr.value.class_ == 9 && attr.value.dim_sizes.size() == 1 && attr.value.dim_sizes[0] > 2 && attr.value.vlen.class_ == 7 && parameter_matches_dimensions(istream,attr,timeid,latid,lonid,levid)) {
+    if (attr.value._class_ == 9 && attr.value.dim_sizes.size() == 1 && attr.value.dim_sizes[0] > 2 && attr.value.vlen.class_ == 7 && parameter_matches_dimensions(istream,attr,timeid,latid,lonid,levid)) {
 	time_method=get_gridded_time_method(var.dataset,timeid);
 	if (time_method.length() == 0 || (myequalf(time_bounds.t1,0,0.0001) && myequalf(time_bounds.t1,time_bounds.t2,0.0001))) {
 	  time_range.first_valid_datetime=tre.instantaneous->first_valid_datetime;
@@ -1481,21 +1481,21 @@ void add_gridded_parameters_to_netCDF_level_entry(InputHDF5Stream& istream,std::
 	}
 	else {
 	  if (time_bounds.changed) {
-	    metautils::logError("time bounds changed","hdf2xml",user,args.argsString);
+	    metautils::log_error("time bounds changed","hdf2xml",user,args.args_string);
 	  }
 	  time_range.first_valid_datetime=tre.bounded->first_valid_datetime;
 	  time_range.last_valid_datetime=tre.bounded->last_valid_datetime;
 	}
 	time_method=strutils::capitalize(time_method);
-	tr_description=metautils::NcTime::getGriddedNetCDFTimeRangeDescription(tre,time_data,time_method,error);
+	tr_description=metautils::NcTime::gridded_NetCDF_time_range_description(tre,time_data,time_method,error);
 	if (error.length() > 0) {
-	  metautils::logError(error,"hdf2xml",user,args.argsString);
+	  metautils::log_error(error,"hdf2xml",user,args.args_string);
 	}
 	tr_description=strutils::capitalize(tr_description);
 	if (std::regex_search(gentry_key,std::regex(tr_description+"$"))) {
 	  if (attr.value.dim_sizes[0] == 3 || attr.value.dim_sizes[0] == 4) {
 	    param_entry->key="ds"+args.dsnum+":"+var.key;
-	    add_gridded_netCDF_parameter(var,scan_data,time_range,parameter_data,*tre.num_steps);
+	    add_gridded_NetCDF_parameter(var,scan_data,time_range,parameter_data,*tre.num_steps);
 	    InvEntry ie;
 	    if (!inv_P_table.found(param_entry->key,ie)) {
 		ie.key=param_entry->key;
@@ -1515,10 +1515,10 @@ void update_level_entry(InputHDF5Stream& istream,const metautils::NcTime::TimeRa
   std::string time_method,tr_description,error;
   metautils::NcTime::TimeRange time_range;
 
-  vars=istream.getDatasetsWithAttribute("DIMENSION_LIST");
+  vars=istream.datasets_with_attribute("DIMENSION_LIST");
   for (const auto& var : vars) {
     var.dataset->attributes.found("DIMENSION_LIST",attr);
-    if (attr.value.class_ == 9 && attr.value.dim_sizes.size() == 1 && attr.value.dim_sizes[0] > 2 && attr.value.vlen.class_ == 7 && parameter_matches_dimensions(istream,attr,timeid,latid,lonid,levid)) {
+    if (attr.value._class_ == 9 && attr.value.dim_sizes.size() == 1 && attr.value.dim_sizes[0] > 2 && attr.value.vlen.class_ == 7 && parameter_matches_dimensions(istream,attr,timeid,latid,lonid,levid)) {
 	param_entry->key="ds"+args.dsnum+":"+var.key;
 	time_method=get_gridded_time_method(var.dataset,timeid);
 	time_method=strutils::capitalize(time_method);
@@ -1526,36 +1526,36 @@ void update_level_entry(InputHDF5Stream& istream,const metautils::NcTime::TimeRa
 	  if (time_method.length() == 0 || (myequalf(time_bounds.t1,0,0.0001) && myequalf(time_bounds.t1,time_bounds.t2,0.0001))) {
 	    time_range.first_valid_datetime=tre.instantaneous->first_valid_datetime;
 	    time_range.last_valid_datetime=tre.instantaneous->last_valid_datetime;
-	    add_gridded_netCDF_parameter(var,scan_data,time_range,parameter_data,*tre.num_steps);
+	    add_gridded_NetCDF_parameter(var,scan_data,time_range,parameter_data,*tre.num_steps);
 	  }
 	  else {
 	    if (time_bounds.changed)
-		metautils::logError("time bounds changed","hdf2xml",user,args.argsString);
+		metautils::log_error("time bounds changed","hdf2xml",user,args.args_string);
 	    time_range.first_valid_datetime=tre.bounded->first_valid_datetime;
 	    time_range.last_valid_datetime=tre.bounded->last_valid_datetime;
-	    add_gridded_netCDF_parameter(var,scan_data,time_range,parameter_data,*tre.num_steps);
+	    add_gridded_NetCDF_parameter(var,scan_data,time_range,parameter_data,*tre.num_steps);
 	  }
 	  gentry->level_table.replace(*lentry);
 	}
 	else {
-	  tr_description=metautils::NcTime::getGriddedNetCDFTimeRangeDescription(tre,time_data,time_method,error);
+	  tr_description=metautils::NcTime::gridded_NetCDF_time_range_description(tre,time_data,time_method,error);
 	  if (error.length() > 0)
-	    metautils::logError(error,"hdf2xml",user,args.argsString);
+	    metautils::log_error(error,"hdf2xml",user,args.args_string);
 	  tr_description=strutils::capitalize(tr_description);
 	  if (std::regex_search(gentry->key,std::regex(tr_description+"$"))) {
 	    if (time_method.length() == 0 || (myequalf(time_bounds.t1,0,0.0001) && myequalf(time_bounds.t1,time_bounds.t2,0.0001))) {
-		if (tre.instantaneous->first_valid_datetime < param_entry->startDateTime)
-		  param_entry->startDateTime=tre.instantaneous->first_valid_datetime;
-		if (tre.instantaneous->last_valid_datetime > param_entry->endDateTime)
-		  param_entry->endDateTime=tre.instantaneous->last_valid_datetime;
+		if (tre.instantaneous->first_valid_datetime < param_entry->start_date_time)
+		  param_entry->start_date_time=tre.instantaneous->first_valid_datetime;
+		if (tre.instantaneous->last_valid_datetime > param_entry->end_date_time)
+		  param_entry->end_date_time=tre.instantaneous->last_valid_datetime;
 	    }
 	    else {
-		if (tre.bounded->first_valid_datetime < param_entry->startDateTime)
-		  param_entry->startDateTime=tre.bounded->first_valid_datetime;
-		if (tre.bounded->last_valid_datetime > param_entry->endDateTime)
-		  param_entry->endDateTime=tre.bounded->last_valid_datetime;
+		if (tre.bounded->first_valid_datetime < param_entry->start_date_time)
+		  param_entry->start_date_time=tre.bounded->first_valid_datetime;
+		if (tre.bounded->last_valid_datetime > param_entry->end_date_time)
+		  param_entry->end_date_time=tre.bounded->last_valid_datetime;
 	    }
-	    param_entry->numTimeSteps+=*tre.num_steps;
+	    param_entry->num_time_steps+=*tre.num_steps;
 	    lentry->parameter_code_table.replace(*param_entry);
 	    gentry->level_table.replace(*lentry);
 	  }
@@ -1582,13 +1582,13 @@ void get_time_bounds(const HDF5::DataArray& data_array,InputHDF5Stream::Dataset 
   }
   time_bounds.t2=data_array_value(data_array,data_array.num_values-1,ds);
   std::string error;
-  tre.bounded->first_valid_datetime=metautils::NcTime::getActualDateTime(time_bounds.t1,time_data,error);
+  tre.bounded->first_valid_datetime=metautils::NcTime::actual_date_time(time_bounds.t1,time_data,error);
   if (error.length() > 0) {
-    metautils::logError(error,"hdf2xml",user,args.argsString);
+    metautils::log_error(error,"hdf2xml",user,args.args_string);
   }
-  tre.bounded->last_valid_datetime=metautils::NcTime::getActualDateTime(time_bounds.t2,time_data,error);
+  tre.bounded->last_valid_datetime=metautils::NcTime::actual_date_time(time_bounds.t2,time_data,error);
   if (error.length() > 0) {
-    metautils::logError(error,"hdf2xml",user,args.argsString);
+    metautils::log_error(error,"hdf2xml",user,args.args_string);
   }
 }
 
@@ -1597,26 +1597,26 @@ DateTime compute_NcTime(HDF5::DataArray& times,size_t index)
   auto val=times.value(index);
   DateTime dt;
   if (time_data.units == "seconds") {
-    dt=time_data.reference.secondsAdded(val);
+    dt=time_data.reference.seconds_added(val);
   }
   else if (time_data.units == "hours") {
     if (myequalf(val,static_cast<int>(val),0.001)) {
-	dt=time_data.reference.hoursAdded(val);
+	dt=time_data.reference.hours_added(val);
     }
     else {
-	dt=time_data.reference.secondsAdded(lroundf(val*3600.));
+	dt=time_data.reference.seconds_added(lroundf(val*3600.));
     }
   }
   else if (time_data.units == "days") {
     if (myequalf(val,static_cast<int>(val),0.001)) {
-	dt=time_data.reference.daysAdded(val);
+	dt=time_data.reference.days_added(val);
     }
     else {
-	dt=time_data.reference.secondsAdded(lroundf(val*86400.));
+	dt=time_data.reference.seconds_added(lroundf(val*86400.));
     }
   }
   else {
-    metautils::logError("compute_NcTime() unable to set date/time for units '"+time_data.units+"'","hdf2xml",user,args.argsString);
+    metautils::log_error("compute_NcTime() unable to set date/time for units '"+time_data.units+"'","hdf2xml",user,args.args_string);
   }
   return dt;
 }
@@ -1636,7 +1636,7 @@ void update_inventory(int unum,int gnum,const HDF5::DataArray& time_array,InputH
 	inv_P_table.found(key,pie);
 	inv_line.str("");
 	std::string error;
-	inv_line << "0|0|" << metautils::NcTime::getActualDateTime(data_array_value(time_array,n,times),time_data,error).toString("%Y%m%d%H%MM") << "|" << unum << "|" << gnum << "|" << ie.num << "|" << pie.num << "|0";
+	inv_line << "0|0|" << metautils::NcTime::actual_date_time(data_array_value(time_array,n,times),time_data,error).to_string("%Y%m%d%H%MM") << "|" << unum << "|" << gnum << "|" << ie.num << "|" << pie.num << "|0";
 	inv_lines.emplace_back(inv_line.str());
     }
   }
@@ -1661,9 +1661,9 @@ void process_units_attribute(const InputHDF5Stream::DatasetEntry& ds_entry,Discr
   std::string attr_val(reinterpret_cast<char *>(attr.value.get()),attr.value.size);
   if (std::regex_search(attr_val,std::regex("since"))) {
     if (!dgd.indexes.time_var.empty()) {
-	metautils::logError("processed_units_attribute() returned error: time was already identified - don't know what to do with variable: "+ds_entry.key,"hdf2xml",user,args.argsString);
+	metautils::log_error("processed_units_attribute() returned error: time was already identified - don't know what to do with variable: "+ds_entry.key,"hdf2xml",user,args.args_string);
     }
-    metautils::CF::fill_NcTimeData(attr_val,time_data,user);
+    metautils::CF::fill_NC_time_data(attr_val,time_data,user);
     dgd.indexes.time_var=ds_entry.key;
   }
   else if (attr_val == "degrees_north") {
@@ -1678,20 +1678,20 @@ void process_units_attribute(const InputHDF5Stream::DatasetEntry& ds_entry,Discr
   }
 }
 
-void scan_CF_point_HDF5_netCDF4_file(InputHDF5Stream& istream,ScanData& scan_data)
+void scan_CF_point_HDF5_NetCDF4_file(InputHDF5Stream& istream,ScanData& scan_data)
 {
   obs_initialize();
-  auto ds_entry_list=istream.getDatasetsWithAttribute("units");
+  auto ds_entry_list=istream.datasets_with_attribute("units");
   DiscreteGeometriesData dgd;
   for (const auto& ds_entry : ds_entry_list) {
     process_units_attribute(ds_entry,dgd);
   }
-  ds_entry_list=istream.getDatasetsWithAttribute("coordinates");
+  ds_entry_list=istream.datasets_with_attribute("coordinates");
 // look for a "station ID"
   for (const auto& ds_entry : ds_entry_list) {
     if (ds_entry.dataset->datatype.class_ == 3) {
 	InputHDF5Stream::Attribute attr;
-	if (ds_entry.dataset->attributes.found("long_name",attr) && attr.value.class_ == 3) {
+	if (ds_entry.dataset->attributes.found("long_name",attr) && attr.value._class_ == 3) {
 	  std::string aval(reinterpret_cast<char *>(attr.value.get()),attr.value.size);
 	  if (std::regex_search(aval,std::regex("ID")) || std::regex_search(aval,std::regex("ident",std::regex::icase))) {
 	    dgd.indexes.stn_id_var=ds_entry.key;
@@ -1704,12 +1704,12 @@ void scan_CF_point_HDF5_netCDF4_file(InputHDF5Stream& istream,ScanData& scan_dat
   }
   HDF5::DataArray time_vals;
   if (dgd.indexes.time_var.empty()) {
-    metautils::logError("scan_CF_point_HDF5_netCDF4_file() returned error: unable to determine time variable","hdf2xml",user,args.argsString);
+    metautils::log_error("scan_CF_point_HDF5_NetCDF4_file() returned error: unable to determine time variable","hdf2xml",user,args.args_string);
   }
   else {
-    auto ds=istream.getDataset("/"+dgd.indexes.time_var);
+    auto ds=istream.dataset("/"+dgd.indexes.time_var);
     if (ds == nullptr) {
-	metautils::logError("scan_CF_point_HDF5_netCDF4_file() returned error: unable to access time variable","hdf2xml",user,args.argsString);
+	metautils::log_error("scan_CF_point_HDF5_NetCDF4_file() returned error: unable to access time variable","hdf2xml",user,args.args_string);
     }
     InputHDF5Stream::Attribute attr;
     if (ds->attributes.found("calendar",attr)) {
@@ -1719,38 +1719,38 @@ void scan_CF_point_HDF5_netCDF4_file(InputHDF5Stream& istream,ScanData& scan_dat
   }
   HDF5::DataArray lat_vals;
   if (dgd.indexes.lat_var.empty()) {
-    metautils::logError("scan_CF_point_HDF5_netCDF4_file() returned error: unable to determine latitude variable","hdf2xml",user,args.argsString);
+    metautils::log_error("scan_CF_point_HDF5_NetCDF4_file() returned error: unable to determine latitude variable","hdf2xml",user,args.args_string);
   }
   else {
-    auto ds=istream.getDataset("/"+dgd.indexes.lat_var);
+    auto ds=istream.dataset("/"+dgd.indexes.lat_var);
     if (ds == nullptr) {
-	metautils::logError("scan_CF_point_HDF5_netCDF4_file() returned error: unable to access latitude variable","hdf2xml",user,args.argsString);
+	metautils::log_error("scan_CF_point_HDF5_NetCDF4_file() returned error: unable to access latitude variable","hdf2xml",user,args.args_string);
     }
     lat_vals.fill(istream,*ds);
   }
   HDF5::DataArray lon_vals;
   if (dgd.indexes.lon_var.empty()) {
-    metautils::logError("scan_CF_point_HDF5_netCDF4_file() returned error: unable to determine longitude variable","hdf2xml",user,args.argsString);
+    metautils::log_error("scan_CF_point_HDF5_NetCDF4_file() returned error: unable to determine longitude variable","hdf2xml",user,args.args_string);
   }
   else {
-    auto ds=istream.getDataset("/"+dgd.indexes.lon_var);
+    auto ds=istream.dataset("/"+dgd.indexes.lon_var);
     if (ds == nullptr) {
-	metautils::logError("scan_CF_point_HDF5_netCDF4_file() returned error: unable to access longitude variable","hdf2xml",user,args.argsString);
+	metautils::log_error("scan_CF_point_HDF5_NetCDF4_file() returned error: unable to access longitude variable","hdf2xml",user,args.args_string);
     }
     lon_vals.fill(istream,*ds);
   }
   HDF5::DataArray ID_vals;
   if (dgd.indexes.stn_id_var.empty()) {
-    metautils::logError("scan_CF_point_HDF5_netCDF4_file() returned error: unable to determine report ID variable","hdf2xml",user,args.argsString);
+    metautils::log_error("scan_CF_point_HDF5_NetCDF4_file() returned error: unable to determine report ID variable","hdf2xml",user,args.args_string);
   }
   else {
-    auto ds=istream.getDataset("/"+dgd.indexes.stn_id_var);
+    auto ds=istream.dataset("/"+dgd.indexes.stn_id_var);
     if (ds == nullptr) {
-	metautils::logError("scan_CF_point_HDF5_netCDF4_file() returned error: unable to access report ID variable","hdf2xml",user,args.argsString);
+	metautils::log_error("scan_CF_point_HDF5_NetCDF4_file() returned error: unable to access report ID variable","hdf2xml",user,args.args_string);
     }
     ID_vals.fill(istream,*ds);
   }
-  scan_data.map_name=getRemoteWebFile("https://rda.ucar.edu/metadata/ParameterTables/HDF5.ds"+args.dsnum+".xml",tdir->name());
+  scan_data.map_name=remote_web_file("https://rda.ucar.edu/metadata/ParameterTables/HDF5.ds"+args.dsnum+".xml",tdir->name());
   scan_data.found_map=!scan_data.map_name.empty();
   std::vector<DateTime> date_times;
   date_times.reserve(time_vals.num_values);
@@ -1767,7 +1767,7 @@ void scan_CF_point_HDF5_netCDF4_file(InputHDF5Stream& istream,ScanData& scan_dat
     if (ds_entry.key != dgd.indexes.time_var && ds_entry.key != dgd.indexes.lat_var && ds_entry.key != dgd.indexes.lon_var && ds_entry.key != dgd.indexes.stn_id_var) {
 	unique_data_type_observation_set.clear();
 	de.key=ds_entry.key;
-	auto ds=istream.getDataset("/"+ds_entry.key);
+	auto ds=istream.dataset("/"+ds_entry.key);
 	std::string descr,units;
 	for (const auto& key : ds->attributes.keys()) {
 	  InputHDF5Stream::Attribute attr;
@@ -1836,7 +1836,7 @@ void scan_CF_point_HDF5_netCDF4_file(InputHDF5Stream& istream,ScanData& scan_dat
   write_type=ObML_type;
 }
 
-void scan_gridded_HDF5_netCDF4_file(InputHDF5Stream& istream,ScanData& scan_data)
+void scan_gridded_HDF5_NetCDF4_file(InputHDF5Stream& istream,ScanData& scan_data)
 {
   std::list<InputHDF5Stream::DatasetEntry> vars;
   InputHDF5Stream::Dataset *ds,*times=nullptr,*lats,*lons,*fcst_ref_time_ds,*bnds_ds;
@@ -1863,26 +1863,26 @@ void scan_gridded_HDF5_netCDF4_file(InputHDF5Stream& istream,ScanData& scan_data
 
   found_time=false;
   grid_initialize();
-  metadata::openInventory(inv,&inv_file,"hdf2xml",user);
-  scan_data.map_name=getRemoteWebFile("https://rda.ucar.edu/metadata/ParameterTables/netCDF4.ds"+args.dsnum+".xml",tdir->name());
+  metadata::open_inventory(inv_file,&inv_dir,inv_stream,"GrML","hdf2xml",user);
+  scan_data.map_name=remote_web_file("https://rda.ucar.edu/metadata/ParameterTables/netCDF4.ds"+args.dsnum+".xml",tdir->name());
 // rename the parameter map so that it is not overwritten by the level map,
 //   which has the same name
   if (scan_data.map_name.length() > 0) {
     std::stringstream oss,ess;
     mysystem2("/bin/mv "+scan_data.map_name+" "+scan_data.map_name+".p",oss,ess);
     if (ess.str().length() > 0) {
-	metautils::logError("unable to rename parameter map; error - '"+ess.str()+"'","hdf2xml",user,args.argsString);
+	metautils::log_error("unable to rename parameter map; error - '"+ess.str()+"'","hdf2xml",user,args.args_string);
     }
     scan_data.map_name+=".p";
     if (parameter_data.map.fill(scan_data.map_name)) {
 	scan_data.found_map=true;
     }
   }
-  vars=istream.getDatasetsWithAttribute("CLASS=DIMENSION_SCALE");
+  vars=istream.datasets_with_attribute("CLASS=DIMENSION_SCALE");
   for (const auto& var : vars) {
-    if (var.dataset->attributes.found("units",attr) && (attr.value.class_ == 3 || (attr.value.class_ == 9 && attr.value.vlen.class_ == 3))) {
+    if (var.dataset->attributes.found("units",attr) && (attr.value._class_ == 3 || (attr.value._class_ == 9 && attr.value.vlen.class_ == 3))) {
 	std::string units_value;
-	if (attr.value.class_ == 3) {
+	if (attr.value._class_ == 3) {
 	  units_value=reinterpret_cast<char *>(attr.value.value);
 	}
 	else {
@@ -1891,11 +1891,11 @@ void scan_gridded_HDF5_netCDF4_file(InputHDF5Stream& istream,ScanData& scan_data
 	}
 	if (std::regex_search(units_value,std::regex("since"))) {
 	  if (found_time) {
-	    metautils::logError("time was already identified - don't know what to do with variable: "+var.key,"hdf2xml",user,args.argsString);
+	    metautils::log_error("time was already identified - don't know what to do with variable: "+var.key,"hdf2xml",user,args.args_string);
 	  }
 	  for (const auto& key : var.dataset->attributes.keys()) {
 	    var.dataset->attributes.found(key,attr);
-	    if (attr.value.class_ == 3) {
+	    if (attr.value._class_ == 3) {
 		if (key == "bounds") {
 		  timeboundsid=reinterpret_cast<char *>(attr.value.value);
 		  break;
@@ -1918,7 +1918,7 @@ void scan_gridded_HDF5_netCDF4_file(InputHDF5Stream& istream,ScanData& scan_data
 	  sp=strutils::split(units_value);
 	  sp2=strutils::split(sp[0],"-");
 	  if (sp2.size() != 3) {
-	    metautils::logError("bad netcdf date in units for time","hdf2xml",user,args.argsString);
+	    metautils::log_error("bad netcdf date in units for time","hdf2xml",user,args.args_string);
 	  }
 	  dt=std::stoi(sp2[0])*10000000000+std::stoi(sp2[1])*100000000+std::stoi(sp2[2])*1000000;
 	  if (sp.size() > 1) {
@@ -1942,7 +1942,7 @@ void scan_gridded_HDF5_netCDF4_file(InputHDF5Stream& istream,ScanData& scan_data
 	}
 	else if (!unique_level_ID_table.found(var.key,se)) {
 	  level_info.ID.push_back(var.key);
-	  if (var.dataset->attributes.found("long_name",attr) && attr.value.class_ == 3) {
+	  if (var.dataset->attributes.found("long_name",attr) && attr.value._class_ == 3) {
 	    level_info.description.push_back(reinterpret_cast<char *>(attr.value.value));
 	  }
 	  level_info.units.push_back(units_value);
@@ -1951,9 +1951,9 @@ void scan_gridded_HDF5_netCDF4_file(InputHDF5Stream& istream,ScanData& scan_data
 	  unique_level_ID_table.insert(se);
 	}
     }
-    else if (var.dataset->attributes.found("positive",attr) && attr.value.class_ == 3 && !unique_level_ID_table.found(var.key,se)) {
+    else if (var.dataset->attributes.found("positive",attr) && attr.value._class_ == 3 && !unique_level_ID_table.found(var.key,se)) {
 	level_info.ID.push_back(var.key);
-	if (var.dataset->attributes.found("long_name",attr) && attr.value.class_ == 3) {
+	if (var.dataset->attributes.found("long_name",attr) && attr.value._class_ == 3) {
 	  level_info.description.push_back(reinterpret_cast<char *>(attr.value.value));
 	}
 	level_info.units.push_back("");
@@ -1963,19 +1963,19 @@ void scan_gridded_HDF5_netCDF4_file(InputHDF5Stream& istream,ScanData& scan_data
     }
   }
 // check for forecasts
-  vars=istream.getDatasetsWithAttribute("standard_name=forecast_reference_time");
+  vars=istream.datasets_with_attribute("standard_name=forecast_reference_time");
   if (vars.size() > 1) {
-    metautils::logError("multiple forecast reference times","hdf2xml",user,args.argsString);
+    metautils::log_error("multiple forecast reference times","hdf2xml",user,args.args_string);
   }
   else if (vars.size() > 0) {
     auto var=vars.front();
-    if (var.dataset->attributes.found("units",attr) && attr.value.class_ == 3) {
+    if (var.dataset->attributes.found("units",attr) && attr.value._class_ == 3) {
 	sdum=reinterpret_cast<char *>(attr.value.value);
 	if (std::regex_search(sdum,std::regex("since"))) {
 	  fcst_ref_time_data.units=sdum.substr(0,sdum.find("since"));
 	  strutils::trim(fcst_ref_time_data.units);
 	  if (fcst_ref_time_data.units != time_data.units) {
-	    metautils::logError("time and forecast reference time have different units","hdf2xml",user,args.argsString);
+	    metautils::log_error("time and forecast reference time have different units","hdf2xml",user,args.args_string);
 	  }
 	  fcst_ref_timeid=var.key;
 	  sdum=sdum.substr(sdum.find("since")+5);
@@ -1987,7 +1987,7 @@ void scan_gridded_HDF5_netCDF4_file(InputHDF5Stream& istream,ScanData& scan_data
 	  sp=strutils::split(sdum);
 	  sp2=strutils::split(sp[0],"-");
 	  if (sp2.size() != 3) {
-	    metautils::logError("bad netcdf date in units for forecast_reference_time","hdf2xml",user,args.argsString);
+	    metautils::log_error("bad netcdf date in units for forecast_reference_time","hdf2xml",user,args.args_string);
 	  }
 	  dt=std::stoi(sp2[0])*10000000000+std::stoi(sp2[1])*100000000+std::stoi(sp2[2])*1000000;
 	  if (sp.size() > 1) {
@@ -2005,42 +2005,42 @@ void scan_gridded_HDF5_netCDF4_file(InputHDF5Stream& istream,ScanData& scan_data
     }
   }
   if (latid.size() == 0 && lonid.size() == 0) {
-    vars=istream.getDatasetsWithAttribute("units=degrees_north");
+    vars=istream.datasets_with_attribute("units=degrees_north");
     if (vars.size() == 0) {
-	vars=istream.getDatasetsWithAttribute("units=degree_north");
+	vars=istream.datasets_with_attribute("units=degree_north");
     }
     for (const auto& v : vars) {
 	latid.push_back(v.key);
     }
-    vars=istream.getDatasetsWithAttribute("units=degrees_east");
+    vars=istream.datasets_with_attribute("units=degrees_east");
     if (vars.size() == 0) {
-	vars=istream.getDatasetsWithAttribute("units=degree_east");
+	vars=istream.datasets_with_attribute("units=degree_east");
     }
     for (const auto& v : vars) {
 	lonid.push_back(v.key);
     }
   }
   if (levid.size() == 0) {
-    vars=istream.getDatasetsWithAttribute("units=Pa");
+    vars=istream.datasets_with_attribute("units=Pa");
     for (const auto& v : vars) {
-	if (v.dataset->attributes.found("DIMENSION_LIST",attr) && attr.value.dim_sizes.size() == 1 && attr.value.dim_sizes[0] == 1 && attr.value.class_ == 9) {
+	if (v.dataset->attributes.found("DIMENSION_LIST",attr) && attr.value.dim_sizes.size() == 1 && attr.value.dim_sizes[0] == 1 && attr.value._class_ == 9) {
 	  level_info.ID.push_back(v.key);
 	  level_info.description.push_back("Pressure Level");
 	  level_info.units.push_back("Pa");
 	  level_info.write.push_back(0);
 	}
     }
-    vars=istream.getDatasetsWithAttribute("positive");
+    vars=istream.datasets_with_attribute("positive");
     for (const auto& v : vars) {
-	if (v.dataset->attributes.found("DIMENSION_LIST",attr) && attr.value.dim_sizes.size() == 1 && attr.value.dim_sizes[0] == 1 && attr.value.class_ == 9) {
+	if (v.dataset->attributes.found("DIMENSION_LIST",attr) && attr.value.dim_sizes.size() == 1 && attr.value.dim_sizes[0] == 1 && attr.value._class_ == 9) {
 	  level_info.ID.push_back(v.key);
-	  if (v.dataset->attributes.found("description",attr) && attr.value.class_ == 3) {
+	  if (v.dataset->attributes.found("description",attr) && attr.value._class_ == 3) {
 	    level_info.description.push_back(reinterpret_cast<char *>(attr.value.value));
 	  }
 	  else {
 	    level_info.description.push_back("");
 	  }
-	  if (v.dataset->attributes.found("units",attr) && attr.value.class_ == 3) {
+	  if (v.dataset->attributes.found("units",attr) && attr.value._class_ == 3) {
 	    level_info.units.push_back(reinterpret_cast<char *>(attr.value.value));
 	  }
 	  else {
@@ -2061,28 +2061,28 @@ void scan_gridded_HDF5_netCDF4_file(InputHDF5Stream& istream,ScanData& scan_data
 	*tre.unit=-1;
 	tre.num_steps=new int;
 	tre.instantaneous=new metautils::NcTime::TimeRange;
-	if ( (times=istream.getDataset("/"+timeid)) == NULL) {
-	  metautils::logError("unable to access the /"+timeid+" dataset for the data temporal range","hdf2xml",user,args.argsString);
+	if ( (times=istream.dataset("/"+timeid)) == NULL) {
+	  metautils::log_error("unable to access the /"+timeid+" dataset for the data temporal range","hdf2xml",user,args.args_string);
 	}
 	time_array.fill(istream,*times);
 	nctime.t1=data_array_value(time_array,0,times);
 	nctime.t2=data_array_value(time_array,time_array.num_values-1,times);
-	tre.instantaneous->first_valid_datetime=metautils::NcTime::getActualDateTime(nctime.t1,time_data,error);
+	tre.instantaneous->first_valid_datetime=metautils::NcTime::actual_date_time(nctime.t1,time_data,error);
 	if (error.length() > 0) {
-	  metautils::logError(error,"hdf2xml",user,args.argsString);
+	  metautils::log_error(error,"hdf2xml",user,args.args_string);
 	}
-	tre.instantaneous->last_valid_datetime=metautils::NcTime::getActualDateTime(nctime.t2,time_data,error);
+	tre.instantaneous->last_valid_datetime=metautils::NcTime::actual_date_time(nctime.t2,time_data,error);
 	if (error.length() > 0) {
-	  metautils::logError(error,"hdf2xml",user,args.argsString);
+	  metautils::log_error(error,"hdf2xml",user,args.args_string);
 	}
 	*tre.num_steps=time_array.num_values;
 	if (fcst_ref_timeid.length() > 0) {
-	  if ( (fcst_ref_time_ds=istream.getDataset("/"+fcst_ref_timeid)) == nullptr) {
-	    metautils::logError("unable to access the /"+fcst_ref_timeid+" dataset for the forecast reference times","hdf2xml",user,args.argsString);
+	  if ( (fcst_ref_time_ds=istream.dataset("/"+fcst_ref_timeid)) == nullptr) {
+	    metautils::log_error("unable to access the /"+fcst_ref_timeid+" dataset for the forecast reference times","hdf2xml",user,args.args_string);
 	  }
 	  fcst_ref_time_array.fill(istream,*fcst_ref_time_ds);
 	  if (fcst_ref_time_array.num_values != time_array.num_values) {
-	    metautils::logError("number of forecast reference times does not equal number of times","hdf2xml",user,args.argsString);
+	    metautils::log_error("number of forecast reference times does not equal number of times","hdf2xml",user,args.args_string);
 	  }
 	  for (size_t n=0; n < time_array.num_values; ++n) {
 	    m=data_array_value(time_array,n,times)-data_array_value(fcst_ref_time_array,n,fcst_ref_time_ds);
@@ -2091,18 +2091,18 @@ void scan_gridded_HDF5_netCDF4_file(InputHDF5Stream& istream,ScanData& scan_data
 		  tre.key=-m*100;
 		}
 		if ( (-m*100) != static_cast<int>(tre.key)) {
-		  metautils::logError("forecast period changed","hdf2xml",user,args.argsString);
+		  metautils::log_error("forecast period changed","hdf2xml",user,args.args_string);
 		}
 	    }
 	    else if (m < 0) {
-		metautils::logError("found a time value that is less than the forecast reference time value","hdf2xml",user,args.argsString);
+		metautils::log_error("found a time value that is less than the forecast reference time value","hdf2xml",user,args.args_string);
 	    }
 	  }
 	}
 	if (timeboundsid.length() > 0) {
 	  tre.bounded=new metautils::NcTime::TimeRange;
-	  if ( (ds=istream.getDataset("/"+timeboundsid)) == NULL) {
-	    metautils::logError("unable to access the /"+timeboundsid+" dataset for the time bounds","hdf2xml",user,args.argsString);
+	  if ( (ds=istream.dataset("/"+timeboundsid)) == NULL) {
+	    metautils::log_error("unable to access the /"+timeboundsid+" dataset for the time bounds","hdf2xml",user,args.args_string);
 	  }
 	  data_array.fill(istream,*ds);
 	  if (data_array.num_values > 0) {
@@ -2111,89 +2111,90 @@ void scan_gridded_HDF5_netCDF4_file(InputHDF5Stream& istream,ScanData& scan_data
 	}
 	else if (climoboundsid.length() > 0) {
 	  tre.bounded=new metautils::NcTime::TimeRange;
-	  if ( (ds=istream.getDataset("/"+climoboundsid)) == NULL) {
-	    metautils::logError("unable to access the /"+climoboundsid+" dataset for the climatology bounds","hdf2xml",user,args.argsString);
+	  if ( (ds=istream.dataset("/"+climoboundsid)) == NULL) {
+	    metautils::log_error("unable to access the /"+climoboundsid+" dataset for the climatology bounds","hdf2xml",user,args.args_string);
 	  }
 	  data_array.fill(istream,*ds);
-	  if (data_array.num_values > 0)
+	  if (data_array.num_values > 0) {
 	    get_time_bounds(data_array,ds,tre);
-	    tre.key=(tre.bounded->last_valid_datetime).getYearsSince(tre.bounded->first_valid_datetime);
-	    tre.instantaneous->last_valid_datetime=(tre.bounded->last_valid_datetime).yearsSubtracted(tre.key);
+	    tre.key=(tre.bounded->last_valid_datetime).years_since(tre.bounded->first_valid_datetime);
+	    tre.instantaneous->last_valid_datetime=(tre.bounded->last_valid_datetime).years_subtracted(tre.key);
 	    if (tre.instantaneous->last_valid_datetime == tre.bounded->first_valid_datetime) {
 		*tre.unit=3;
 	    }
-	    else if ((tre.instantaneous->last_valid_datetime).getMonthsSince(tre.bounded->first_valid_datetime) == 3) {
+	    else if ((tre.instantaneous->last_valid_datetime).months_since(tre.bounded->first_valid_datetime) == 3) {
 		*tre.unit=2;
 	    }
-	    else if ((tre.instantaneous->last_valid_datetime).getMonthsSince(tre.bounded->first_valid_datetime) == 1) {
+	    else if ((tre.instantaneous->last_valid_datetime).months_since(tre.bounded->first_valid_datetime) == 1) {
 		*tre.unit=1;
 	    }
 	    else {
-		metautils::logError("unable to determine climatology unit","hdf2xml",user,args.argsString);
+		metautils::log_error("unable to determine climatology unit","hdf2xml",user,args.args_string);
 	    }
 // COARDS convention for climatology over all-available years
-	    if ((tre.instantaneous->first_valid_datetime).getYear() == 0) {
+	    if ((tre.instantaneous->first_valid_datetime).year() == 0) {
 		tre.key=0x7fffffff;
 	    }
+	  }
 	}
 	if (time_data.units == "months") {
-	  if ((tre.instantaneous->first_valid_datetime).getDay() == 1 && (tre.instantaneous->first_valid_datetime).getTime() == 0) {
-	    tre.instantaneous->last_valid_datetime.addSeconds(getDaysInMonth((tre.instantaneous->last_valid_datetime).getYear(),(tre.instantaneous->last_valid_datetime).getMonth(),time_data.calendar)*86400-1,time_data.calendar);
+	  if ((tre.instantaneous->first_valid_datetime).day() == 1 && (tre.instantaneous->first_valid_datetime).time() == 0) {
+	    tre.instantaneous->last_valid_datetime.add_seconds(days_in_month((tre.instantaneous->last_valid_datetime).year(),(tre.instantaneous->last_valid_datetime).month(),time_data.calendar)*86400-1,time_data.calendar);
 	  }
 	  if (timeboundsid.length() > 0) {
-	    if ((tre.bounded->first_valid_datetime).getDay() == 1) {
-		tre.bounded->last_valid_datetime.addDays(getDaysInMonth((tre.bounded->last_valid_datetime).getYear(),(tre.bounded->last_valid_datetime).getMonth(),time_data.calendar)-1,time_data.calendar);
+	    if ((tre.bounded->first_valid_datetime).day() == 1) {
+		tre.bounded->last_valid_datetime.add_days(days_in_month((tre.bounded->last_valid_datetime).year(),(tre.bounded->last_valid_datetime).month(),time_data.calendar)-1,time_data.calendar);
 	    }
 	  }
 	  else if (climoboundsid.length() > 0) {
-	    if ((tre.bounded->first_valid_datetime).getDay() == (tre.bounded->last_valid_datetime).getDay() && (tre.bounded->first_valid_datetime).getTime() == 0 && (tre.bounded->last_valid_datetime).getTime() == 0) {
-		tre.bounded->last_valid_datetime.subtractSeconds(1);
+	    if ((tre.bounded->first_valid_datetime).day() == (tre.bounded->last_valid_datetime).day() && (tre.bounded->first_valid_datetime).time() == 0 && (tre.bounded->last_valid_datetime).time() == 0) {
+		tre.bounded->last_valid_datetime.subtract_seconds(1);
 	    }
 	  }
 	}
 	time_range_table.insert(tre);
     }
     if (latid.size() != lonid.size()) {
-	metautils::logError("unequal number of latitude and longitude coordinate variables","hdf2xml",user,args.argsString);
+	metautils::log_error("unequal number of latitude and longitude coordinate variables","hdf2xml",user,args.args_string);
     }
     for (size_t n=0; n < latid.size(); ++n) {
-	if ( (lats=istream.getDataset("/"+latid[n])) == NULL) {
-	  metautils::logError("unable to access the /"+latid[n]+" dataset for the latitudes","hdf2xml",user,args.argsString);
+	if ( (lats=istream.dataset("/"+latid[n])) == NULL) {
+	  metautils::log_error("unable to access the /"+latid[n]+" dataset for the latitudes","hdf2xml",user,args.args_string);
 	}
 	lat_array.fill(istream,*lats);
-	if ( (lons=istream.getDataset("/"+lonid[n])) == NULL) {
-	  metautils::logError("unable to access the /"+lonid[n]+" dataset for the latitudes","hdf2xml",user,args.argsString);
+	if ( (lons=istream.dataset("/"+lonid[n])) == NULL) {
+	  metautils::log_error("unable to access the /"+lonid[n]+" dataset for the latitudes","hdf2xml",user,args.args_string);
 	}
 	lon_array.fill(istream,*lons);
 	def.slatitude=data_array_value(lat_array,0,lats);
 	def.slongitude=data_array_value(lon_array,0,lons);
 	InputHDF5Stream::Attribute lat_attr,lon_attr;
-	if (lats->attributes.found("DIMENSION_LIST",lat_attr) && lat_attr.value.dim_sizes.size() == 1 && lat_attr.value.dim_sizes[0] == 2 && lat_attr.value.class_ == 9 && lons->attributes.found("DIMENSION_LIST",lon_attr) && lon_attr.value.dim_sizes.size() == 1 && lon_attr.value.dim_sizes[0] == 2 && lon_attr.value.class_ == 9) {
+	if (lats->attributes.found("DIMENSION_LIST",lat_attr) && lat_attr.value.dim_sizes.size() == 1 && lat_attr.value.dim_sizes[0] == 2 && lat_attr.value._class_ == 9 && lons->attributes.found("DIMENSION_LIST",lon_attr) && lon_attr.value.dim_sizes.size() == 1 && lon_attr.value.dim_sizes[0] == 2 && lon_attr.value._class_ == 9) {
 	  if (lat_attr.value.vlen.class_ == 7 && lon_attr.value.vlen.class_ == 7) {
-	    if (istream.getReferenceTablePointer()->found(HDF5::getValue(&lat_attr.value.vlen.buffer[4],lat_attr.value.precision),re) && istream.getReferenceTablePointer()->found(HDF5::getValue(&lon_attr.value.vlen.buffer[4],lon_attr.value.precision),re2) && re.name == re2.name && istream.getReferenceTablePointer()->found(HDF5::getValue(&lat_attr.value.vlen.buffer[8+lat_attr.value.precision],lat_attr.value.precision),re2) && istream.getReferenceTablePointer()->found(HDF5::getValue(&lon_attr.value.vlen.buffer[8+lon_attr.value.precision],lon_attr.value.precision),re3) && re2.name == re3.name) {
-		if ( (ds=istream.getDataset("/"+re.name)) == NULL || !ds->attributes.found("NAME",attr) || attr.value.class_ != 3) {
-		  metautils::logError("(1)unable to determine grid definition from '"+latid[n]+"' and '"+lonid[n]+"'","hdf2xml",user,args.argsString);
+	    if (istream.reference_table_pointer()->found(HDF5::value(&lat_attr.value.vlen.buffer[4],lat_attr.value.precision_),re) && istream.reference_table_pointer()->found(HDF5::value(&lon_attr.value.vlen.buffer[4],lon_attr.value.precision_),re2) && re.name == re2.name && istream.reference_table_pointer()->found(HDF5::value(&lat_attr.value.vlen.buffer[8+lat_attr.value.precision_],lat_attr.value.precision_),re2) && istream.reference_table_pointer()->found(HDF5::value(&lon_attr.value.vlen.buffer[8+lon_attr.value.precision_],lon_attr.value.precision_),re3) && re2.name == re3.name) {
+		if ( (ds=istream.dataset("/"+re.name)) == NULL || !ds->attributes.found("NAME",attr) || attr.value._class_ != 3) {
+		  metautils::log_error("(1)unable to determine grid definition from '"+latid[n]+"' and '"+lonid[n]+"'","hdf2xml",user,args.args_string);
 		}
 		sp=strutils::split(std::string(reinterpret_cast<char *>(attr.value.value)));
 		if (sp.size() == 11) {
 		  dim.y=std::stoi(sp[10]);
 		}
 		else {
-		  metautils::logError("(2)unable to determine grid definition from '"+latid[n]+"' and '"+lonid[n]+"'","hdf2xml",user,args.argsString);
+		  metautils::log_error("(2)unable to determine grid definition from '"+latid[n]+"' and '"+lonid[n]+"'","hdf2xml",user,args.args_string);
 		}
-		if ( (ds=istream.getDataset("/"+re2.name)) == NULL || !ds->attributes.found("NAME",attr) || attr.value.class_ != 3) {
-		  metautils::logError("(3)unable to determine grid definition from '"+latid[n]+"' and '"+lonid[n]+"'","hdf2xml",user,args.argsString);
+		if ( (ds=istream.dataset("/"+re2.name)) == NULL || !ds->attributes.found("NAME",attr) || attr.value._class_ != 3) {
+		  metautils::log_error("(3)unable to determine grid definition from '"+latid[n]+"' and '"+lonid[n]+"'","hdf2xml",user,args.args_string);
 		}
 		sp=strutils::split(std::string(reinterpret_cast<char *>(attr.value.value)));
 		if (sp.size() == 11) {
 		  dim.x=std::stoi(sp[10]);
 		}
 		else {
-		  metautils::logError("(4)unable to determine grid definition from '"+latid[n]+"' and '"+lonid[n]+"'","hdf2xml",user,args.argsString);
+		  metautils::log_error("(4)unable to determine grid definition from '"+latid[n]+"' and '"+lonid[n]+"'","hdf2xml",user,args.args_string);
 		}
 	    }
 	    else {
-		metautils::logError("(5)unable to determine grid definition from '"+latid[n]+"' and '"+lonid[n]+"'","hdf2xml",user,args.argsString);
+		metautils::log_error("(5)unable to determine grid definition from '"+latid[n]+"' and '"+lonid[n]+"'","hdf2xml",user,args.args_string);
 	    }
 	    auto center_x=dim.x/2;
 	    auto center_y=dim.y/2;
@@ -2264,11 +2265,11 @@ std::cerr << myequalf(data_array_value(lon_array,ym*lon_array.dimensions[1]+cent
 std::cerr << data_array_value(lat_array,center_y*lon_array.dimensions[1]+xm,lats) << " " << center_y << " " << lon_array.dimensions[1] << " " << xm << std::endl;
 std::cerr << data_array_value(lat_array,center_y*lon_array.dimensions[1]+center_x+1,lats) << " " << center_y << " " << lon_array.dimensions[1] << " " << center_x+1 << std::endl;
 std::cerr << myequalf(data_array_value(lat_array,center_y*lon_array.dimensions[1]+xm,lats),data_array_value(lat_array,center_y*lon_array.dimensions[1]+center_x+1,lats),0.00001) << std::endl;
-		metautils::logError("(6)unable to determine grid definition from '"+latid[n]+"' and '"+lonid[n]+"'","hdf2xml",user,args.argsString);
+		metautils::log_error("(6)unable to determine grid definition from '"+latid[n]+"' and '"+lonid[n]+"'","hdf2xml",user,args.args_string);
 	    }
 	  }
 	  else {
-	    metautils::logError("(7)unable to determine grid definition from '"+latid[n]+"' and '"+lonid[n]+"'","hdf2xml",user,args.argsString);
+	    metautils::log_error("(7)unable to determine grid definition from '"+latid[n]+"' and '"+lonid[n]+"'","hdf2xml",user,args.args_string);
 	  }
 	}
 	else {
@@ -2289,15 +2290,15 @@ std::cerr << myequalf(data_array_value(lat_array,center_y*lon_array.dimensions[1
 	    ds=nullptr;
 	  }
 	  else {
-	    if ( (ds=istream.getDataset("/"+levid)) == nullptr) {
-		metautils::logError("unable to access the /"+levid+" dataset for level information","hdf2xml",user,args.argsString);
+	    if ( (ds=istream.dataset("/"+levid)) == nullptr) {
+		metautils::log_error("unable to access the /"+levid+" dataset for level information","hdf2xml",user,args.args_string);
 	    }
 	    data_array.fill(istream,*ds);
 	    num_levels=data_array.num_values;
-	    if (ds->attributes.found("bounds",attr) && attr.value.class_ == 3) {
+	    if (ds->attributes.found("bounds",attr) && attr.value._class_ == 3) {
 		sdum=reinterpret_cast<char *>(attr.value.value);
-		if ( (bnds_ds=istream.getDataset("/"+sdum)) == nullptr) {
-		  metautils::logError("unable to get bounds for level '"+levid+"'","hdf2xml",user,args.argsString);
+		if ( (bnds_ds=istream.dataset("/"+sdum)) == nullptr) {
+		  metautils::log_error("unable to get bounds for level '"+levid+"'","hdf2xml",user,args.args_string);
 		}
 		bnds_array.fill(istream,*bnds_ds);
 	    }
@@ -2309,7 +2310,7 @@ std::cerr << myequalf(data_array_value(lat_array,center_y*lon_array.dimensions[1
 		gentry->key=key2;
 		sp=strutils::split(gentry->key,"<!>");
 		InvEntry uie,gie;
-		if (inv.is_open()) {
+		if (inv_stream.is_open()) {
 		  inv_U_table.found(sp.back(),uie);
 		  gie.key=sp[0];
 		  for (size_t nn=1; nn < sp.size()-1; ++nn) {
@@ -2321,8 +2322,8 @@ std::cerr << myequalf(data_array_value(lat_array,center_y*lon_array.dimensions[1
 // new grid
 		  gentry->level_table.clear();
 		  lentry->parameter_code_table.clear();
-		  param_entry->numTimeSteps=0;
-		  add_gridded_parameters_to_netCDF_level_entry(istream,gentry->key,timeid,latid[n],lonid[n],levid,scan_data,tre,parameter_data);
+		  param_entry->num_time_steps=0;
+		  add_gridded_parameters_to_NetCDF_level_entry(istream,gentry->key,timeid,latid[n],lonid[n],levid,scan_data,tre,parameter_data);
 		  if (lentry->parameter_code_table.size() > 0) {
 		    for (l=0; l < num_levels; ++l) {
 			lentry->key="ds"+args.dsnum+","+levid+":";
@@ -2359,7 +2360,7 @@ std::cerr << myequalf(data_array_value(lat_array,center_y*lon_array.dimensions[1
 			}
 			gentry->level_table.insert(*lentry);
 			level_info.write[m]=1;
-			if (inv.is_open()) {
+			if (inv_stream.is_open()) {
 			  update_inventory(uie.num,gie.num,time_array,times);
 			}
 		    }
@@ -2386,7 +2387,7 @@ std::cerr << myequalf(data_array_value(lat_array,center_y*lon_array.dimensions[1
 		    }
 		    if (!gentry->level_table.found(lentry->key,*lentry)) {
 			lentry->parameter_code_table.clear();
-			add_gridded_parameters_to_netCDF_level_entry(istream,gentry->key,timeid,latid[n],lonid[n],levid,scan_data,tre,parameter_data);
+			add_gridded_parameters_to_NetCDF_level_entry(istream,gentry->key,timeid,latid[n],lonid[n],levid,scan_data,tre,parameter_data);
 			if (lentry->parameter_code_table.size() > 0) {
 			  gentry->level_table.insert(*lentry);
 			  level_info.write[m]=1;
@@ -2395,7 +2396,7 @@ std::cerr << myequalf(data_array_value(lat_array,center_y*lon_array.dimensions[1
 		    else {
  			update_level_entry(istream,tre,timeid,latid[n],lonid[n],levid,scan_data,parameter_data,level_info.write[m]);
 		    }
-		    if (level_info.write[m] == 1 && inv.is_open()) {
+		    if (level_info.write[m] == 1 && inv_stream.is_open()) {
 			update_inventory(uie.num,gie.num,time_array,times);
 		    }
 		  }
@@ -2404,22 +2405,22 @@ std::cerr << myequalf(data_array_value(lat_array,center_y*lon_array.dimensions[1
 	    }
 	  }
 	}
-	error=metautils::NcLevel::writeLevelMap(args.dsnum,level_info);
+	error=metautils::NcLevel::write_level_map(args.dsnum,level_info);
 	if (error.length() > 0) {
-	  metautils::logError(error,"hdf2xml",user,args.argsString);
+	  metautils::log_error(error,"hdf2xml",user,args.args_string);
 	}
     }
   }
   write_type=GrML_type;
   if (grid_table->size() == 0) {
     if (found_time) {
-	metautils::logError("No grids found - no content metadata will be generated","hdf2xml",user,args.argsString);
+	metautils::log_error("No grids found - no content metadata will be generated","hdf2xml",user,args.args_string);
     }
     else {
-	metautils::logError("Time coordinate variable not found - no content metadata will be generated","hdf2xml",user,args.argsString);
+	metautils::log_error("Time coordinate variable not found - no content metadata will be generated","hdf2xml",user,args.args_string);
     }
   }
-if (inv.is_open()) {
+if (inv_stream.is_open()) {
 InvEntry ie;
 ie.key="x";
 ie.num=0;
@@ -2427,9 +2428,9 @@ inv_R_table.insert(ie);
 }
 }
 
-void scan_HDF5_netCDF4_file(InputHDF5Stream& istream,ScanData& scan_data)
+void scan_HDF5_NetCDF4_file(InputHDF5Stream& istream,ScanData& scan_data)
 {
-  InputHDF5Stream::Dataset *ds=istream.getDataset("/");
+  InputHDF5Stream::Dataset *ds=istream.dataset("/");
   if (ds == nullptr) {
     myerror="unable to access global attributes";
     exit(1);
@@ -2445,7 +2446,7 @@ void scan_HDF5_netCDF4_file(InputHDF5Stream& istream,ScanData& scan_data)
 	}
     }
     if (feature_type == "point") {
-	scan_CF_point_HDF5_netCDF4_file(istream,scan_data);
+	scan_CF_point_HDF5_NetCDF4_file(istream,scan_data);
     }
     else {
 	myerror="featureType '"+feature_type+"' not recognized";
@@ -2453,7 +2454,7 @@ void scan_HDF5_netCDF4_file(InputHDF5Stream& istream,ScanData& scan_data)
     }
   }
   else {
-    scan_gridded_HDF5_netCDF4_file(istream,scan_data);
+    scan_gridded_HDF5_NetCDF4_file(istream,scan_data);
   }
 }
 
@@ -2471,7 +2472,7 @@ void scan_HDF5_file(std::list<std::string>& filelist,ScanData& scan_data)
 	scan_ISPD_HDF5_file(istream);
     }
     else if (args.format == "hdf5nc4") {
-	scan_HDF5_netCDF4_file(istream,scan_data);
+	scan_HDF5_NetCDF4_file(istream,scan_data);
     }
     else if (args.format == "usarrthdf5") {
 	scan_US_Array_Transportable_HDF5_file(istream,scan_data);
@@ -2484,8 +2485,8 @@ void scan_HDF5_file(std::list<std::string>& filelist,ScanData& scan_data)
   }
   if (write_type == GrML_type) {
     cmd_type="GrML";
-    if (!args.inventoryOnly) {
-	metadata::GrML::writeGrML(*grid_table,"hdf2xml",user);
+    if (!args.inventory_only) {
+	metadata::GrML::write_GrML(*grid_table,"hdf2xml",user);
     }
     grid_finalize();
   }
@@ -2493,10 +2494,10 @@ void scan_HDF5_file(std::list<std::string>& filelist,ScanData& scan_data)
     if (num_not_missing > 0) {
 	args.format="hdf5";
 	cmd_type="ObML";
-	metadata::ObML::writeObML(ID_table,platform_table,"hdf2xml",user);
+	metadata::ObML::write_ObML(ID_table,platform_table,"hdf2xml",user);
     }
     else {
-	metautils::logError("all stations have missing location information - no usable data found; no content metadata will be saved for this file","hdf2xml",user,args.argsString);
+	metautils::log_error("all stations have missing location information - no usable data found; no content metadata will be saved for this file","hdf2xml",user,args.args_string);
     }
     obs_finalize();
   }
@@ -2507,26 +2508,26 @@ void scan_HDF5_file(std::list<std::string>& filelist,ScanData& scan_data)
     map_type="dataType";
   }
   else {
-    metautils::logError("scanHDF5File returned error: unknown map type","hdf2xml",user,args.argsString);
+    metautils::log_error("scanHDF5File returned error: unknown map type","hdf2xml",user,args.args_string);
   }
-  error=metautils::NcParameter::writeParameterMap(args.dsnum,scan_data.varlist,scan_data.var_changes_table,map_type,scan_data.map_name,scan_data.found_map,warning);
+  error=metautils::NcParameter::write_parameter_map(args.dsnum,scan_data.varlist,scan_data.var_changes_table,map_type,scan_data.map_name,scan_data.found_map,warning);
 }
 
 void scan_file()
 {
 
   tfile=new TempFile;
-  if (!tfile->open(directives.tempPath)) {
-    metautils::logError("scan_file() was not able to create a temporary file in "+directives.tempPath,"hdf2xml",user,args.argsString);
+  if (!tfile->open(directives.temp_path)) {
+    metautils::log_error("scan_file() was not able to create a temporary file in "+directives.temp_path,"hdf2xml",user,args.args_string);
   }
   tdir=new TempDir;
-  if (!tdir->create(directives.tempPath)) {
-    metautils::logError("scan_file() was not able to create a temporary directory in "+directives.tempPath,"hdf2xml",user,args.argsString);
+  if (!tdir->create(directives.temp_path)) {
+    metautils::log_error("scan_file() was not able to create a temporary directory in "+directives.temp_path,"hdf2xml",user,args.args_string);
   }
   std::string file_format,error;
   std::list<std::string> filelist;
-  if (!primaryMetadata::prepareFileForMetadataScanning(*tfile,*tdir,&filelist,file_format,error)) {
-    metautils::logError("prepareFileForMetadataScanning() returned '"+error+"'","hdf2xml",user,args.argsString);
+  if (!primaryMetadata::prepare_file_for_metadata_scanning(*tfile,*tdir,&filelist,file_format,error)) {
+    metautils::log_error("prepare_file_for_metadata_scanning() returned '"+error+"'","hdf2xml",user,args.args_string);
   }
   if (filelist.size() == 0) {
     filelist.push_back(tfile->name());
@@ -2571,61 +2572,61 @@ int main(int argc,char **argv)
   }
   signal(SIGSEGV,segv_handler);
   signal(SIGINT,int_handler);
-  args.argsString=getUnixArgsString(argc,argv,'%');
-  metautils::readConfig("hdf2xml",user,args.argsString);
+  args.args_string=unix_args_string(argc,argv,'%');
+  metautils::read_config("hdf2xml",user,args.args_string);
   parse_args();
-  atexit(cleanUp);
+  atexit(clean_up);
   metautils::cmd_register("hdf2xml",user);
-  if (!args.overwriteOnly) {
-    metautils::checkForExistingCMD("GrML");
-    metautils::checkForExistingCMD("ObML");
+  if (!args.overwrite_only) {
+    metautils::check_for_existing_CMD("GrML");
+    metautils::check_for_existing_CMD("ObML");
   }
   scan_file();
   flags="-f";
-  if (!args.inventoryOnly && std::regex_search(args.path,std::regex("^https://rda.ucar.edu"))) {
+  if (!args.inventory_only && std::regex_search(args.path,std::regex("^https://rda.ucar.edu"))) {
     flags="-wf";
   }
-  if (args.updateDB) {
-    if (!args.updateSummary) {
+  if (args.update_DB) {
+    if (!args.update_summary) {
 	flags="-S "+flags;
     }
     if (!args.regenerate) {
 	flags="-R "+flags;
     }
     if (cmd_type.length() == 0) {
-	metautils::logError("content metadata type was not specified","hdf2xml",user,args.argsString);
+	metautils::log_error("content metadata type was not specified","hdf2xml",user,args.args_string);
     }
     std::stringstream oss,ess;
-    if (mysystem2(directives.localRoot+"/bin/scm -d "+args.dsnum+" "+flags+" "+args.filename+"."+cmd_type,oss,ess) < 0) {
+    if (mysystem2(directives.local_root+"/bin/scm -d "+args.dsnum+" "+flags+" "+args.filename+"."+cmd_type,oss,ess) < 0) {
 	std::cerr << ess.str() << std::endl;
     }
   }
-  if (inv.is_open()) {
+  if (inv_stream.is_open()) {
     InvEntry ie;
     for (const auto& key : inv_U_table.keys()) {
 	inv_U_table.found(key,ie);
-	inv << "U<!>" << ie.num << "<!>" << key << std::endl;
+	inv_stream << "U<!>" << ie.num << "<!>" << key << std::endl;
     }
     for (const auto& key : inv_G_table.keys()) {
 	inv_G_table.found(key,ie);
-	inv << "G<!>" << ie.num << "<!>" << key << std::endl;
+	inv_stream << "G<!>" << ie.num << "<!>" << key << std::endl;
     }
     for (const auto& key : inv_L_table.keys()) {
 	inv_L_table.found(key,ie);
-	inv << "L<!>" << ie.num << "<!>" << key << std::endl;
+	inv_stream << "L<!>" << ie.num << "<!>" << key << std::endl;
     }
     for (const auto& key : inv_P_table.keys()) {
 	inv_P_table.found(key,ie);
-	inv << "P<!>" << ie.num << "<!>" << key << std::endl;
+	inv_stream << "P<!>" << ie.num << "<!>" << key << std::endl;
     }
     for (const auto& key : inv_R_table.keys()) {
 	inv_R_table.found(key,ie);
-	inv << "R<!>" << ie.num << "<!>" << key << std::endl;
+	inv_stream << "R<!>" << ie.num << "<!>" << key << std::endl;
     }
-    inv << "-----" << std::endl;
+    inv_stream << "-----" << std::endl;
     for (const auto& line : inv_lines) {
-	inv << line << std::endl;
+	inv_stream << line << std::endl;
     }
-    metadata::closeInventory(inv,inv_file,"GrML",true,true,"hdf2xml",user);
+    metadata::close_inventory(inv_file,inv_dir,inv_stream,"GrML",true,true,"hdf2xml",user);
   }
 }

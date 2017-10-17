@@ -37,25 +37,28 @@ TempFile *tfile;
 TempDir *tdir;
 std::string myerror="";
 
-extern "C" void cleanUp()
+extern "C" void clean_up()
 {
-  if (tfile != NULL)
+  if (tfile != NULL) {
     delete tfile;
-  if (tdir != NULL)
+  }
+  if (tdir != NULL) {
     delete tdir;
-  if (myerror.length() > 0)
-    metautils::logError(myerror,"bufr2xml",user,args.argsString);
+  }
+  if (!myerror.empty()) {
+    metautils::log_error(myerror,"bufr2xml",user,args.args_string);
+  }
 }
 
-void parseArgs()
+void parse_args()
 {
-  args.updateDB=true;
-  args.updateSummary=true;
-  args.updateGraphics=true;
-  args.overridePrimaryCheck=false;
+  args.update_DB=true;
+  args.update_summary=true;
+  args.update_graphics=true;
+  args.override_primary_check=false;
   args.regenerate=true;
-  args.temp_loc=directives.tempPath;
-  std::deque<std::string> sp=strutils::split(args.argsString,"%");
+  args.temp_loc=directives.temp_path;
+  std::deque<std::string> sp=strutils::split(args.args_string,"%");
   for (size_t n=0; n < sp.size()-1; ++n) {
     if (sp[n] == "-f") {
 	args.format=sp[++n];
@@ -74,24 +77,24 @@ void parseArgs()
     }
     else if (sp[n] == "-U") {
 	if (user == "dattore") {
-	  args.updateDB=false;
+	  args.update_DB=false;
 	}
     }
     else if (sp[n] == "-NC") {
 	if (user == "dattore") {
-	  args.overridePrimaryCheck=true;
+	  args.override_primary_check=true;
 	}
     }
     else if (sp[n] == "-G") {
 	if (user == "dattore") {
-	  args.updateGraphics=false;
+	  args.update_graphics=false;
 	}
     }
     else if (sp[n] == "-R") {
         args.regenerate=false;
     }
     else if (sp[n] == "-S") {
-        args.updateSummary=false;
+        args.update_summary=false;
     }
     else {
 	std::cerr << "Error: bad argument " << sp[n] << std::endl;
@@ -106,28 +109,28 @@ void parseArgs()
     args.format=strutils::to_lower(args.format);
   }
   if (args.format == "prepbufr") {
-    rpt.setDataHandler(HandleNCEPPREPBUFR);
+    rpt.set_data_handler(handle_NCEP_PREPBUFR);
   }
   else if (args.format == "adpbufr") {
-    rpt.setDataHandler(HandleNCEPADPBUFR);
+    rpt.set_data_handler(handle_NCEP_ADPBUFR);
   }
   else if (args.format == "radbufr") {
-    rpt.setDataHandler(HandleNCEPRadianceBUFR);
+    rpt.set_data_handler(handle_NCEP_radiance_BUFR);
   }
   else if (args.format == "ecmwfbufr") {
-    rpt.setDataHandler(HandleECMWFBUFR);
+    rpt.set_data_handler(handle_ECMWF_BUFR);
   }
   else {
-    metautils::logError("Error: format "+args.format+" not recognized","bufr2xml",user,args.argsString);
+    metautils::log_error("Error: format "+args.format+" not recognized","bufr2xml",user,args.args_string);
   }
   if (args.dsnum.length() == 0) {
     std::cerr << "Error: no dataset number specified" << std::endl;
     exit(1);
   }
   if (args.dsnum == "999.9") {
-    args.overridePrimaryCheck=true;
-    args.updateDB=false;
-    args.updateSummary=false;
+    args.override_primary_check=true;
+    args.update_DB=false;
+    args.update_summary=false;
     args.regenerate=false;
   }
   size_t idx=sp.back().rfind("/");
@@ -137,15 +140,15 @@ void parseArgs()
 
 bool isValidDate(DateTime& datetime)
 {
-  DateTime current=getCurrentDateTime();
+  DateTime current=current_date_time();
 
-  if (datetime.getYear() < 1900 || datetime.getYear() > current.getYear()+20) {
+  if (datetime.year() < 1900 || datetime.year() > current.year()+20) {
     return false;
   }
-  if (datetime.getMonth() < 1 || datetime.getMonth() > 12) {
+  if (datetime.month() < 1 || datetime.month() > 12) {
     return false;
   }
-  if (datetime.getDay() < 1 || datetime.getDay() > static_cast<short>(getDaysInMonth(datetime.getYear(),datetime.getMonth()))) {
+  if (datetime.day() < 1 || datetime.day() > static_cast<short>(days_in_month(datetime.year(),datetime.month()))) {
     return false;
   }
   return true;
@@ -186,7 +189,7 @@ void updateIDTable(size_t obsTypeIndex,float lat,float lon,size_t nsteps,DateTim
 	  for (size_t m=0; m < 360; ++m) {
 	    ientry.data->min_lon_bitmap[m]=ientry.data->max_lon_bitmap[m]=9999;
 	  }
-	  convertLatLonToBox(1,0.,ientry.data->W_lon,l,k);
+	  convert_lat_lon_to_box(1,0.,ientry.data->W_lon,l,k);
 	  ientry.data->min_lon_bitmap[k]=ientry.data->max_lon_bitmap[k]=ientry.data->W_lon;
 	}
 	if (lat < ientry.data->S_lat) {
@@ -201,7 +204,7 @@ void updateIDTable(size_t obsTypeIndex,float lat,float lon,size_t nsteps,DateTim
 	if (lon > ientry.data->E_lon) {
 	  ientry.data->E_lon=lon;
 	}
-	convertLatLonToBox(1,0.,lon,l,k);
+	convert_lat_lon_to_box(1,0.,lon,l,k);
 	if (ientry.data->min_lon_bitmap[k] > 900.) {
 	  ientry.data->min_lon_bitmap[k]=ientry.data->max_lon_bitmap[k]=lon;
 	}
@@ -248,7 +251,7 @@ void updatePlatformTable(size_t obsTypeIndex,float lat,float lon,size_t nsteps)
 	pentry.boxflags->npole=1;
     }
     else {
-	convertLatLonToBox(1,lat,lon,l,k);
+	convert_lat_lon_to_box(1,lat,lon,l,k);
 	pentry.boxflags->flags[l-1][k]=1;
 	pentry.boxflags->flags[l-1][360]=1;
     }
@@ -262,7 +265,7 @@ void updatePlatformTable(size_t obsTypeIndex,float lat,float lon,size_t nsteps)
 	pentry.boxflags->npole=1;
     }
     else {
-	convertLatLonToBox(1,lat,lon,l,k);
+	convert_lat_lon_to_box(1,lat,lon,l,k);
 	pentry.boxflags->flags[l-1][k]=1;
 	pentry.boxflags->flags[l-1][360]=1;
     }
@@ -283,12 +286,12 @@ void processNCEPPREPBUFRObservation(std::string& message_type,size_t subset_numb
   if (dhr == -999) {
     return;
   }
-  datetime=rpt.getDateTime();
+  datetime=rpt.date_time();
   if (dhr >= 0) {
-    datetime.addHours(dhr);
+    datetime.add_hours(dhr);
   }
   else {
-    datetime.subtractHours(-dhr);
+    datetime.subtract_hours(-dhr);
   }
   pentry.key="";
   switch (pdata[subset_number]->type.prepbufr) {
@@ -388,7 +391,7 @@ void processNCEPPREPBUFRObservation(std::string& message_type,size_t subset_numb
 	pentry.key="bogus";
 	break;
     default:
-	metautils::logError("processNCEPPREPBUFRObservation error:  PREPBUFR type "+strutils::itos(pdata[subset_number]->type.prepbufr)+" not recognized (ON29 code = "+strutils::itos(pdata[subset_number]->type.ON29)+")  date: "+datetime.toString()+"  id: '"+pdata[subset_number]->stnid+"'","bufr2xml",user,args.argsString);
+	metautils::log_error("processNCEPPREPBUFRObservation error:  PREPBUFR type "+strutils::itos(pdata[subset_number]->type.prepbufr)+" not recognized (ON29 code = "+strutils::itos(pdata[subset_number]->type.ON29)+")  date: "+datetime.to_string()+"  id: '"+pdata[subset_number]->stnid+"'","bufr2xml",user,args.args_string);
   }
   if (pentry.key.length() == 0) {
     switch (pdata[subset_number]->type.ON29) {
@@ -462,7 +465,7 @@ void processNCEPPREPBUFRObservation(std::string& message_type,size_t subset_numb
 	  pentry.key="drifting_buoy";
 	  break;
 	default:
-	  metautils::logError("processNCEPPREPBUFRObservation error: unknown platform type "+strutils::itos(pdata[subset_number]->type.ON29),"bufr2xml",user,args.argsString);
+	  metautils::log_error("processNCEPPREPBUFRObservation error: unknown platform type "+strutils::itos(pdata[subset_number]->type.ON29),"bufr2xml",user,args.args_string);
     }
   }
   if (pdata[subset_number]->stnid.length() > 0) {
@@ -475,19 +478,19 @@ void processNCEPPREPBUFRObservation(std::string& message_type,size_t subset_numb
     sdum=pdata[subset_number]->acftid;
   }
   else {
-    metautils::logError("processPREPBUFRObservation returned error: unable to get an ID for '"+message_type+", date "+datetime.toString(),"bufr2xml",user,args.argsString);
+    metautils::log_error("processPREPBUFRObservation returned error: unable to get an ID for '"+message_type+", date "+datetime.to_string(),"bufr2xml",user,args.args_string);
   }
-  ientry.key=getPREPBUFRIDKey(metautils::cleanID(sdum),pentry.key,message_type);
+  ientry.key=PREPBUFR_ID_key(metautils::clean_ID(sdum),pentry.key,message_type);
   if (ientry.key.length() == 0) {
-    metautils::logError("processPREPBUFRObservation returned error: unable to get ID key for '"+message_type+"', ID: '"+sdum+"' ("+pdata[subset_number]->satid+") ("+pdata[subset_number]->acftid+") ("+pdata[subset_number]->stnid+")","bufr2xml",user,args.argsString);
+    metautils::log_error("processPREPBUFRObservation returned error: unable to get ID key for '"+message_type+"', ID: '"+sdum+"' ("+pdata[subset_number]->satid+") ("+pdata[subset_number]->acftid+") ("+pdata[subset_number]->stnid+")","bufr2xml",user,args.args_string);
   }
   trueLon= (pdata[subset_number]->elon > 180.) ? (pdata[subset_number]->elon-360.) : pdata[subset_number]->elon;
   for (const auto& group : pdata[subset_number]->cat_groups) {
     de.key=strutils::itos(group.code);
     if (group.code > 63) {
-	metautils::logError("processNCEPPREPBUFRObservation error:  bad category '"+de.key+"', "+pentry.key+", date "+datetime.toString()+", id '"+pdata[subset_number]->stnid+"'","bufr2xml",user,args.argsString);
+	metautils::log_error("processNCEPPREPBUFRObservation error:  bad category '"+de.key+"', "+pentry.key+", date "+datetime.to_string()+", id '"+pdata[subset_number]->stnid+"'","bufr2xml",user,args.args_string);
     }
-    uoe.key=ientry.key+datetime.toString("%Y-%m-%d %H");
+    uoe.key=ientry.key+datetime.to_string("%Y-%m-%d %H");
     nsteps=0;
     if (!uniqueObservationTable[obsTypeIndex]->found(uoe.key,uoe)) {
 	nsteps=1;
@@ -513,11 +516,11 @@ void processNCEPPREPBUFRObservation(std::string& message_type,size_t subset_numb
     }
 // patch for NNRP prepqm files
     de.data.reset(new metadata::ObML::DataTypeEntry::Data);
-    if (rpt.getCenter() == 99 && rpt.getSubCenter() == 0) {
+    if (rpt.center() == 99 && rpt.sub_center() == 0) {
 	de.data->map="7-3";
     }
     else {
-	de.data->map=strutils::itos(rpt.getCenter())+"-"+strutils::itos(rpt.getSubCenter());
+	de.data->map=strutils::itos(rpt.center())+"-"+strutils::itos(rpt.sub_center());
     }
     if (isValidDate(datetime)) {
 	updateIDTable(obsTypeIndex,pdata[subset_number]->lat,trueLon,nsteps,datetime);
@@ -530,10 +533,10 @@ void processNCEPADPBUFRObservation(size_t subset_number)
 {
   NCEPADPBUFRData **adata=reinterpret_cast<NCEPADPBUFRData **>(data);
   int obsTypeIndex=-1;
-  int type=rpt.getDataType()*1000+rpt.getDataSubType();
+  int type=rpt.data_type()*1000+rpt.data_subtype();
 
-  if (adata[subset_number]->datetime.getYear() == 31073) {
-    adata[subset_number]->datetime=rpt.getDateTime();
+  if (adata[subset_number]->datetime.year() == 31073) {
+    adata[subset_number]->datetime=rpt.date_time();
   }
   switch (type) {
     case 0:
@@ -749,17 +752,17 @@ void processNCEPADPBUFRObservation(size_t subset_number)
     }
     default:
     {
-	metautils::logError("processNCEPADPBUFRObservation error:  rpt sub-type "+strutils::itos(rpt.getDataSubType())+" not recognized for rpt type "+strutils::itos(rpt.getDataType())+"  date: "+adata[subset_number]->datetime.toString()+"  id: '"+adata[subset_number]->rpid+"'","bufr2xml",user,args.argsString);
+	metautils::log_error("processNCEPADPBUFRObservation error:  rpt sub-type "+strutils::itos(rpt.data_subtype())+" not recognized for rpt type "+strutils::itos(rpt.data_type())+"  date: "+adata[subset_number]->datetime.to_string()+"  id: '"+adata[subset_number]->rpid+"'","bufr2xml",user,args.args_string);
     }
   }
   ientry.key="";
   if (pentry.key == "satellite") {
     if (!adata[subset_number]->satid.empty()) {
-	ientry.key=metautils::cleanID(adata[subset_number]->satid);
+	ientry.key=metautils::clean_ID(adata[subset_number]->satid);
 	ientry.key=pentry.key+"[!]BUFRsatID[!]"+ientry.key;
     }
     else if (!adata[subset_number]->rpid.empty()) {
-	ientry.key=metautils::cleanID(adata[subset_number]->rpid);
+	ientry.key=metautils::clean_ID(adata[subset_number]->rpid);
 	switch (type) {
 	  case 12003:
 	  {
@@ -773,7 +776,7 @@ void processNCEPADPBUFRObservation(size_t subset_number)
 	}
     }
     else if (!adata[subset_number]->stsn.empty()) {
-	ientry.key=metautils::cleanID(adata[subset_number]->stsn);
+	ientry.key=metautils::clean_ID(adata[subset_number]->stsn);
 	switch (type) {
 	  case 12004:
 	  {
@@ -788,19 +791,19 @@ void processNCEPADPBUFRObservation(size_t subset_number)
     }
   }
   else if (!adata[subset_number]->wmoid.empty()) {
-    ientry.key=metautils::cleanID(adata[subset_number]->wmoid);
+    ientry.key=metautils::clean_ID(adata[subset_number]->wmoid);
     ientry.key=pentry.key+"[!]WMO[!]"+ientry.key;
   }
   else if (!adata[subset_number]->acrn.empty()) {
-    ientry.key=metautils::cleanID(adata[subset_number]->acrn);
+    ientry.key=metautils::clean_ID(adata[subset_number]->acrn);
     ientry.key=pentry.key+"[!]callSign[!]"+ientry.key;
   }
   else if (!adata[subset_number]->acftid.empty()) {
-    ientry.key=metautils::cleanID(adata[subset_number]->acftid);
+    ientry.key=metautils::clean_ID(adata[subset_number]->acftid);
     ientry.key=pentry.key+"[!]other[!]"+ientry.key;
   }
   else if (!adata[subset_number]->rpid.empty()) {
-    ientry.key=metautils::cleanID(adata[subset_number]->rpid);
+    ientry.key=metautils::clean_ID(adata[subset_number]->rpid);
     switch (type) {
 	case 1002:
 	case 1003:
@@ -861,16 +864,16 @@ void processNCEPADPBUFRObservation(size_t subset_number)
 	}
 	default:
 	{
-	  metautils::logError(std::string("processNCEPADPBUFRObservation error: can't get report ID from RPID: "+adata[subset_number]->rpid+"  date: ")+adata[subset_number]->datetime.toString()+"  data type: "+strutils::itos(rpt.getDataType())+"-"+strutils::itos(rpt.getDataSubType()),"bufr2xml",user,args.argsString);
+	  metautils::log_error(std::string("processNCEPADPBUFRObservation error: can't get report ID from RPID: "+adata[subset_number]->rpid+"  date: ")+adata[subset_number]->datetime.to_string()+"  data type: "+strutils::itos(rpt.data_type())+"-"+strutils::itos(rpt.data_subtype()),"bufr2xml",user,args.args_string);
 	}
     }
   }
   if (ientry.key.empty()) {
-    metautils::logError(std::string("processNCEPADPBUFRObservation error: can't get report ID from anywhere  date: ")+adata[subset_number]->datetime.toString()+"  data type: "+strutils::itos(rpt.getDataType())+"-"+strutils::itos(rpt.getDataSubType()),"bufr2xml",user,args.argsString);
+    metautils::log_error(std::string("processNCEPADPBUFRObservation error: can't get report ID from anywhere  date: ")+adata[subset_number]->datetime.to_string()+"  data type: "+strutils::itos(rpt.data_type())+"-"+strutils::itos(rpt.data_subtype()),"bufr2xml",user,args.args_string);
   }
   de.data.reset(new metadata::ObML::DataTypeEntry::Data);
-  de.data->map=strutils::itos(rpt.getCenter())+"-"+strutils::itos(rpt.getSubCenter());
-  de.key=strutils::ftos(rpt.getDataType(),3,0,'0')+"."+strutils::ftos(rpt.getDataSubType(),3,0,'0');
+  de.data->map=strutils::itos(rpt.center())+"-"+strutils::itos(rpt.sub_center());
+  de.key=strutils::ftos(rpt.data_type(),3,0,'0')+"."+strutils::ftos(rpt.data_subtype(),3,0,'0');
   if (isValidDate(adata[subset_number]->datetime) && adata[subset_number]->lat <= 90. && adata[subset_number]->lat >= -90. && adata[subset_number]->lon <= 180. && adata[subset_number]->lon >= -180.) {
     updateIDTable(obsTypeIndex,adata[subset_number]->lat,adata[subset_number]->lon,1,adata[subset_number]->datetime);
     updatePlatformTable(obsTypeIndex,adata[subset_number]->lat,adata[subset_number]->lon,1);
@@ -880,7 +883,7 @@ void processNCEPADPBUFRObservation(size_t subset_number)
 void processNCEPRadianceBUFRObservation(size_t subset_number)
 {
   NCEPRadianceBUFRData **rdata=reinterpret_cast<NCEPRadianceBUFRData **>(data);
-  int type=rpt.getDataType()*1000+rpt.getDataSubType();
+  int type=rpt.data_type()*1000+rpt.data_subtype();
   int obsTypeIndex=-1;
 
   switch (type) {
@@ -925,18 +928,18 @@ void processNCEPRadianceBUFRObservation(size_t subset_number)
 	obsTypeIndex=1;
 	break;
     default:
-      metautils::logError("processNCEPRadianceBUFRObservation error:  rpt sub-type "+strutils::itos(rpt.getDataSubType())+" not recognized for rpt type "+strutils::itos(rpt.getDataType())+"  date: "+rpt.getDateTime().toString()+"  id: '"+rdata[subset_number]->satid+"'","bufr2xml",user,args.argsString);
+      metautils::log_error("processNCEPRadianceBUFRObservation error:  rpt sub-type "+strutils::itos(rpt.data_subtype())+" not recognized for rpt type "+strutils::itos(rpt.data_type())+"  date: "+rpt.date_time().to_string()+"  id: '"+rdata[subset_number]->satid+"'","bufr2xml",user,args.args_string);
   }
   if (rdata[subset_number]->satid.length() > 0) {
-    ientry.key=metautils::cleanID(rdata[subset_number]->satid);
+    ientry.key=metautils::clean_ID(rdata[subset_number]->satid);
     ientry.key=pentry.key+"[!]BUFRsatID[!]"+ientry.key;
   }
   else {
-    metautils::logError(std::string("processNCEPRadianceBUFRObservation error: can't get report ID from anywhere  date: ")+rpt.getDateTime().toString()+"  data type: "+strutils::itos(rpt.getDataType())+"-"+strutils::itos(rpt.getDataSubType()),"bufr2xml",user,args.argsString);
+    metautils::log_error(std::string("processNCEPRadianceBUFRObservation error: can't get report ID from anywhere  date: ")+rpt.date_time().to_string()+"  data type: "+strutils::itos(rpt.data_type())+"-"+strutils::itos(rpt.data_subtype()),"bufr2xml",user,args.args_string);
   }
   de.data.reset(new metadata::ObML::DataTypeEntry::Data);
-  de.data->map=strutils::itos(rpt.getCenter())+"-"+strutils::itos(rpt.getSubCenter());
-  de.key=strutils::ftos(rpt.getDataType(),3,0,'0')+"."+strutils::ftos(rpt.getDataSubType(),3,0,'0');
+  de.data->map=strutils::itos(rpt.center())+"-"+strutils::itos(rpt.sub_center());
+  de.key=strutils::ftos(rpt.data_type(),3,0,'0')+"."+strutils::ftos(rpt.data_subtype(),3,0,'0');
   for (const auto& group : rdata[subset_number]->radiance_groups) {
     DateTime dt=group.datetime;
     if (isValidDate(dt) && group.lat <= 90. && group.lat >= -90. && group.lon <= 180. && group.lon >= -180.) {
@@ -952,7 +955,7 @@ void processECMWFBUFRObservation(size_t subset_number)
   int obsTypeIndex=-1;
   std::string block_num;
 
-  if (edata[subset_number]->datetime.getYear() > 3000) {
+  if (edata[subset_number]->datetime.year() > 3000) {
     return;
   }
   int type=edata[subset_number]->ecmwf_os.rdb_type*1000+edata[subset_number]->ecmwf_os.rdb_subtype;
@@ -967,7 +970,7 @@ void processECMWFBUFRObservation(size_t subset_number)
     case 1117:
     case 1140:
 	if (edata[subset_number]->wmoid.length() == 0) {
-	  metautils::logError(std::string("processECMWFBUFRObservation error:  WMO ID not found - date: ")+edata[subset_number]->datetime.toString(),"bufr2xml",user,args.argsString);
+	  metautils::log_error(std::string("processECMWFBUFRObservation error:  WMO ID not found - date: ")+edata[subset_number]->datetime.to_string(),"bufr2xml",user,args.args_string);
 	}
 	pentry.key="land_station";
 	block_num=(edata[subset_number]->wmoid).substr(0,2);
@@ -988,16 +991,16 @@ void processECMWFBUFRObservation(size_t subset_number)
     case 1022:
     case 1023:
 	if (edata[subset_number]->shipid.length() == 0) {
-	  metautils::logError(std::string("processECMWFBUFRObservation error:  SHIP ID not found - date: ")+edata[subset_number]->datetime.toString(),"bufr2xml",user,args.argsString);
+	  metautils::log_error(std::string("processECMWFBUFRObservation error:  SHIP ID not found - date: ")+edata[subset_number]->datetime.to_string(),"bufr2xml",user,args.args_string);
 	}
 	pentry.key="roving_ship";
-	ientry.key=pentry.key+"[!]other[!]"+metautils::cleanID(edata[subset_number]->shipid);
+	ientry.key=pentry.key+"[!]other[!]"+metautils::clean_ID(edata[subset_number]->shipid);
 	obsTypeIndex=1;
 	break;
     case 1021:
     case 1027:
 	if (edata[subset_number]->buoyid.length() == 0) {
-	  metautils::logError(std::string("processECMWFBUFRObservation error:  BUOY ID not found - date: ")+edata[subset_number]->datetime.toString(),"bufr2xml",user,args.argsString);
+	  metautils::log_error(std::string("processECMWFBUFRObservation error:  BUOY ID not found - date: ")+edata[subset_number]->datetime.to_string(),"bufr2xml",user,args.args_string);
 	}
 	pentry.key="drifting_buoy";
 	ientry.key=pentry.key+"[!]other[!]"+edata[subset_number]->buoyid;
@@ -1013,7 +1016,7 @@ void processECMWFBUFRObservation(size_t subset_number)
     case 3086:
     case 3087:
 	if (edata[subset_number]->satid.length() == 0) {
-	  metautils::logError(std::string("processECMWFBUFRObservation error:  SATELLITE ID not found - date: ")+edata[subset_number]->datetime.toString(),"bufr2xml",user,args.argsString);
+	  metautils::log_error(std::string("processECMWFBUFRObservation error:  SATELLITE ID not found - date: ")+edata[subset_number]->datetime.to_string(),"bufr2xml",user,args.args_string);
 	}
 	pentry.key="satellite";
 	ientry.key=pentry.key+"[!]BUFRsatID[!]"+edata[subset_number]->satid;
@@ -1023,7 +1026,7 @@ void processECMWFBUFRObservation(size_t subset_number)
     case 3089:
     case 12127:
 	if (edata[subset_number]->satid.length() == 0) {
-	  metautils::logError(std::string("processECMWFBUFRObservation error:  SATELLITE ID not found - date: ")+edata[subset_number]->datetime.toString(),"bufr2xml",user,args.argsString);
+	  metautils::log_error(std::string("processECMWFBUFRObservation error:  SATELLITE ID not found - date: ")+edata[subset_number]->datetime.to_string(),"bufr2xml",user,args.args_string);
 	}
 	pentry.key="satellite";
 	ientry.key=pentry.key+"[!]BUFRsatID[!]"+edata[subset_number]->satid;
@@ -1032,7 +1035,7 @@ void processECMWFBUFRObservation(size_t subset_number)
     case 4091:
     case 5101:
 	if (edata[subset_number]->wmoid.length() == 0) {
-	  metautils::logError(std::string("processECMWFBUFRObservation error:  WMO ID not found - date: ")+edata[subset_number]->datetime.toString(),"bufr2xml",user,args.argsString);
+	  metautils::log_error(std::string("processECMWFBUFRObservation error:  WMO ID not found - date: ")+edata[subset_number]->datetime.to_string(),"bufr2xml",user,args.args_string);
 	}
 	pentry.key="land_station";
 	block_num=(edata[subset_number]->wmoid).substr(0,2);
@@ -1048,17 +1051,17 @@ void processECMWFBUFRObservation(size_t subset_number)
     case 5102:
     case 5106:
 	if (edata[subset_number]->shipid.length() == 0) {
-	  metautils::logError(std::string("processECMWFBUFRObservation error:  SHIP ID not found - date: ")+edata[subset_number]->datetime.toString(),"bufr2xml",user,args.argsString);
+	  metautils::log_error(std::string("processECMWFBUFRObservation error:  SHIP ID not found - date: ")+edata[subset_number]->datetime.to_string(),"bufr2xml",user,args.args_string);
 	}
 	pentry.key="roving_ship";
-	ientry.key=pentry.key+"[!]other[!]"+metautils::cleanID(edata[subset_number]->shipid);
+	ientry.key=pentry.key+"[!]other[!]"+metautils::clean_ID(edata[subset_number]->shipid);
 	obsTypeIndex=0;
 	break;
     case 4095:
     case 4096:
     case 4097:
 	if (edata[subset_number]->wmoid.length() == 0) {
-	  metautils::logError(std::string("processECMWFBUFRObservation error:  WMO ID not found - date: ")+edata[subset_number]->datetime.toString(),"bufr2xml",user,args.argsString);
+	  metautils::log_error(std::string("processECMWFBUFRObservation error:  WMO ID not found - date: ")+edata[subset_number]->datetime.to_string(),"bufr2xml",user,args.args_string);
 	}
 	pentry.key="wind_profiler";
 	ientry.key=pentry.key+"[!]WMO[!]"+edata[subset_number]->wmoid;
@@ -1071,10 +1074,10 @@ void processECMWFBUFRObservation(size_t subset_number)
     case 7144:
     case 7145:
 	if (edata[subset_number]->acftid.length() == 0) {
-	  metautils::logError(std::string("processECMWFBUFRObservation error:  ACFT ID not found - date: ")+edata[subset_number]->datetime.toString(),"bufr2xml",user,args.argsString);
+	  metautils::log_error(std::string("processECMWFBUFRObservation error:  ACFT ID not found - date: ")+edata[subset_number]->datetime.to_string(),"bufr2xml",user,args.args_string);
 	}
 	pentry.key="aircraft";
-	ientry.key=pentry.key+"[!]other[!]"+metautils::cleanID(edata[subset_number]->acftid);
+	ientry.key=pentry.key+"[!]other[!]"+metautils::clean_ID(edata[subset_number]->acftid);
 	obsTypeIndex=0;
 	break;
     case 10164:
@@ -1083,10 +1086,10 @@ void processECMWFBUFRObservation(size_t subset_number)
 	obsTypeIndex=0;
 	break;
     default:
-      metautils::logError("processECMWFBUFRObservation error:  rdb sub-type "+strutils::itos(edata[subset_number]->ecmwf_os.rdb_subtype)+" not recognized for rdb type "+strutils::itos(edata[subset_number]->ecmwf_os.rdb_type)+"  date: "+edata[subset_number]->datetime.toString()+"  id: '"+edata[subset_number]->ecmwf_os.ID+"'","bufr2xml",user,args.argsString);
+      metautils::log_error("processECMWFBUFRObservation error:  rdb sub-type "+strutils::itos(edata[subset_number]->ecmwf_os.rdb_subtype)+" not recognized for rdb type "+strutils::itos(edata[subset_number]->ecmwf_os.rdb_type)+"  date: "+edata[subset_number]->datetime.to_string()+"  id: '"+edata[subset_number]->ecmwf_os.ID+"'","bufr2xml",user,args.args_string);
   }
   de.data.reset(new metadata::ObML::DataTypeEntry::Data);
-  de.data->map=strutils::itos(rpt.getCenter())+"-"+strutils::itos(rpt.getSubCenter());
+  de.data->map=strutils::itos(rpt.center())+"-"+strutils::itos(rpt.sub_center());
   de.key=strutils::ftos(edata[subset_number]->ecmwf_os.rdb_type,3,0,'0')+"."+strutils::ftos(edata[subset_number]->ecmwf_os.rdb_subtype,3,0,'0');
   updateIDTable(obsTypeIndex,edata[subset_number]->lat,edata[subset_number]->lon,1,edata[subset_number]->datetime);
   updatePlatformTable(obsTypeIndex,edata[subset_number]->lat,edata[subset_number]->lon,1);
@@ -1103,25 +1106,25 @@ void scanFile()
   tfile->open(args.temp_loc);
   tdir=new TempDir;
   tdir->create(args.temp_loc);
-  if (!primaryMetadata::prepareFileForMetadataScanning(*tfile,*tdir,NULL,file_format,error)) {
-    metautils::logError("prepareFileForMetadataScanning() returned '"+error+"'","bufr2xml",user,args.argsString);
+  if (!primaryMetadata::prepare_file_for_metadata_scanning(*tfile,*tdir,NULL,file_format,error)) {
+    metautils::log_error("prepare_file_for_metadata_scanning() returned '"+error+"'","bufr2xml",user,args.args_string);
   }
   uniqueObservationTable=new my::map<UniqueObservationEntry> *[metadata::ObML::NUM_OBS_TYPES];
   for (size_t n=0; n < metadata::ObML::NUM_OBS_TYPES; ++n) {
     uniqueObservationTable[n]=new my::map<UniqueObservationEntry>(999999);
   }
   buffer=new unsigned char[BUF_LEN];
-  if (!primaryMetadata::openFileForMetadataScanning(reinterpret_cast<void *>(&istream),tfile->name(),error)) {
-    metautils::logError("openFileForMetadataScanning() returned '"+error+"'","bufr2xml",user,args.argsString);
+  if (!primaryMetadata::open_file_for_metadata_scanning(reinterpret_cast<void *>(&istream),tfile->name(),error)) {
+    metautils::log_error("open_file_for_metadata_scanning() returned '"+error+"'","bufr2xml",user,args.args_string);
   }
   while (istream.read(buffer,BUF_LEN) > 0) {
     rpt.fill(istream,buffer,BUFRReport::header_only);
-    if (rpt.getDataType() != 11) {
+    if (rpt.data_type() != 11) {
 	if (args.format == "prepbufr") {
-	  message_type=istream.getDataCategoryDescription(rpt.getDataType());
+	  message_type=istream.data_category_description(rpt.data_type());
 	}
-	data=rpt.getData();
-	for (int n=0; n < rpt.getNumberOfSubsets(); ++n) {
+	data=rpt.data();
+	for (int n=0; n < rpt.number_of_subsets(); ++n) {
 	  if (args.format == "prepbufr") {
 	    processNCEPPREPBUFRObservation(message_type,n);
 	  }
@@ -1143,14 +1146,14 @@ void scanFile()
 
 extern "C" void segv_handler(int)
 {
-  cleanUp();
+  clean_up();
   metautils::cmd_unregister();
-  metautils::logError("core dump","bufr2xml",user,args.argsString);
+  metautils::log_error("core dump","bufr2xml",user,args.args_string);
 }
 
 extern "C" void int_handler(int)
 {
-  cleanUp();
+  clean_up();
   metautils::cmd_unregister();
 }
 
@@ -1179,33 +1182,33 @@ int main(int argc,char **argv)
   }
   signal(SIGSEGV,segv_handler);
   signal(SIGINT,int_handler);
-  args.argsString=getUnixArgsString(argc,argv,'%');
-  metautils::readConfig("bufr2xml",user,args.argsString);
-  parseArgs();
+  args.args_string=unix_args_string(argc,argv,'%');
+  metautils::read_config("bufr2xml",user,args.args_string);
+  parse_args();
   flags="-f";
   if (std::regex_search(args.path,std::regex("^https://rda.ucar.edu"))) {
     flags="-wf";
   }
-  atexit(cleanUp);
+  atexit(clean_up);
   metautils::cmd_register("bufr2xml",user);
-  metautils::checkForExistingCMD("ObML");
+  metautils::check_for_existing_CMD("ObML");
   scanFile();
   if (ID_table == nullptr) {
     std::cerr << "No data found - no content metadata will be generated" << std::endl;
     exit(1);
   }
-  metadata::ObML::writeObML(ID_table,platform_table,"bufr2xml",user);
-  if (args.updateDB) {
-    if (!args.updateGraphics) {
+  metadata::ObML::write_ObML(ID_table,platform_table,"bufr2xml",user);
+  if (args.update_DB) {
+    if (!args.update_graphics) {
 	flags="-G "+flags;
     }
     if (!args.regenerate) {
 	flags="-R "+flags;
     }
-    if (!args.updateSummary) {
+    if (!args.update_summary) {
 	flags="-S "+flags;
     }
-    if (mysystem2(directives.localRoot+"/bin/scm -d "+args.dsnum+" "+flags+" "+args.filename+".ObML",oss,ess) < 0) {
+    if (mysystem2(directives.local_root+"/bin/scm -d "+args.dsnum+" "+flags+" "+args.filename+".ObML",oss,ess) < 0) {
 	std::cerr << ess.str() << std::endl;
     }
   }

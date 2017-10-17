@@ -23,10 +23,9 @@ metautils::Args args;
 my::map<metadata::GrML::GridEntry> grid_table;
 const std::string user=getenv("USER");
 TempFile *tfile=nullptr;
-std::string tfile_name;
-TempDir *tdir=nullptr;
-TempFile *inv_file=nullptr;
-std::ofstream inv;
+std::string tfile_name,inv_file;
+TempDir *tdir=nullptr,*inv_dir=nullptr;
+std::ofstream inv_stream;
 std::string myerror="";
 std::string mywarning="";
 const char *grib1_time_unit[]={"minute","hour","day","month","year","year","year","year","","","hour","hour","hour"};
@@ -36,18 +35,18 @@ const char *grib2_time_unit[]={"minute","hour","day","month","year","year","year
 const int grib2_per_day[]={1440,24,1,0,0,0,0,0,0,0,24,24,24,86400};
 const int grib2_unit_mult[]={1,1,1,1,1,10,30,100,1,1,3,6,12,1};
 
-void parseArgs()
+void parse_args()
 {
   std::deque<std::string> sp;
   size_t n;
 
-  args.updateDB=true;
-  args.updateSummary=true;
-  args.overridePrimaryCheck=false;
-  args.overwriteOnly=false;
+  args.update_DB=true;
+  args.update_summary=true;
+  args.override_primary_check=false;
+  args.overwrite_only=false;
   args.regenerate=true;
-  args.temp_loc=directives.tempPath;
-  sp=strutils::split(args.argsString,"!");
+  args.temp_loc=directives.temp_path;
+  sp=strutils::split(args.args_string,"!");
   for (n=0; n < sp.size()-1; n++) {
     if (sp[n] == "-f") {
 	args.format=sp[++n];
@@ -65,25 +64,25 @@ void parseArgs()
         args.member_name=sp[++n];
     }
     else if (sp[n] == "-I") {
-	args.inventoryOnly=true;
-	args.updateDB=false;
+	args.inventory_only=true;
+	args.update_DB=false;
     }
     else if (sp[n] == "-S") {
-	args.updateSummary=false;
+	args.update_summary=false;
     }
     else if (sp[n] == "-U") {
 	if (user == "dattore") {
-	  args.updateDB=false;
+	  args.update_DB=false;
 	}
     }
     else if (sp[n] == "-NC") {
 	if (user == "dattore") {
-	  args.overridePrimaryCheck=true;
+	  args.override_primary_check=true;
 	}
     }
     else if (sp[n] == "-OO") {
 	if (user == "dattore") {
-	  args.overwriteOnly=true;
+	  args.overwrite_only=true;
 	}
     }
     else if (sp[n] == "-R") {
@@ -108,9 +107,9 @@ void parseArgs()
     exit(1);
   }
   if (args.dsnum == "999.9") {
-    args.overridePrimaryCheck=true;
-    args.updateDB=false;
-    args.updateSummary=false;
+    args.override_primary_check=true;
+    args.update_DB=false;
+    args.update_summary=false;
     args.regenerate=false;
   }
   n=sp[sp.size()-1].rfind("/");
@@ -118,7 +117,7 @@ void parseArgs()
   args.filename=sp[sp.size()-1].substr(n+1);
 }
 
-extern "C" void cleanUp()
+extern "C" void clean_up()
 {
   std::stringstream oss,ess;
 
@@ -134,7 +133,7 @@ extern "C" void cleanUp()
     delete tdir;
   }
   if (myerror.length() > 0) {
-    metautils::logError(myerror,"grid2xml",user,args.argsString);
+    metautils::log_error(myerror,"grid2xml",user,args.args_string);
   }
 }
 
@@ -145,7 +144,7 @@ struct InvEntry {
   int num;
 };
 
-void scanFile()
+void scan_file()
 {
   idstream *istream=nullptr;
   Grid *grid=nullptr;
@@ -155,9 +154,9 @@ void scanFile()
   int BUF_LEN=0;
   unsigned char *buffer=nullptr;
   int n;
-  std::string file_format,units,levelType;
+  std::string file_format,units,level_type;
   const char *pole[]={"N","S"};
-  DateTime firstValidDateTime,lastValidDateTime;
+  DateTime first_valid_date_time,last_valid_date_time;
   size_t fcst_hr;
   metautils::StringEntry pe,ee;
   Grid::EnsembleData ensdata;
@@ -239,7 +238,7 @@ void scanFile()
     grid=new GPCPGrid;
   }
   else {
-    metautils::logError(args.format+"-formatted files not recognized","grid2xml",user,args.argsString);
+    metautils::log_error(args.format+"-formatted files not recognized","grid2xml",user,args.args_string);
   }
   tfile=new TempFile;
   tdir=new TempDir;
@@ -259,7 +258,7 @@ void scanFile()
 	idx=(tfile->name()).rfind("/");
 	tfile_name=(tfile->name()).substr(0,idx+1)+tfile_name;
 	if (mysystem2("/bin/ln -s "+tfile->name()+" "+tfile_name,oss,ess) < 0) {
-	  metautils::logError("unable to sym-link to temporary file - "+ess.str(),"grid2xml",user,args.argsString);
+	  metautils::log_error("unable to sym-link to temporary file - "+ess.str(),"grid2xml",user,args.args_string);
 	}
     }
     else {
@@ -267,28 +266,28 @@ void scanFile()
     }
   }
   tdir->create(args.temp_loc);
-  if (!primaryMetadata::prepareFileForMetadataScanning(*tfile,*tdir,NULL,file_format,error)) {
-    metautils::logError("prepareFileForMetadataScanning() returned '"+error+"'","grid2xml",user,args.argsString);
+  if (!primaryMetadata::prepare_file_for_metadata_scanning(*tfile,*tdir,NULL,file_format,error)) {
+    metautils::log_error("prepare_file_for_metadata_scanning() returned '"+error+"'","grid2xml",user,args.args_string);
   }
-  if (!primaryMetadata::openFileForMetadataScanning(istream,tfile_name,error)) {
+  if (!primaryMetadata::open_file_for_metadata_scanning(istream,tfile_name,error)) {
     if (error.length() > 0) {
-	metautils::logError("openFileForMetadataScanning() returned '"+error+"'","grid2xml",user,args.argsString);
+	metautils::log_error("open_file_for_metadata_scanning() returned '"+error+"'","grid2xml",user,args.args_string);
     }
     else {
-	metautils::logError("openFileForMetadataScanning(): unable to open file","grid2xml",user,args.argsString);
+	metautils::log_error("open_file_for_metadata_scanning(): unable to open file","grid2xml",user,args.args_string);
     }
   }
   if ((file_format.length() == 0 || file_format == "TAR") && (args.format == "grib" || args.format == "grib0" || args.format == "grib2")) {
-    metadata::openInventory(inv,&inv_file,"grid2xml",user);
+    metadata::open_inventory(inv_file,&inv_dir,inv_stream,"GrML","grid2xml",user);
   }
-  else if (args.inventoryOnly) {
-    metautils::logError("scanFile returned error: unable to inventory "+args.path+"/"+args.filename+" because archive format is '"+file_format+"'","grid2xml",user,args.argsString);
+  else if (args.inventory_only) {
+    metautils::log_error("scan_file() returned error: unable to inventory "+args.path+"/"+args.filename+" because archive format is '"+file_format+"'","grid2xml",user,args.args_string);
   }
   while (1) {
-    if ((args.format != "grib" && args.format != "grib2") || ngrids == message->getNumberOfGrids()) {
+    if ((args.format != "grib" && args.format != "grib2") || ngrids == message->number_of_grids()) {
 	if ( (bytes_read=istream->peek()) < 0) {
 	  if (bytes_read == bfstream::error) {
-	    metautils::logError("An error occurred while reading the data file - no content metadata was generated","grid2xml",user,args.argsString);
+	    metautils::log_error("An error occurred while reading the data file - no content metadata was generated","grid2xml",user,args.args_string);
 	    exit(1);
 	  }
 	  else {
@@ -308,10 +307,10 @@ void scanFile()
     if (args.format == "grib" || args.format == "grib2") {
 	if (ngrids == 0) {
 	  message->fill(buffer,true);
-	  while (message->getNumberOfGrids() == 0) {
+	  while (message->number_of_grids() == 0) {
 	    if ( (bytes_read=istream->peek()) < 0) {
 		if (bytes_read == bfstream::error) {
-		  metautils::logError("An error occurred while reading the data file - no content metadata was generated","grid2xml",user,args.argsString);
+		  metautils::log_error("An error occurred while reading the data file - no content metadata was generated","grid2xml",user,args.args_string);
 		  exit(1);
 		}
 		else
@@ -325,34 +324,34 @@ void scanFile()
 	    istream->read(buffer,BUF_LEN);
 	    message->fill(buffer,true);
 	  }
-	  if (message->getNumberOfGrids() == 0) {
+	  if (message->number_of_grids() == 0) {
 	    break;
 	  }
 	}
-	grid=message->getGrid(ngrids);
+	grid=message->grid(ngrids);
 	++ngrids;
     }
     else {
 	if (args.format == "cmorph025") {
-	  reinterpret_cast<CMORPH025Grid *>(grid)->setDateTime(reinterpret_cast<InputCMORPH025GridStream *>(istream)->getDateTime());
-	  reinterpret_cast<CMORPH025Grid *>(grid)->setLatitudes(reinterpret_cast<InputCMORPH025GridStream *>(istream)->getStartLatitude(),reinterpret_cast<InputCMORPH025GridStream *>(istream)->getEndLatitude());
+	  reinterpret_cast<CMORPH025Grid *>(grid)->set_date_time(reinterpret_cast<InputCMORPH025GridStream *>(istream)->date_time());
+	  reinterpret_cast<CMORPH025Grid *>(grid)->set_latitudes(reinterpret_cast<InputCMORPH025GridStream *>(istream)->start_latitude(),reinterpret_cast<InputCMORPH025GridStream *>(istream)->end_latitude());
 	}
 	else if (args.format == "gpcp") {
-	  grid->fill(buffer,Grid::fullGrid);
+	  grid->fill(buffer,Grid::full_grid);
 	}
 	else {
-	  grid->fill(buffer,Grid::headerOnly);
+	  grid->fill(buffer,Grid::header_only);
 	}
     }
-    griddef=grid->getDefinition();
-    if (args.format == "gpcp" && reinterpret_cast<GPCPGrid *>(grid)->isEmptyGrid()) {
+    griddef=grid->definition();
+    if (args.format == "gpcp" && reinterpret_cast<GPCPGrid *>(grid)->is_empty_grid()) {
 	griddef.type=0;
     }
     if (griddef.type > 0) {
-	firstValidDateTime=grid->getValidDateTime();
+	first_valid_date_time=grid->valid_date_time();
 	gentry.key=strutils::itos(griddef.type)+"<!>";
 	if (griddef.type != Grid::sphericalHarmonicsType) {
-	  griddim=grid->getDimensions();
+	  griddim=grid->dimensions();
 	  gentry.key+=strutils::itos(griddim.x)+"<!>"+strutils::itos(griddim.y)+"<!>"+strutils::ftos(griddef.slatitude,3)+"<!>"+strutils::ftos(griddef.slongitude,3)+"<!>"+strutils::ftos(griddef.elatitude,3)+"<!>"+strutils::ftos(griddef.elongitude,3)+"<!>"+strutils::ftos(griddef.loincrement,3)+"<!>";
 	  switch (griddef.type) {
 	    case Grid::gaussianLatitudeLongitudeType:
@@ -378,21 +377,21 @@ void scanFile()
 	pe.key="";
 	ee.key="";
 	units="";
-	fcst_hr=grid->getForecastTime()/10000;
+	fcst_hr=grid->forecast_time()/10000;
 	if (args.format == "grib" || args.format == "grib0") {
-	  if (message->getEdition() == 0) {
+	  if (message->edition() == 0) {
 	    args.format="grib0";
 	  }
-	  lastValidDateTime=firstValidDateTime;
-	  lentry.key=strutils::ftos(grid->getSource())+"-"+strutils::ftos((reinterpret_cast<GRIBGrid *>(grid))->getSubCenterID());
+	  last_valid_date_time=first_valid_date_time;
+	  lentry.key=strutils::ftos(grid->source())+"-"+strutils::ftos((reinterpret_cast<GRIBGrid *>(grid))->sub_center_ID());
 	  pentry.key=lentry.key;
 	  if (args.format == "grib") {
-	    pentry.key+="."+strutils::ftos((reinterpret_cast<GRIBGrid *>(grid))->getParameterTableCode());
+	    pentry.key+="."+strutils::ftos((reinterpret_cast<GRIBGrid *>(grid))->parameter_table_code());
 	  }
-	  pentry.key+=":"+strutils::ftos(grid->getParameter());
-	  gentry.key+="<!>"+(reinterpret_cast<GRIBGrid *>(grid))->getProductDescription();
-	  pe.key=lentry.key+":"+strutils::itos((reinterpret_cast<GRIBGrid *>(grid))->getProcess());
-	  ensdata=grid->getEnsembleData();
+	  pentry.key+=":"+strutils::ftos(grid->parameter());
+	  gentry.key+="<!>"+(reinterpret_cast<GRIBGrid *>(grid))->product_description();
+	  pe.key=lentry.key+":"+strutils::itos((reinterpret_cast<GRIBGrid *>(grid))->process());
+	  ensdata=grid->ensemble_data();
 	  if (ensdata.fcst_type.length() > 0) {
 	    ee.key=ensdata.fcst_type+"<!>"+pe.key;
 	    if (ensdata.ID.length() > 0)
@@ -400,52 +399,52 @@ void scanFile()
 	    if (ensdata.total_size > 0)
 		ee.key+="<!>"+strutils::itos(ensdata.total_size);
 	  }
-	  levelType=strutils::itos((reinterpret_cast<GRIBGrid *>(grid))->getFirstLevelType());
+	  level_type=strutils::itos((reinterpret_cast<GRIBGrid *>(grid))->first_level_type());
 	  if (args.format == "grib" || args.format == "grib1") {
 	    sdum="WMO_GRIB1";
 	  }
 	  else {
 	    sdum="WMO_GRIB0";
 	  }
-	  if (level_mapper.levelIsLayer(sdum,levelType,lentry.key) < 0) {
-	    metautils::logError("no entry for "+levelType+", '"+lentry.key+"' in level map on "+grid->getValidDateTime().toString(),"grid2xml",user,args.argsString);
+	  if (level_mapper.level_is_a_layer(sdum,level_type,lentry.key) < 0) {
+	    metautils::log_error("no entry for "+level_type+", '"+lentry.key+"' in level map on "+grid->valid_date_time().to_string(),"grid2xml",user,args.args_string);
 	  }
 	  lentry.key+=",";
-	  if (level_mapper.levelIsLayer(sdum,levelType,lentry.key)) {
-	    lentry.key+=levelType+":"+strutils::ftos(grid->getFirstLevelValue(),5)+":"+strutils::ftos(grid->getSecondLevelValue(),5);
+	  if (level_mapper.level_is_a_layer(sdum,level_type,lentry.key)) {
+	    lentry.key+=level_type+":"+strutils::ftos(grid->first_level_value(),5)+":"+strutils::ftos(grid->second_level_value(),5);
 	  }
 	  else {
-	    lentry.key+=levelType+":"+strutils::ftos(grid->getFirstLevelValue(),5);
+	    lentry.key+=level_type+":"+strutils::ftos(grid->first_level_value(),5);
 	  }
 	  idx=gentry.key.rfind("<!>");
-	  if (inv.is_open()) {
-	    sdum=strutils::lltos((reinterpret_cast<InputGRIBStream *>(istream))->getCurrentRecordOffset())+"|"+strutils::itos(message->length())+"|"+grid->getValidDateTime().toString("%Y%m%d%H%MM");
+	  if (inv_stream.is_open()) {
+	    sdum=strutils::lltos((reinterpret_cast<InputGRIBStream *>(istream))->current_record_offset())+"|"+strutils::itos(message->length())+"|"+grid->valid_date_time().to_string("%Y%m%d%H%MM");
 	    ie.key=gentry.key.substr(idx+3);
 	    if (!inv_U_table.found(ie.key,ie)) {
 		ie.num=inv_U_table.size();
 		inv_U_table.insert(ie);
-		inv_U_list.push_back(ie.key);
+		inv_U_list.emplace_back(ie.key);
 	    }
 	    sdum+="|"+strutils::itos(ie.num);
 	    ie.key=strutils::substitute(gentry.key.substr(0,idx),"<!>",",");
 	    if (!inv_G_table.found(ie.key,ie)) {
 		ie.num=inv_G_table.size();
 		inv_G_table.insert(ie);
-		inv_G_list.push_back(ie.key);
+		inv_G_list.emplace_back(ie.key);
 	    }
 	    sdum+="|"+strutils::itos(ie.num);
 	    ie.key=lentry.key;
 	    if (!inv_L_table.found(ie.key,ie)) {
 		ie.num=inv_L_table.size();
 		inv_L_table.insert(ie);
-		inv_L_list.push_back(ie.key);
+		inv_L_list.emplace_back(ie.key);
 	    }
 	    sdum+="|"+strutils::itos(ie.num);
 	    ie.key=pentry.key;
 	    if (!inv_P_table.found(ie.key,ie)) {
 		ie.num=inv_P_table.size();
 		inv_P_table.insert(ie);
-		inv_P_list.push_back(ie.key);
+		inv_P_list.emplace_back(ie.key);
 	    }
 	    sdum+="|"+strutils::itos(ie.num);
 	    ie.key=pe.key;
@@ -454,7 +453,7 @@ void scanFile()
 		if (!inv_R_table.found(ie.key,ie)) {
 		  ie.num=inv_R_table.size();
 		  inv_R_table.insert(ie);
-		  inv_R_list.push_back(ie.key);
+		  inv_R_list.emplace_back(ie.key);
 		}
 		sdum+=strutils::itos(ie.num);
 	    }
@@ -464,59 +463,59 @@ void scanFile()
 		if (!inv_E_table.found(ie.key,ie)) {
 		  ie.num=inv_E_table.size();
 		  inv_E_table.insert(ie);
-		  inv_E_list.push_back(ie.key);
+		  inv_E_list.emplace_back(ie.key);
 		}
 		sdum+=strutils::itos(ie.num);
 	    }
-	    inv_lines.push_back(sdum);
+	    inv_lines.emplace_back(sdum);
 	  }
 	}
 	else if (args.format == "grib2") {
 /*
-	  lastValidDateTime=firstValidDateTime;
-firstValidDateTime=grid->getReferenceDateTime().hoursAdded(grid->getForecastTime()/10000);
+	  last_valid_date_time=first_valid_date_time;
+first_valid_date_time=grid->reference_date_time().hours_added(grid->forecast_time()/10000);
 */
-	  lentry.key=strutils::ftos(grid->getSource())+"-"+strutils::ftos((reinterpret_cast<GRIB2Grid *>(grid))->getSubCenterID());
-	  pentry.key=lentry.key+"."+strutils::ftos((reinterpret_cast<GRIB2Grid *>(grid))->getParameterTableCode())+"-"+strutils::ftos((reinterpret_cast<GRIB2Grid *>(grid))->getLocalTableCode())+":"+strutils::ftos((reinterpret_cast<GRIB2Grid *>(grid))->getDiscipline())+"."+strutils::ftos((reinterpret_cast<GRIB2Grid *>(grid))->getParameterCategory())+"."+strutils::ftos(grid->getParameter());
-	  pe.key=lentry.key+":"+strutils::itos((reinterpret_cast<GRIBGrid *>(grid))->getProcess())+"."+strutils::itos((reinterpret_cast<GRIB2Grid *>(grid))->getBackgroundProcess())+"."+strutils::itos((reinterpret_cast<GRIB2Grid *>(grid))->getForecastProcess());
-	  levelType=strutils::itos((reinterpret_cast<GRIB2Grid *>(grid))->getFirstLevelType());
-	  n=(reinterpret_cast<GRIB2Grid *>(grid))->getSecondLevelType();
+	  lentry.key=strutils::ftos(grid->source())+"-"+strutils::ftos((reinterpret_cast<GRIB2Grid *>(grid))->sub_center_ID());
+	  pentry.key=lentry.key+"."+strutils::ftos((reinterpret_cast<GRIB2Grid *>(grid))->parameter_table_code())+"-"+strutils::ftos((reinterpret_cast<GRIB2Grid *>(grid))->local_table_code())+":"+strutils::ftos((reinterpret_cast<GRIB2Grid *>(grid))->discipline())+"."+strutils::ftos((reinterpret_cast<GRIB2Grid *>(grid))->parameter_category())+"."+strutils::ftos(grid->parameter());
+	  pe.key=lentry.key+":"+strutils::itos((reinterpret_cast<GRIBGrid *>(grid))->process())+"."+strutils::itos((reinterpret_cast<GRIB2Grid *>(grid))->background_process())+"."+strutils::itos((reinterpret_cast<GRIB2Grid *>(grid))->forecast_process());
+	  level_type=strutils::itos((reinterpret_cast<GRIB2Grid *>(grid))->first_level_type());
+	  n=(reinterpret_cast<GRIB2Grid *>(grid))->second_level_type();
 	  lentry.key+=",";
 	  if (n != 255) {
-	    lentry.key+=levelType+"-"+strutils::itos(n)+":";
-	    if (!myequalf(grid->getFirstLevelValue(),Grid::missingValue)) {
-		lentry.key+=strutils::ftos(grid->getFirstLevelValue(),5);
+	    lentry.key+=level_type+"-"+strutils::itos(n)+":";
+	    if (!myequalf(grid->first_level_value(),Grid::missing_value)) {
+		lentry.key+=strutils::ftos(grid->first_level_value(),5);
 	    }
 	    else {
 		lentry.key+="0";
 	    }
 	    lentry.key+=":";
-	    if (!myequalf(grid->getSecondLevelValue(),Grid::missingValue)) {
-		lentry.key+=strutils::ftos(grid->getSecondLevelValue(),5);
+	    if (!myequalf(grid->second_level_value(),Grid::missing_value)) {
+		lentry.key+=strutils::ftos(grid->second_level_value(),5);
 	    }
 	    else {
 		lentry.key+="0";
 	    }
 	  }
 	  else {
-	    lentry.key+=levelType+":";
-	    if (!myequalf(grid->getFirstLevelValue(),Grid::missingValue)) {
-		lentry.key+=strutils::ftos(grid->getFirstLevelValue(),5);
+	    lentry.key+=level_type+":";
+	    if (!myequalf(grid->first_level_value(),Grid::missing_value)) {
+		lentry.key+=strutils::ftos(grid->first_level_value(),5);
 	    }
 	    else {
 		lentry.key+="0";
 	    }
 	  }
-	  short ptype=(reinterpret_cast<GRIB2Grid *>(grid))->getProductType();
-	  gentry.key+="<!>"+(reinterpret_cast<GRIB2Grid *>(grid))->getProductDescription();
-	  firstValidDateTime=grid->getForecastDateTime();
-	  lastValidDateTime=grid->getValidDateTime();
+	  short ptype=(reinterpret_cast<GRIB2Grid *>(grid))->product_type();
+	  gentry.key+="<!>"+(reinterpret_cast<GRIB2Grid *>(grid))->product_description();
+	  first_valid_date_time=grid->forecast_date_time();
+	  last_valid_date_time=grid->valid_date_time();
 	  switch (ptype) {
 	    case 0:
 	    case 1:
 	    case 2:
 		if (ptype == 1) {
-		  ensdata=grid->getEnsembleData();
+		  ensdata=grid->ensemble_data();
 		  if (ensdata.fcst_type.length() > 0) {
 		    ee.key=ensdata.fcst_type+"<!>"+pe.key;
 		    if (ensdata.ID.length() > 0) {
@@ -532,7 +531,7 @@ firstValidDateTime=grid->getReferenceDateTime().hoursAdded(grid->getForecastTime
 	    case 11:
 	    case 12:
 		if (ptype == 11 || ptype == 12) {
-		  ensdata=grid->getEnsembleData();
+		  ensdata=grid->ensemble_data();
 		  if (ensdata.fcst_type.length() > 0) {
 		    ee.key=ensdata.fcst_type+"<!>"+pe.key;
 		    if (ensdata.ID.length() > 0)
@@ -544,35 +543,35 @@ firstValidDateTime=grid->getReferenceDateTime().hoursAdded(grid->getForecastTime
 		break;
 	  }
 	  idx=gentry.key.rfind("<!>");
-	  if (inv.is_open()) {
-//	    sdum=strutils::lltos(((InputGRIBStream *)istream)->getCurrentRecordOffset())+"|"+strutils::lltos(message->length())+"|"+grid->getValidDateTime().toString("%Y%m%d%H%MM");
-sdum=strutils::lltos((reinterpret_cast<InputGRIBStream *>(istream))->getCurrentRecordOffset())+"|"+strutils::lltos(message->length())+"|"+lastValidDateTime.toString("%Y%m%d%H%MM");
+	  if (inv_stream.is_open()) {
+//	    sdum=strutils::lltos(((InputGRIBStream *)istream)->getCurrentRecordOffset())+"|"+strutils::lltos(message->length())+"|"+grid->valid_date_time().to_string("%Y%m%d%H%MM");
+sdum=strutils::lltos((reinterpret_cast<InputGRIBStream *>(istream))->current_record_offset())+"|"+strutils::lltos(message->length())+"|"+last_valid_date_time.to_string("%Y%m%d%H%MM");
 	    ie.key=gentry.key.substr(idx+3);
 	    if (!inv_U_table.found(ie.key,ie)) {
 		ie.num=inv_U_table.size();
 		inv_U_table.insert(ie);
-		inv_U_list.push_back(ie.key);
+		inv_U_list.emplace_back(ie.key);
 	    }
 	    sdum+="|"+strutils::itos(ie.num);
 	    ie.key=strutils::substitute(gentry.key.substr(0,idx),"<!>",",");
 	    if (!inv_G_table.found(ie.key,ie)) {
 		ie.num=inv_G_table.size();
 		inv_G_table.insert(ie);
-		inv_G_list.push_back(ie.key);
+		inv_G_list.emplace_back(ie.key);
 	    }
 	    sdum+="|"+strutils::itos(ie.num);
 	    ie.key=lentry.key;
 	    if (!inv_L_table.found(ie.key,ie)) {
 		ie.num=inv_L_table.size();
 		inv_L_table.insert(ie);
-		inv_L_list.push_back(ie.key);
+		inv_L_list.emplace_back(ie.key);
 	    }
 	    sdum+="|"+strutils::itos(ie.num);
 	    ie.key=pentry.key;
 	    if (!inv_P_table.found(ie.key,ie)) {
 		ie.num=inv_P_table.size();
 		inv_P_table.insert(ie);
-		inv_P_list.push_back(ie.key);
+		inv_P_list.emplace_back(ie.key);
 	    }
 	    sdum+="|"+strutils::itos(ie.num);
 	    ie.key=pe.key;
@@ -581,7 +580,7 @@ sdum=strutils::lltos((reinterpret_cast<InputGRIBStream *>(istream))->getCurrentR
 		if (!inv_R_table.found(ie.key,ie)) {
 		  ie.num=inv_R_table.size();
 		  inv_R_table.insert(ie);
-		  inv_R_list.push_back(ie.key);
+		  inv_R_list.emplace_back(ie.key);
 		}
 		sdum+=strutils::itos(ie.num);
 	    }
@@ -591,55 +590,55 @@ sdum=strutils::lltos((reinterpret_cast<InputGRIBStream *>(istream))->getCurrentR
 		if (!inv_E_table.found(ie.key,ie)) {
 		  ie.num=inv_E_table.size();
 		  inv_E_table.insert(ie);
-		  inv_E_list.push_back(ie.key);
+		  inv_E_list.emplace_back(ie.key);
 		}
 		sdum+=strutils::itos(ie.num);
 	    }
-	    inv_lines.push_back(sdum);
+	    inv_lines.emplace_back(sdum);
 	  }
 	}
 	else if (args.format == "oct" || args.format == "tropical" || args.format == "ll" || args.format == "slp" || args.format == "navy") {
-	  lastValidDateTime=firstValidDateTime;
-	  pentry.key=strutils::itos(grid->getParameter());
+	  last_valid_date_time=first_valid_date_time;
+	  pentry.key=strutils::itos(grid->parameter());
 	  if (fcst_hr == 0) {
-	    if (firstValidDateTime.getDay() == 0) {
-		firstValidDateTime.addDays(1);
-		lastValidDateTime.addMonths(1);
+	    if (first_valid_date_time.day() == 0) {
+		first_valid_date_time.add_days(1);
+		last_valid_date_time.add_months(1);
 		gentry.key+="<!>Monthly Mean of Analyses";
 	    }
 	    else
 		gentry.key+="<!>Analysis";
 	  }
 	  else {
-	    if (firstValidDateTime.getDay() == 0) {
-		firstValidDateTime.addDays(1);
-	   	lastValidDateTime.addMonths(1);
+	    if (first_valid_date_time.day() == 0) {
+		first_valid_date_time.add_days(1);
+	   	last_valid_date_time.add_months(1);
 		gentry.key+="<!>Monthly Mean of "+strutils::itos(fcst_hr)+"-hour Forecasts";
 	    }
 	    else {
 		gentry.key+="<!>"+strutils::itos(fcst_hr)+"-hour Forecast";
 	    }
-	    firstValidDateTime.addHours(fcst_hr);
+	    first_valid_date_time.add_hours(fcst_hr);
 	  }
-	  if (myequalf(grid->getSecondLevelValue(),0.)) {
-	    lentry.key="0:"+strutils::itos(grid->getFirstLevelValue());
+	  if (myequalf(grid->second_level_value(),0.)) {
+	    lentry.key="0:"+strutils::itos(grid->first_level_value());
 	  }
 	  else {
-	    lentry.key="1:"+strutils::itos(grid->getFirstLevelValue())+":"+strutils::itos(grid->getSecondLevelValue());
+	    lentry.key="1:"+strutils::itos(grid->first_level_value())+":"+strutils::itos(grid->second_level_value());
 	  }
 	}
 	else if (args.format == "jraieeemm") {
-	  lastValidDateTime=firstValidDateTime;
-	  lastValidDateTime.setDay(getDaysInMonth(firstValidDateTime.getYear(),firstValidDateTime.getMonth()));
-	  lastValidDateTime.addHours(18);
-	  pentry.key=strutils::itos(grid->getParameter());
+	  last_valid_date_time=first_valid_date_time;
+	  last_valid_date_time.set_day(days_in_month(first_valid_date_time.year(),first_valid_date_time.month()));
+	  last_valid_date_time.add_hours(18);
+	  pentry.key=strutils::itos(grid->parameter());
 	  gentry.key+="<!>Monthly Mean (4 per day) of ";
-	  if (grid->getForecastTime() == 0) {
+	  if (grid->forecast_time() == 0) {
 	    gentry.key+="Analyses";
 	  }
 	  else {
 	    gentry.key+="Forecasts";
-	    sdum=(reinterpret_cast<JRAIEEEMMGrid *>(grid))->getTimeRange();
+	    sdum=(reinterpret_cast<JRAIEEEMMGrid *>(grid))->time_range();
 	    if (sdum == "MN  ") {
 		gentry.key+=" of 6-hour Average";
 	    }
@@ -653,96 +652,96 @@ sdum=strutils::lltos((reinterpret_cast<InputGRIBStream *>(istream))->getCurrentR
 		gentry.key+=" of 6-hour Minimum";
 	    }
 	  }
-	  lentry.key=strutils::itos(grid->getFirstLevelType())+":"+strutils::ftos(grid->getFirstLevelValue(),5);
+	  lentry.key=strutils::itos(grid->first_level_type())+":"+strutils::ftos(grid->first_level_value(),5);
 	}
 	else if (args.format == "ussrslp") {
-	  pentry.key=strutils::itos(grid->getParameter());
+	  pentry.key=strutils::itos(grid->parameter());
 	  if (fcst_hr == 0)
 	    gentry.key+="<!>Analysis";
 	  else
 	    gentry.key+="<!>"+strutils::itos(fcst_hr)+"-hour Forecast";
 	}
 	else if (args.format == "on84") {
-	  lastValidDateTime=firstValidDateTime;
-	  pentry.key=strutils::itos(grid->getParameter());
-	  switch ((reinterpret_cast<ON84Grid *>(grid))->getTimeMarker()) {
+	  last_valid_date_time=first_valid_date_time;
+	  pentry.key=strutils::itos(grid->parameter());
+	  switch ((reinterpret_cast<ON84Grid *>(grid))->time_marker()) {
 	    case 0:
 		gentry.key+="<!>Analysis";
 		break;
 	    case 3:
-		fcst_hr-=(reinterpret_cast<ON84Grid *>(grid))->getF2();
+		fcst_hr-=(reinterpret_cast<ON84Grid *>(grid))->F2();
 		gentry.key+="<!>";
 		if (fcst_hr > 0)
-		  gentry.key+=strutils::itos(fcst_hr+(reinterpret_cast<ON84Grid *>(grid))->getF2())+"-hour Forecast of ";
-		gentry.key+=strutils::itos((reinterpret_cast<ON84Grid *>(grid))->getF2())+"-hour Accumulation";
+		  gentry.key+=strutils::itos(fcst_hr+(reinterpret_cast<ON84Grid *>(grid))->F2())+"-hour Forecast of ";
+		gentry.key+=strutils::itos((reinterpret_cast<ON84Grid *>(grid))->F2())+"-hour Accumulation";
 		break;
 	    default:
-		metautils::logError("ON84 time marker "+strutils::itos((reinterpret_cast<ON84Grid *>(grid))->getTimeMarker())+" not recognized","grid2xml",user,args.argsString);
+		metautils::log_error("ON84 time marker "+strutils::itos((reinterpret_cast<ON84Grid *>(grid))->time_marker())+" not recognized","grid2xml",user,args.args_string);
 	  }
-	  pe.key=strutils::itos((reinterpret_cast<ON84Grid *>(grid))->getRunMarker())+"."+strutils::itos((reinterpret_cast<ON84Grid *>(grid))->getGeneratingProgram());
-	  if (myequalf(grid->getSecondLevelValue(),0.)) {
-	    switch ((reinterpret_cast<ON84Grid *>(grid))->getFirstLevelType()) {
+	  pe.key=strutils::itos((reinterpret_cast<ON84Grid *>(grid))->run_marker())+"."+strutils::itos((reinterpret_cast<ON84Grid *>(grid))->generating_program());
+	  if (myequalf(grid->second_level_value(),0.)) {
+	    switch ((reinterpret_cast<ON84Grid *>(grid))->first_level_type()) {
 		case 144:
 		case 145:
 		case 146:
 		case 147:
 		case 148:
-		  lentry.key=strutils::itos((reinterpret_cast<ON84Grid *>(grid))->getFirstLevelType())+":1:0";
+		  lentry.key=strutils::itos((reinterpret_cast<ON84Grid *>(grid))->first_level_type())+":1:0";
 		  break;
 		default:
-		  lentry.key=strutils::itos((reinterpret_cast<ON84Grid *>(grid))->getFirstLevelType())+":"+strutils::ftos(grid->getFirstLevelValue(),5);
+		  lentry.key=strutils::itos((reinterpret_cast<ON84Grid *>(grid))->first_level_type())+":"+strutils::ftos(grid->first_level_value(),5);
 	    }
 	  }
 	  else {
-	    lentry.key=strutils::itos((reinterpret_cast<ON84Grid *>(grid))->getFirstLevelType())+":"+strutils::ftos(grid->getFirstLevelValue(),5)+":"+strutils::ftos(grid->getSecondLevelValue(),5);
+	    lentry.key=strutils::itos((reinterpret_cast<ON84Grid *>(grid))->first_level_type())+":"+strutils::ftos(grid->first_level_value(),5)+":"+strutils::ftos(grid->second_level_value(),5);
 	  }
 	}
 	else if (args.format == "cgcm1") {
-	  pentry.key=(reinterpret_cast<CGCM1Grid *>(grid))->getParameterName();
+	  pentry.key=(reinterpret_cast<CGCM1Grid *>(grid))->parameter_name();
 	  strutils::trim(pentry.key);
 	  strutils::replace_all(pentry.key,"\"","&quot;");
-	  lastValidDateTime=firstValidDateTime;
+	  last_valid_date_time=first_valid_date_time;
 	  if (fcst_hr == 0) {
-	    if (firstValidDateTime.getDay() > 0)
+	    if (first_valid_date_time.day() > 0)
 		gentry.key+="<!>Analysis";
 	    else {
 		gentry.key+="<!>Monthly Mean of Analyses";
-		firstValidDateTime.setDay(1);
-		lastValidDateTime.setDay(getDaysInMonth(lastValidDateTime.getYear(),lastValidDateTime.getMonth()));
+		first_valid_date_time.set_day(1);
+		last_valid_date_time.set_day(days_in_month(last_valid_date_time.year(),last_valid_date_time.month()));
 	    }
 	  }
 	  else {
 	    gentry.key+="<!>"+strutils::itos(fcst_hr)+"-hour Forecast";
 	  }
-	  lentry.key=strutils::itos(grid->getFirstLevelValue());
+	  lentry.key=strutils::itos(grid->first_level_value());
 	}
 	else if (args.format == "cmorph025") {
-	  pentry.key=(reinterpret_cast<InputCMORPH025GridStream *>(istream))->getParameterCode();
+	  pentry.key=(reinterpret_cast<InputCMORPH025GridStream *>(istream))->parameter_code();
 	  strutils::trim(pentry.key);
-	  lastValidDateTime=firstValidDateTime;
+	  last_valid_date_time=first_valid_date_time;
 	  gentry.key+="<!>Analysis";
 	  lentry.key="surface";
 	}
 	else if (args.format == "cmorph8km") {
 	  pentry.key="CMORPH";
-	  lastValidDateTime=firstValidDateTime;
-	  firstValidDateTime=grid->getReferenceDateTime();
+	  last_valid_date_time=first_valid_date_time;
+	  first_valid_date_time=grid->reference_date_time();
 	  gentry.key+="<!>30-minute Average (initial+0 to initial+30)";
 	  lentry.key="surface";
 	}
 	else if (args.format == "gpcp") {
 	  pentry.key=reinterpret_cast<GPCPGrid *>(grid)->parameter_name();
-	  lastValidDateTime=firstValidDateTime;
-	  firstValidDateTime=grid->getReferenceDateTime();
-	  size_t hrs_since=lastValidDateTime.getHoursSince(firstValidDateTime);
+	  last_valid_date_time=first_valid_date_time;
+	  first_valid_date_time=grid->reference_date_time();
+	  size_t hrs_since=last_valid_date_time.hours_since(first_valid_date_time);
 	  if (hrs_since == 24) {
 	    gentry.key+="<!>Daily Mean";
 	  }
-	  else if (hrs_since == getDaysInMonth(firstValidDateTime.getYear(),firstValidDateTime.getMonth())*24) {
+	  else if (hrs_since == days_in_month(first_valid_date_time.year(),first_valid_date_time.month())*24) {
 	    gentry.key+="<!>Monthly Mean";
 	  }
 	  else {
-	    metautils::logError("can't figure out gridded product type","grid2xml",user,args.argsString);
+	    metautils::log_error("can't figure out gridded product type","grid2xml",user,args.args_string);
 	  }
 	  lentry.key="surface";
 	}
@@ -750,9 +749,9 @@ sdum=strutils::lltos((reinterpret_cast<InputGRIBStream *>(istream))->getCurrentR
 	  gentry.level_table.clear();
 	  lentry.units=units;
 	  lentry.parameter_code_table.clear();
-	  pentry.startDateTime=firstValidDateTime;
-	  pentry.endDateTime=lastValidDateTime;
-	  pentry.numTimeSteps=1;
+	  pentry.start_date_time=first_valid_date_time;
+	  pentry.end_date_time=last_valid_date_time;
+	  pentry.num_time_steps=1;
 	  lentry.parameter_code_table.insert(pentry);
 	  gentry.level_table.insert(lentry);
 	  gentry.process_table.clear();
@@ -769,27 +768,27 @@ sdum=strutils::lltos((reinterpret_cast<InputGRIBStream *>(istream))->getCurrentR
 	  if (!gentry.level_table.found(lentry.key,lentry)) {
 	    lentry.units=units;
 	    lentry.parameter_code_table.clear();
-	    pentry.startDateTime=firstValidDateTime;
-	    pentry.endDateTime=lastValidDateTime;
-	    pentry.numTimeSteps=1;
+	    pentry.start_date_time=first_valid_date_time;
+	    pentry.end_date_time=last_valid_date_time;
+	    pentry.num_time_steps=1;
 	    lentry.parameter_code_table.insert(pentry);
 	    gentry.level_table.insert(lentry);
 	  }
 	  else {
 	    if (!lentry.parameter_code_table.found(pentry.key,pentry)) {
-		pentry.startDateTime=firstValidDateTime;
-		pentry.endDateTime=lastValidDateTime;
-		pentry.numTimeSteps=1;
+		pentry.start_date_time=first_valid_date_time;
+		pentry.end_date_time=last_valid_date_time;
+		pentry.num_time_steps=1;
 		lentry.parameter_code_table.insert(pentry);
 	    }
 	    else {
-		if (firstValidDateTime < pentry.startDateTime) {
-		  pentry.startDateTime=firstValidDateTime;
+		if (first_valid_date_time < pentry.start_date_time) {
+		  pentry.start_date_time=first_valid_date_time;
 		}
-		if (lastValidDateTime > pentry.endDateTime) {
-		  pentry.endDateTime=lastValidDateTime;
+		if (last_valid_date_time > pentry.end_date_time) {
+		  pentry.end_date_time=last_valid_date_time;
 		}
-		pentry.numTimeSteps++;
+		pentry.num_time_steps++;
 		lentry.parameter_code_table.replace(pentry);
 	    }
 	    gentry.level_table.replace(lentry);
@@ -812,44 +811,44 @@ sdum=strutils::lltos((reinterpret_cast<InputGRIBStream *>(istream))->getCurrentR
   if (inv_lines.size() > 0) {
     for (auto item : inv_U_list) {
 	inv_U_table.found(item,ie);
-	inv << "U<!>" << ie.num << "<!>" << item << std::endl;
+	inv_stream << "U<!>" << ie.num << "<!>" << item << std::endl;
     }
     for (auto item : inv_G_list) {
 	inv_G_table.found(item,ie);
-	inv << "G<!>" << ie.num << "<!>" << item << std::endl;
+	inv_stream << "G<!>" << ie.num << "<!>" << item << std::endl;
     }
     for (auto item : inv_L_list) {
 	inv_L_table.found(item,ie);
-	inv << "L<!>" << ie.num << "<!>" << item << std::endl;
+	inv_stream << "L<!>" << ie.num << "<!>" << item << std::endl;
     }
     for (auto item : inv_P_list) {
 	inv_P_table.found(item,ie);
-	inv << "P<!>" << ie.num << "<!>" << item << std::endl;
+	inv_stream << "P<!>" << ie.num << "<!>" << item << std::endl;
     }
     for (auto item : inv_R_list) {
 	inv_R_table.found(item,ie);
-	inv << "R<!>" << ie.num << "<!>" << item << std::endl;
+	inv_stream << "R<!>" << ie.num << "<!>" << item << std::endl;
     }
     for (auto item : inv_E_list) {
 	inv_E_table.found(item,ie);
-	inv << "E<!>" << ie.num << "<!>" << item << std::endl;
+	inv_stream << "E<!>" << ie.num << "<!>" << item << std::endl;
     }
-    inv << "-----" << std::endl;
+    inv_stream << "-----" << std::endl;
     for (auto line : inv_lines)
-	inv << line << std::endl;
+	inv_stream << line << std::endl;
   }
 }
 
 extern "C" void segv_handler(int)
 {
-  cleanUp();
+  clean_up();
   metautils::cmd_unregister();
-  metautils::logError("core dump","grid2xml",user,args.argsString);
+  metautils::log_error("core dump","grid2xml",user,args.args_string);
 }
 
 extern "C" void int_handler(int)
 {
-  cleanUp();
+  clean_up();
   metautils::cmd_unregister();
 }
 
@@ -906,35 +905,35 @@ int main(int argc,char **argv)
   }
   signal(SIGSEGV,segv_handler);
   signal(SIGINT,int_handler);
-  args.argsString=getUnixArgsString(argc,argv,'!');
-  metautils::readConfig("grid2xml",user,args.argsString);
-  parseArgs();
+  args.args_string=unix_args_string(argc,argv,'!');
+  metautils::read_config("grid2xml",user,args.args_string);
+  parse_args();
   flags="-f";
-  if (!args.inventoryOnly && strutils::has_beginning(args.path,"https://rda.ucar.edu")) {
+  if (!args.inventory_only && strutils::has_beginning(args.path,"https://rda.ucar.edu")) {
     flags="-wf";
   }
-  atexit(cleanUp);
+  atexit(clean_up);
   metautils::cmd_register("grid2xml",user);
-  if (!args.overwriteOnly && !args.inventoryOnly) {
-    metautils::checkForExistingCMD("GrML");
+  if (!args.overwrite_only && !args.inventory_only) {
+    metautils::check_for_existing_CMD("GrML");
   }
-  scanFile();
-  if (!args.inventoryOnly) {
-    metadata::GrML::writeGrML(grid_table,"grid2xml",user);
+  scan_file();
+  if (!args.inventory_only) {
+    metadata::GrML::write_GrML(grid_table,"grid2xml",user);
   }
-  if (args.updateDB) {
-    if (!args.updateSummary) {
+  if (args.update_DB) {
+    if (!args.update_summary) {
 	flags="-S "+flags;
     }
     if (!args.regenerate) {
 	flags="-R "+flags;
     }
-    if (mysystem2(directives.localRoot+"/bin/scm -d "+args.dsnum+" "+flags+" "+args.filename+".GrML",oss,ess) < 0) {
+    if (mysystem2(directives.local_root+"/bin/scm -d "+args.dsnum+" "+flags+" "+args.filename+".GrML",oss,ess) < 0) {
 	std::cerr << ess.str() << std::endl;
     }
   }
-  if (inv.is_open()) {
-    metadata::closeInventory(inv,inv_file,"GrML",true,args.updateSummary,"grid2xml",user);
+  if (inv_stream.is_open()) {
+    metadata::close_inventory(inv_file,inv_dir,inv_stream,"GrML",true,args.update_summary,"grid2xml",user);
   }
   return 0;
 }
