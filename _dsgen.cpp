@@ -37,10 +37,10 @@ struct PeriodEntry {
   std::string start,end;
 };
 struct GridDefinitionEntry {
-  GridDefinitionEntry() : key(),definition(),defParams() {}
+  GridDefinitionEntry() : key(),definition(),definition_parameters() {}
 
   size_t key;
-  std::string definition,defParams;
+  std::string definition,definition_parameters;
 };
 struct XEntry {
   XEntry() : key(),a(nullptr) {}
@@ -55,19 +55,17 @@ XMLDocument xdoc;
 MySQL::Server server;
 int div_num=0;
 
-void generateIndex(std::string type)
+void generate_index(std::string type,std::string tdir_name)
 {
   std::ofstream ofs;
-  XMLElement e;
-  std::deque<std::string> sp,sp2;
-  int width,height;
-  MySQL::Query query;
-  MySQL::Row row;
-  std::string title,sdum;
-
-  ofs.open((temp_dir.name()+"/index.html").c_str());
+  if (type == "work-in-progress") {
+    ofs.open((tdir_name+"/test_index.html").c_str());
+  }
+  else {
+    ofs.open((tdir_name+"/index.html").c_str());
+  }
   if (!ofs.is_open()) {
-    metautils::logError("unable to open output for 'index.html'","dsgen",user,args.argsString);
+    metautils::log_error("unable to open output for 'index.html'","dsgen",user,args.args_string);
   }
   ofs << "<!DOCTYPE html>" << std::endl;
   ofs << "<head>" << std::endl;
@@ -78,8 +76,8 @@ void generateIndex(std::string type)
   else {
     ofs << "<meta http-equiv=\"Content-type\" content=\"application/xml+xhtml;charset=UTF-8\" />" << std::endl;
     ofs << "<meta name=\"fragment\" content=\"!\">" << std::endl;
-    e=xdoc.element("dsOverview/title");
-    title=e.content();
+    auto e=xdoc.element("dsOverview/title");
+    auto title=e.content();
     ofs << "<title>CISL RDA: " << title << "</title>" << std::endl;
     ofs << "<?php include (\"main/styles.inc\"); ?>" << std::endl;
     ofs << "<?php include (\"main/scripts.inc\"); ?>" << std::endl;
@@ -111,35 +109,36 @@ void generateIndex(std::string type)
     ofs << "?>" << std::endl;
     ofs << "<tr valign=\"top\"><td rowspan=\"2\" width=\"1\"><img style=\"float: left; margin-right: 5px\" src=\"/images/ds_logos/";
     e=xdoc.element("dsOverview/logo");
-    if (e.content().length() > 0) {
-	sp=strutils::split(e.content(),".");
-	sp2=strutils::split(sp[sp.size()-2],"_");
-	width=std::stoi(sp2[sp2.size()-2]);
-	height=std::stoi(sp2[sp2.size()-1]);
+    if (!e.content().empty()) {
+	auto logo_parts=strutils::split(e.content(),".");
+	auto geometry_parts=strutils::split(logo_parts[logo_parts.size()-2],"_");
+	auto width=std::stoi(geometry_parts[geometry_parts.size()-2]);
+	auto height=std::stoi(geometry_parts[geometry_parts.size()-1]);
 	ofs << e.content() << "\" width=\"" << lroundf(width*70./height) << "\"";
     }
     else {
 	ofs << "default_200_200.png\" width=\"70\"";
     }
     ofs << " height=\"70\" /></td><td><span class=\"fs24px bold\">" << title << "</span><br /><span class=\"fs16px bold\"><span class=\"blue\">ds" << dsnum << "</span>";
-    query.set("doi","dssdb.dsvrsn","dsid = 'ds"+dsnum+"' and status = 'A'");
+    MySQL::Query query("doi","dssdb.dsvrsn","dsid = 'ds"+dsnum+"' and status = 'A'");
+    MySQL::Row row;
     if (query.submit(server) == 0 && query.fetch_row(row) && !row[0].empty()) {
 	ofs << "&nbsp;|&nbsp;<span class=\"blue\">DOI: " << row[0] << "</span>";
     }
     ofs << "</span><div id=\"ds_bookmark\" style=\"display: inline; margin-left: 2px\"><?php if ($can_bookmark) { $dsid=\"" << dsnum << "\"; if ($is_bookmarked) { include(\"dsbookmarks/showunset.inc\"); } else { include(\"dsbookmarks/showset.inc\"); } } ?></div></td></tr>" << std::endl;
     e=xdoc.element("dsOverview/contact");
-    sp=strutils::split(e.content());
-    query.set("select logname,phoneno from dssdb.dssgrp where fstname = '"+sp[0]+"' and lstname = '"+sp[1]+"'");
+    auto contact_parts=strutils::split(e.content());
+    query.set("select logname,phoneno from dssdb.dssgrp where fstname = '"+contact_parts[0]+"' and lstname = '"+contact_parts[1]+"'");
     if (query.submit(server) < 0) {
-	metautils::logError("mysql error while trying to get specialist information: "+query.error(),"dsgen",user,args.argsString);
+	metautils::log_error("mysql error while trying to get specialist information: "+query.error(),"dsgen",user,args.args_string);
     }
     if (!query.fetch_row(row)) {
-	metautils::logError("no result returned for specialist '"+e.content()+"'","dsgen",user,args.argsString);
+	metautils::log_error("no result returned for specialist '"+e.content()+"'","dsgen",user,args.args_string);
     }
-    sdum=row[1];
-    strutils::replace_all(sdum,"(","");
-    strutils::replace_all(sdum,")","");
-    ofs << "<tr valign=\"bottom\"><td align=\"right\"><span class=\"fs16px\">For assistance, contact <a class=\"blue\" href=\"mailto:"+row[0]+"@ucar.edu\">"+e.content()+"</a> <span class=\"mediumGrayText\">("+sdum+").</span></span></td></tr>" << std::endl;
+    auto phoneno=row[1];
+    strutils::replace_all(phoneno,"(","");
+    strutils::replace_all(phoneno,")","");
+    ofs << "<tr valign=\"bottom\"><td align=\"right\"><span class=\"fs16px\">For assistance, contact <a class=\"blue\" href=\"mailto:"+row[0]+"@ucar.edu\">"+e.content()+"</a> <span class=\"mediumGrayText\">("+phoneno+").</span></span></td></tr>" << std::endl;
     ofs << "</table>" << std::endl;
     ofs << "<?php include(\"main/dstabs";
     if (type == "dead") {
@@ -171,7 +170,7 @@ void generateIndex(std::string type)
   ofs.close();
 }
 
-bool compareStrings(const std::string& left,const std::string& right)
+bool compare_strings(const std::string& left,const std::string& right)
 {
   if (left <= right) {
     return true;
@@ -181,15 +180,12 @@ bool compareStrings(const std::string& left,const std::string& right)
   }
 }
 
-bool compareReferences(XMLElement& left,XMLElement& right)
+bool compare_references(XMLElement& left,XMLElement& right)
 { 
-  std::string l,r;
-  XMLElement e;
-  
-  e=left.element("year");
-  l=e.content();
+  auto e=left.element("year");
+  auto l=e.content();
   e=right.element("year");
-  r=e.content();
+  auto r=e.content();
   if (l > r) {
     return true;
   }
@@ -211,14 +207,11 @@ bool compareReferences(XMLElement& left,XMLElement& right)
   }
 }
 
-bool compareLevels(const std::string& left,const std::string& right)
+bool compare_levels(const std::string& left,const std::string& right)
 {
-  size_t lidx,ridx;
-  std::string lval,lunits,rval,runits;
-  int ilval,irval;
-
   if (((left[0] >= '0' && left[0] <= '9') || (left[0] == '-' && left[1] >= '0' && left[1] <= '9')) && ((right[0] >= '0' && right[0] <= '9') || (right[0] == '-' && right[1] >= '0' && right[1] <= '9'))) {
-    lidx=left.find(" ");
+    auto lidx=left.find(" ");
+    std::string lval,lunits;
     if (lidx != std::string::npos) {
 	lval=left.substr(0,lidx);
 	lunits=left.substr(lidx+1);
@@ -227,7 +220,9 @@ bool compareLevels(const std::string& left,const std::string& right)
 	lval=left;
 	lunits="";
     }
-    if ( (ridx=right.find(" ")) != std::string::npos) {
+    auto ridx=right.find(" ");
+    std::string rval,runits;
+    if (ridx != std::string::npos) {
 	rval=right.substr(0,ridx);
 	runits=right.substr(ridx+1);
     }
@@ -235,8 +230,8 @@ bool compareLevels(const std::string& left,const std::string& right)
 	rval=right;
 	runits="";
     }
-    ilval=std::stoi(lval);
-    irval=std::stoi(rval);
+    auto ilval=std::stoi(lval);
+    auto irval=std::stoi(rval);
     if (lunits == runits) {
 	if (lunits == "mbar" || lunits == "deg K") {
 	  if (ilval >= irval) {
@@ -280,24 +275,20 @@ bool compareLevels(const std::string& left,const std::string& right)
   }
 }
 
-void insertTable(std::ofstream& ofs,std::list<std::string> list,int max_columns,std::string color1,std::string color2)
+void insert_table(std::ofstream& ofs,std::list<std::string> list,int max_columns,std::string color1,std::string color2)
 {
-  int num_rows;
-  int cmax,max_mod;
-  int n,m,l;
-
   ofs << "<table cellspacing=\"0\">" << std::endl;
-  num_rows=list.size()/max_columns;
+  auto num_rows=list.size()/max_columns;
   if ( (list.size() % max_columns) != 0) {
     ++num_rows;
-    max_mod=(list.size() % max_columns);
-    for (n=max_columns-1; n > 1; n--) {
-	if (static_cast<int>(list.size()/n) <= num_rows) {
+    auto max_mod=(list.size() % max_columns);
+    for (int n=max_columns-1; n > 1; n--) {
+	if ( (list.size()/n) <= num_rows) {
 	  if ( (list.size() % n) == 0) {
 	    max_columns=n;
 	    break;
 	  }
-	  else if (static_cast<int>(list.size() % n) > max_mod) {
+	  else if ( (list.size() % n) > max_mod) {
 	    max_mod=(list.size() % n);
 	    max_columns=n;
 	  }
@@ -308,9 +299,9 @@ void insertTable(std::ofstream& ofs,std::list<std::string> list,int max_columns,
   if ( (list.size() % max_columns) != 0) {
     ++num_rows;
   }
-  cmax=max_columns-1;
-  n=0;
-  m=0;
+  auto cmax=max_columns-1;
+  auto n=0;
+  size_t m=0;
   for (const auto& item : list) {
     n=n % max_columns;
     if (n == 0) {
@@ -377,7 +368,7 @@ void insertTable(std::ofstream& ofs,std::list<std::string> list,int max_columns,
   }
   if (n != max_columns) {
     if (num_rows > 1) {
-	for (l=n; l < max_columns; ++l) {
+	for (int l=n; l < max_columns; ++l) {
 	  ofs << "<td class=\"border-bottom border-left";
 	  if (l == cmax) {
 	    ofs << " border-right";
@@ -401,29 +392,27 @@ void insertTable(std::ofstream& ofs,std::list<std::string> list,int max_columns,
   ofs << "</table>" << std::endl;
 }
 
-void insertTextField(std::ofstream& ofs,std::string element_name,std::string section_title)
+void insert_text_field(std::ofstream& ofs,std::string element_name,std::string section_title)
 {
-  size_t idx;
-
-  auto sdum=xdoc.element("dsOverview/"+element_name).to_string();
-  if (sdum.length() > 0) {
-    strutils::replace_all(sdum,"<"+element_name+">","");
-    strutils::replace_all(sdum,"</"+element_name+">","");
-    strutils::trim(sdum);
-    if ( (idx=sdum.find("<p")) == std::string::npos) {
-	idx=sdum.find("<P");
+  auto e=xdoc.element("dsOverview/"+element_name).to_string();
+  if (!e.empty()) {
+    strutils::replace_all(e,"<"+element_name+">","");
+    strutils::replace_all(e,"</"+element_name+">","");
+    strutils::trim(e);
+    size_t idx;
+    if ( (idx=e.find("<p")) == std::string::npos) {
+	idx=e.find("<P");
     }
     if (idx == 0) {
-	auto idx2=sdum.find(">",idx);
-	sdum.insert(idx2," style=\"margin: 0px; padding: 0px\"");
+	auto idx2=e.find(">",idx);
+	e.insert(idx2," style=\"margin: 0px; padding: 0px\"");
     }
-    ofs << "<tr style=\"vertical-align: top\"><td class=\"bold\">" << section_title << ":</td><td>" << sdum << "</td></tr>" << std::endl;
+    ofs << "<tr style=\"vertical-align: top\"><td class=\"bold\">" << section_title << ":</td><td>" << e << "</td></tr>" << std::endl;
   }
 }
 
-void generateDescription(std::string type)
+void generate_description(std::string type,std::string tdir_name)
 {
-  std::string sdum,sdum2;
   MySQL::Row row,row2;
   std::string start_date_time,end_date_time;
   my::map<PeriodEntry> periods_table;
@@ -433,15 +422,9 @@ void generateDescription(std::string type)
   StringEntry se;
   my::map<CoverageEntry> unique_grid_definitions_table;
   CoverageEntry ce;
-  my::map<GridDefinitionEntry> grid_definition_table;
   GridDefinitionEntry gde;
-  double west_lon,east_lon,south_lat,north_lat;
-  std::list<double> straddle_east_lons;
-  double min_west_lon=9999.,max_east_lon=-9999.,min_south_lat=9999.,max_north_lat=-9999.;
   my::map<XEntry> groups_table,rda_files_table(99999),metadata_files_table(99999);
   XEntry xe;
-  XMLDocument fdoc;
-  std::deque<std::string> sp;
   bool grouped_periods=false;
   bool found_content_metadata=false;
   bool started_pubs=false;
@@ -449,13 +432,13 @@ void generateDescription(std::string type)
 
   std::string dsnum2=strutils::substitute(dsnum,".","");
   std::ofstream ofs;
-  ofs.open((temp_dir.name()+"/description.html").c_str());
+  ofs.open((tdir_name+"/description.html").c_str());
   if (!ofs.is_open()) {
-    metautils::logError("unable to open output for 'description.html'","dsgen",user,args.argsString);
+    metautils::log_error("unable to open output for 'description.html'","dsgen",user,args.args_string);
   }
   if (type == "dead") {
     ofs << "<table class=\"fs16px\" width=\"100%\" cellspacing=\"10\" cellpadding=\"0\" border=\"0\">" << std::endl;
-    insertTextField(ofs,"summary","Abstract");
+    insert_text_field(ofs,"summary","Abstract");
     ofs << "</table>" << std::endl;
     ofs.close();
     return;
@@ -467,15 +450,15 @@ void generateDescription(std::string type)
     return;
   }
 */
-  databases=metautils::getCMDDatabases("dsgen","x",dsnum);
+  databases=metautils::CMD_databases("dsgen","x",dsnum);
   if (databases.size() == 0) {
-    metautils::logError("empty CMD database list","dsgen",user,args.argsString);
+    metautils::log_error("empty CMD database list","dsgen",user,args.args_string);
   }
   for (const auto& db : databases) {
     if (db[0] != 'V' && table_exists(server,db+".ds"+dsnum2+"_primaries")) {
 	MySQL::LocalQuery query("select distinct format from "+db+".formats as f left join "+db+".ds"+dsnum2+"_primaries as d on d.format_code = f.code where !isnull(d.format_code)");
 	if (query.submit(server) < 0) {
-	  metautils::logError("query: "+query.show()+" returned error: "+query.error(),"dsgen",user,args.argsString);
+	  metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",user,args.args_string);
 	}
 	while (query.fetch_row(row)) {
 	  formats.emplace_back(row[0]+"<!>");
@@ -530,14 +513,14 @@ void generateDescription(std::string type)
 // YouTube tutorial
   ofs << "<tr style=\"vertical-align: bottom\"><td class=\"bold nowrap\">Help with this page:</td><td><a href=\"http://ncarrda.blogspot.com/search/label/Tutorial+YouTube+Description\" target=\"_tutorial\">RDA dataset description page video tour</a></td></tr>" << std::endl;
 // dataset summary (abstract)
-  insertTextField(ofs,"summary","Abstract");
+  insert_text_field(ofs,"summary","Abstract");
 // acknowledgments
-  insertTextField(ofs,"acknowledgement","Acknowledgments");
+  insert_text_field(ofs,"acknowledgement","Acknowledgments");
 // temporal range(s)
   ofs << "<tr style=\"vertical-align: top\"><td class=\"bold nowrap\">Temporal Range:</td><td>";
   MySQL::LocalQuery query("select dsid from dssdb.dsgroup where dsid = 'ds"+dsnum+"'");
   if (query.submit(server) < 0) {
-    metautils::logError("query: "+query.show()+" returned error: "+query.error(),"dsgen",user,args.argsString);
+    metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",user,args.args_string);
   }
   if (query.num_rows() > 0) {
     query.set("select p.date_start,p.time_start,p.start_flag,p.date_end,p.time_end,p.end_flag,p.time_zone,g.title,g.grpid from dssdb.dsperiod as p left join dssdb.dsgroup as g on (p.dsid = g.dsid and p.gindex = g.gindex) where p.dsid = 'ds"+dsnum+"' and g.pindex = 0 and date_start > '0000-00-00' and date_start < '3000-01-01' and date_end > '0000-00-00' and date_end < '3000-01-01' union select p.date_start,p.time_start,p.start_flag,p.date_end,p.time_end,p.end_flag,p.time_zone,g2.title,g.grpid from dssdb.dsperiod as p left join dssdb.dsgroup as g on (p.dsid = g.dsid and p.gindex = g.gindex) left join dssdb.dsgroup as g2 on (p.dsid = g2.dsid and g.pindex = g2.gindex) where p.dsid = 'ds"+dsnum+"' and date_start > '0000-00-00' and date_start < '3000-01-01' and date_end > '0000-00-00' and date_end < '3000-01-01' and !isnull(g2.title) order by title");
@@ -546,24 +529,24 @@ void generateDescription(std::string type)
     query.set("select date_start,time_start,start_flag,date_end,time_end,end_flag,time_zone,NULL,NULL from dssdb.dsperiod where dsid = 'ds"+dsnum+"' and date_start > '0000-00-00' and date_start < '3000-01-01' and date_end > '0000-00-00' and date_end < '3000-01-01'");
   }
   if (query.submit(server) < 0) {
-    metautils::logError("query: "+query.show()+" returned error: "+query.error(),"dsgen",user,args.argsString);
+    metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",user,args.args_string);
   }
   if (query.num_rows() == 0) {
     query.set("select date_start,time_start,start_flag,date_end,time_end,end_flag,time_zone,NULL,NULL from dssdb.dsperiod where dsid = 'ds"+dsnum+"' and date_start > '0000-00-00' and date_start < '3000-01-01' and date_end > '0000-00-00' and date_end < '3000-01-01'");
     if (query.submit(server) < 0) {
-	metautils::logError("query: "+query.show()+" returned error: "+query.error(),"dsgen",user,args.argsString);
+	metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",user,args.args_string);
     }
   }
   if (query.num_rows() > 1) {
     MySQL::LocalQuery query2("distinct gindex","dssdb.dsperiod","dsid = 'ds"+dsnum+"'");
     if (query2.submit(server) < 0) {
-	metautils::logError("query: "+query2.show()+" returned error: "+query2.error(),"dsgen",user,args.argsString);
+	metautils::log_error("query: "+query2.show()+" returned error: "+query2.error(),"dsgen",user,args.args_string);
     }
     if (query2.num_rows() > 1) {
 	grouped_periods=true;
 	query2.set("select gindex,title from dssdb.dsgroup where dsid = 'ds"+dsnum+"'");
 	if (query2.submit(server) < 0) {
-	  metautils::logError("error: "+query2.error()+" while getting groups data","dsgen",user,args.argsString);
+	  metautils::log_error("error: "+query2.error()+" while getting groups data","dsgen",user,args.args_string);
 	}
 	while (query2.fetch_row(row2)) {
 	  xe.key=row2[0];
@@ -574,7 +557,7 @@ void generateDescription(std::string type)
 //	query2.set("select mssfile,tindex from dssdb.mssfile where dsid = 'ds"+dsnum+"' and property = 'P' and retention_days > 0");
 query2.set("select mssfile,tindex from dssdb.mssfile where dsid = 'ds"+dsnum+"' and type = 'P' and status = 'P'");
 	if (query2.submit(server) < 0) {
-	  metautils::logError("error: "+query2.error()+" while getting RDA files data","dsgen",user,args.argsString);
+	  metautils::log_error("error: "+query2.error()+" while getting RDA files data","dsgen",user,args.args_string);
 	}
 	while (query2.fetch_row(row2)) {
 	  xe.key=row2[0];
@@ -593,23 +576,23 @@ query2.set("select mssfile,tindex from dssdb.mssfile where dsid = 'ds"+dsnum+"' 
 	}
 	query2.set("select min(concat(date_start,' ',time_start)),min(start_flag),max(concat(date_end,' ',time_end)),min(end_flag),any_value(time_zone) from dssdb.dsperiod where dsid = 'ds"+dsnum+"' and date_start > '0000-00-00' and date_start < '3000-01-01' and date_end > '0000-00-00' and date_end < '3000-01-01' group by dsid");
 	if (query2.submit(server) < 0) {
-	  metautils::logError("query: "+query2.show()+" returned error: "+query2.error(),"dsgen",user,args.argsString);
+	  metautils::log_error("query: "+query2.show()+" returned error: "+query2.error(),"dsgen",user,args.args_string);
 	}
 	query2.fetch_row(row2);
-	start_date_time=summarizeMetadata::setDateTimeString(row2[0],row2[1],row2[4]);
-	end_date_time=summarizeMetadata::setDateTimeString(row2[2],row2[3],row2[4]);
-	sdum=start_date_time;
+	start_date_time=summarizeMetadata::set_date_time_string(row2[0],row2[1],row2[4]);
+	end_date_time=summarizeMetadata::set_date_time_string(row2[2],row2[3],row2[4]);
+	auto temporal=start_date_time;
 	if (end_date_time.length() > 0 && end_date_time != start_date_time) {
-	  sdum+=" to "+end_date_time;
+	  temporal+=" to "+end_date_time;
 	}
-	ofs << sdum << " <span class=\"fs13px\">(Entire dataset)</span>";
+	ofs << temporal << " <span class=\"fs13px\">(Entire dataset)</span>";
 	ofs << "<br /><span id=\"D" << div_num << "\"><a href=\"javascript:swapDivs(" << div_num << "," << div_num+1 << ")\" title=\"Expand dataset product period list\"><img src=\"/images/bluetriangle.gif\" width=\"12\" height=\"15\" border=\"0\"><span class=\"fs13px\">Period details by dataset product</span></a></span><span style=\"visibility: hidden; position: absolute; top: 0\" id=\"D" << div_num+1 << "\"><a href=\"javascript:swapDivs(" << div_num+1 << "," << div_num << ")\"><img src=\"/images/bluetriangle90.gif\" width=\"15\" height=\"12\" border=\"0\" title=\"Collapse dataset product period list\"></a><span class=\"fs13px\">Period details by dataset product:";
 	div_num+=2;
     }
   }
   while (query.fetch_row(row)) {
-    start_date_time=summarizeMetadata::setDateTimeString(row[0]+" "+row[1],row[2],row[6]);
-    end_date_time=summarizeMetadata::setDateTimeString(row[3]+" "+row[4],row[5],row[6]);
+    start_date_time=summarizeMetadata::set_date_time_string(row[0]+" "+row[1],row[2],row[6]);
+    end_date_time=summarizeMetadata::set_date_time_string(row[3]+" "+row[4],row[5],row[6]);
     if (row[7].length() > 0) {
 	pe.key=row[7];
     }
@@ -634,13 +617,13 @@ query2.set("select mssfile,tindex from dssdb.mssfile where dsid = 'ds"+dsnum+"' 
   n=0;
   for (const auto& key : periods_table.keys()) {
     periods_table.found(key,pe);
-    sdum=pe.start;
+    auto temporal=pe.start;
     if (pe.end.length() > 0 && pe.end != pe.start) {
-	sdum+=" to "+pe.end;
+	temporal+=" to "+pe.end;
     }
 //    if (key.length() > 0) {
 if (periods_table.size() > 1) {
-	sdum+=" ("+key+")";
+	temporal+=" ("+key+")";
     }
 /*
     if (grouped_periods || n > 0) {
@@ -648,10 +631,10 @@ if (periods_table.size() > 1) {
     }
 */
     if (periods_table.size() > 1) {
-	ofs << "<div style=\"margin-left: 10px\">" << sdum << "</div>";
+	ofs << "<div style=\"margin-left: 10px\">" << temporal << "</div>";
     }
     else {
-	ofs << sdum;
+	ofs << temporal;
     }
     ++n;
   }
@@ -666,46 +649,46 @@ if (periods_table.size() > 1) {
   }
 // access restrictions
   e=xdoc.element("dsOverview/restrictions/access");
-  sdum=e.to_string();
-  strutils::replace_all(sdum,"<access>","");
-  strutils::replace_all(sdum,"</access>","");
+  auto access=e.to_string();
+  strutils::replace_all(access,"<access>","");
+  strutils::replace_all(access,"</access>","");
   size_t idx;
-  if ( (idx=sdum.find("<p")) == std::string::npos) {
-    idx=sdum.find("<P");
+  if ( (idx=access.find("<p")) == std::string::npos) {
+    idx=access.find("<P");
   }
   if (idx != std::string::npos) {
-    auto idx2=sdum.find(">",idx);
-    sdum.insert(idx2," style=\"margin: 0px; padding: 0px\"");
+    auto idx2=access.find(">",idx);
+    access.insert(idx2," style=\"margin: 0px; padding: 0px\"");
   }
-  if (sdum.length() > 0) {
-    ofs << "<tr style=\"vertical-align: top\"><td class=\"bold\">Access Restrictions:</td><td>" << sdum << "</td></tr>" << std::endl;
+  if (!access.empty()) {
+    ofs << "<tr style=\"vertical-align: top\"><td class=\"bold\">Access Restrictions:</td><td>" << access << "</td></tr>" << std::endl;
   }
 // usage restrictions
   e=xdoc.element("dsOverview/restrictions/usage");
-  sdum=e.to_string();
-  strutils::replace_all(sdum,"<usage>","");
-  strutils::replace_all(sdum,"</usage>","");
-  if ( (idx=sdum.find("<p")) == std::string::npos) {
-    idx=sdum.find("<P");
+  auto usage=e.to_string();
+  strutils::replace_all(usage,"<usage>","");
+  strutils::replace_all(usage,"</usage>","");
+  if ( (idx=usage.find("<p")) == std::string::npos) {
+    idx=usage.find("<P");
   }
   if (idx != std::string::npos) {
-    auto idx2=sdum.find(">",idx);
-    sdum.insert(idx2," style=\"margin: 0px; padding: 0px\"");
+    auto idx2=usage.find(">",idx);
+    usage.insert(idx2," style=\"margin: 0px; padding: 0px\"");
   }
-  if (sdum.length() > 0) {
-    ofs << "<tr style=\"vertical-align: top\"><td class=\"bold\">Usage Restrictions:</td><td>" << sdum << "</td></tr>" << std::endl;
+  if (!usage.empty()) {
+    ofs << "<tr style=\"vertical-align: top\"><td class=\"bold\">Usage Restrictions:</td><td>" << usage << "</td></tr>" << std::endl;
   }
 // variables
   ofs << "<tr style=\"vertical-align: top\"><td class=\"bold\">Variables:</td><td>" << std::endl;
   query.set("select substring_index(path,' > ',-1) as var from search.variables_new as v left join search.GCMD_sciencekeywords as g on g.uuid = v.keyword where v.vocabulary = 'GCMD' and v.dsid = '"+dsnum+"' order by var");
   if (query.submit(server) < 0) {
-    metautils::logError("query: "+query.show()+" returned error: "+query.error(),"dsgen",user,args.argsString);
+    metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",user,args.args_string);
   }
   std::list<std::string> strings;
   while (query.fetch_row(row)) {
     strings.emplace_back(strutils::capitalize(row[0]));
   }
-  insertTable(ofs,strings,4,"#e1eaff","#c8daff");
+  insert_table(ofs,strings,4,"#e1eaff","#c8daff");
   auto elist=xdoc.element_list("dsOverview/contentMetadata/detailedVariables/detailedVariable");
   if (elist.size() > 0) {
     for (const auto& ele : elist) {
@@ -715,23 +698,23 @@ if (periods_table.size() > 1) {
 	}
     }
   }
-  struct stat buf;
-  if (existsOnRDAWebServer("rda.ucar.edu","/SERVER_ROOT/web/datasets/ds"+dsnum+"/metadata/grib.html",buf)) {
+  if (exists_on_server(directives.web_server,"/data/web/datasets/ds"+dsnum+"/metadata/grib.html")) {
     ofs << "<div>GRIB parameter table:  <a href=\"/datasets/ds" << dsnum << "/#metadata/grib.html?_do=y\">HTML</a>";
-    if (existsOnRDAWebServer("rda.ucar.edu","/SERVER_ROOT/web/datasets/ds"+dsnum+"/metadata/grib.xml",buf))
+    if (exists_on_server(directives.web_server,"/data/web/datasets/ds"+dsnum+"/metadata/grib.xml")) {
 	ofs << " | <a href=\"/datasets/ds" << dsnum << "/metadata/grib.xml\">XML</a></div>";
+    }
     ofs << std::endl;
   }
-  if (existsOnRDAWebServer("rda.ucar.edu","/SERVER_ROOT/web/datasets/ds"+dsnum+"/metadata/grib2.html",buf)) {
+  if (exists_on_server(directives.web_server,"/data/web/datasets/ds"+dsnum+"/metadata/grib2.html")) {
     ofs << "<div>GRIB2 parameter table:  <a href=\"/datasets/ds" << dsnum << "/#metadata/grib2.html?_do=y\">HTML</a>";
-    if (existsOnRDAWebServer("rda.ucar.edu","/SERVER_ROOT/web/datasets/ds"+dsnum+"/metadata/grib2.xml",buf)) {
+    if (exists_on_server(directives.web_server,"/data/web/datasets/ds"+dsnum+"/metadata/grib2.xml")) {
 	ofs << " | <a href=\"/datasets/ds" << dsnum << "/metadata/grib2.xml\">XML</a></div>"; 
     }
     ofs << std::endl;
   }
-  if (existsOnRDAWebServer("rda.ucar.edu","/SERVER_ROOT/web/datasets/ds"+dsnum+"/metadata/on84.html",buf)) {
+  if (exists_on_server(directives.web_server,"/data/web/datasets/ds"+dsnum+"/metadata/on84.html")) {
     ofs << "<div>ON84 parameter table:  <a href=\"/datasets/ds" << dsnum << "/metadata/on84.html\">HTML</a>";
-    if (existsOnRDAWebServer("rda.ucar.edu","/SERVER_ROOT/web/datasets/ds"+dsnum+"/metadata/on84.html",buf)) {
+    if (exists_on_server(directives.web_server,"/data/web/datasets/ds"+dsnum+"/metadata/on84.html")) {
 	ofs << " | <a href=\"/datasets/ds" << dsnum << "/metadata/on84.xml\">XML</a></div>";
     }
     ofs << std::endl;
@@ -740,22 +723,22 @@ if (periods_table.size() > 1) {
   if (query.submit(server) == 0) {
     std::stringstream vars_by_product;
     while (query.fetch_row(row)) {
-	if (existsOnRDAWebServer("rda.ucar.edu","/SERVER_ROOT/web/datasets/ds"+dsnum+"/metadata/customize.GrML."+row[0],buf)) {
-	  sdum=getRemoteWebFile("https://rda.ucar.edu/datasets/ds"+dsnum+"/metadata/customize.GrML."+row[0],temp_dir.name());
-	  if (sdum.length() > 0) {
+	if (exists_on_server(directives.web_server,"/SERVER_ROOT/web/datasets/ds"+dsnum+"/metadata/customize.GrML."+row[0])) {
+	  auto c_file=remote_web_file("https://rda.ucar.edu/datasets/ds"+dsnum+"/metadata/customize.GrML."+row[0],temp_dir.name());
+	  if (!c_file.empty()) {
 	    std::ifstream ifs;
 	    char line[32768];
-	    ifs.open(sdum);
+	    ifs.open(c_file);
 	    ifs.getline(line,32768);
 	    if (std::regex_search(line,std::regex("^curl_subset="))) {
 		ifs.getline(line,32768);
 	    }
 	    auto nvar=std::stoi(line);
 	    std::list<std::string> varlist;
-	    for (n=0; n < nvar; ++n) {
+	    for (int n=0; n < nvar; ++n) {
 		ifs.getline(line,32768);
-		sp=strutils::split(line,"<!>");
-		varlist.emplace_back(sp[1]);
+		auto var_parts=strutils::split(line,"<!>");
+		varlist.emplace_back(var_parts[1]);
 	    }
 	    ifs.close();
 	    if (varlist.size() > 0) {
@@ -783,7 +766,7 @@ if (periods_table.size() > 1) {
     for (const auto& type : types) {
 	if (type == "grid") {
 	  ofs << "<tr style=\"vertical-align: top\"><td class=\"bold nowrap\">Vertical Levels:</td><td>See the <a href=\"#metadata/detailed.html?_do=y&view=level\">detailed metadata</a> for level information";
-	  if (existsOnRDAWebServer("rda.ucar.edu","/SERVER_ROOT/web/datasets/ds"+dsnum+"/metadata/grib2_levels.html",buf)) {
+	  if (exists_on_server(directives.web_server,"/SERVER_ROOT/web/datasets/ds"+dsnum+"/metadata/grib2_levels.html")) {
 	    ofs << "<br /><a href=\"/datasets/ds" << dsnum << "/#metadata/grib2_levels.html?_do=y\">GRIB2 level table</a>"; 
 	  }
 	  ofs << "</td></tr>" << std::endl;
@@ -802,36 +785,35 @@ if (periods_table.size() > 1) {
 	    levels.emplace_back(ele.attribute_value("type"));
 	  }
 	  else {
-	    if (ele.attribute_value("value").length() > 0) {
-		sdum=ele.attribute_value("value")+" "+ele.attribute_value("units");
-		if (std::regex_search(sdum,std::regex("^\\."))) {
-		  sdum="0"+sdum;
+	    if (!ele.attribute_value("value").empty()) {
+		auto level=ele.attribute_value("value")+" "+ele.attribute_value("units");
+		if (std::regex_search(level,std::regex("^\\."))) {
+		  level="0"+level;
 		}
-		sdum2=ele.attribute_value("type");
-		if (ele.attribute_value("value") != "0" && strutils::contains(sdum2,"height below")) {
-		  sdum="-"+sdum;
+		if (ele.attribute_value("value") != "0" && strutils::contains(ele.attribute_value("type"),"height below")) {
+		  level="-"+level;
 		}
-		levels.emplace_back(sdum);
+		levels.emplace_back(level);
 	    }
 	    else {
-		sdum=ele.attribute_value("top");
-		if (std::regex_search(sdum,std::regex("^\\."))) {
-		  sdum="0"+sdum;
+		auto layer=ele.attribute_value("top");
+		if (std::regex_search(layer,std::regex("^\\."))) {
+		  layer="0"+layer;
 		}
 		if (ele.attribute_value("top") != ele.attribute_value("bottom")) {
-		  sdum2=ele.attribute_value("bottom");
-		  if (std::regex_search(sdum2,std::regex("^\\."))) {
-		    sdum2="0"+sdum2;
+		  auto bottom=ele.attribute_value("bottom");
+		  if (std::regex_search(bottom,std::regex("^\\."))) {
+		    bottom="0"+bottom;
 		  }
-		  sdum+="-"+sdum2;
+		  layer+="-"+bottom;
 		}
-		sdum+=" "+ele.attribute_value("units");
-		levels.emplace_back(sdum);
+		layer+=" "+ele.attribute_value("units");
+		levels.emplace_back(layer);
 	    }
 	  }
 	}
-	levels.sort(compareLevels);
-	insertTable(ofs,levels,4,"#c8daff","#e1eaff");
+	levels.sort(compare_levels);
+	insert_table(ofs,levels,4,"#c8daff","#e1eaff");
 	ofs << "</td></tr>" << std::endl;
     }
   }
@@ -842,11 +824,11 @@ if (periods_table.size() > 1) {
     if (elist.size() > 0) {
 	ofs << "<tr style=\"vertical-align: bottom\"><td class=\"bold\">Temporal Frequencies:</td><td>";
 	for (const auto& ele : elist) {
-	  sdum=ele.attribute_value("type");
+	  auto tfreq_type=ele.attribute_value("type");
 	  if (m > 0) {
 	    ofs << ", ";
 	  }
-	  if (sdum == "regular") {
+	  if (tfreq_type == "regular") {
 	    n=std::stoi(ele.attribute_value("number"));
 	    ofs << "Every ";
 	    if (n > 1) {
@@ -856,52 +838,52 @@ if (periods_table.size() > 1) {
 	    if (n > 1) {
 		ofs << "s";
 	    }
-	    sdum=ele.attribute_value("statistics");
-	    if (sdum.length() > 0) {
-		ofs << " (" << strutils::capitalize(sdum) << ")";
+	    auto stats=ele.attribute_value("statistics");
+	    if (!stats.empty()) {
+		ofs << " (" << strutils::capitalize(stats) << ")";
 	    }
 	    ofs << std::endl;
 	  }
-	  else if (sdum == "irregular") {
+	  else if (tfreq_type == "irregular") {
 	    ofs << "various times per " << ele.attribute_value("unit");
-	    sdum=ele.attribute_value("statistics");
-	    if (sdum.length() > 0) {
-		ofs << " (" << strutils::capitalize(sdum) << ")";
+	    auto stats=ele.attribute_value("statistics");
+	    if (!stats.empty()) {
+		ofs << " (" << strutils::capitalize(stats) << ")";
 	    }
 	  }
-	  else if (sdum == "climatology") {
-	    sdum=ele.attribute_value("unit");
-	    if (sdum == "hour") {
-		sdum="Hourly";
+	  else if (tfreq_type == "climatology") {
+	    auto unit=ele.attribute_value("unit");
+	    if (unit == "hour") {
+		unit="Hourly";
 	    }
-	    else if (sdum == "day") {
-		sdum="Daily";
+	    else if (unit == "day") {
+		unit="Daily";
 	    }
-	    else if (sdum == "week") {
-		sdum="Weekly";
+	    else if (unit == "week") {
+		unit="Weekly";
 	    }
-	    else if (sdum == "month") {
-		sdum="Monthly";
+	    else if (unit == "month") {
+		unit="Monthly";
 	    }
-	    else if (sdum == "winter") {
-		sdum="Winter Season";
+	    else if (unit == "winter") {
+		unit="Winter Season";
 	    }
-	    else if (sdum == "spring") {
-		sdum="Spring Season";
+	    else if (unit == "spring") {
+		unit="Spring Season";
 	    }
-	    else if (sdum == "summer") {
-		sdum="Summer Season";
+	    else if (unit == "summer") {
+		unit="Summer Season";
 	    }
-	    else if (sdum == "autumn") {
-		sdum="Autumn Season";
+	    else if (unit == "autumn") {
+		unit="Autumn Season";
 	    }
-	    else if (sdum == "year") {
-		sdum="Annual";
+	    else if (unit == "year") {
+		unit="Annual";
 	    }
-	    else if (sdum == "30-year") {
-		sdum="30-year (climate normal)";
+	    else if (unit == "30-year") {
+		unit="30-year (climate normal)";
 	    }
-	    ofs << sdum << " Climatology";
+	    ofs << unit << " Climatology";
 	  }
 	  ++m;
 	}
@@ -912,7 +894,7 @@ if (periods_table.size() > 1) {
   if (found_content_metadata) {
     if (types.size() > 0) {
 	ofs << "<tr style=\"vertical-align: top\"><td class=\"bold nowrap\">Data Types:</td><td>";
-	n=0;
+	auto n=0;
 	for (const auto& type : types) {
 	  if (n > 0) {
 	    ofs << ", ";
@@ -927,7 +909,7 @@ if (periods_table.size() > 1) {
     elist=xdoc.element_list("dsOverview/contentMetadata/dataType");
     if (elist.size() > 0) {
 	ofs << "<tr style=\"vertical-align: top\"><td class=\"bold nowrap\">Data Types:</td><td>";
-	n=0;
+	auto n=0;
 	std::unordered_map<std::string,char> unique_data_types;
 	for (const auto& ele : elist) {
 	  if (unique_data_types.find(ele.content()) == unique_data_types.end()) {
@@ -943,6 +925,7 @@ if (periods_table.size() > 1) {
   }
 // spatial coverage
   if (found_content_metadata) {
+    my::map<GridDefinitionEntry> grid_definition_table;
     for (const auto& type : types) {
 	if (type == "grid") {
 	  if (grouped_periods) {
@@ -952,23 +935,23 @@ if (periods_table.size() > 1) {
 	    query.set("select distinct gridDefinition_codes from GrML.ds"+dsnum2+"_agrids");
 	  }
 	  if (query.submit(server) < 0)
-	    metautils::logError("error: "+query.error()+" while getting grid definitions","dsgen",user,args.argsString);
+	    metautils::log_error("error: "+query.error()+" while getting grid definitions","dsgen",user,args.args_string);
 	  while (query.fetch_row(row)) {
 	    std::vector<size_t> values;
-	    bitmap::uncompressValues(row[0],values);
+	    bitmap::uncompress_values(row[0],values);
 	    for (const auto& value : values) {
 		gde.key=value;
 		if (!grid_definition_table.found(gde.key,gde)) {
 		  MySQL::LocalQuery query2("definition,defParams","GrML.gridDefinitions","code = "+strutils::itos(gde.key));
 		  if (query2.submit(server) < 0) {
-		    metautils::logError("query: "+query2.show()+" returned error: "+query2.error(),"dsgen",user,args.argsString);
+		    metautils::log_error("query: "+query2.show()+" returned error: "+query2.error(),"dsgen",user,args.args_string);
 		  }
 		  query2.fetch_row(row2);
 		  gde.definition=row2[0];
-		  gde.defParams=row2[1];
+		  gde.definition_parameters=row2[1];
 		  grid_definition_table.insert(gde);
 		}
-		ce.key=gde.definition+"<!>"+gde.defParams;
+		ce.key=gde.definition+"<!>"+gde.definition_parameters;
 		se.key="";
 		if (query.length() > 1) {
 		  if (metadata_files_table.found(row[1],xe) && rda_files_table.found(*(xe.a),xe) && groups_table.found(*(xe.a),xe)) {
@@ -999,28 +982,30 @@ if (periods_table.size() > 1) {
   else {
     elist=xdoc.element_list("dsOverview/contentMetadata/geospatialCoverage/grid");
     for (const auto& ele : elist) {
-	sdum=ele.attribute_value("definition")+"<!>"+ele.attribute_value("numX")+":"+ele.attribute_value("numY");
-	if (std::regex_search(sdum,std::regex("^latLon"))) {
-	  sdum+=":"+ele.attribute_value("startLat")+":"+ele.attribute_value("startLon")+":"+ele.attribute_value("endLat")+":"+ele.attribute_value("endLon")+":"+ele.attribute_value("xRes")+":"+ele.attribute_value("yRes");
+	ce.key=ele.attribute_value("definition")+"<!>"+ele.attribute_value("numX")+":"+ele.attribute_value("numY");
+	if (std::regex_search(ce.key,std::regex("^latLon"))) {
+	  ce.key+=":"+ele.attribute_value("startLat")+":"+ele.attribute_value("startLon")+":"+ele.attribute_value("endLat")+":"+ele.attribute_value("endLon")+":"+ele.attribute_value("xRes")+":"+ele.attribute_value("yRes");
 	}
-	else if (std::regex_search(sdum,std::regex("^gaussLatLon"))) {
-	  sdum+=":"+ele.attribute_value("startLat")+":"+ele.attribute_value("startLon")+":"+ele.attribute_value("endLat")+":"+ele.attribute_value("endLon")+":"+ele.attribute_value("xRes")+":"+ele.attribute_value("numY");
+	else if (std::regex_search(ce.key,std::regex("^gaussLatLon"))) {
+	  ce.key+=":"+ele.attribute_value("startLat")+":"+ele.attribute_value("startLon")+":"+ele.attribute_value("endLat")+":"+ele.attribute_value("endLon")+":"+ele.attribute_value("xRes")+":"+ele.attribute_value("numY");
 	}
-	else if (std::regex_search(sdum,std::regex("^polarStereographic"))) {
-	  sdum+=":"+ele.attribute_value("startLat")+":"+ele.attribute_value("startLon")+":60"+ele.attribute_value("pole")+":"+ele.attribute_value("projLon")+":"+ele.attribute_value("pole")+":"+ele.attribute_value("xRes")+":"+ele.attribute_value("yRes");
+	else if (std::regex_search(ce.key,std::regex("^polarStereographic"))) {
+	  ce.key+=":"+ele.attribute_value("startLat")+":"+ele.attribute_value("startLon")+":60"+ele.attribute_value("pole")+":"+ele.attribute_value("projLon")+":"+ele.attribute_value("pole")+":"+ele.attribute_value("xRes")+":"+ele.attribute_value("yRes");
 	}
-	else if (std::regex_search(sdum,std::regex("^mercator"))) {
-	  sdum+=":"+ele.attribute_value("startLat")+":"+ele.attribute_value("startLon")+":"+ele.attribute_value("endLat")+":"+ele.attribute_value("endLon")+":"+ele.attribute_value("xRes")+":"+ele.attribute_value("yRes")+":"+ele.attribute_value("resLat");
+	else if (std::regex_search(ce.key,std::regex("^mercator"))) {
+	  ce.key+=":"+ele.attribute_value("startLat")+":"+ele.attribute_value("startLon")+":"+ele.attribute_value("endLat")+":"+ele.attribute_value("endLon")+":"+ele.attribute_value("xRes")+":"+ele.attribute_value("yRes")+":"+ele.attribute_value("resLat");
 	}
-	else if (std::regex_search(sdum,std::regex("^lambertConformal"))) {
-	  sdum+=":"+ele.attribute_value("startLat")+":"+ele.attribute_value("startLon")+":"+ele.attribute_value("resLat")+":"+ele.attribute_value("projLon")+":"+ele.attribute_value("pole")+":"+ele.attribute_value("xRes")+":"+ele.attribute_value("yRes")+":"+ele.attribute_value("stdParallel1")+":"+ele.attribute_value("stdParallel2");
+	else if (std::regex_search(ce.key,std::regex("^lambertConformal"))) {
+	  ce.key+=":"+ele.attribute_value("startLat")+":"+ele.attribute_value("startLon")+":"+ele.attribute_value("resLat")+":"+ele.attribute_value("projLon")+":"+ele.attribute_value("pole")+":"+ele.attribute_value("xRes")+":"+ele.attribute_value("yRes")+":"+ele.attribute_value("stdParallel1")+":"+ele.attribute_value("stdParallel2");
 	}
-	ce.key=sdum;
 	unique_grid_definitions_table.insert(ce);
     }
   }
+  double min_west_lon=9999.,max_east_lon=-9999.,min_south_lat=9999.,max_north_lat=-9999.;
+  std::list<double> straddle_east_lons;
   for (const auto& grid : unique_grid_definitions_table.keys()) {
-    if (getSpatialDomainFromGridDefinition(grid,"primeMeridian",west_lon,south_lat,east_lon,north_lat)) {
+    double west_lon,east_lon,south_lat,north_lat;
+    if (fill_spatial_domain_from_grid_definition(grid,"primeMeridian",west_lon,south_lat,east_lon,north_lat)) {
 	if (east_lon < 0. && east_lon < west_lon) {
 // data straddle the date line
 	  straddle_east_lons.emplace_back(east_lon);
@@ -1056,54 +1041,54 @@ if (periods_table.size() > 1) {
     if (max_east_lon > 180.) {
 	max_east_lon-=360.;
     }
-    sdum=strutils::ftos(fabs(min_west_lon),3);
+    auto west=strutils::ftos(fabs(min_west_lon),3);
     if (min_west_lon < 0) {
-	sdum+="W";
+	west+="W";
     }
     else {
-	sdum+="E";
+	west+="E";
     }
-    ofs << "Longitude Range:  Westernmost=" << sdum << "  Easternmost=";
-    sdum=strutils::ftos(fabs(max_east_lon),3);
+    ofs << "Longitude Range:  Westernmost=" << west << "  Easternmost=";
+    auto east=strutils::ftos(fabs(max_east_lon),3);
     if (max_east_lon < 0) {
-	sdum+="W";
+	east+="W";
     }
     else {
-	sdum+="E";
+	east+="E";
     }
-    ofs << sdum << "<br />" << std::endl;
-    sdum=strutils::ftos(fabs(min_south_lat),3);
+    ofs << east << "<br />" << std::endl;
+    auto south=strutils::ftos(fabs(min_south_lat),3);
     if (min_south_lat < 0) {
-	sdum+="S";
+	south+="S";
     }
     else {
-        sdum+="N";
+        south+="N";
     }
-    ofs << "Latitude Range:  Southernmost=" << sdum << "  Northernmost=";
-    sdum=strutils::ftos(fabs(max_north_lat),3);
+    ofs << "Latitude Range:  Southernmost=" << south << "  Northernmost=";
+    auto north=strutils::ftos(fabs(max_north_lat),3);
     if (max_north_lat < 0) {
-	sdum+="S";
+	north+="S";
     }
     else {
-	sdum+="N";
+	north+="N";
     }
-    ofs << sdum << std::endl;
+    ofs << north << std::endl;
     ofs << "<br /><span id=\"D" << div_num << "\"><a href=\"javascript:swapDivs(" << div_num << "," << div_num+1 << ")\" title=\"Expand coverage details\"><img src=\"/images/triangle.gif\" width=\"12\" height=\"15\" border=\"0\"><span class=\"fs13px\">Detailed coverage information</span></a></span><span style=\"visibility: hidden; position: absolute; top: 0\" id=\"D" << div_num+1 << "\"><a href=\"javascript:swapDivs(" << div_num+1 << "," << div_num << ")\"><img src=\"/images/triangle90.gif\" width=\"15\" height=\"12\" border=\"0\" title=\"Collapse coverage details\"></a><span class=\"fs13px\">Detailed coverage information:" << std::endl;
     div_num+=2;
     my::map<CoverageEntry> grid_definitions;
     for (const auto& key : unique_grid_definitions_table.keys()) {
 	unique_grid_definitions_table.found(key,ce);
-	ce.key=convertGridDefinition(key);
+	ce.key=convert_grid_definition(key);
 	grid_definitions.insert(ce);
     }
-    grid_definitions.keysort(compareStrings);
+    grid_definitions.keysort(compare_strings);
     for (const auto& key : grid_definitions.keys()) {
 	ofs << "<div style=\"margin-left: 10px\">" << key;
 	if (grid_definitions.size() > 1) {
 	  grid_definitions.found(key,ce);
 	  if (ce.groups != nullptr) {
 	    ofs << "<div style=\"margin-left: 15px; color: #6a6a6a\">(";
-	    n=0;
+	    auto n=0;
 	    for (const auto& gkey : ce.groups->keys()) {
 		if (n++ > 0) {
 		  ofs << ", ";
@@ -1120,7 +1105,7 @@ if (periods_table.size() > 1) {
 // data contributors
   query.set("select g.path from search.contributors_new as c left join search.GCMD_providers as g on g.uuid = c.keyword where c.dsid = '"+dsnum+"' and c.vocabulary = 'GCMD'");
   if (query.submit(server) < 0) {
-    metautils::logError("query: "+query.show()+" returned error: "+query.error(),"dsgen",user,args.argsString);
+    metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",user,args.args_string);
   }
   ofs << "<tr style=\"vertical-align: top\"><td class=\"bold nowrap\">Data Contributors:</td><td>";
   n=0;
@@ -1128,14 +1113,15 @@ if (periods_table.size() > 1) {
     if (n > 0) {
 	ofs << " | ";
     }
-    sdum=row[0];
-    if ( (idx=sdum.find(">")) != std::string::npos) {
-	sdum2=sdum.substr(idx+1);
-	sdum=sdum.substr(0,idx);
+    auto short_name=row[0];
+    std::string long_name="";
+    if ( (idx=short_name.find(">")) != std::string::npos) {
+	long_name=short_name.substr(idx+1);
+	short_name=short_name.substr(0,idx);
     }
-    strutils::trim(sdum);
-    strutils::trim(sdum2);
-    ofs << "<span class=\"infosrc\" onMouseOver=\"javascript:popInfo(this,'src" << n << "','#e1eaff','left','bottom')\" onMouseOut=\"javascript:hideInfo('src" << n << "')\">" << sdum << "</span><div class=\"info\" id=\"src" << n << "\" class=\"source\"><small>" << sdum2 << "</small></div>";
+    strutils::trim(short_name);
+    strutils::trim(long_name);
+    ofs << "<span class=\"infosrc\" onMouseOver=\"javascript:popInfo(this,'src" << n << "','#e1eaff','left','bottom')\" onMouseOut=\"javascript:hideInfo('src" << n << "')\">" << short_name << "</span><div class=\"info\" id=\"src" << n << "\" class=\"source\"><small>" << long_name << "</small></div>";
     ++n;
   }
   ofs << "</td></tr>" << std::endl;
@@ -1156,27 +1142,29 @@ if (periods_table.size() > 1) {
   elist=xdoc.element_list("dsOverview/relatedResource");
   if (elist.size() > 0) {
     ofs << "<tr style=\"vertical-align: ";
-    if (elist.size() > 1)
+    if (elist.size() > 1) {
 	ofs << "top";
-    else
+    }
+    else {
 	ofs << "bottom";
+    }
     ofs << "\"><td class=\"bold\">Related Resources:</td><td>";
     for (const auto& ele : elist) {
-	sdum=ele.content();
-	strutils::trim(sdum);
-	if (strutils::has_ending(sdum,".") && sdum[sdum.length()-2] != '.') {
-	  strutils::chop(sdum);
+	auto description=ele.content();
+	strutils::trim(description);
+	if (strutils::has_ending(description,".") && description[description.length()-2] != '.') {
+	  strutils::chop(description);
 	}
 	ofs << "<a href=\"" << ele.attribute_value("url") << "\">";
 	is_local=false;
-	sdum2=ele.attribute_value("url");
-	if (std::regex_search(sdum2,std::regex("^http://rda.ucar.edu")) || std::regex_search(sdum2,std::regex("^https://rda.ucar.edu")) || std::regex_search(sdum2,std::regex("^http://dss.ucar.edu")) || std::regex_search(sdum2,std::regex("^https://dss.ucar.edu"))) {
+	auto url=ele.attribute_value("url");
+	if (std::regex_search(url,std::regex("^http://rda.ucar.edu")) || std::regex_search(url,std::regex("^https://rda.ucar.edu")) || std::regex_search(url,std::regex("^http://dss.ucar.edu")) || std::regex_search(url,std::regex("^https://dss.ucar.edu"))) {
 	  is_local=true;
 	}
 	if (!is_local) {
 	  ofs << "<span class=\"italic\">";
 	}
-	ofs << sdum;
+	ofs << description;
 	if (!is_local) {
 	  ofs << "</span>";
 	}
@@ -1195,21 +1183,21 @@ if (periods_table.size() > 1) {
   if (elist.size() > 0) {
     ofs << "<tr style=\"vertical-align: top\"><td class=\"bold\">Publications:</td><td>";
     started_pubs=true;
-    elist.sort(compareReferences);
+    elist.sort(compare_references);
     for (const auto& ele : elist) {
 	ofs << "<div>" << ele.element("authorList").content() << ", " << ele.element("year").content() << ": ";
-	sdum=ele.attribute_value("type");
-	if (sdum == "journal") {
+	auto pub_type=ele.attribute_value("type");
+	if (pub_type == "journal") {
 	  e=ele.element("periodical");
-	  sdum=ele.element("url").content();
-	  sdum2=ele.element("title").content();
-	  if (sdum.length() > 0) {
-	    ofs << "<a href=\"" << sdum << "\">" << sdum2 << "</a>";
+	  auto url=ele.element("url").content();
+	  auto title=ele.element("title").content();
+	  if (!url.empty()) {
+	    ofs << "<a href=\"" << url << "\">" << title << "</a>";
 	  }
 	  else {
-	    ofs << sdum2;
+	    ofs << title;
 	  }
-	  if (!strutils::has_ending(sdum2,"?")) {
+	  if (!strutils::has_ending(title,"?")) {
 	    ofs << ".";
 	  }
 	  ofs << "  <i>" << e.content() << "</i>, ";
@@ -1226,85 +1214,99 @@ if (periods_table.size() > 1) {
 	  }
 	  else {
 	    ofs << "<b>" << e.attribute_value("number") << "</b>, ";
-	    sdum=e.attribute_value("pages");
-	    if (std::regex_search(sdum,std::regex("^AGU:"))) {
-		ofs << sdum.substr(4);
+	    auto pages=e.attribute_value("pages");
+	    if (std::regex_search(pages,std::regex("^AGU:"))) {
+		ofs << pages.substr(4);
 	    }
 	    else {
-		sp=strutils::split(sdum,"-"); 
-		if (sp.size() == 2 && sp[0] == sp[1]) {
-		  ofs << sp[0];
+		auto page_parts=strutils::split(pages,"-"); 
+		if (page_parts.size() == 2 && page_parts[0] == page_parts[1]) {
+		  ofs << page_parts[0];
 		}
 		else {
 		  ofs << e.attribute_value("pages");
 		}
 	    }
 	  }
-	  sdum=ele.element("doi").content();
-	  if (sdum.length() > 0) {
-	    ofs << " (DOI: " << sdum << ")";
+	  auto doi=ele.element("doi").content();
+	  if (!doi.empty()) {
+	    ofs << " (DOI: " << doi << ")";
 	  }
 	  ofs << ".";
 	}
-	else if (sdum == "preprint") {
+	else if (pub_type == "preprint") {
 	  e=ele.element("conference");
-	  sdum=ele.element("url").content();
-	  if (sdum.length() > 0)
-	    ofs << "<a href=\"" << sdum << "\">" << ele.element("title").content() << "</a>";
-	  else
+	  auto url=ele.element("url").content();
+	  if (!url.empty()) {
+	    ofs << "<a href=\"" << url << "\">" << ele.element("title").content() << "</a>";
+	  }
+	  else {
 	    ofs << ele.element("title").content();
+	  }
 	  ofs << ".  <i>Proceedings of the " << e.content() << "</i>, " << e.attribute_value("host") << ", " << e.attribute_value("location");
-	  sdum=e.attribute_value("pages");
-	  if (sdum.length() > 0)
-	    ofs << ", " << sdum;
-	  sdum=ele.element("doi").content();
-	  if (sdum.length() > 0)
-	    ofs << " (DOI: " << sdum << ")";
+	  auto pages=e.attribute_value("pages");
+	  if (!pages.empty()) {
+	    ofs << ", " << pages;
+	  }
+	  auto doi=ele.element("doi").content();
+	  if (!doi.empty()) {
+	    ofs << " (DOI: " << doi << ")";
+	  }
 	  ofs << ".";
 	}
-	else if (sdum == "technical_report") {
+	else if (pub_type == "technical_report") {
 	  e=ele.element("organization");
-	  sdum=ele.element("url").content();
-	  if (sdum.length() > 0)
-	    ofs << "<i><a href=\"" << sdum << "\">" << ele.element("title").content() << "</a>.</i>";
-	  else
+	  auto url=ele.element("url").content();
+	  if (!url.empty()) {
+	    ofs << "<i><a href=\"" << url << "\">" << ele.element("title").content() << "</a>.</i>";
+	  }
+	  else {
 	    ofs << "<i>" << ele.element("title").content() << ".</i>";
+	  }
 	  ofs << "  ";
-	  sdum=e.attribute_value("reportID");
-	  if (sdum.length() > 0)
-	    ofs << sdum << ", ";
+	  auto report_ID=e.attribute_value("reportID");
+	  if (!report_ID.empty()) {
+	    ofs << report_ID << ", ";
+	  }
 	  ofs << e.content();
-	  sdum=e.attribute_value("pages");
-	  if (sdum != "-99")
+	  auto pages=e.attribute_value("pages");
+	  if (pages != "-99") {
 	    ofs << ", " << e.attribute_value("pages") << " pp.";
-	  sdum=ele.element("doi").content();
-	  if (sdum.length() > 0)
-	    ofs << " (DOI: " << sdum << ").";
+	  }
+	  auto doi=ele.element("doi").content();
+	  if (!doi.empty()) {
+	    ofs << " (DOI: " << doi << ").";
+	  }
 	}
-	else if (sdum == "book") {
+	else if (pub_type == "book") {
 	  e=ele.element("publisher");
 	  ofs << "<i>" << ele.element("title").content() << "</i>. " << e.content() << ", " << e.attribute_value("place");
-	  sdum=ele.element("doi").content();
-	  if (sdum.length() > 0)
-	    ofs << " (DOI: " << sdum << ")";
+	  auto doi=ele.element("doi").content();
+	  if (!doi.empty()) {
+	    ofs << " (DOI: " << doi << ")";
+	  }
 	  ofs << ".";
 	}
-	else if (sdum == "book_chapter") {
+	else if (pub_type == "book_chapter") {
 	  e=ele.element("book");
 	  ofs << "\"" << ele.element("title").content() << "\", in " << e.content() << ". Ed. " << e.attribute_value("editor") << ", " << e.attribute_value("publisher") << ", ";
-	  if (e.attribute_value("pages") == "0-0")
+	  if (e.attribute_value("pages") == "0-0") {
 	    ofs << "In Press";
-	  else
+	  }
+	  else {
 	    ofs << e.attribute_value("pages");
-	  sdum=ele.element("doi").content();
-	  if (sdum.length() > 0)
-	    ofs << " (DOI: " << sdum << ")";
+	  }
+	  auto doi=ele.element("doi").content();
+	  if (!doi.empty()) {
+	    ofs << " (DOI: " << doi << ")";
+	  }
 	  ofs << ".";
 	}
 	ofs << "</div>" << std::endl;
-	sdum=ele.element("annotation").content();
-	if (sdum.length() > 0)
-	  ofs << "<div style=\"margin-left: 15px; color: #5f5f5f\">" << sdum << "</div>" << std::endl;
+	auto annotation=ele.element("annotation").content();
+	if (!annotation.empty() > 0) {
+	  ofs << "<div style=\"margin-left: 15px; color: #5f5f5f\">" << annotation << "</div>" << std::endl;
+	}
 	ofs << "<br />" << std::endl;
     }
   }
@@ -1349,11 +1351,11 @@ if (periods_table.size() > 1) {
   ofs << "<tr style=\"vertical-align: top\"><td class=\"bold nowrap\">Total Volume:</td><td>";
   query.set("primary_size","dssdb.dataset","dsid = 'ds"+dsnum+"'");
   if (query.submit(server) < 0) {
-    metautils::logError("query: "+query.show()+" returned error: "+query.error(),"dsgen",user,args.argsString);
+    metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",user,args.args_string);
   }
   MySQL::LocalQuery query2("select primary_size,title,grpid from dssdb.dsgroup where dsid = 'ds"+dsnum+"' and pindex = 0 and primary_size > 0");
   if (query2.submit(server) < 0) {
-    metautils::logError("query: "+query2.show()+" returned error: "+query2.error(),"dsgen",user,args.argsString);
+    metautils::log_error("query: "+query2.show()+" returned error: "+query2.error(),"dsgen",user,args.args_string);
   }
   const int VOLUME_LEN=4;
   const char *v[VOLUME_LEN]={"MB","GB","TB","PB"};
@@ -1396,44 +1398,48 @@ if (periods_table.size() > 1) {
 	formats.emplace_back(ele.content()+"<!>"+ele.attribute_value("href"));
     }
   }
+  struct stat buf;
+  XMLDocument fdoc;
   if (stat(("/"+server_root+"/web/metadata").c_str(),&buf) == 0) {
     fdoc.open("/"+server_root+"/web/metadata/FormatReferences.xml");
   }
   else {
-    sdum=getRemoteWebFile("https://rda.ucar.edu/metadata/FormatReferences.xml",temp_dir.name());
-    fdoc.open(sdum);
+    auto file=remote_web_file("https://rda.ucar.edu/metadata/FormatReferences.xml",temp_dir.name());
+    fdoc.open(file);
   }
   if (!fdoc) {
-    metautils::logError("unable to open FormatReferences.xml","dsgen",user,args.argsString);
+    metautils::log_error("unable to open FormatReferences.xml","dsgen",user,args.args_string);
   }
   n=0;
   for (const auto& format : formats) {
-    sp=strutils::split(format,"<!>");
-    sdum=sp[0];
-    if (std::regex_search(sdum,std::regex("^proprietary_"))) {
-	strutils::replace_all(sdum,"proprietary_","");
-	if (sp[1].length() > 0)
-	  sdum2=sp[1];
+    auto format_parts=strutils::split(format,"<!>");
+    auto description=format_parts[0];
+    std::string url;
+    if (std::regex_search(description,std::regex("^proprietary_"))) {
+	strutils::replace_all(description,"proprietary_","");
+	if (!format_parts[1].empty()) {
+	  url=format_parts[1];
+	}
 	else {
-	  sdum+=" (see dataset documentation)";
-	  sdum2="";
+	  description+=" (see dataset documentation)";
+	  url="";
 	}
     }
     else {
-	e=fdoc.element(("formatReferences/format@name="+sdum));
-	sdum2=e.attribute_value("href");
+	e=fdoc.element(("formatReferences/format@name="+description));
+	url=e.attribute_value("href");
     }
-    if (sdum2.length() > 0) {
-	ofs << "<a href=\"" << sdum2 << "\" target=\"_format\">";
-	if (!std::regex_search(sdum2,std::regex("^http://rda.ucar.edu"))) {
+    if (!url.empty()) {
+	ofs << "<a href=\"" << url << "\" target=\"_format\">";
+	if (!std::regex_search(url,std::regex("^http://rda.ucar.edu"))) {
 	  ofs << "<i>";
 	}
     }
-    strutils::replace_all(sdum,"_"," ");
-    ofs << sdum;
-    if (sdum2.length() > 0) {
+    strutils::replace_all(description,"_"," ");
+    ofs << description;
+    if (!url.empty()) {
 	ofs << "</a>";
-	if (!std::regex_search(sdum2,std::regex("^http://rda.ucar.edu"))) {
+	if (!std::regex_search(url,std::regex("^http://rda.ucar.edu"))) {
 	  ofs << "</i>";
 	}
     }
@@ -1466,7 +1472,7 @@ if (periods_table.size() > 1) {
     for (const auto& ele : elist) {
 	query.set("dsid,title","search.datasets","dsid = '"+ele.attribute_value("ID")+"' and (type = 'P' or type = 'H')");
 	if (query.submit(server) < 0)
-          metautils::logError("query: "+query.show()+" returned error: "+query.error(),"dsgen",user,args.argsString);
+          metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",user,args.args_string);
 	if (query.fetch_row(row)) {
 	  ofs << "<tr valign=\"top\"><td><a href=\"/datasets/ds" << row[0] << "#description\">" << row[0] << "</a></td><td>-</td><td>" << row[1] << "</td></tr>";
 	}
@@ -1474,7 +1480,7 @@ if (periods_table.size() > 1) {
     ofs << "</table></td></tr>" << std::endl;
   }
 // more details
-  if (existsOnRDAWebServer("rda.ucar.edu","/SERVER_ROOT/web/datasets/ds"+dsnum+"/metadata/detailed.html",buf)) {
+  if (exists_on_server(directives.web_server,"/SERVER_ROOT/web/datasets/ds"+dsnum+"/metadata/detailed.html")) {
     ofs << "<tr style=\"vertical-align: top\"><td class=\"bold nowrap\">More Details:</td><td>View <a href=\"#metadata/detailed.html?_do=y\">more details</a> for this dataset, including dataset citation, data contributors, and other detailed metadata</td></tr>" << std::endl;
   }
 // RDA blog
@@ -1493,56 +1499,51 @@ if (periods_table.size() > 1) {
 
 int main(int argc,char **argv)
 {
-  std::ofstream ofs;
-  std::string sdum,type,output,error;
-
   if (argc != 2) {
     std::cerr << "usage: dsgen nnn.n" << std::endl;
     exit(1);
   }
-  temp_dir.create("/glade2/scratch2/rdadata");
+  temp_dir.create("/glade/scratch/rdadata");
   dsnum=argv[1];
   if (std::regex_search(dsnum,std::regex("^ds"))) {
     dsnum=dsnum.substr(2);
   }
-  args.argsString=getUnixArgsString(argc,argv);
-  metautils::readConfig("dsgen",user,args.argsString);
-  metautils::connectToMetadataServer(server);
+  args.args_string=unix_args_string(argc,argv);
+  metautils::read_config("dsgen",user,args.args_string);
+  metautils::connect_to_metadata_server(server);
   server_root=strutils::token(directives.web_server,".",0);
   struct stat buf;
+  std::string ds_overview;
   if (stat(("/data/web/datasets/ds"+dsnum+"/metadata/dsOverview.xml").c_str(),&buf) == 0) {
-    sdum="/data/web/datasets/ds"+dsnum+"/metadata/dsOverview.xml";
+    ds_overview="/data/web/datasets/ds"+dsnum+"/metadata/dsOverview.xml";
   }
   else {
-    sdum=getRemoteWebFile("https://rda.ucar.edu/datasets/ds"+dsnum+"/metadata/dsOverview.xml",temp_dir.name());
-    if (sdum.length() == 0) {
-	metautils::logError("dsOverview.xml does not exist for "+dsnum,"dsgen",user,args.argsString);
+    ds_overview=remote_web_file("https://rda.ucar.edu/datasets/ds"+dsnum+"/metadata/dsOverview.xml",temp_dir.name());
+    if (ds_overview.empty()) {
+	metautils::log_error("dsOverview.xml does not exist for "+dsnum,"dsgen",user,args.args_string);
     }
   }
-  if (!xdoc.open(sdum)) {
-    metautils::logError("unable to open dsOverview.xml for "+dsnum+"; parse error: '"+xdoc.parse_error()+"'","dsgen",user,args.argsString);
+  if (!xdoc.open(ds_overview)) {
+    metautils::log_error("unable to open dsOverview.xml for "+dsnum+"; parse error: '"+xdoc.parse_error()+"'","dsgen",user,args.args_string);
   }
-  type=xdoc.element("dsOverview").attribute_value("type");
-  generateIndex(type);
+  auto type=xdoc.element("dsOverview").attribute_value("type");
+  TempDir dataset_doc_dir;
+  if (!dataset_doc_dir.create("/glade/scratch/rdadata")) {
+    metautils::log_error("unable to create temporary document directory","dsgen",user,args.args_string);
+  }
+  generate_index(type,dataset_doc_dir.name());
   if (type != "internal") {
-    generateDescription(type);
+    generate_description(type,dataset_doc_dir.name());
   }
   xdoc.close();
   server.disconnect();
+  std::string remote_path="/data/web";
   if (type == "work-in-progress") {
-    if (hostSync(temp_dir.name()+"/index.html","/__HOST__/web/internal/datasets/ds"+dsnum+"/test_index.html",error) < 0) {
-	metautils::logWarning("couldn't sync index.html - hostSync error(s): '"+error+"'","dsgen",user,args.argsString);
-    }
-    if (hostSync(temp_dir.name()+"/description.html","/__HOST__/web/internal/datasets/ds"+dsnum+"/test_description.html",error) < 0) {
-	metautils::logWarning("couldn't sync description.html - hostSync error(s): '"+error+"'","dsgen",user,args.argsString);
-    }
+    remote_path+="/internal";
   }
-  else {
-    if (hostSync(temp_dir.name()+"/index.html","/__HOST__/web/datasets/ds"+dsnum+"/index.html",error) < 0) {
-	metautils::logWarning("couldn't sync index.html - hostSync error(s): '"+error+"'","dsgen",user,args.argsString);
-    }
-    if (hostSync(temp_dir.name()+"/description.html","/__HOST__/web/datasets/ds"+dsnum+"/description.html",error) < 0) {
-	metautils::logWarning("couldn't sync description.html - hostSync error(s): '"+error+"'","dsgen",user,args.argsString);
-    }
+  remote_path+="/datasets/ds"+dsnum;
+  std::string error;
+  if (host_sync(dataset_doc_dir.name(),".",remote_path,error) < 0) {
+    metautils::log_warning("couldn't sync dataset files - host_sync error(s): '"+error+"'","dsgen",user,args.args_string);
   }
 }
