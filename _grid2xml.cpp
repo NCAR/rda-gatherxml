@@ -383,7 +383,7 @@ void scan_file()
 	    args.format="grib0";
 	  }
 	  last_valid_date_time=first_valid_date_time;
-	  lentry.key=strutils::ftos(grid->source())+"-"+strutils::ftos((reinterpret_cast<GRIBGrid *>(grid))->sub_center_ID());
+	  lentry.key=strutils::ftos(grid->source())+"-"+strutils::ftos((reinterpret_cast<GRIBGrid *>(grid))->sub_center_id());
 	  pentry.key=lentry.key;
 	  if (args.format == "grib") {
 	    pentry.key+="."+strutils::ftos((reinterpret_cast<GRIBGrid *>(grid))->parameter_table_code());
@@ -394,8 +394,8 @@ void scan_file()
 	  ensdata=grid->ensemble_data();
 	  if (ensdata.fcst_type.length() > 0) {
 	    ee.key=ensdata.fcst_type+"<!>"+pe.key;
-	    if (ensdata.ID.length() > 0)
-		ee.key+="%"+ensdata.ID;
+	    if (ensdata.id.length() > 0)
+		ee.key+="%"+ensdata.id;
 	    if (ensdata.total_size > 0)
 		ee.key+="<!>"+strutils::itos(ensdata.total_size);
 	  }
@@ -475,7 +475,7 @@ void scan_file()
 	  last_valid_date_time=first_valid_date_time;
 first_valid_date_time=grid->reference_date_time().hours_added(grid->forecast_time()/10000);
 */
-	  lentry.key=strutils::ftos(grid->source())+"-"+strutils::ftos((reinterpret_cast<GRIB2Grid *>(grid))->sub_center_ID());
+	  lentry.key=strutils::ftos(grid->source())+"-"+strutils::ftos((reinterpret_cast<GRIB2Grid *>(grid))->sub_center_id());
 	  pentry.key=lentry.key+"."+strutils::ftos((reinterpret_cast<GRIB2Grid *>(grid))->parameter_table_code())+"-"+strutils::ftos((reinterpret_cast<GRIB2Grid *>(grid))->local_table_code())+":"+strutils::ftos((reinterpret_cast<GRIB2Grid *>(grid))->discipline())+"."+strutils::ftos((reinterpret_cast<GRIB2Grid *>(grid))->parameter_category())+"."+strutils::ftos(grid->parameter());
 	  pe.key=lentry.key+":"+strutils::itos((reinterpret_cast<GRIBGrid *>(grid))->process())+"."+strutils::itos((reinterpret_cast<GRIB2Grid *>(grid))->background_process())+"."+strutils::itos((reinterpret_cast<GRIB2Grid *>(grid))->forecast_process());
 	  level_type=strutils::itos((reinterpret_cast<GRIB2Grid *>(grid))->first_level_type());
@@ -514,12 +514,13 @@ first_valid_date_time=grid->reference_date_time().hours_added(grid->forecast_tim
 	    case 0:
 	    case 1:
 	    case 2:
+	    {
 		if (ptype == 1) {
 		  ensdata=grid->ensemble_data();
 		  if (ensdata.fcst_type.length() > 0) {
 		    ee.key=ensdata.fcst_type+"<!>"+pe.key;
-		    if (ensdata.ID.length() > 0) {
-			ee.key+="%"+ensdata.ID;
+		    if (ensdata.id.length() > 0) {
+			ee.key+="%"+ensdata.id;
 		    }
 		    if (ensdata.total_size > 0) {
 			ee.key+="<!>"+strutils::itos(ensdata.total_size);
@@ -527,20 +528,25 @@ first_valid_date_time=grid->reference_date_time().hours_added(grid->forecast_tim
 		  }
 		}
 		break;
+	    }
 	    case 8:
 	    case 11:
 	    case 12:
+	    {
 		if (ptype == 11 || ptype == 12) {
 		  ensdata=grid->ensemble_data();
 		  if (ensdata.fcst_type.length() > 0) {
 		    ee.key=ensdata.fcst_type+"<!>"+pe.key;
-		    if (ensdata.ID.length() > 0)
-			ee.key+="%"+ensdata.ID;
-		    if (ensdata.total_size > 0)
+		    if (ensdata.id.length() > 0) {
+			ee.key+="%"+ensdata.id;
+		    }
+		    if (ensdata.total_size > 0) {
 			ee.key+="<!>"+strutils::itos(ensdata.total_size);
+		    }
 		  }
 		}
 		break;
+	    }
 	  }
 	  idx=gentry.key.rfind("<!>");
 	  if (inv_stream.is_open()) {

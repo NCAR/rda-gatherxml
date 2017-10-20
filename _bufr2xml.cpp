@@ -109,16 +109,16 @@ void parse_args()
     args.format=strutils::to_lower(args.format);
   }
   if (args.format == "prepbufr") {
-    rpt.set_data_handler(handle_NCEP_PREPBUFR);
+    rpt.set_data_handler(handle_ncep_prepbufr);
   }
   else if (args.format == "adpbufr") {
-    rpt.set_data_handler(handle_NCEP_ADPBUFR);
+    rpt.set_data_handler(handle_ncep_adpbufr);
   }
   else if (args.format == "radbufr") {
-    rpt.set_data_handler(handle_NCEP_radiance_BUFR);
+    rpt.set_data_handler(handle_ncep_radiance_bufr);
   }
   else if (args.format == "ecmwfbufr") {
-    rpt.set_data_handler(handle_ECMWF_BUFR);
+    rpt.set_data_handler(handle_ecmwf_bufr);
   }
   else {
     metautils::log_error("Error: format "+args.format+" not recognized","bufr2xml",user,args.args_string);
@@ -480,7 +480,7 @@ void processNCEPPREPBUFRObservation(std::string& message_type,size_t subset_numb
   else {
     metautils::log_error("processPREPBUFRObservation returned error: unable to get an ID for '"+message_type+", date "+datetime.to_string(),"bufr2xml",user,args.args_string);
   }
-  ientry.key=PREPBUFR_ID_key(metautils::clean_ID(sdum),pentry.key,message_type);
+  ientry.key=prepbufr_id_key(metautils::clean_ID(sdum),pentry.key,message_type);
   if (ientry.key.length() == 0) {
     metautils::log_error("processPREPBUFRObservation returned error: unable to get ID key for '"+message_type+"', ID: '"+sdum+"' ("+pdata[subset_number]->satid+") ("+pdata[subset_number]->acftid+") ("+pdata[subset_number]->stnid+")","bufr2xml",user,args.args_string);
   }
