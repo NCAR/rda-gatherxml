@@ -229,7 +229,7 @@ exit(1);
 	exit(1);
     }
     args.path=sp.back();
-    if (!std::regex_search(args.path,std::regex("^/FS/DSS/")) && !std::regex_search(args.path,std::regex("^/DSS/")) && !std::regex_search(args.path,std::regex("^https://rda.ucar.edu"))) {
+    if (!std::regex_search(args.path,std::regex("^(/FS){0,1}/DSS/")) && !std::regex_search(args.path,std::regex("^https://rda.ucar.edu"))) {
 	if (args.path.length() > 128) {
 	  std::cerr << "Error: filename exceeds 128 characters in length" << std::endl;
 	  exit(1);
@@ -243,6 +243,10 @@ exit(1);
 	  strutils::replace_all(args.args_string,args.path,sdum);
 	  args.path=sdum;
 	}
+    }
+    if (std::regex_search(args.path,std::regex("^(/FS){0,1}/DSS/")) && std::regex_search(host_name(),std::regex("^r([0-9]){1,}i([0-9]){1,}n([0-9]){1,}$"))) {
+	std::cerr << "Terminating: cheyenne compute nodes do not have access to the HPSS" << std::endl;
+	exit(1);
     }
     sp=strutils::split(args.path,"..m..");
     if (sp.size() > 1) {
