@@ -233,7 +233,7 @@ void scanGHCNV3File(std::list<std::string>& filelist)
   initialize_for_observations();
 // load the station inventory
   MySQL::Server server;
-  metautils::connect_to_RDADB_server(server);
+  metautils::connect_to_rdadb_server(server);
   if (!server) {
     metautils::log_error("scanGHCNV3File returned error: '"+server.error()+"' while trying to connect to RDADB","ascii2xml",user,args.args_string);
   }

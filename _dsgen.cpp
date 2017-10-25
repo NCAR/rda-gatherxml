@@ -450,7 +450,7 @@ void generate_description(std::string type,std::string tdir_name)
     return;
   }
 */
-  databases=metautils::CMD_databases("dsgen","x",dsnum);
+  databases=metautils::cmd_databases("dsgen","x",dsnum);
   if (databases.size() == 0) {
     metautils::log_error("empty CMD database list","dsgen",user,args.args_string);
   }

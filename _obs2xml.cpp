@@ -540,7 +540,7 @@ size_t getTD32PlatformAndStationInformation(Observation *obs,std::string& ientry
 	if (header.type == "DLY") {
 	  de.key=ID+reports[n].date_time.to_string("%Y-%m-%d");
 	  start.set(reports[n].date_time.year(),reports[n].date_time.month(),reports[n].date_time.day(),reports[n].date_time.time()/10000+9999);
-	  start.set_UTC_offset(-2400);
+	  start.set_utc_offset(-2400);
 	}
 	else if (header.type == "MLY") {
 	  if (reports[n].date_time.month() == 13) {

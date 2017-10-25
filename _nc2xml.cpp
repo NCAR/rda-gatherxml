@@ -3438,7 +3438,7 @@ void scan_raf_aircraft_netcdf_file(InputNetCDFStream& istream,bool& found_map,st
 	pentry.key="aircraft";
 	sdum=*(reinterpret_cast<std::string *>(attrs[n].values));
 	sp=strutils::split(sdum);
-	ientry.key=pentry.key+"[!]callSign[!]"+metautils::clean_ID(sp[0]);
+	ientry.key=pentry.key+"[!]callSign[!]"+metautils::clean_id(sp[0]);
     }
     else if (attrs[n].name == "coordinates") {
 	sdum=*(reinterpret_cast<std::string *>(attrs[n].values));
@@ -3833,7 +3833,7 @@ void scan_prepbufr_netcdf_file(InputNetCDFStream& istream,bool& found_map,std::s
 	else {
 	  metautils::log_error("scan_prepbufr_netcdf_file() returned error: unknown observation type '"+array[idx].type+"'","nc2xml",user,args.args_string);
 	}
-	ientry.key=prepbufr_id_key(metautils::clean_ID(array[idx].ID),pentry.key,array[idx].type);
+	ientry.key=prepbufr_id_key(metautils::clean_id(array[idx].ID),pentry.key,array[idx].type);
 	if (ientry.key.empty()) {
 	  metautils::log_error("scan_prepbufr_netcdf_file() returned error: unable to get ID key for '"+array[idx].type+"', ID: '"+array[idx].ID+"'","nc2xml",user,args.args_string);
 	}
@@ -3946,7 +3946,7 @@ void scan_idd_metar_netcdf_file(InputNetCDFStream& istream,bool found_map,DataTy
 	    index= (format == 0) ? m : parent_index[m];
 	    if (index < static_cast<int>(times.size())) {
 		dt=compute_nc_time(times,m);
-		ientry.key=pentry.key+"[!]callSign[!]"+metautils::clean_ID(ID);
+		ientry.key=pentry.key+"[!]callSign[!]"+metautils::clean_id(ID);
 		de.key=vars[n].name;
 		sdum=datatype_map.description(de.key);
 		if (!found_map || sdum.empty()) {
@@ -4040,7 +4040,7 @@ void scan_idd_buoy_netcdf_file(InputNetCDFStream& istream,bool found_map,DataTyp
 		else {
 		  pentry.key="roving_ship";
 		}
-		ientry.key=pentry.key+"[!]callSign[!]"+metautils::clean_ID(ID);
+		ientry.key=pentry.key+"[!]callSign[!]"+metautils::clean_id(ID);
 	    }
 	    else {
 		pentry.key="drifting_buoy";
@@ -4228,7 +4228,7 @@ void scan_idd_upper_air_netcdf_file(InputNetCDFStream& istream,bool found_map,Da
 		if (wmo_ids[m] == wmo_id_miss_val.get()) {
 		  ID.assign(&(reinterpret_cast<char *>(stn_ids.get()))[m*id_len],id_len);
 		  strutils::trim(ID);
-		  ientry.key=pentry.key+"[!]callSign[!]"+metautils::clean_ID(ID);
+		  ientry.key=pentry.key+"[!]callSign[!]"+metautils::clean_id(ID);
 		}
 		else {
 		  ientry.key=pentry.key+"[!]WMO[!]"+strutils::ftos(wmo_ids[m],5,0,'0');

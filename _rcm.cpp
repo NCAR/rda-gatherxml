@@ -23,7 +23,7 @@ bool verified_new_file_is_archived(std::string& error)
     return true;
   }
   MySQL::Server server;
-  metautils::connect_to_RDADB_server(server);
+  metautils::connect_to_rdadb_server(server);
   std::string qstring,column;
   if (std::regex_search(old_name,std::regex("^(/FS){0,1}/DSS"))) {
     column="mssid";
@@ -131,7 +131,7 @@ void rewrite_URI_in_CMD_file(std::string db)
   strutils::replace_all(oname,"/","%");
   strutils::replace_all(nname,"/","%");
   if (std::regex_search(strutils::to_lower(oname),std::regex("\\.htar$"))) {
-    metautils::connect_to_RDADB_server(server);
+    metautils::connect_to_rdadb_server(server);
     query.set("select h.hfile from mssfile as m left join htarfile as h on h.mssid = m.mssid where m.dsid = 'ds"+args.dsnum+"' and mssfile = '"+new_name+"'");
     if (query.submit(server) < 0) {
 	metautils::log_error("unable to get HTAR member file names for '"+new_name+"'","rcm",user,args.args_string);
@@ -349,7 +349,7 @@ bool renamed_CMD()
   std::deque<std::string> sp;
 
   metautils::connect_to_metadata_server(server);
-  metautils::connect_to_RDADB_server(server_d);
+  metautils::connect_to_rdadb_server(server_d);
   if (std::regex_search(old_name,std::regex("^(/FS){0,1}/DSS"))) {
     filetable="_primaries";
     column="mssID";

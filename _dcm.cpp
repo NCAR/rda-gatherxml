@@ -355,7 +355,7 @@ bool removed(std::string file)
 	mss_gindex_set.emplace(row[0]);
     }
     MySQL::Server server_d;
-    metautils::connect_to_RDADB_server(server_d);
+    metautils::connect_to_rdadb_server(server_d);
     if (file_removed) {
 	query.set("tindex","mssfile","mssfile = '"+file+"'");
 	if (query.submit(server_d) == 0 && query.num_rows() == 1) {
@@ -388,7 +388,7 @@ bool removed(std::string file)
 	web_gindex_set.emplace(row[0]);
     }
     MySQL::Server server_d;
-    metautils::connect_to_RDADB_server(server_d);
+    metautils::connect_to_rdadb_server(server_d);
     if (file_removed) {
 	query.set("tindex","wfile","wfile = '"+file+"'");
 	if (query.submit(server_d) == 0 && query.num_rows() == 1) {
@@ -647,7 +647,7 @@ int main(int argc,char **argv)
     std::cerr << std::endl;
   }
   server.disconnect();
-  metautils::connect_to_RDADB_server(server);
+  metautils::connect_to_rdadb_server(server);
   if (server) {
     server.update("dataset","version = version+1","dsid = 'ds"+args.dsnum+"'");
     server.disconnect();

@@ -380,7 +380,7 @@ void summarize_GrML()
 	tm1=time(NULL);
     }
     open_xml_file(xdoc,fname.path);
-    metautils::connect_to_RDADB_server(server_d);
+    metautils::connect_to_rdadb_server(server_d);
     if (!server_d) {
 	metautils::log_error("summarize_GrML() could not connect to mysql server - error: "+server_d.error(),"scm",user,args.args_string);
     }
@@ -1552,7 +1552,7 @@ void summarize_ObML(std::list<KMLData>& kml_list)
   for (auto& fname : ObML_file_list) {
     path=fname.path.substr(0,fname.path.rfind("/")+1);
     open_xml_file(xdoc,fname.path);
-    metautils::connect_to_RDADB_server(server_d);
+    metautils::connect_to_rdadb_server(server_d);
     if (!server_d) {
       metautils::log_error("summarize_ObML() could not connect to mysql server - error: "+server_d.error(),"scm",user,args.args_string);
     }
@@ -1921,7 +1921,7 @@ void summarize_SatML()
 	strutils::replace_all(fname.name,"file://MSS:","");
 	fname.is_mss_file=true;
 	local_args.summarized_hpss_file=true;
-	metautils::connect_to_RDADB_server(server_d);
+	metautils::connect_to_rdadb_server(server_d);
 	if (!server_d)
 	  metautils::log_error("summarize_SatML() could not connect to mysql server - error: "+server_d.error(),"scm",user,args.args_string);
 	if (server_d.update("mssfile","meta_link = 'Sat'","dsid = 'ds"+args.dsnum+"' and mssfile = '"+fname.name+"'") < 0)
@@ -2075,7 +2075,7 @@ void summarize_FixML()
       tm1=time(NULL);
     }
     open_xml_file(xdoc,fname.path);
-    metautils::connect_to_RDADB_server(server_d);
+    metautils::connect_to_rdadb_server(server_d);
     if (!server_d) {
 	metautils::log_error("summarize_FixML() could not connect to mysql server - error: "+server_d.error(),"scm",user,args.args_string);
     }
