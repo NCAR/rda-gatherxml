@@ -662,18 +662,18 @@ void add_gridded_parameters_to_netcdf_level_entry(const std::vector<netCDFStream
     if (!vars[n].is_coord) {
 	time_method=gridded_time_method(vars[n],timeid);
 	if (time_method.empty() || (myequalf(time_bounds_s.t1,0,0.0001) && myequalf(time_bounds_s.t1,time_bounds_s.t2,0.0001))) {
-	  first_valid_date_time=tre.instantaneous->first_valid_datetime;
-	  last_valid_date_time=tre.instantaneous->last_valid_datetime;
+	  first_valid_date_time=tre.data->instantaneous.first_valid_datetime;
+	  last_valid_date_time=tre.data->instantaneous.last_valid_datetime;
 	}
 	else {
 	  if (time_bounds_s.changed) {
 	    metautils::log_error("time bounds changed","nc2xml",user,args.args_string);
 	  }
-	  first_valid_date_time=tre.bounded->first_valid_datetime;
-	  last_valid_date_time=tre.bounded->last_valid_datetime;
+	  first_valid_date_time=tre.data->bounded.first_valid_datetime;
+	  last_valid_date_time=tre.data->bounded.last_valid_datetime;
 	}
 	time_method=strutils::capitalize(time_method);
-	tr_description=metautils::NcTime::gridded_NetCDF_time_range_description(tre,time_data,time_method,error);
+	tr_description=metautils::NcTime::gridded_netcdf_time_range_description(tre,time_data,time_method,error);
 	if (!error.empty()) {
 	  metautils::log_error(error,"nc2xml",user,args.args_string);
 	}
@@ -683,7 +683,7 @@ void add_gridded_parameters_to_netcdf_level_entry(const std::vector<netCDFStream
 	  if (std::regex_search(gentry_key,std::regex("^[12]<!>1<!>"))) {
 	    if (is_zonal_mean_grid_variable(vars[n],timedimid,levdimid,latdimid)) {
 		param_entry.key="ds"+args.dsnum+":"+vars[n].name;
-		add_gridded_netcdf_parameter(vars[n],found_map,first_valid_date_time,last_valid_date_time,*tre.num_steps,parameter_table,var_list,changed_var_table,parameter_map);
+		add_gridded_netcdf_parameter(vars[n],found_map,first_valid_date_time,last_valid_date_time,tre.data->num_steps,parameter_table,var_list,changed_var_table,parameter_map);
 		if (inv_stream.is_open()) {
 		  add_grid_to_inventory(gentry_key);
 		}
@@ -693,7 +693,7 @@ void add_gridded_parameters_to_netcdf_level_entry(const std::vector<netCDFStream
 	    if (is_regular_lat_lon_grid_variable(vars[n],timedimid,levdimid,latdimid,londimid)) {
 // check as a regular lat/lon grid variable
 		param_entry.key="ds"+args.dsnum+":"+vars[n].name;
-		add_gridded_netcdf_parameter(vars[n],found_map,first_valid_date_time,last_valid_date_time,*tre.num_steps,parameter_table,var_list,changed_var_table,parameter_map);
+		add_gridded_netcdf_parameter(vars[n],found_map,first_valid_date_time,last_valid_date_time,tre.data->num_steps,parameter_table,var_list,changed_var_table,parameter_map);
 		if (inv_stream.is_open()) {
 		  add_grid_to_inventory(gentry_key);
 		}
@@ -701,7 +701,7 @@ void add_gridded_parameters_to_netcdf_level_entry(const std::vector<netCDFStream
 	    else if (is_polar_stereographic_grid_variable(vars[n],timedimid,levdimid,latdimid)) {
 // check as a polar-stereographic grid variable
 		param_entry.key="ds"+args.dsnum+":"+vars[n].name;
-		add_gridded_netcdf_parameter(vars[n],found_map,first_valid_date_time,last_valid_date_time,*tre.num_steps,parameter_table,var_list,changed_var_table,parameter_map);
+		add_gridded_netcdf_parameter(vars[n],found_map,first_valid_date_time,last_valid_date_time,tre.data->num_steps,parameter_table,var_list,changed_var_table,parameter_map);
 		if (inv_stream.is_open()) {
 		  add_grid_to_inventory(gentry_key);
 		}
@@ -726,7 +726,7 @@ void add_gridded_time_range(std::string key_start,std::list<std::string>& gentry
 	}
 	else {
 	  time_method=strutils::capitalize(time_method);
-	  gentry_key=key_start+metautils::NcTime::gridded_NetCDF_time_range_description(tre,time_data,time_method,error);
+	  gentry_key=key_start+metautils::NcTime::gridded_netcdf_time_range_description(tre,time_data,time_method,error);
 	  if (!error.empty()) {
 	    metautils::log_error(error,"nc2xml",user,args.args_string);
 	  }
@@ -735,7 +735,7 @@ void add_gridded_time_range(std::string key_start,std::list<std::string>& gentry
     }
   }
   if (found_var_with_no_time_method) {
-    gentry_key=key_start+metautils::NcTime::gridded_NetCDF_time_range_description(tre,time_data,"",error);
+    gentry_key=key_start+metautils::NcTime::gridded_netcdf_time_range_description(tre,time_data,"",error);
     if (!error.empty()) {
 	metautils::log_error(error,"nc2xml",user,args.args_string);
     }
@@ -883,7 +883,7 @@ void process_units_attribute(const netCDFStream::Attribute& attr,const netCDFStr
 void scan_cf_point_netcdf_file(InputNetCDFStream& istream,bool& found_map,DataTypeMap& datatype_map,std::list<std::string>& var_list)
 {
   if (verbose_operation) {
-    std::cout << "...beginning function scanPointNetCDFFile..." << std::endl;
+    std::cout << "...beginning function scan_cf_point_netcdf_file..." << std::endl;
   }
   initialize_for_observations();
   auto vars=istream.variables();
@@ -2404,22 +2404,18 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream,bool& found_map,Paramet
 			  }
 			  tre.key=d2.years_since(d1)+1;
 			  if (!tr_table.found(tre.key,tre)) {
-			    tre.unit=new int;
-			    tre.num_steps=new int;
-			    *tre.num_steps=0;
-			    tre.instantaneous=new metautils::NcTime::TimeRange;
-			    tre.instantaneous->first_valid_datetime.set(static_cast<long long>(30001231235959));
-			    tre.instantaneous->last_valid_datetime.set(static_cast<long long>(10000101000000));
-			    tre.bounded=new metautils::NcTime::TimeRange;
-			    tre.bounded->first_valid_datetime.set(static_cast<long long>(30001231235959));
-			    tre.bounded->last_valid_datetime.set(static_cast<long long>(10000101000000));
+			    tre.data.reset(new metautils::NcTime::TimeRangeEntry::Data);
+			    tre.data->instantaneous.first_valid_datetime.set(static_cast<long long>(30001231235959));
+			    tre.data->instantaneous.last_valid_datetime.set(static_cast<long long>(10000101000000));
+			    tre.data->bounded.first_valid_datetime.set(static_cast<long long>(30001231235959));
+			    tre.data->bounded.last_valid_datetime.set(static_cast<long long>(10000101000000));
 			    tr_table.insert(tre);
 			  }
-			  if (d1 < tre.bounded->first_valid_datetime) {
-			    tre.bounded->first_valid_datetime=d1;
+			  if (d1 < tre.data->bounded.first_valid_datetime) {
+			    tre.data->bounded.first_valid_datetime=d1;
 			  }
-			  if (d2 > tre.bounded->last_valid_datetime) {
-			    tre.bounded->last_valid_datetime=d2;
+			  if (d2 > tre.data->bounded.last_valid_datetime) {
+			    tre.data->bounded.last_valid_datetime=d2;
 			  }
 			  if (d1.month() > d2.month()) {
 			    d1.set_year(d2.year()-1);
@@ -2444,8 +2440,8 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream,bool& found_map,Paramet
 				metautils::log_error("unable to handle climatology of "+strutils::itos(y)+"-day means","nc2xml",user,args.args_string);
 			    }
 			  }
-			  *tre.unit=y;
-			  ++(*tre.num_steps);
+			  tre.data->unit=y;
+			  ++(tre.data->num_steps);
 			}
 			delete[] ta1;
 			delete[] ta2;
@@ -2680,11 +2676,7 @@ else {
 	if (source == "CAM") {
 	  tre.key=-11;
 	}
-	tre.unit=new int;
-	*tre.unit=-1;
-	tre.num_steps=new int;
-	tre.instantaneous=new metautils::NcTime::TimeRange;
-	tre.bounded=new metautils::NcTime::TimeRange;
+	tre.data.reset(new metautils::NcTime::TimeRangeEntry::Data);
 // get t number of time steps and the temporal range
 	istream.variable_data(timeid,var_data);
 	time_s.t1=var_data.front();
@@ -2697,15 +2689,15 @@ else {
 	  }
 	}
 	std::string error;
-	tre.instantaneous->first_valid_datetime=metautils::NcTime::actual_date_time(time_s.t1,time_data,error);
+	tre.data->instantaneous.first_valid_datetime=metautils::NcTime::actual_date_time(time_s.t1,time_data,error);
 	if (!error.empty()) {
 	  metautils::log_error(error,"nc2xml",user,args.args_string);
 	}
-	tre.instantaneous->last_valid_datetime=metautils::NcTime::actual_date_time(time_s.t2,time_data,error);
+	tre.data->instantaneous.last_valid_datetime=metautils::NcTime::actual_date_time(time_s.t2,time_data,error);
 	if (!error.empty()) {
 	  metautils::log_error(error,"nc2xml",user,args.args_string);
 	}
-	*tre.num_steps=var_data.size();
+	tre.data->num_steps=var_data.size();
 	if (!timeboundsid.empty()) {
 	  auto timeboundstype=netCDFStream::NcType::_NULL;
 	  for (m=0; m < vars.size(); ++m) {
@@ -2732,24 +2724,24 @@ else {
 	    }
 	  }
 	  time_bounds_s.t2=var_data.back();
-	  tre.bounded->first_valid_datetime=metautils::NcTime::actual_date_time(time_bounds_s.t1,time_data,error);
+	  tre.data->bounded.first_valid_datetime=metautils::NcTime::actual_date_time(time_bounds_s.t1,time_data,error);
 	  if (!error.empty()) {
 	    metautils::log_error(error,"nc2xml",user,args.args_string);
 	  }
-	  tre.bounded->last_valid_datetime=metautils::NcTime::actual_date_time(time_bounds_s.t2,time_data,error);
+	  tre.data->bounded.last_valid_datetime=metautils::NcTime::actual_date_time(time_bounds_s.t2,time_data,error);
 	  if (!error.empty()) {
 	    metautils::log_error(error,"nc2xml",user,args.args_string);
 	  }
 	}
 	if (time_data.units == "months") {
-	  if ((tre.instantaneous->first_valid_datetime).day() == 1) {
+	  if ((tre.data->instantaneous.first_valid_datetime).day() == 1) {
 //	    (tre.instantaneous->last_valid_datetime).addDays(days_in_month((tre.instantaneous->last_valid_datetime).year(),(tre.instantaneous->last_valid_datetime).month(),time_data.calendar)-1,time_data.calendar);
-(tre.instantaneous->last_valid_datetime).add_months(1);
+(tre.data->instantaneous.last_valid_datetime).add_months(1);
 	  }
 	  if (!timeboundsid.empty()) {
-	    if ((tre.bounded->first_valid_datetime).day() == 1) {
+	    if ((tre.data->bounded.first_valid_datetime).day() == 1) {
 //		(tre.bounded->last_valid_datetime).addDays(days_in_month((tre.bounded->last_valid_datetime).year(),(tre.bounded->last_valid_datetime).month(),time_data.calendar)-1,time_data.calendar);
-(tre.bounded->last_valid_datetime).add_months(1);
+(tre.data->bounded.last_valid_datetime).add_months(1);
 	    }
 	  }
 	}
@@ -2879,13 +2871,13 @@ else {
 			  time_method=strutils::capitalize(time_method);
 			  if (!lentry.parameter_code_table.found(param_entry.key,param_entry)) {
 			    if (time_method.empty() || (myequalf(time_bounds_s.t1,0,0.0001) && myequalf(time_bounds_s.t1,time_bounds_s.t2,0.0001))) {
-				add_gridded_netcdf_parameter(vars[l],found_map,tre.instantaneous->first_valid_datetime,tre.instantaneous->last_valid_datetime,*tre.num_steps,parameter_table,var_list,changed_var_table,parameter_map);
+				add_gridded_netcdf_parameter(vars[l],found_map,tre.data->instantaneous.first_valid_datetime,tre.data->instantaneous.last_valid_datetime,tre.data->num_steps,parameter_table,var_list,changed_var_table,parameter_map);
 			    }
 			    else {
 				if (time_bounds_s.changed) {
 				  metautils::log_error("time bounds changed","nc2xml",user,args.args_string);
 				}
-				add_gridded_netcdf_parameter(vars[l],found_map,tre.bounded->first_valid_datetime,tre.bounded->last_valid_datetime,*tre.num_steps,parameter_table,var_list,changed_var_table,parameter_map);
+				add_gridded_netcdf_parameter(vars[l],found_map,tre.data->bounded.first_valid_datetime,tre.data->bounded.last_valid_datetime,tre.data->num_steps,parameter_table,var_list,changed_var_table,parameter_map);
 			    }
 			    gentry.level_table.replace(lentry);
 			    if (inv_stream.is_open()) {
@@ -2894,29 +2886,29 @@ else {
 			  }
 			  else {
 			    std::string error;
-			    tr_description=metautils::NcTime::gridded_NetCDF_time_range_description(tre,time_data,time_method,error);
+			    tr_description=metautils::NcTime::gridded_netcdf_time_range_description(tre,time_data,time_method,error);
 			    if (!error.empty()) {
 				metautils::log_error(error,"nc2xml",user,args.args_string);
 			    }
 			    tr_description=strutils::capitalize(tr_description);
 			    if (strutils::has_ending(gentry.key,tr_description)) {
 				if (time_method.empty() || (myequalf(time_bounds_s.t1,0,0.0001) && myequalf(time_bounds_s.t1,time_bounds_s.t2,0.0001))) {
-				  if (tre.instantaneous->first_valid_datetime < param_entry.start_date_time) {
-				    param_entry.start_date_time=tre.instantaneous->first_valid_datetime;
+				  if (tre.data->instantaneous.first_valid_datetime < param_entry.start_date_time) {
+				    param_entry.start_date_time=tre.data->instantaneous.first_valid_datetime;
 				  }
-				  if (tre.instantaneous->last_valid_datetime > param_entry.end_date_time) {
-				    param_entry.end_date_time=tre.instantaneous->last_valid_datetime;
+				  if (tre.data->instantaneous.last_valid_datetime > param_entry.end_date_time) {
+				    param_entry.end_date_time=tre.data->instantaneous.last_valid_datetime;
 				  }
 				}
 				else {
-				  if (tre.bounded->first_valid_datetime < param_entry.start_date_time) {
-				    param_entry.start_date_time=tre.bounded->first_valid_datetime;
+				  if (tre.data->bounded.first_valid_datetime < param_entry.start_date_time) {
+				    param_entry.start_date_time=tre.data->bounded.first_valid_datetime;
 				  }
-				  if (tre.bounded->last_valid_datetime > param_entry.end_date_time) {
-				    param_entry.end_date_time=tre.bounded->last_valid_datetime;
+				  if (tre.data->bounded.last_valid_datetime > param_entry.end_date_time) {
+				    param_entry.end_date_time=tre.data->bounded.last_valid_datetime;
 				  }
 				}
-				param_entry.num_time_steps+=*tre.num_steps;
+				param_entry.num_time_steps+=tre.data->num_steps;
 				lentry.parameter_code_table.replace(param_entry);
 				gentry.level_table.replace(lentry);
 				if (inv_stream.is_open()) {
@@ -3083,16 +3075,15 @@ void scan_wrf_simulation_netcdf_file(InputNetCDFStream& istream,bool& found_map,
 		timeid=vars[n].name;
 		timedimid=vars[n].dimids[0];
 		found_time=true;
-		tre.instantaneous=new metautils::NcTime::TimeRange;
-		tre.num_steps=new int;
 		istream.variable_data(vars[n].name,var_data);
 		time_s.num_times=var_data.size();
 		std::string error;
-		tre.instantaneous->first_valid_datetime=metautils::NcTime::actual_date_time(var_data.front(),time_data,error);
+		tre.data.reset(new metautils::NcTime::TimeRangeEntry::Data);
+		tre.data->instantaneous.first_valid_datetime=metautils::NcTime::actual_date_time(var_data.front(),time_data,error);
 		if (!error.empty()) {
 		  metautils::log_error(error,"nc2xml",user,args.args_string);
 		}
-		tre.instantaneous->last_valid_datetime=metautils::NcTime::actual_date_time(var_data.back(),time_data,error);
+		tre.data->instantaneous.last_valid_datetime=metautils::NcTime::actual_date_time(var_data.back(),time_data,error);
 		if (!error.empty()) {
 		  metautils::log_error(error,"nc2xml",user,args.args_string);
 		}
@@ -3102,7 +3093,7 @@ void scan_wrf_simulation_netcdf_file(InputNetCDFStream& istream,bool& found_map,
 			time_s.times[l]=var_data[l];
 		    }
 		}
-		*tre.num_steps=time_s.num_times;
+		tre.data->num_steps=time_s.num_times;
 	    }
 	  }
 	}
