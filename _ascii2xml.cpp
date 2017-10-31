@@ -229,7 +229,9 @@ void update_platform_table(size_t obs_type_index,float lat,float lon)
 void scanGHCNV3File(std::list<std::string>& filelist)
 {
   TempDir tdir;
-  tdir.create("/glade/scratch/rdadata");
+  if (!tdir.create(directives.temp_path)) {
+    metautils::log_error("scanGHCNV3File(): unable to create temporary directory","ascii2xml",user,args.args_string);
+  }
   initialize_for_observations();
 // load the station inventory
   MySQL::Server server;

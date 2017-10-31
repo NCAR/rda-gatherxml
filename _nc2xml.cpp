@@ -2942,7 +2942,7 @@ else {
 	map_contents.clear();
     }
     auto tdir=new TempDir;
-    if (!tdir->create("/glade/scratch/rdadata")) {
+    if (!tdir->create(directives.temp_path)) {
 	metautils::log_error("can't create temporary directory for netCDF levels","nc2xml",user,args.args_string);
     }
     std::stringstream oss,ess;

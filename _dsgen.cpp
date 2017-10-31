@@ -1503,13 +1503,15 @@ int main(int argc,char **argv)
     std::cerr << "usage: dsgen nnn.n" << std::endl;
     exit(1);
   }
-  temp_dir.create("/glade/scratch/rdadata");
   dsnum=argv[1];
   if (std::regex_search(dsnum,std::regex("^ds"))) {
     dsnum=dsnum.substr(2);
   }
   args.args_string=unix_args_string(argc,argv);
   metautils::read_config("dsgen",user,args.args_string);
+  if (!temp_dir.create(directives.temp_path)) {
+    metautils::log_error("unable to create temporary directory","dsgen",user,args.args_string);
+  }
   metautils::connect_to_metadata_server(server);
   server_root=strutils::token(directives.web_server,".",0);
   struct stat buf;
@@ -1528,7 +1530,7 @@ int main(int argc,char **argv)
   }
   auto type=xdoc.element("dsOverview").attribute_value("type");
   TempDir dataset_doc_dir;
-  if (!dataset_doc_dir.create("/glade/scratch/rdadata")) {
+  if (!dataset_doc_dir.create(directives.temp_path)) {
     metautils::log_error("unable to create temporary document directory","dsgen",user,args.args_string);
   }
   generate_index(type,dataset_doc_dir.name());

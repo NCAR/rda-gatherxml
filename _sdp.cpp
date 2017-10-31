@@ -206,7 +206,7 @@ int main(int argc,char **argv)
   MySQL::Server server;
   metautils::connect_to_metadata_server(server);
   MySQL::Server server_d;
-  metautils::connect_to_RDADB_server(server_d);
+  metautils::connect_to_rdadb_server(server_d);
   if (!server || !server_d) {
     std::cerr << "Error connecting to MySQL:: database" << std::endl;
     exit(1);
@@ -259,14 +259,18 @@ int main(int argc,char **argv)
     group_ID="Entire Dataset";
   }
   auto *tdir=new TempDir();
-  tdir->create("/glade/scratch/rdadata");
+  if (!tdir->create(directives.temp_path)) {
+    metautils::log_error("unable to create temporary directory (1)","sdp",user,args.args_string);
+  }
   auto old_ds_overview=remote_web_file("http://rda.ucar.edu/datasets/ds"+args.dsnum+"/metadata/dsOverview.xml",tdir->name());
   std::ifstream ifs(old_ds_overview.c_str());
   if (!ifs.is_open()) {
     metautils::log_error("unable to open overview XML file for ds"+args.dsnum,"sdp",user,args.args_string);
   }
   auto *sync_dir=new TempDir();
-  sync_dir->create("/glade/scratch/rdadata");
+  if (!sync_dir->create(directives.temp_path)) {
+    metautils::log_error("unable to create temporary directory (2)","sdp",user,args.args_string);
+  }
   std::ofstream ofs((sync_dir->name()+"/dsOverview.xml").c_str());
   if (!ofs.is_open()) {
     metautils::log_error("unable to open output file for updated XML","sdp",user,args.args_string);

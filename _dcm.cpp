@@ -96,8 +96,8 @@ std::string tempdir_name()
   static TempDir *tdir=nullptr;
   if (tdir == nullptr) {
     tdir=new TempDir;
-    if (!tdir->create("/glade/scratch/rdadata")) {
-	metautils::log_error("unable to create temporary directory in /glade/scratch/rdadata","dcm",user,args.args_string);
+    if (!tdir->create(directives.temp_path)) {
+	metautils::log_error("unable to create temporary directory","dcm",user,args.args_string);
     }
   }
   return tdir->name();

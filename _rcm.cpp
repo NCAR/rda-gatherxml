@@ -97,8 +97,8 @@ void rewrite_URI_in_CMD_file(std::string db)
   struct stat buf;
   bool old_is_gzipped=false;
 
-  if (!tdir.create("/glade2/scratch2/rdadata")) {
-    metautils::log_error("unable to create temporary directory in /glade2/scratch2/rdadata","rcm",user,args.args_string);
+  if (!tdir.create(directives.temp_path)) {
+    metautils::log_error("unable to create temporary directory","rcm",user,args.args_string);
   }
   if (std::regex_search(old_name,std::regex("^(/FS){0,1}/DSS"))) {
     cmdir="fmd";
