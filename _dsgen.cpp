@@ -723,7 +723,7 @@ if (periods_table.size() > 1) {
   if (query.submit(server) == 0) {
     std::stringstream vars_by_product;
     while (query.fetch_row(row)) {
-	if (exists_on_server(directives.web_server,"/SERVER_ROOT/web/datasets/ds"+dsnum+"/metadata/customize.GrML."+row[0])) {
+	if (exists_on_server(directives.web_server,"/data/web/datasets/ds"+dsnum+"/metadata/customize.GrML."+row[0])) {
 	  auto c_file=remote_web_file("https://rda.ucar.edu/datasets/ds"+dsnum+"/metadata/customize.GrML."+row[0],temp_dir.name());
 	  if (!c_file.empty()) {
 	    std::ifstream ifs;
@@ -766,7 +766,7 @@ if (periods_table.size() > 1) {
     for (const auto& type : types) {
 	if (type == "grid") {
 	  ofs << "<tr style=\"vertical-align: top\"><td class=\"bold nowrap\">Vertical Levels:</td><td>See the <a href=\"#metadata/detailed.html?_do=y&view=level\">detailed metadata</a> for level information";
-	  if (exists_on_server(directives.web_server,"/SERVER_ROOT/web/datasets/ds"+dsnum+"/metadata/grib2_levels.html")) {
+	  if (exists_on_server(directives.web_server,"/data/web/datasets/ds"+dsnum+"/metadata/grib2_levels.html")) {
 	    ofs << "<br /><a href=\"/datasets/ds" << dsnum << "/#metadata/grib2_levels.html?_do=y\">GRIB2 level table</a>"; 
 	  }
 	  ofs << "</td></tr>" << std::endl;
@@ -1480,7 +1480,7 @@ if (periods_table.size() > 1) {
     ofs << "</table></td></tr>" << std::endl;
   }
 // more details
-  if (exists_on_server(directives.web_server,"/SERVER_ROOT/web/datasets/ds"+dsnum+"/metadata/detailed.html")) {
+  if (exists_on_server(directives.web_server,"/data/web/datasets/ds"+dsnum+"/metadata/detailed.html")) {
     ofs << "<tr style=\"vertical-align: top\"><td class=\"bold nowrap\">More Details:</td><td>View <a href=\"#metadata/detailed.html?_do=y\">more details</a> for this dataset, including dataset citation, data contributors, and other detailed metadata</td></tr>" << std::endl;
   }
 // RDA blog
