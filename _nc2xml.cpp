@@ -377,7 +377,8 @@ DateTime compute_nc_time(netCDFStream::VariableData& times,size_t index)
 
   val=times[index];
   if (val < 0.) {
-    metautils::log_error("compute_nc_time() returned error: negative time offset not allowed","nc2xml",user,args.args_string);
+    std::cerr << "Terminating - negative time offset not allowed" << std::endl;
+    exit(1);
   }
   if (time_data.units == "seconds") {
     dt=time_data.reference.seconds_added(val);
