@@ -58,7 +58,7 @@ int div_num=0;
 void generate_index(std::string type,std::string tdir_name)
 {
   std::ofstream ofs;
-  if (type == "work-in-progress") {
+  if (type == "W") {
     ofs.open((tdir_name+"/test_index.html").c_str());
   }
   else {
@@ -69,11 +69,25 @@ void generate_index(std::string type,std::string tdir_name)
   }
   ofs << "<!DOCTYPE html>" << std::endl;
   ofs << "<head>" << std::endl;
-  if (type == "internal") {
+  if (type == "I") {
     ofs << "<meta http-equiv=\"Refresh\" content=\"0; url=/index.html?hash=error&code=404&url=/datasets/ds" << dsnum << "\" />" << std::endl;
     ofs << "</head>" << std::endl;
   }
   else {
+    struct stat buf;
+    std::string ds_overview;
+    if (stat(("/data/web/datasets/ds"+dsnum+"/metadata/dsOverview.xml").c_str(),&buf) == 0) {
+	ds_overview="/data/web/datasets/ds"+dsnum+"/metadata/dsOverview.xml";
+    }
+    else {
+	ds_overview=remote_web_file("https://rda.ucar.edu/datasets/ds"+dsnum+"/metadata/dsOverview.xml",temp_dir.name());
+	if (ds_overview.empty()) {
+	  metautils::log_error("dsOverview.xml does not exist for "+dsnum,"dsgen",user,args.args_string);
+	}
+    }
+    if (!xdoc.open(ds_overview)) {
+	metautils::log_error("unable to open dsOverview.xml for "+dsnum+"; parse error: '"+xdoc.parse_error()+"'","dsgen",user,args.args_string);
+    }
     ofs << "<meta http-equiv=\"Content-type\" content=\"application/xml+xhtml;charset=UTF-8\" />" << std::endl;
     ofs << "<meta name=\"fragment\" content=\"!\">" << std::endl;
     auto e=xdoc.element("dsOverview/title");
@@ -141,8 +155,8 @@ void generate_index(std::string type,std::string tdir_name)
     ofs << "<tr valign=\"bottom\"><td align=\"right\"><span class=\"fs16px\">For assistance, contact <a class=\"blue\" href=\"mailto:"+row[0]+"@ucar.edu\">"+e.content()+"</a> <span class=\"mediumGrayText\">("+phoneno+").</span></span></td></tr>" << std::endl;
     ofs << "</table>" << std::endl;
     ofs << "<?php include(\"main/dstabs";
-    if (type == "dead") {
-	ofs << "-" << type;
+    if (type == "D") {
+	ofs << "-dead";
     }
     ofs << ".inc\"); ?>" << std::endl;
     ofs << "</div>" << std::endl;
@@ -436,7 +450,7 @@ void generate_description(std::string type,std::string tdir_name)
   if (!ofs.is_open()) {
     metautils::log_error("unable to open output for 'description.html'","dsgen",user,args.args_string);
   }
-  if (type == "dead") {
+  if (type == "D") {
     ofs << "<table class=\"fs16px\" width=\"100%\" cellspacing=\"10\" cellpadding=\"0\" border=\"0\">" << std::endl;
     insert_text_field(ofs,"summary","Abstract");
     ofs << "</table>" << std::endl;
@@ -444,7 +458,7 @@ void generate_description(std::string type,std::string tdir_name)
     return;
   }
 /*
-  if (type == "internal") {
+  if (type == "I") {
     ofs << "<ul>This dataset has been removed from public view.  If you have questions about this dataset, please contact the specialist that is named above.</ul>" << std::endl;
     ofs.close();
     return;
@@ -1513,34 +1527,24 @@ int main(int argc,char **argv)
     metautils::log_error("unable to create temporary directory","dsgen",user,args.args_string);
   }
   metautils::connect_to_metadata_server(server);
-  server_root=strutils::token(directives.web_server,".",0);
-  struct stat buf;
-  std::string ds_overview;
-  if (stat(("/data/web/datasets/ds"+dsnum+"/metadata/dsOverview.xml").c_str(),&buf) == 0) {
-    ds_overview="/data/web/datasets/ds"+dsnum+"/metadata/dsOverview.xml";
+  MySQL::LocalQuery query("select type from search.datasets where dsid = '"+dsnum+"'");
+  MySQL::Row row;
+  if (query.submit(server) < 0 || !query.fetch_row(row)) {
+    metautils::log_error("unable to determine dataset type","dsgen",user,args.args_string);
   }
-  else {
-    ds_overview=remote_web_file("https://rda.ucar.edu/datasets/ds"+dsnum+"/metadata/dsOverview.xml",temp_dir.name());
-    if (ds_overview.empty()) {
-	metautils::log_error("dsOverview.xml does not exist for "+dsnum,"dsgen",user,args.args_string);
-    }
-  }
-  if (!xdoc.open(ds_overview)) {
-    metautils::log_error("unable to open dsOverview.xml for "+dsnum+"; parse error: '"+xdoc.parse_error()+"'","dsgen",user,args.args_string);
-  }
-  auto type=xdoc.element("dsOverview").attribute_value("type");
+  auto type=row[0];
   TempDir dataset_doc_dir;
   if (!dataset_doc_dir.create(directives.temp_path)) {
     metautils::log_error("unable to create temporary document directory","dsgen",user,args.args_string);
   }
   generate_index(type,dataset_doc_dir.name());
-  if (type != "internal") {
+  if (type != "I") {
     generate_description(type,dataset_doc_dir.name());
+    xdoc.close();
   }
-  xdoc.close();
   server.disconnect();
   std::string remote_path="/data/web";
-  if (type == "work-in-progress") {
+  if (type == "W") {
     remote_path+="/internal";
   }
   remote_path+="/datasets/ds"+dsnum;
