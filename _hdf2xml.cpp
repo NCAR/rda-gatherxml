@@ -19,11 +19,12 @@ metautils::Args args;
 std::string user=getenv("USER");
 TempFile *tfile=NULL;
 std::string inv_file;
-TempDir *tdir=nullptr,*inv_dir=nullptr;
+TempDir *inv_dir=nullptr;
 std::ofstream inv_stream;
 struct ScanData {
-  ScanData() : map_name(),varlist(),var_changes_table(),found_map(false),convert_ids_to_upper_case(false) {}
+  ScanData() : tdir(nullptr),map_name(),varlist(),var_changes_table(),found_map(false),convert_ids_to_upper_case(false) {}
 
+  std::unique_ptr<TempDir> tdir;
   std::string map_name;
   std::list<std::string> varlist;
   my::map<metautils::StringEntry> var_changes_table;
@@ -104,9 +105,6 @@ extern "C" void clean_up()
 {
   if (tfile != NULL) {
     delete tfile;
-  }
-  if (tdir != NULL) {
-    delete tdir;
   }
   if (wss.str().length() > 0) {
     metautils::log_warning(wss.str(),"hdf2xml",user,args.args_string);
@@ -1196,7 +1194,7 @@ void scan_usarray_transportable_hdf5_file(InputHDF5Stream& istream,ScanData& sca
 	}
     }
   }
-  scan_data.map_name=remote_web_file("https://rda.ucar.edu/metadata/ParameterTables/HDF5.ds"+args.dsnum+".xml",tdir->name());
+  scan_data.map_name=remote_web_file("https://rda.ucar.edu/metadata/ParameterTables/HDF5.ds"+args.dsnum+".xml",scan_data.tdir->name());
   scan_data.found_map=(scan_data.map_name.length() > 0);
   se.key=de.key+"<!>"+se.key+"<!>Hz";
   scan_data.varlist.emplace_back(se.key);
@@ -1770,7 +1768,7 @@ void scan_cf_point_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
     }
     id_vals.fill(istream,*ds);
   }
-  scan_data.map_name=remote_web_file("https://rda.ucar.edu/metadata/ParameterTables/HDF5.ds"+args.dsnum+".xml",tdir->name());
+  scan_data.map_name=remote_web_file("https://rda.ucar.edu/metadata/ParameterTables/HDF5.ds"+args.dsnum+".xml",scan_data.tdir->name());
   scan_data.found_map=!scan_data.map_name.empty();
   std::vector<DateTime> date_times;
   date_times.reserve(time_vals.num_values);
@@ -1883,10 +1881,10 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
   auto found_time=false;
   grid_initialize();
   metadata::open_inventory(inv_file,&inv_dir,inv_stream,"GrML","hdf2xml",user);
-  scan_data.map_name=remote_web_file("https://rda.ucar.edu/metadata/ParameterTables/netCDF4.ds"+args.dsnum+".xml",tdir->name());
+  scan_data.map_name=remote_web_file("https://rda.ucar.edu/metadata/ParameterTables/netCDF4.ds"+args.dsnum+".xml",scan_data.tdir->name());
 // rename the parameter map so that it is not overwritten by the level map,
 //   which has the same name
-  if (scan_data.map_name.length() > 0) {
+  if (!scan_data.map_name.empty()) {
     std::stringstream oss,ess;
     mysystem2("/bin/mv "+scan_data.map_name+" "+scan_data.map_name+".p",oss,ess);
     if (ess.str().length() > 0) {
@@ -2619,19 +2617,21 @@ void scan_hdf5_file(std::list<std::string>& filelist,ScanData& scan_data)
     map_type="dataType";
   }
   else {
-    metautils::log_error("scanHDF5File returned error: unknown map type","hdf2xml",user,args.args_string);
+    metautils::log_error("scan_hdf5_file() returned error: unknown map type","hdf2xml",user,args.args_string);
   }
   error=metautils::NcParameter::write_parameter_map(args.dsnum,scan_data.varlist,scan_data.var_changes_table,map_type,scan_data.map_name,scan_data.found_map,warning);
+  if (!error.empty()) {
+    metautils::log_error("scan_hdf5_file() returned error: "+error,"hdf2xml",user,args.args_string);
+  }
 }
 
 void scan_file()
 {
-
   tfile=new TempFile;
   if (!tfile->open(directives.temp_path)) {
     metautils::log_error("scan_file() was not able to create a temporary file in "+directives.temp_path,"hdf2xml",user,args.args_string);
   }
-  tdir=new TempDir;
+  auto tdir=new TempDir;
   if (!tdir->create(directives.temp_path)) {
     metautils::log_error("scan_file() was not able to create a temporary directory in "+directives.temp_path,"hdf2xml",user,args.args_string);
   }
@@ -2644,6 +2644,10 @@ void scan_file()
     filelist.emplace_back(tfile->name());
   }
   ScanData scan_data;
+  scan_data.tdir.reset(new TempDir);
+  if (!scan_data.tdir->create(directives.temp_path)) {
+    metautils::log_error("scan_file() was not able to create a temporary directory in "+directives.temp_path,"hdf2xml",user,args.args_string);
+  }
   if (std::regex_search(args.format,std::regex("hdf4"))) {
     scan_hdf4_file(filelist,scan_data);
   }
