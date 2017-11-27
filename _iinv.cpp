@@ -87,10 +87,6 @@ struct TimeRangeEntry {
 
 void insert_grml_inventory()
 {
-  std::deque<std::string> sp,spx;
-  std::vector<TimeRangeEntry> time_range_codes;
-  std::list<std::string> lock_table_list;
-
   MySQL::Server server;
   metautils::connect_to_metadata_server(server);
   auto grml_filename=remote_web_file("https://rda.ucar.edu/datasets/ds"+args.dsnum+"/metadata/inv/"+args.filename+".gz",temp_dir.name());
@@ -137,38 +133,39 @@ void insert_grml_inventory()
   std::string uflag=strutils::strand(3);
   int nlines=0,num_dupes=0;
   long long total_bytes=0;
-  std::vector<std::string> grid_definition_codes,level_codes,parameters,processes,ensembles;
+  std::vector<TimeRangeEntry> time_range_codes;
+  std::vector<std::string> grid_definition_codes,level_codes,parameters,processes,ensembles,parameter_codes;
   char line[32768];
   ifs.getline(line,32768);
   while (!ifs.eof()) {
     nlines++;
     std::string sline=line;
     if (std::regex_search(sline,std::regex("<!>"))) {
-	sp=strutils::split(sline,"<!>");
-	switch (sp[0][0]) {
+	auto line_parts=strutils::split(sline,"<!>");
+	switch (line_parts[0][0]) {
 	  case 'U':
 	  {
 	    TimeRangeEntry tre;
-	    if (sp[2] == "Analysis" || std::regex_search(sp[2],std::regex("^0-hour")) || sp[2] == "Monthly Mean") {
+	    if (line_parts[2] == "Analysis" || std::regex_search(line_parts[2],std::regex("^0-hour")) || line_parts[2] == "Monthly Mean") {
 		tre.hour_diff=0;
 	    }
-	    else if (std::regex_search(sp[2],std::regex("-hour Forecast$"))) {
-		tre.hour_diff=std::stoi(sp[2].substr(0,sp[2].find("-")));
+	    else if (std::regex_search(line_parts[2],std::regex("-hour Forecast$"))) {
+		tre.hour_diff=std::stoi(line_parts[2].substr(0,line_parts[2].find("-")));
 	    }
-	    else if (std::regex_search(sp[2],std::regex("to initial\\+"))) {
-		auto hr=sp[2].substr(sp[2].find("to initial+")+11);
+	    else if (std::regex_search(line_parts[2],std::regex("to initial\\+"))) {
+		auto hr=line_parts[2].substr(line_parts[2].find("to initial+")+11);
 		strutils::chop(hr);
 		tre.hour_diff=std::stoi(hr);
 	    }
 	    else {
-		metautils::log_warning("insert_grml_inventory() does not recognize product '"+sp[2]+"'","iinv",user,args.args_string);
+		metautils::log_warning("insert_grml_inventory() does not recognize product '"+line_parts[2]+"'","iinv",user,args.args_string);
 	    }
-	    query.set("code","WGrML.timeRanges","timeRange = '"+sp[2]+"'");
+	    query.set("code","WGrML.timeRanges","timeRange = '"+line_parts[2]+"'");
 	    if (query.submit(server) < 0) {
 		metautils::log_error("insert_grml_inventory() returned error: "+query.error()+" while trying to get timeRange code","iinv",user,args.args_string);
 	    }
 	    if (query.num_rows() == 0) {
-		metautils::log_error("no timeRange code for '"+sp[2]+"'","iinv",user,args.args_string);
+		metautils::log_error("no timeRange code for '"+line_parts[2]+"'","iinv",user,args.args_string);
 	    }
 	    query.fetch_row(row);
 	    tre.code=row[0];
@@ -177,135 +174,166 @@ void insert_grml_inventory()
 	  }
 	  case 'G':
 	  {
-	    spx=strutils::split(sp[2],",");
+	    auto gdef_params=strutils::split(line_parts[2],",");
 	    std::string definition,definition_parameters;
-	    switch (std::stoi(spx[0])) {
+	    switch (std::stoi(gdef_params[0])) {
 		case Grid::latitudeLongitudeType:
 		case Grid::gaussianLatitudeLongitudeType:
 		{
-		  if (std::stoi(spx[0]) == Grid::latitudeLongitudeType) {
+		  if (std::stoi(gdef_params[0]) == Grid::latitudeLongitudeType) {
 		    definition="latLon";
 		  }
-		  else if (std::stoi(spx[0]) == Grid::gaussianLatitudeLongitudeType) {
+		  else if (std::stoi(gdef_params[0]) == Grid::gaussianLatitudeLongitudeType) {
 		    definition="gaussLatLon";
 		  }
-		  definition_parameters=spx[1]+":"+spx[2]+":";
-		  if (std::regex_search(spx[3],std::regex("^-"))) {
-		    definition_parameters+=spx[3].substr(1)+"S:";
+		  definition_parameters=gdef_params[1]+":"+gdef_params[2]+":";
+		  if (gdef_params[3][0] == '-') {
+		    definition_parameters+=gdef_params[3].substr(1)+"S:";
 		  }
 		  else {
-		    definition_parameters+=spx[3]+"N:";
+		    definition_parameters+=gdef_params[3]+"N:";
 		  }
-		  if (std::regex_search(spx[4],std::regex("^-"))) {
-		    definition_parameters+=spx[4].substr(1)+"W:";
-		  }
-		  else {
-		    definition_parameters+=spx[4]+"E:";
-		  }
-		  if (std::regex_search(spx[5],std::regex("^-"))) {
-		    definition_parameters+=spx[5].substr(1)+"S:";
+		  if (gdef_params[4][0] == '-') {
+		    definition_parameters+=gdef_params[4].substr(1)+"W:";
 		  }
 		  else {
-		    definition_parameters+=spx[5]+"N:";
+		    definition_parameters+=gdef_params[4]+"E:";
 		  }
-		  if (std::regex_search(spx[6],std::regex("^-"))) {
-		    definition_parameters+=spx[6].substr(1)+"W:";
+		  if (gdef_params[5][0] == '-') {
+		    definition_parameters+=gdef_params[5].substr(1)+"S:";
 		  }
 		  else {
-		    definition_parameters+=spx[6]+"E:";
+		    definition_parameters+=gdef_params[5]+"N:";
 		  }
-		  definition_parameters+=spx[7]+":"+spx[8];
+		  if (gdef_params[6][0] == '-') {
+		    definition_parameters+=gdef_params[6].substr(1)+"W:";
+		  }
+		  else {
+		    definition_parameters+=gdef_params[6]+"E:";
+		  }
+		  definition_parameters+=gdef_params[7]+":"+gdef_params[8];
+		  break;
+		}
+		case Grid::polarStereographicType:
+		{
+		  definition="polarStereographic";
+		  definition_parameters=gdef_params[1]+":"+gdef_params[2]+":";
+		  if (gdef_params[3][0] == '-') {
+		    definition_parameters+=gdef_params[3].substr(1)+"S:";
+		  }
+		  else {
+		    definition_parameters+=gdef_params[3]+"N:";
+		  }
+		  if (gdef_params[4][0] == '-') {
+		    definition_parameters+=gdef_params[4].substr(1)+"W:";
+		  }
+		  else {
+		    definition_parameters+=gdef_params[4]+"E:";
+		  }
+		  if (gdef_params[5][0] == '-') {
+		    definition_parameters+=gdef_params[5].substr(1)+"S:";
+		  }
+		  else {
+		    definition_parameters+=gdef_params[5]+"N:";
+		  }
+		  if (gdef_params[6][0] == '-') {
+		    definition_parameters+=gdef_params[6].substr(1)+"W:";
+		  }
+		  else {
+		    definition_parameters+=gdef_params[6]+"E:";
+		  }
+		  definition_parameters+=gdef_params[9]+":"+gdef_params[7]+":"+gdef_params[8];
 		  break;
 		}
 		case Grid::mercatorType:
 		{
 		  definition="mercator";
-		  definition_parameters=spx[1]+":"+spx[2]+":";
-		  if (std::regex_search(spx[3],std::regex("^-"))) {
-		    definition_parameters+=spx[3].substr(1)+"S:";
+		  definition_parameters=gdef_params[1]+":"+gdef_params[2]+":";
+		  if (gdef_params[3][0] == '-') {
+		    definition_parameters+=gdef_params[3].substr(1)+"S:";
 		  }
 		  else {
-		    definition_parameters+=spx[3]+"N:";
+		    definition_parameters+=gdef_params[3]+"N:";
 		  }
-		  if (std::regex_search(spx[4],std::regex("^-"))) {
-		    definition_parameters+=spx[4].substr(1)+"W:";
-		  }
-		  else {
-		    definition_parameters+=spx[4]+"E:";
-		  }
-		  if (std::regex_search(spx[5],std::regex("^-"))) {
-		    definition_parameters+=spx[5].substr(1)+"S:";
+		  if (gdef_params[4][0] == '-') {
+		    definition_parameters+=gdef_params[4].substr(1)+"W:";
 		  }
 		  else {
-		    definition_parameters+=spx[5]+"N:";
+		    definition_parameters+=gdef_params[4]+"E:";
 		  }
-		  if (std::regex_search(spx[6],std::regex("^-"))) {
-		    definition_parameters+=spx[6].substr(1)+"W:";
-		  }
-		  else {
-		    definition_parameters+=spx[6]+"E:";
-		  }
-		  definition_parameters+=spx[7]+":"+spx[8]+":";
-		  if (std::regex_search(spx[9],std::regex("^-"))) {
-		    definition_parameters+=spx[9].substr(1)+"S";
+		  if (gdef_params[5][0] == '-') {
+		    definition_parameters+=gdef_params[5].substr(1)+"S:";
 		  }
 		  else {
-		    definition_parameters+=spx[9]+"N";
+		    definition_parameters+=gdef_params[5]+"N:";
+		  }
+		  if (gdef_params[6][0] == '-') {
+		    definition_parameters+=gdef_params[6].substr(1)+"W:";
+		  }
+		  else {
+		    definition_parameters+=gdef_params[6]+"E:";
+		  }
+		  definition_parameters+=gdef_params[7]+":"+gdef_params[8]+":";
+		  if (gdef_params[9][0] == '-') {
+		    definition_parameters+=gdef_params[9].substr(1)+"S";
+		  }
+		  else {
+		    definition_parameters+=gdef_params[9]+"N";
 		  }
 		  break;
 		}
 		case Grid::lambertConformalType:
 		{
 		  definition="lambertConformal";
-		  definition_parameters=spx[1]+":"+spx[2]+":";
-		  if (std::regex_search(spx[3],std::regex("^-"))) {
-		    definition_parameters+=spx[3].substr(1)+"S:";
+		  definition_parameters=gdef_params[1]+":"+gdef_params[2]+":";
+		  if (gdef_params[3][0] == '-') {
+		    definition_parameters+=gdef_params[3].substr(1)+"S:";
 		  }
 		  else {
-		    definition_parameters+=spx[3]+"N:";
+		    definition_parameters+=gdef_params[3]+"N:";
 		  }
-		  if (std::regex_search(spx[4],std::regex("^-"))) {
-		    definition_parameters+=spx[4].substr(1)+"W:";
-		  }
-		  else {
-		    definition_parameters+=spx[4]+"E:";
-		  }
-		  if (std::regex_search(spx[5],std::regex("^-"))) {
-		    definition_parameters+=spx[5].substr(1)+"S:";
+		  if (gdef_params[4][0] == '-') {
+		    definition_parameters+=gdef_params[4].substr(1)+"W:";
 		  }
 		  else {
-		    definition_parameters+=spx[5]+"N:";
+		    definition_parameters+=gdef_params[4]+"E:";
 		  }
-		  if (std::regex_search(spx[6],std::regex("^-"))) {
-		    definition_parameters+=spx[6].substr(1)+"W:";
-		  }
-		  else {
-		    definition_parameters+=spx[6]+"E:";
-		  }
-		  definition_parameters+=spx[9]+":"+spx[7]+":"+spx[8]+":";
-		  if (std::regex_search(spx[10],std::regex("^-"))) {
-		    definition_parameters+=spx[10].substr(1)+"S:";
+		  if (gdef_params[5][0] == '-') {
+		    definition_parameters+=gdef_params[5].substr(1)+"S:";
 		  }
 		  else {
-		    definition_parameters+=spx[10]+"N:";
+		    definition_parameters+=gdef_params[5]+"N:";
 		  }
-		  if (std::regex_search(spx[11],std::regex("^-"))) {
-		    definition_parameters+=spx[11].substr(1)+"S";
+		  if (gdef_params[6][0] == '-') {
+		    definition_parameters+=gdef_params[6].substr(1)+"W:";
 		  }
 		  else {
-		    definition_parameters+=spx[11]+"N";
+		    definition_parameters+=gdef_params[6]+"E:";
+		  }
+		  definition_parameters+=gdef_params[9]+":"+gdef_params[7]+":"+gdef_params[8]+":";
+		  if (gdef_params[10][0] == '-') {
+		    definition_parameters+=gdef_params[10].substr(1)+"S:";
+		  }
+		  else {
+		    definition_parameters+=gdef_params[10]+"N:";
+		  }
+		  if (gdef_params[11][0] == '-') {
+		    definition_parameters+=gdef_params[11].substr(1)+"S";
+		  }
+		  else {
+		    definition_parameters+=gdef_params[11]+"N";
 		  }
 		  break;
 		}
 		case Grid::sphericalHarmonicsType:
 		{
 		  definition="sphericalHarmonics";
-		  definition_parameters=spx[1]+":"+spx[2]+":"+spx[3];
+		  definition_parameters=gdef_params[1]+":"+gdef_params[2]+":"+gdef_params[3];
 		  break;
 		}
 		default:
 		{
-		  metautils::log_error("insert_grml_inventory() does not understand grid type "+spx[0],"iinv",user,args.args_string);
+		  metautils::log_error("insert_grml_inventory() does not understand grid type "+gdef_params[0],"iinv",user,args.args_string);
 		}
 	    }
 	    query.set("code","WGrML.gridDefinitions","definition = '"+definition+"' and defParams = '"+definition_parameters+"'");
@@ -321,30 +349,30 @@ void insert_grml_inventory()
 	  }
 	  case 'L':
 	  {
-	    spx=strutils::split(sp[2],":");
-	    if (spx.size() < 2 || spx.size() > 3) {
-		metautils::log_error("insert_grml_inventory() found bad level code: "+sp[2],"iinv",user,args.args_string);
+	    auto lev_parts=strutils::split(line_parts[2],":");
+	    if (lev_parts.size() < 2 || lev_parts.size() > 3) {
+		metautils::log_error("insert_grml_inventory() found bad level code: "+line_parts[2],"iinv",user,args.args_string);
 	    }
 	    std::string map,type;
-	    if (std::regex_search(spx[0],std::regex(","))) {
-		auto idx=spx[0].find(",");
-		map=spx[0].substr(0,idx);
-		type=spx[0].substr(idx+1);
+	    if (std::regex_search(lev_parts[0],std::regex(","))) {
+		auto idx=lev_parts[0].find(",");
+		map=lev_parts[0].substr(0,idx);
+		type=lev_parts[0].substr(idx+1);
 	    }
 	    else {
 		map="";
-		type=spx[0];
+		type=lev_parts[0];
 	    }
 	    std::string value;
-	    switch (spx.size()) {
+	    switch (lev_parts.size()) {
 		case 2:
 		{
-		  value=spx[1];
+		  value=lev_parts[1];
 		  break;
 		}
 		case 3:
 		{
-		  value=spx[2]+","+spx[1];
+		  value=lev_parts[2]+","+lev_parts[1];
 		  break;
 		}
 	    }
@@ -361,11 +389,11 @@ void insert_grml_inventory()
 	  }
 	  case 'P':
 	  {
-	    parameters.emplace_back(sp[2]);
-	    auto pcode=format_code+"!"+sp[2];
+	    parameters.emplace_back(line_parts[2]);
+	    auto pcode=format_code+"!"+line_parts[2];
 	    if (!MySQL::table_exists(server,"IGrML.ds"+local_args.dsnum2+"_inventory_"+pcode)) {
 		std::string result;
-		if (sp.size() > 3 && sp[3] == "BIG") {
+		if (line_parts.size() > 3 && line_parts[3] == "BIG") {
 		  if (server.command("create table IGrML.`ds"+local_args.dsnum2+"_inventory_"+pcode+"` like IGrML.template_inventory_p_big",result) < 0) {
 		    metautils::log_error("insert_grml_inventory() returned error: "+server.error()+" while trying to create parameter inventory table","iinv",user,args.args_string);
 		  }
@@ -376,17 +404,17 @@ void insert_grml_inventory()
 		  }
 		}
 	    }
-	    lock_table_list.emplace_back(pcode);
+	    parameter_codes.emplace_back(pcode);
 	    break;
 	  }
 	  case 'R':
 	  {
-	    processes.emplace_back(sp[2]);
+	    processes.emplace_back(line_parts[2]);
 	    break;
 	  }
 	  case 'E':
 	  {
-	    ensembles.emplace_back(sp[2]);
+	    ensembles.emplace_back(line_parts[2]);
 	    break;
 	  }
 	}
@@ -396,7 +424,7 @@ void insert_grml_inventory()
 	if (first) {
 	  sdum="lock tables ";
 	  n=0;
-	  for (auto& item : lock_table_list) {
+	  for (auto& item : parameter_codes) {
 	    if (n > 0) {
 		sdum+=", ";
 	    }
@@ -409,12 +437,12 @@ void insert_grml_inventory()
 	  first=false;
 	}
 */
-	sp=strutils::split(sline,"|");
-	total_bytes+=std::stoll(sp[1]);
-	auto tr_index=std::stoi(sp[3]);
+	auto inv_parts=strutils::split(sline,"|");
+	total_bytes+=std::stoll(inv_parts[1]);
+	auto tr_index=std::stoi(inv_parts[3]);
 	std::string init_date;
 	if (time_range_codes[tr_index].hour_diff != 0x7fffffff) {
-	  init_date=DateTime(std::stoll(sp[2])*100).hours_subtracted(time_range_codes[tr_index].hour_diff).to_string("%Y%m%d%H%MM");
+	  init_date=DateTime(std::stoll(inv_parts[2])*100).hours_subtracted(time_range_codes[tr_index].hour_diff).to_string("%Y%m%d%H%MM");
 	  if (dupe_vdates == "N") {
 	    InitTimeEntry ite;
 	    ite.key=init_date;
@@ -435,35 +463,35 @@ void insert_grml_inventory()
 	else {
 	  init_date="0";
 	}
-	auto insert_string=web_id_code+","+sp[0]+","+sp[1]+","+sp[2]+","+init_date+","+time_range_codes[tr_index].code+","+grid_definition_codes[std::stoi(sp[4])]+","+level_codes[std::stoi(sp[5])]+",";
-	if (sp.size() > 7 && !sp[7].empty()) {
-	  insert_string+="'"+processes[std::stoi(sp[7])]+"',";
+	auto insert_string=web_id_code+","+inv_parts[0]+","+inv_parts[1]+","+inv_parts[2]+","+init_date+","+time_range_codes[tr_index].code+","+grid_definition_codes[std::stoi(inv_parts[4])]+","+level_codes[std::stoi(inv_parts[5])]+",";
+	if (inv_parts.size() > 7 && !inv_parts[7].empty()) {
+	  insert_string+="'"+processes[std::stoi(inv_parts[7])]+"',";
 	}
 	else {
 	  insert_string+="'',";
 	}
-	if (sp.size() > 8 && !sp[8].empty()) {
-	  insert_string+="'"+ensembles[std::stoi(sp[8])]+"'";
+	if (inv_parts.size() > 8 && !inv_parts[8].empty()) {
+	  insert_string+="'"+ensembles[std::stoi(inv_parts[8])]+"'";
 	}
 	else {
 	  insert_string+="''";
 	}
 	insert_string+=",'"+uflag+"'";
-	auto pcode=format_code+"!"+parameters[std::stoi(sp[6])];
+	auto pcode=format_code+"!"+parameters[std::stoi(inv_parts[6])];
 	if (server.insert("IGrML.`ds"+local_args.dsnum2+"_inventory_"+pcode+"`","webID_code,byte_offset,byte_length,valid_date,init_date,timeRange_code,gridDefinition_code,level_code,process,ensemble,uflag",insert_string,"") < 0) {
 	  if (!std::regex_search(server.error(),std::regex("Duplicate entry"))) {
 	    metautils::log_error("insert_grml_inventory() returned error: "+server.error()+" while inserting row '"+insert_string+"'","iinv",user,args.args_string);
 	  }
 	  else {
-	    std::string dupe_where="webID_code = "+web_id_code+" and valid_date = "+sp[2]+" and timeRange_code = "+time_range_codes[tr_index].code+" and gridDefinition_code = "+grid_definition_codes[std::stoi(sp[4])]+" and level_code = "+level_codes[std::stoi(sp[5])];
-	    if (sp.size() > 7 && !sp[7].empty()) {
-		dupe_where+=" and process = '"+processes[std::stoi(sp[7])]+"'";
+	    std::string dupe_where="webID_code = "+web_id_code+" and valid_date = "+inv_parts[2]+" and timeRange_code = "+time_range_codes[tr_index].code+" and gridDefinition_code = "+grid_definition_codes[std::stoi(inv_parts[4])]+" and level_code = "+level_codes[std::stoi(inv_parts[5])];
+	    if (inv_parts.size() > 7 && !inv_parts[7].empty()) {
+		dupe_where+=" and process = '"+processes[std::stoi(inv_parts[7])]+"'";
 	    }
 	    else {
 		dupe_where+=" and process = ''";
 	    }
-	    if (sp.size() > 8 && !sp[8].empty()) {
-		dupe_where+=" and ensemble = '"+ensembles[std::stoi(sp[8])]+"'";
+	    if (inv_parts.size() > 8 && !inv_parts[8].empty()) {
+		dupe_where+=" and ensemble = '"+ensembles[std::stoi(inv_parts[8])]+"'";
 	    }
 	    else {
 		dupe_where+=" and ensemble = ''";
@@ -479,7 +507,7 @@ void insert_grml_inventory()
 		}
 	    }
 	    else {
-		if (server.update("IGrML.`ds"+local_args.dsnum2+"_inventory_"+pcode+"`","byte_offset = "+sp[0]+", byte_length = "+sp[1]+",init_date = "+init_date+",uflag = '"+uflag+"'",dupe_where) < 0) {
+		if (server.update("IGrML.`ds"+local_args.dsnum2+"_inventory_"+pcode+"`","byte_offset = "+inv_parts[0]+", byte_length = "+inv_parts[1]+",init_date = "+init_date+",uflag = '"+uflag+"'",dupe_where) < 0) {
 		  metautils::log_error("insert_grml_inventory() returned error: "+server.error()+" while updating duplicate row: '"+dupe_where+"'","iinv",user,args.args_string);
 		}
 	    }
@@ -489,8 +517,8 @@ void insert_grml_inventory()
     ifs.getline(line,32768);
   }
   ifs.close();
-  for (const auto& item : lock_table_list) {
-    server._delete("IGrML.`ds"+local_args.dsnum2+"_inventory_"+item+"`","webID_code = "+web_id_code+" and uflag != '"+uflag+"'");
+  for (const auto& pcode : parameter_codes) {
+    server._delete("IGrML.`ds"+local_args.dsnum2+"_inventory_"+pcode+"`","webID_code = "+web_id_code+" and uflag != '"+uflag+"'");
   }
 //  server.issueCommand("unlock tables",error);
   if (server.insert("IGrML.ds"+local_args.dsnum2+"_inventory_summary","webID_code,byte_length,dupe_vdates",web_id_code+","+strutils::lltos(total_bytes)+",'"+dupe_vdates+"'","update byte_length = "+strutils::lltos(total_bytes)+", dupe_vdates = '"+dupe_vdates+"'") < 0) {
