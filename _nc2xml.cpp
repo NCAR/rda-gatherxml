@@ -383,6 +383,14 @@ DateTime compute_nc_time(netCDFStream::VariableData& times,size_t index)
   if (time_data.units == "seconds") {
     dt=time_data.reference.seconds_added(val);
   }
+  else if (time_data.units == "minutes") {
+    if (myequalf(val,static_cast<int>(val),0.001)) {
+	dt=time_data.reference.minutes_added(val);
+    }
+    else {
+	dt=time_data.reference.seconds_added(lroundf(val*60.));
+    }
+  }
   else if (time_data.units == "hours") {
     if (myequalf(val,static_cast<int>(val),0.001)) {
 	dt=time_data.reference.hours_added(val);
@@ -869,12 +877,12 @@ void process_units_attribute(const netCDFStream::Attribute& attr,const netCDFStr
     fill_nc_time_data(attr);
     dgd.indexes.time_var=var_index;
   }
-  else if (u == "degrees_north") {
+  else if (std::regex_search(u,std::regex("^degree(s){0,1}(_){0,1}((north)|N)$"))) {
     if (dgd.indexes.lat_var == 0xffffffff) {
 	dgd.indexes.lat_var=var_index;
     }
   }
-  else if (u == "degrees_east") {
+  else if (std::regex_search(u,std::regex("^degree(s){0,1}(_){0,1}((east)|E)$"))) {
     if (dgd.indexes.lon_var == 0xffffffff) {
 	dgd.indexes.lon_var=var_index;
     }
@@ -884,7 +892,7 @@ void process_units_attribute(const netCDFStream::Attribute& attr,const netCDFStr
 void scan_cf_point_netcdf_file(InputNetCDFStream& istream,bool& found_map,DataTypeMap& datatype_map,std::list<std::string>& var_list)
 {
   if (verbose_operation) {
-    std::cout << "...beginning function scan_cf_point_netcdf_file..." << std::endl;
+    std::cout << "...beginning function scan_cf_point_netcdf_file()..." << std::endl;
   }
   initialize_for_observations();
   auto vars=istream.variables();
@@ -982,6 +990,9 @@ void scan_cf_point_netcdf_file(InputNetCDFStream& istream,bool& found_map,DataTy
 
 void scan_cf_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,DiscreteGeometriesData& dgd,std::unordered_map<size_t,std::string>& T_map)
 {
+  if (verbose_operation) {
+    std::cout << "...beginning function scan_cf_orthogonal_time_series_netcdf_file()..." << std::endl;
+  }
   metadata::open_inventory(inv_file,&inv_dir,inv_stream,"ObML","nc2xml",user);
   if (inv_stream.is_open()) {
     inv_stream << "netCDF:timeSeries|" << istream.record_size() << std::endl;
@@ -994,7 +1005,7 @@ void scan_cf_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,Discr
   if (dgd.indexes.lat_var == 0xffffffff || dgd.indexes.lon_var == 0xffffffff || dgd.indexes.stn_id_var == 0xffffffff) {
 // lat/lon not found, look for known alternates in global attributes
     auto gattrs=istream.global_attributes();
-    size_t known_sources;
+    size_t known_sources=0xffffffff;
     for (size_t n=0; n < gattrs.size(); ++n) {
 	if (strutils::to_lower(gattrs[n].name) == "title") {
 	  if (strutils::to_lower(*(reinterpret_cast<std::string *>(gattrs[n].values))) == "hadisd") {
@@ -1046,6 +1057,28 @@ void scan_cf_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,Discr
 	}
     }
   }
+  if (dgd.indexes.lat_var == 0xffffffff || dgd.indexes.lon_var == 0xffffffff || dgd.indexes.stn_id_var == 0xffffffff) {
+    std::string error;
+    if (dgd.indexes.lat_var == 0xffffffff) {
+	if (!error.empty()) {
+	  error+=", ";
+	}
+	error+="latitude could not be identified";
+    }
+    if (dgd.indexes.lon_var == 0xffffffff) {
+	if (!error.empty()) {
+	  error+=", ";
+	}
+	error+="longitude could not be identified";
+    }
+    if (dgd.indexes.stn_id_var == 0xffffffff) {
+	if (!error.empty()) {
+	  error+=", ";
+	}
+	error+="timeseries_id role could not be identified";
+    }
+    metautils::log_error("scan_cf_orthogonal_time_series_netcdf_file() returned error: "+error,"nc2xml",user,args.args_string);
+  }
   auto vars=istream.variables();
   netCDFStream::VariableData times;
   if (istream.variable_data(vars[dgd.indexes.time_var].name,times) == netCDFStream::NcType::_NULL) {
@@ -1078,7 +1111,7 @@ void scan_cf_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,Discr
   if (platform_types.size() == 0) {
     std::string id;
     for (size_t n=0; n < num_stns; ++n) {
-	if (ids_type == netCDFStream::NcType::INT || ids_type == netCDFStream::NcType::FLOAT || ids_type == netCDFStream::NcType::DOUBLE) {
+	if (ids_type == netCDFStream::NcType::SHORT || ids_type == netCDFStream::NcType::INT || ids_type == netCDFStream::NcType::FLOAT || ids_type == netCDFStream::NcType::DOUBLE) {
 	  id=strutils::ftos(ids[n]);
 	}
 	else if (ids_type == netCDFStream::NcType::CHAR) {
@@ -1195,10 +1228,16 @@ void scan_cf_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,Discr
 	}
     }
   }
+  if (verbose_operation) {
+    std::cout << "...function scan_cf_orthogonal_time_series_netcdf_file() done." << std::endl;
+  }
 }
 
 void scan_cf_non_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,DiscreteGeometriesData& dgd,std::unordered_map<size_t,std::string>& T_map)
 {
+  if (verbose_operation) {
+    std::cout << "...beginning function scan_cf_non_orthogonal_time_series_netcdf_file()..." << std::endl;
+  }
   size_t id_len=0;
   auto vars=istream.variables();
   netCDFStream::VariableData times;
@@ -1386,6 +1425,9 @@ id_types.emplace_back("unknown");
 	  }
 	}
     }
+  }
+  if (verbose_operation) {
+    std::cout << "...function scan_cf_non_orthogonal_time_series_netcdf_file() done." << std::endl;
   }
 }
 
@@ -2028,7 +2070,7 @@ id_types.emplace_back("unknown");
   if (dgd.indexes.sample_dim_var != 0xffffffff) {
 // H.19
     if (dgd.indexes.instance_dim_var == 0xffffffff) {
-	metautils::log_error("scanCFNonOrthgonalTimeSeriesProfileNetCDFFile returned error: found sample dimension but not instance dimension","nc2xml",user,args.args_string);
+	metautils::log_error("scan_cf_non_orthgonal_time_series_profile_netcdf_file() returned error: found sample dimension but not instance dimension","nc2xml",user,args.args_string);
     }
     netCDFStream::VariableData row_sizes,station_indexes;
     if (istream.variable_data(vars[dgd.indexes.sample_dim_var].name,row_sizes) == netCDFStream::NcType::_NULL) {
