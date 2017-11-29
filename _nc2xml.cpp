@@ -4789,7 +4789,8 @@ int main(int argc,char **argv)
 	  metadata::ObML::write_ObML(ID_table,platform_table,"nc2xml",user);
 	}
 	else {
-	  metautils::log_error("all variables contain only missing data values - no usable data found; no content metadata will be saved for this file","nc2xml",user,args.args_string);
+	  std::cerr << "Terminating - data variables could not be identified or they only contain missing values. No content metadata will be saved for this file" << std::endl;
+	  exit(1);
 	}
     }
   }
