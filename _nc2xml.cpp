@@ -1098,8 +1098,8 @@ void scan_cf_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,Discr
     id_len=dims[vars[dgd.indexes.stn_id_var].dimids.back()].length;
   }
   auto stn_dim=-1;
-  size_t num_stns=1;
-  if (dgd.indexes.stn_id_var != 0xffffffff && vars[dgd.indexes.stn_id_var].dimids.size() > 1) {
+  size_t num_stns=0;
+  if (dgd.indexes.stn_id_var != 0xffffffff) {
     stn_dim=vars[dgd.indexes.stn_id_var].dimids[0];
     if (vars[dgd.indexes.stn_id_var].is_rec) {
 	num_stns=istream.num_records();
@@ -1143,6 +1143,9 @@ void scan_cf_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,Discr
   std::vector<DateTime> dts;
   for (const auto& var : vars) {
     if (var.name != vars[dgd.indexes.time_var].name && var.dimids.size() > 0 && ((var.dimids[0] == vars[dgd.indexes.time_var].dimids[0] && (stn_dim == -1 || (var.dimids.size() > 1 && static_cast<int>(var.dimids[1]) == stn_dim))) || (var.dimids.size() > 1 && dgd.indexes.stn_id_var != 0xffffffff && var.dimids[0] == vars[dgd.indexes.stn_id_var].dimids[0] && var.dimids[1] == vars[dgd.indexes.time_var].dimids[0]))) {
+	if (verbose_operation) {
+	  std::cout << "Scanning netCDF variable '" << var.name << "' ..." << std::endl;
+	}
 	de.key=var.name;
 	if (inv_stream.is_open()) {
 	  if (D_map.find(var.name) == D_map.end()) {
