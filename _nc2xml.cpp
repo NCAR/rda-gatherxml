@@ -184,18 +184,19 @@ void initialize_for_observations()
 
 void update_ID_table(size_t obs_type_index,float lat,float lon,DateTime& datetime,double unique_timestamp,DateTime *min_datetime,DateTime *max_datetime)
 {
-  size_t n,m;
-  metautils::StringEntry se;
-
+  if (lat < -90. || lat > 90. || lon < -180. || lon > 360.) {
+    return;
+  }
   if (!ID_table[obs_type_index]->found(ientry.key,ientry)) {
     ientry.data.reset(new metadata::ObML::IDEntry::Data);
     ientry.data->N_lat=ientry.data->S_lat=lat;
     ientry.data->W_lon=ientry.data->E_lon=lon;
     ientry.data->min_lon_bitmap.reset(new float[360]);
     ientry.data->max_lon_bitmap.reset(new float[360]);
-    for (n=0; n < 360; ++n) {
+    for (size_t n=0; n < 360; ++n) {
 	ientry.data->min_lon_bitmap[n]=ientry.data->max_lon_bitmap[n]=999.;
     }
+    size_t n,m;
     convert_lat_lon_to_box(1,0.,ientry.data->W_lon,n,m);
     ientry.data->min_lon_bitmap[m]=ientry.data->max_lon_bitmap[m]=ientry.data->W_lon;
     if (min_datetime == NULL) {
@@ -215,6 +216,7 @@ void update_ID_table(size_t obs_type_index,float lat,float lon,DateTime& datetim
     de.data->nsteps=1;
     ientry.data->data_types_table.insert(de);
     ID_table[obs_type_index]->insert(ientry);
+    metautils::StringEntry se;
     se.key=strutils::itos(obs_type_index)+";"+ientry.key+"-"+strutils::dtos(unique_timestamp);
     unique_observation_table.insert(se);
     se.key+=":"+de.key;
@@ -234,6 +236,7 @@ void update_ID_table(size_t obs_type_index,float lat,float lon,DateTime& datetim
 	if (lon > ientry.data->E_lon) {
 	  ientry.data->E_lon=lon;
 	}
+	size_t n,m;
 	convert_lat_lon_to_box(1,0.,lon,n,m);
 	if (ientry.data->min_lon_bitmap[m] > 900.) {
 	  ientry.data->min_lon_bitmap[m]=ientry.data->max_lon_bitmap[m]=lon;
@@ -267,6 +270,7 @@ void update_ID_table(size_t obs_type_index,float lat,float lon,DateTime& datetim
 	  ientry.data->end=*max_datetime;
 	}
     }
+    metautils::StringEntry se;
     se.key=strutils::itos(obs_type_index)+";"+ientry.key+"-"+strutils::dtos(unique_timestamp);
     if (!unique_observation_table.found(se.key,se)) {
 	++(ientry.data->nsteps);
@@ -294,6 +298,9 @@ void update_ID_table(size_t obs_type_index,float lat,float lon,DateTime& datetim
 
 void update_platform_table(size_t obs_type_index,float lat,float lon)
 {
+  if (lat < -90. || lat > 90. || lon < -180. || lon > 360.) {
+    return;
+  }
   if (!platform_table[obs_type_index].found(pentry.key,pentry)) {
     pentry.boxflags.reset(new summarizeMetadata::BoxFlags);
     pentry.boxflags->initialize(361,180,0,0);
@@ -866,25 +873,45 @@ struct DiscreteGeometriesData {
   std::string z_units,z_pos;
 };
 
-void process_units_attribute(const netCDFStream::Attribute& attr,const netCDFStream::Variable& var,size_t var_index,DiscreteGeometriesData& dgd)
+void process_units_attribute(const std::vector<netCDFStream::Variable>& vars,size_t var_index,size_t attr_index,DiscreteGeometriesData& dgd)
 {
-  auto u=*(reinterpret_cast<std::string *>(attr.values));
+  auto u=*(reinterpret_cast<std::string *>(vars[var_index].attrs[attr_index].values));
   u=strutils::to_lower(u);
   if (std::regex_search(u,std::regex("since"))) {
     if (dgd.indexes.time_var != 0xffffffff) {
-	metautils::log_error("process_units_attribute() returned error: time was already identified - don't know what to do with variable: "+var.name,"nc2xml",user,args.args_string);
+	metautils::log_error("process_units_attribute() returned error: time was already identified - don't know what to do with variable: "+vars[var_index].name,"nc2xml",user,args.args_string);
     }
-    fill_nc_time_data(attr);
+    fill_nc_time_data(vars[var_index].attrs[attr_index]);
     dgd.indexes.time_var=var_index;
   }
   else if (std::regex_search(u,std::regex("^degree(s){0,1}(_){0,1}((north)|N)$"))) {
     if (dgd.indexes.lat_var == 0xffffffff) {
 	dgd.indexes.lat_var=var_index;
     }
+    else {
+	for (size_t n=0; n < vars[var_index].attrs.size(); ++n) {
+	  if (std::regex_search(vars[var_index].attrs[n].name,std::regex("bounds",std::regex_constants::icase))) {
+	    auto v=*(reinterpret_cast<std::string *>(vars[var_index].attrs[n].values));
+	    if (v == vars[dgd.indexes.lat_var].name) {
+		dgd.indexes.lat_var=var_index;
+	    }
+	  }
+	}
+    }
   }
   else if (std::regex_search(u,std::regex("^degree(s){0,1}(_){0,1}((east)|E)$"))) {
     if (dgd.indexes.lon_var == 0xffffffff) {
 	dgd.indexes.lon_var=var_index;
+    }
+    else {
+	for (size_t n=0; n < vars[var_index].attrs.size(); ++n) {
+	  if (std::regex_search(vars[var_index].attrs[n].name,std::regex("bounds",std::regex_constants::icase))) {
+	    auto v=*(reinterpret_cast<std::string *>(vars[var_index].attrs[n].values));
+	    if (v == vars[dgd.indexes.lon_var].name) {
+		dgd.indexes.lon_var=var_index;
+	    }
+	  }
+	}
     }
   }
 }
@@ -901,7 +928,7 @@ void scan_cf_point_netcdf_file(InputNetCDFStream& istream,bool& found_map,DataTy
     for (size_t m=0; m < vars[n].attrs.size(); ++m) {
 	if (vars[n].attrs[m].nc_type == netCDFStream::NcType::CHAR) {
 	  if (vars[n].attrs[m].name == "units") {
-	    process_units_attribute(vars[n].attrs[m],vars[n],n,dgd);
+	    process_units_attribute(vars,n,m,dgd);
 	  }
 	}
     }
@@ -1100,12 +1127,17 @@ void scan_cf_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,Discr
   auto stn_dim=-1;
   size_t num_stns=0;
   if (dgd.indexes.stn_id_var != 0xffffffff) {
-    stn_dim=vars[dgd.indexes.stn_id_var].dimids[0];
-    if (vars[dgd.indexes.stn_id_var].is_rec) {
-	num_stns=istream.num_records();
+    if (vars[dgd.indexes.stn_id_var].dimids.size() > 1) {
+	stn_dim=vars[dgd.indexes.stn_id_var].dimids.front();
+	if (vars[dgd.indexes.stn_id_var].is_rec) {
+	  num_stns=istream.num_records();
+	}
+	else {
+	  num_stns=dims[stn_dim].length;
+	}
     }
     else {
-	num_stns=dims[stn_dim].length;
+	num_stns=1;
     }
   }
   if (platform_types.size() == 0) {
@@ -1446,7 +1478,7 @@ void scan_cf_time_series_netcdf_file(InputNetCDFStream& istream,bool& found_map,
     for (size_t m=0; m < vars[n].attrs.size(); ++m) {
 	if (vars[n].attrs[m].nc_type == netCDFStream::NcType::CHAR) {
 	  if (vars[n].attrs[m].name == "units") {
-	    process_units_attribute(vars[n].attrs[m],vars[n],n,dgd);
+	    process_units_attribute(vars,n,m,dgd);
 	  }
 	  else if (vars[n].attrs[m].name == "cf_role") {
 	    auto r=*(reinterpret_cast<std::string *>(vars[n].attrs[m].values));
@@ -1879,7 +1911,7 @@ void scan_cf_profile_netcdf_file(InputNetCDFStream& istream,bool& found_map,Data
     for (size_t m=0; m < vars[n].attrs.size(); ++m) {
 	if (vars[n].attrs[m].nc_type == netCDFStream::NcType::CHAR) {
 	  if (vars[n].attrs[m].name == "units") {
-	    process_units_attribute(vars[n].attrs[m],vars[n],n,dgd);
+	    process_units_attribute(vars,n,m,dgd);
 	  }
 	  else if (vars[n].attrs[m].name == "cf_role") {
 	    auto r=*(reinterpret_cast<std::string *>(vars[n].attrs[m].values));
@@ -2182,7 +2214,7 @@ void scan_cf_time_series_profile_netcdf_file(InputNetCDFStream& istream,bool& fo
     for (size_t m=0; m < vars[n].attrs.size(); ++m) {
 	if (vars[n].attrs[m].nc_type == netCDFStream::NcType::CHAR) {
 	  if (vars[n].attrs[m].name == "units") {
-	    process_units_attribute(vars[n].attrs[m],vars[n],n,dgd);
+	    process_units_attribute(vars,n,m,dgd);
 	  }
 	  else if (vars[n].attrs[m].name == "cf_role") {
 	    auto r=*(reinterpret_cast<std::string *>(vars[n].attrs[m].values));
