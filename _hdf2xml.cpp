@@ -2257,30 +2257,22 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
 	  metautils::log_error("unable to access the /"+lat_ids[n]+" dataset for the latitudes","hdf2xml",user,args.args_string);
 	}
 	gcoords.latitude.data_array.fill(istream,*gcoords.latitude.ds);
+	def.slatitude=data_array_value(gcoords.latitude.data_array,0,gcoords.latitude.ds.get());
 	gcoords.longitude.id=lon_ids[n];
 	gcoords.longitude.ds=istream.dataset("/"+lon_ids[n]);
 	if (gcoords.longitude.ds == nullptr) {
 	  metautils::log_error("unable to access the /"+lon_ids[n]+" dataset for the latitudes","hdf2xml",user,args.args_string);
 	}
 	gcoords.longitude.data_array.fill(istream,*gcoords.longitude.ds);
+	def.slongitude=data_array_value(gcoords.longitude.data_array,0,gcoords.longitude.ds.get());
 	InputHDF5Stream::Attribute lat_bounds,lon_bounds;
 	std::shared_ptr<InputHDF5Stream::Dataset> lat_bounds_ds(nullptr),lon_bounds_ds(nullptr);
 	HDF5::DataArray lat_bounds_array,lon_bounds_array;
 	if (gcoords.latitude.ds->attributes.found("bounds",lat_bounds) && lat_bounds.value._class_ == 3 && gcoords.longitude.ds->attributes.found("bounds",lon_bounds) && lon_bounds.value._class_ == 3) {
 	  if ( (lat_bounds_ds=istream.dataset("/"+std::string(reinterpret_cast<char *>(lat_bounds.value.value)))) != nullptr && (lon_bounds_ds=istream.dataset("/"+std::string(reinterpret_cast<char *>(lon_bounds.value.value)))) != nullptr) {
 	    lat_bounds_array.fill(istream,*lat_bounds_ds);
-	    def.slatitude=data_array_value(lat_bounds_array,0,lat_bounds_ds.get());
 	    lon_bounds_array.fill(istream,*lon_bounds_ds);
-	    def.slongitude=data_array_value(lon_bounds_array,0,lon_bounds_ds.get());
 	  }
-	  else {
-	    def.slatitude=data_array_value(gcoords.latitude.data_array,0,gcoords.latitude.ds.get());
-	    def.slongitude=data_array_value(gcoords.longitude.data_array,0,gcoords.longitude.ds.get());
-	  }
-	}
-	else {
-	  def.slatitude=data_array_value(gcoords.latitude.data_array,0,gcoords.latitude.ds.get());
-	  def.slongitude=data_array_value(gcoords.longitude.data_array,0,gcoords.longitude.ds.get());
 	}
 	InputHDF5Stream::Attribute lat_attr,lon_attr;
 	if (gcoords.latitude.ds->attributes.found("DIMENSION_LIST",lat_attr) && lat_attr.value.dim_sizes.size() == 1 && lat_attr.value.dim_sizes[0] == 2 && lat_attr.value._class_ == 9 && gcoords.longitude.ds->attributes.found("DIMENSION_LIST",lon_attr) && lon_attr.value.dim_sizes.size() == 1 && lon_attr.value.dim_sizes[0] == 2 && lon_attr.value._class_ == 9) {
@@ -2430,16 +2422,16 @@ std::cerr << myequalf(data_array_value(gcoords.latitude.data_array,center_y*gcoo
 	  def.type=Grid::latitudeLongitudeType;
 	  dim.y=gcoords.latitude.data_array.num_values;
 	  dim.x=gcoords.longitude.data_array.num_values;
+	  def.elatitude=data_array_value(gcoords.latitude.data_array,dim.y-1,gcoords.latitude.ds.get());
+	  def.elongitude=data_array_value(gcoords.longitude.data_array,dim.x-1,gcoords.longitude.ds.get());
+	  def.laincrement=fabs((def.elatitude-def.slatitude)/(dim.y-1));
+	  def.loincrement=fabs((def.elongitude-def.slongitude)/(dim.x-1));
 	  if (lat_bounds_array.num_values > 0) {
+	    def.slatitude=data_array_value(lat_bounds_array,0,lat_bounds_ds.get());
+	    def.slongitude=data_array_value(lon_bounds_array,0,lon_bounds_ds.get());
 	    def.elatitude=data_array_value(lat_bounds_array,lat_bounds_array.num_values-1,lat_bounds_ds.get());
 	    def.elongitude=data_array_value(lon_bounds_array,lon_bounds_array.num_values-1,lon_bounds_ds.get());
 	  }
-	  else {
-	    def.elatitude=data_array_value(gcoords.latitude.data_array,dim.y-1,gcoords.latitude.ds.get());
-	    def.elongitude=data_array_value(gcoords.longitude.data_array,dim.x-1,gcoords.longitude.ds.get());
-	  }
-	  def.laincrement=fabs((def.elatitude-def.slatitude)/(dim.y-1));
-	  def.loincrement=fabs((def.elongitude-def.slongitude)/(dim.x-1));
 	}
 	for (size_t m=0; m < level_info.ID.size(); ++m) {
 	  gentry_table.clear();
