@@ -272,7 +272,7 @@ void updatePlatformTable(size_t obsTypeIndex,float lat,float lon,size_t nsteps)
   }
 }
 
-void processNCEPPREPBUFRObservation(std::string& message_type,size_t subset_number)
+void process_ncep_prepbufr_observation(std::string& message_type,size_t subset_number)
 {
   NCEPPREPBUFRData **pdata=reinterpret_cast<NCEPPREPBUFRData **>(data);
   short dhr;
@@ -391,7 +391,7 @@ void processNCEPPREPBUFRObservation(std::string& message_type,size_t subset_numb
 	pentry.key="bogus";
 	break;
     default:
-	metautils::log_error("processNCEPPREPBUFRObservation error:  PREPBUFR type "+strutils::itos(pdata[subset_number]->type.prepbufr)+" not recognized (ON29 code = "+strutils::itos(pdata[subset_number]->type.ON29)+")  date: "+datetime.to_string()+"  id: '"+pdata[subset_number]->stnid+"'","bufr2xml",user,args.args_string);
+	metautils::log_error("process_ncep_prepbufr_observation() error:  PREPBUFR type "+strutils::itos(pdata[subset_number]->type.prepbufr)+" not recognized (ON29 code = "+strutils::itos(pdata[subset_number]->type.ON29)+")  date: "+datetime.to_string()+"  id: '"+pdata[subset_number]->stnid+"'","bufr2xml",user,args.args_string);
   }
   if (pentry.key.length() == 0) {
     switch (pdata[subset_number]->type.ON29) {
@@ -465,7 +465,7 @@ void processNCEPPREPBUFRObservation(std::string& message_type,size_t subset_numb
 	  pentry.key="drifting_buoy";
 	  break;
 	default:
-	  metautils::log_error("processNCEPPREPBUFRObservation error: unknown platform type "+strutils::itos(pdata[subset_number]->type.ON29),"bufr2xml",user,args.args_string);
+	  metautils::log_error("process_ncep_prepbufr_observation() error: unknown platform type "+strutils::itos(pdata[subset_number]->type.ON29),"bufr2xml",user,args.args_string);
     }
   }
   if (pdata[subset_number]->stnid.length() > 0) {
@@ -478,17 +478,17 @@ void processNCEPPREPBUFRObservation(std::string& message_type,size_t subset_numb
     sdum=pdata[subset_number]->acftid;
   }
   else {
-    metautils::log_error("processPREPBUFRObservation returned error: unable to get an ID for '"+message_type+", date "+datetime.to_string(),"bufr2xml",user,args.args_string);
+    metautils::log_error("process_ncep_prepbufr_observation() returned error: unable to get an ID for '"+message_type+", date "+datetime.to_string(),"bufr2xml",user,args.args_string);
   }
   ientry.key=prepbufr_id_key(metautils::clean_id(sdum),pentry.key,message_type);
   if (ientry.key.length() == 0) {
-    metautils::log_error("processPREPBUFRObservation returned error: unable to get ID key for '"+message_type+"', ID: '"+sdum+"' ("+pdata[subset_number]->satid+") ("+pdata[subset_number]->acftid+") ("+pdata[subset_number]->stnid+")","bufr2xml",user,args.args_string);
+    metautils::log_error("process_ncep_prepbufr_observation() returned error: unable to get ID key for '"+message_type+"', ID: '"+sdum+"' ("+pdata[subset_number]->satid+") ("+pdata[subset_number]->acftid+") ("+pdata[subset_number]->stnid+")","bufr2xml",user,args.args_string);
   }
   trueLon= (pdata[subset_number]->elon > 180.) ? (pdata[subset_number]->elon-360.) : pdata[subset_number]->elon;
   for (const auto& group : pdata[subset_number]->cat_groups) {
     de.key=strutils::itos(group.code);
     if (group.code > 63) {
-	metautils::log_error("processNCEPPREPBUFRObservation error:  bad category '"+de.key+"', "+pentry.key+", date "+datetime.to_string()+", id '"+pdata[subset_number]->stnid+"'","bufr2xml",user,args.args_string);
+	metautils::log_error("process_ncep_prepbufr_observation() error:  bad category '"+de.key+"', "+pentry.key+", date "+datetime.to_string()+", id '"+pdata[subset_number]->stnid+"'","bufr2xml",user,args.args_string);
     }
     uoe.key=ientry.key+datetime.to_string("%Y-%m-%d %H");
     nsteps=0;
@@ -529,7 +529,7 @@ void processNCEPPREPBUFRObservation(std::string& message_type,size_t subset_numb
   }
 }
 
-void processNCEPADPBUFRObservation(size_t subset_number)
+void process_ncep_adp_bufr_observation(size_t subset_number)
 {
   NCEPADPBUFRData **adata=reinterpret_cast<NCEPADPBUFRData **>(data);
   int obsTypeIndex=-1;
@@ -666,6 +666,9 @@ void processNCEPADPBUFRObservation(size_t subset_number)
     case 4011:
     case 4012:
     case 4013:
+    case 4014:
+    case 4015:
+    case 4103:
     {
 	pentry.key="aircraft";
 	obsTypeIndex=0;
@@ -692,6 +695,11 @@ void processNCEPADPBUFRObservation(size_t subset_number)
     case 5021:
     case 5022:
     case 5023:
+    case 5030:
+    case 5031:
+    case 5032:
+    case 5034:
+    case 5039:
     case 5041:
     case 5042:
     case 5043:
@@ -752,7 +760,7 @@ void processNCEPADPBUFRObservation(size_t subset_number)
     }
     default:
     {
-	metautils::log_error("processNCEPADPBUFRObservation error:  rpt sub-type "+strutils::itos(rpt.data_subtype())+" not recognized for rpt type "+strutils::itos(rpt.data_type())+"  date: "+adata[subset_number]->datetime.to_string()+"  id: '"+adata[subset_number]->rpid+"'","bufr2xml",user,args.args_string);
+	metautils::log_error("process_ncep_adp_bufr_observation() error:  rpt sub-type "+strutils::itos(rpt.data_subtype())+" not recognized for rpt type "+strutils::itos(rpt.data_type())+"  date: "+adata[subset_number]->datetime.to_string()+"  id: '"+adata[subset_number]->rpid+"'","bufr2xml",user,args.args_string);
     }
   }
   ientry.key="";
@@ -864,12 +872,12 @@ void processNCEPADPBUFRObservation(size_t subset_number)
 	}
 	default:
 	{
-	  metautils::log_error(std::string("processNCEPADPBUFRObservation error: can't get report ID from RPID: "+adata[subset_number]->rpid+"  date: ")+adata[subset_number]->datetime.to_string()+"  data type: "+strutils::itos(rpt.data_type())+"-"+strutils::itos(rpt.data_subtype()),"bufr2xml",user,args.args_string);
+	  metautils::log_error(std::string("process_ncep_adp_bufr_observation() error: can't get report ID from RPID: "+adata[subset_number]->rpid+"  date: ")+adata[subset_number]->datetime.to_string()+"  data type: "+strutils::itos(rpt.data_type())+"-"+strutils::itos(rpt.data_subtype()),"bufr2xml",user,args.args_string);
 	}
     }
   }
   if (ientry.key.empty()) {
-    metautils::log_error(std::string("processNCEPADPBUFRObservation error: can't get report ID from anywhere  date: ")+adata[subset_number]->datetime.to_string()+"  data type: "+strutils::itos(rpt.data_type())+"-"+strutils::itos(rpt.data_subtype()),"bufr2xml",user,args.args_string);
+    metautils::log_error(std::string("process_ncep_adp_bufr_observation() error: can't get report ID from anywhere  date: ")+adata[subset_number]->datetime.to_string()+"  data type: "+strutils::itos(rpt.data_type())+"-"+strutils::itos(rpt.data_subtype())+"  platform: "+pentry.key,"bufr2xml",user,args.args_string);
   }
   de.data.reset(new metadata::ObML::DataTypeEntry::Data);
   de.data->map=strutils::itos(rpt.center())+"-"+strutils::itos(rpt.sub_center());
@@ -880,7 +888,7 @@ void processNCEPADPBUFRObservation(size_t subset_number)
   }
 }
 
-void processNCEPRadianceBUFRObservation(size_t subset_number)
+void process_ncep_radiance_bufr_observation(size_t subset_number)
 {
   NCEPRadianceBUFRData **rdata=reinterpret_cast<NCEPRadianceBUFRData **>(data);
   int type=rpt.data_type()*1000+rpt.data_subtype();
@@ -928,14 +936,14 @@ void processNCEPRadianceBUFRObservation(size_t subset_number)
 	obsTypeIndex=1;
 	break;
     default:
-      metautils::log_error("processNCEPRadianceBUFRObservation error:  rpt sub-type "+strutils::itos(rpt.data_subtype())+" not recognized for rpt type "+strutils::itos(rpt.data_type())+"  date: "+rpt.date_time().to_string()+"  id: '"+rdata[subset_number]->satid+"'","bufr2xml",user,args.args_string);
+      metautils::log_error("process_ncep_radiance_bufr_observation() error:  rpt sub-type "+strutils::itos(rpt.data_subtype())+" not recognized for rpt type "+strutils::itos(rpt.data_type())+"  date: "+rpt.date_time().to_string()+"  id: '"+rdata[subset_number]->satid+"'","bufr2xml",user,args.args_string);
   }
   if (rdata[subset_number]->satid.length() > 0) {
     ientry.key=metautils::clean_id(rdata[subset_number]->satid);
     ientry.key=pentry.key+"[!]BUFRsatID[!]"+ientry.key;
   }
   else {
-    metautils::log_error(std::string("processNCEPRadianceBUFRObservation error: can't get report ID from anywhere  date: ")+rpt.date_time().to_string()+"  data type: "+strutils::itos(rpt.data_type())+"-"+strutils::itos(rpt.data_subtype()),"bufr2xml",user,args.args_string);
+    metautils::log_error(std::string("process_ncep_radiance_bufr_observation() error: can't get report ID from anywhere  date: ")+rpt.date_time().to_string()+"  data type: "+strutils::itos(rpt.data_type())+"-"+strutils::itos(rpt.data_subtype()),"bufr2xml",user,args.args_string);
   }
   de.data.reset(new metadata::ObML::DataTypeEntry::Data);
   de.data->map=strutils::itos(rpt.center())+"-"+strutils::itos(rpt.sub_center());
@@ -949,7 +957,7 @@ void processNCEPRadianceBUFRObservation(size_t subset_number)
   }
 }
 
-void processECMWFBUFRObservation(size_t subset_number)
+void process_ecmwf_bufr_observation(size_t subset_number)
 {
   ECMWFBUFRData **edata=reinterpret_cast<ECMWFBUFRData **>(data);
   int obsTypeIndex=-1;
@@ -970,7 +978,7 @@ void processECMWFBUFRObservation(size_t subset_number)
     case 1117:
     case 1140:
 	if (edata[subset_number]->wmoid.length() == 0) {
-	  metautils::log_error(std::string("processECMWFBUFRObservation error:  WMO ID not found - date: ")+edata[subset_number]->datetime.to_string(),"bufr2xml",user,args.args_string);
+	  metautils::log_error(std::string("process_ecmwf_bufr_observation() error:  WMO ID not found - date: ")+edata[subset_number]->datetime.to_string(),"bufr2xml",user,args.args_string);
 	}
 	pentry.key="land_station";
 	block_num=(edata[subset_number]->wmoid).substr(0,2);
@@ -991,7 +999,7 @@ void processECMWFBUFRObservation(size_t subset_number)
     case 1022:
     case 1023:
 	if (edata[subset_number]->shipid.length() == 0) {
-	  metautils::log_error(std::string("processECMWFBUFRObservation error:  SHIP ID not found - date: ")+edata[subset_number]->datetime.to_string(),"bufr2xml",user,args.args_string);
+	  metautils::log_error(std::string("process_ecmwf_bufr_observation() error:  SHIP ID not found - date: ")+edata[subset_number]->datetime.to_string(),"bufr2xml",user,args.args_string);
 	}
 	pentry.key="roving_ship";
 	ientry.key=pentry.key+"[!]other[!]"+metautils::clean_id(edata[subset_number]->shipid);
@@ -1000,7 +1008,7 @@ void processECMWFBUFRObservation(size_t subset_number)
     case 1021:
     case 1027:
 	if (edata[subset_number]->buoyid.length() == 0) {
-	  metautils::log_error(std::string("processECMWFBUFRObservation error:  BUOY ID not found - date: ")+edata[subset_number]->datetime.to_string(),"bufr2xml",user,args.args_string);
+	  metautils::log_error(std::string("process_ecmwf_bufr_observation() error:  BUOY ID not found - date: ")+edata[subset_number]->datetime.to_string(),"bufr2xml",user,args.args_string);
 	}
 	pentry.key="drifting_buoy";
 	ientry.key=pentry.key+"[!]other[!]"+edata[subset_number]->buoyid;
@@ -1016,7 +1024,7 @@ void processECMWFBUFRObservation(size_t subset_number)
     case 3086:
     case 3087:
 	if (edata[subset_number]->satid.length() == 0) {
-	  metautils::log_error(std::string("processECMWFBUFRObservation error:  SATELLITE ID not found - date: ")+edata[subset_number]->datetime.to_string(),"bufr2xml",user,args.args_string);
+	  metautils::log_error(std::string("process_ecmwf_bufr_observation() error:  SATELLITE ID not found - date: ")+edata[subset_number]->datetime.to_string(),"bufr2xml",user,args.args_string);
 	}
 	pentry.key="satellite";
 	ientry.key=pentry.key+"[!]BUFRsatID[!]"+edata[subset_number]->satid;
@@ -1026,7 +1034,7 @@ void processECMWFBUFRObservation(size_t subset_number)
     case 3089:
     case 12127:
 	if (edata[subset_number]->satid.length() == 0) {
-	  metautils::log_error(std::string("processECMWFBUFRObservation error:  SATELLITE ID not found - date: ")+edata[subset_number]->datetime.to_string(),"bufr2xml",user,args.args_string);
+	  metautils::log_error(std::string("process_ecmwf_bufr_observation() error:  SATELLITE ID not found - date: ")+edata[subset_number]->datetime.to_string(),"bufr2xml",user,args.args_string);
 	}
 	pentry.key="satellite";
 	ientry.key=pentry.key+"[!]BUFRsatID[!]"+edata[subset_number]->satid;
@@ -1035,7 +1043,7 @@ void processECMWFBUFRObservation(size_t subset_number)
     case 4091:
     case 5101:
 	if (edata[subset_number]->wmoid.length() == 0) {
-	  metautils::log_error(std::string("processECMWFBUFRObservation error:  WMO ID not found - date: ")+edata[subset_number]->datetime.to_string(),"bufr2xml",user,args.args_string);
+	  metautils::log_error(std::string("process_ecmwf_bufr_observation() error:  WMO ID not found - date: ")+edata[subset_number]->datetime.to_string(),"bufr2xml",user,args.args_string);
 	}
 	pentry.key="land_station";
 	block_num=(edata[subset_number]->wmoid).substr(0,2);
@@ -1051,7 +1059,7 @@ void processECMWFBUFRObservation(size_t subset_number)
     case 5102:
     case 5106:
 	if (edata[subset_number]->shipid.length() == 0) {
-	  metautils::log_error(std::string("processECMWFBUFRObservation error:  SHIP ID not found - date: ")+edata[subset_number]->datetime.to_string(),"bufr2xml",user,args.args_string);
+	  metautils::log_error(std::string("process_ecmwf_bufr_observation() error:  SHIP ID not found - date: ")+edata[subset_number]->datetime.to_string(),"bufr2xml",user,args.args_string);
 	}
 	pentry.key="roving_ship";
 	ientry.key=pentry.key+"[!]other[!]"+metautils::clean_id(edata[subset_number]->shipid);
@@ -1061,7 +1069,7 @@ void processECMWFBUFRObservation(size_t subset_number)
     case 4096:
     case 4097:
 	if (edata[subset_number]->wmoid.length() == 0) {
-	  metautils::log_error(std::string("processECMWFBUFRObservation error:  WMO ID not found - date: ")+edata[subset_number]->datetime.to_string(),"bufr2xml",user,args.args_string);
+	  metautils::log_error(std::string("process_ecmwf_bufr_observation() error:  WMO ID not found - date: ")+edata[subset_number]->datetime.to_string(),"bufr2xml",user,args.args_string);
 	}
 	pentry.key="wind_profiler";
 	ientry.key=pentry.key+"[!]WMO[!]"+edata[subset_number]->wmoid;
@@ -1074,7 +1082,7 @@ void processECMWFBUFRObservation(size_t subset_number)
     case 7144:
     case 7145:
 	if (edata[subset_number]->acftid.length() == 0) {
-	  metautils::log_error(std::string("processECMWFBUFRObservation error:  ACFT ID not found - date: ")+edata[subset_number]->datetime.to_string(),"bufr2xml",user,args.args_string);
+	  metautils::log_error(std::string("process_ecmwf_bufr_observation() error:  ACFT ID not found - date: ")+edata[subset_number]->datetime.to_string(),"bufr2xml",user,args.args_string);
 	}
 	pentry.key="aircraft";
 	ientry.key=pentry.key+"[!]other[!]"+metautils::clean_id(edata[subset_number]->acftid);
@@ -1086,7 +1094,7 @@ void processECMWFBUFRObservation(size_t subset_number)
 	obsTypeIndex=0;
 	break;
     default:
-      metautils::log_error("processECMWFBUFRObservation error:  rdb sub-type "+strutils::itos(edata[subset_number]->ecmwf_os.rdb_subtype)+" not recognized for rdb type "+strutils::itos(edata[subset_number]->ecmwf_os.rdb_type)+"  date: "+edata[subset_number]->datetime.to_string()+"  id: '"+edata[subset_number]->ecmwf_os.ID+"'","bufr2xml",user,args.args_string);
+      metautils::log_error("process_ecmwf_bufr_observation() error:  rdb sub-type "+strutils::itos(edata[subset_number]->ecmwf_os.rdb_subtype)+" not recognized for rdb type "+strutils::itos(edata[subset_number]->ecmwf_os.rdb_type)+"  date: "+edata[subset_number]->datetime.to_string()+"  id: '"+edata[subset_number]->ecmwf_os.ID+"'","bufr2xml",user,args.args_string);
   }
   de.data.reset(new metadata::ObML::DataTypeEntry::Data);
   de.data->map=strutils::itos(rpt.center())+"-"+strutils::itos(rpt.sub_center());
@@ -1095,7 +1103,7 @@ void processECMWFBUFRObservation(size_t subset_number)
   updatePlatformTable(obsTypeIndex,edata[subset_number]->lat,edata[subset_number]->lon,1);
 }
 
-void scanFile()
+void scan_file()
 {
   InputBUFRStream istream;
   const size_t BUF_LEN=800000;
@@ -1126,16 +1134,16 @@ void scanFile()
 	data=rpt.data();
 	for (int n=0; n < rpt.number_of_subsets(); ++n) {
 	  if (args.format == "prepbufr") {
-	    processNCEPPREPBUFRObservation(message_type,n);
+	    process_ncep_prepbufr_observation(message_type,n);
 	  }
 	  else if (args.format == "adpbufr") {
-	    processNCEPADPBUFRObservation(n);
+	    process_ncep_adp_bufr_observation(n);
 	  }
 	  else if (args.format == "radbufr") {
-	    processNCEPRadianceBUFRObservation(n);
+	    process_ncep_radiance_bufr_observation(n);
 	  }
 	  else if (args.format == "ecmwfbufr") {
-	    processECMWFBUFRObservation(n);
+	    process_ecmwf_bufr_observation(n);
 	  }
 	}
     }
@@ -1192,7 +1200,7 @@ int main(int argc,char **argv)
   atexit(clean_up);
   metautils::cmd_register("bufr2xml",user);
   metautils::check_for_existing_CMD("ObML");
-  scanFile();
+  scan_file();
   if (ID_table == nullptr) {
     std::cerr << "No data found - no content metadata will be generated" << std::endl;
     exit(1);
