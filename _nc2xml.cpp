@@ -182,7 +182,7 @@ void initialize_for_observations()
   }
 }
 
-void update_ID_table(size_t obs_type_index,float lat,float lon,DateTime& datetime,double unique_timestamp,DateTime *min_datetime,DateTime *max_datetime)
+void update_id_table(size_t obs_type_index,float lat,float lon,DateTime *datetime,double unique_timestamp,DateTime *min_datetime = nullptr,DateTime *max_datetime = nullptr)
 {
   if (lat < -90. || lat > 90. || lon < -180. || lon > 360.) {
     return;
@@ -199,13 +199,13 @@ void update_ID_table(size_t obs_type_index,float lat,float lon,DateTime& datetim
     size_t n,m;
     convert_lat_lon_to_box(1,0.,ientry.data->W_lon,n,m);
     ientry.data->min_lon_bitmap[m]=ientry.data->max_lon_bitmap[m]=ientry.data->W_lon;
-    if (min_datetime == NULL) {
-	ientry.data->start=datetime;
+    if (min_datetime == nullptr) {
+	ientry.data->start=*datetime;
     }
     else {
 	ientry.data->start=*min_datetime;
     }
-    if (max_datetime == NULL) {
+    if (max_datetime == nullptr) {
 	ientry.data->end=ientry.data->start;
     }
     else {
@@ -250,9 +250,9 @@ void update_ID_table(size_t obs_type_index,float lat,float lon,DateTime& datetim
 	  }
 	}
     }
-    if (min_datetime == NULL) {
-	if (datetime < ientry.data->start) {
-	  ientry.data->start=datetime;
+    if (min_datetime == nullptr) {
+	if (*datetime < ientry.data->start) {
+	  ientry.data->start=*datetime;
 	}
     }
     else {
@@ -260,9 +260,9 @@ void update_ID_table(size_t obs_type_index,float lat,float lon,DateTime& datetim
 	  ientry.data->start=*min_datetime;
 	}
     }
-    if (max_datetime == NULL) {
-	if (datetime > ientry.data->end) {
-	  ientry.data->end=datetime;
+    if (max_datetime == nullptr) {
+	if (*datetime > ientry.data->end) {
+	  ientry.data->end=*datetime;
 	}
     }
     else {
@@ -291,10 +291,12 @@ void update_ID_table(size_t obs_type_index,float lat,float lon,DateTime& datetim
   }
 }
 
-void update_ID_table(size_t obs_type_index,float lat,float lon,DateTime& datetime,double unique_timestamp)
+/*
+void update_id_table(size_t obs_type_index,float lat,float lon,DateTime& datetime,double unique_timestamp)
 {
-  update_ID_table(obs_type_index,lat,lon,datetime,unique_timestamp,nullptr,nullptr);
+  update_id_table(obs_type_index,lat,lon,datetime,unique_timestamp,nullptr,nullptr);
 }
+*/
 
 void update_platform_table(size_t obs_type_index,float lat,float lon)
 {
@@ -865,9 +867,9 @@ struct DiscreteGeometriesData {
   DiscreteGeometriesData() : indexes(),z_units(),z_pos() {}
 
   struct Indexes {
-    Indexes() : time_var(0xffffffff),stn_id_var(0xffffffff),lat_var(0xffffffff),lon_var(0xffffffff),sample_dim_var(0xffffffff),instance_dim_var(0xffffffff),z_var(0xffffffff) {}
+    Indexes() : time_var(0xffffffff),time_bounds_var(0xffffffff),stn_id_var(0xffffffff),lat_var(0xffffffff),lon_var(0xffffffff),sample_dim_var(0xffffffff),instance_dim_var(0xffffffff),z_var(0xffffffff) {}
 
-    size_t time_var,stn_id_var,lat_var,lon_var,sample_dim_var,instance_dim_var,z_var;
+    size_t time_var,time_bounds_var,stn_id_var,lat_var,lon_var,sample_dim_var,instance_dim_var,z_var;
   };
   Indexes indexes;
   std::string z_units,z_pos;
@@ -1003,7 +1005,7 @@ void scan_cf_point_netcdf_file(InputNetCDFStream& istream,bool& found_map,DataTy
 	    pentry.key="unknown";
 	    update_platform_table(1,lats[n],lons[n]);
 	    ientry.key=pentry.key+"[!]latlon[!]"+IDs[n];
-	    update_ID_table(1,lats[n],lons[n],date_times[n],times[n]);
+	    update_id_table(1,lats[n],lons[n],&date_times[n],times[n]);
 	    ++total_num_not_missing;
 	  }
 	}
@@ -1239,7 +1241,7 @@ void scan_cf_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,Discr
 		    T_map.emplace(m,dts[m].to_string("%Y%m%d%H%MM"));
 		  }
 		}
-		update_ID_table(1,lats[n],lons[n],dts[m],times[m]);
+		update_id_table(1,lats[n],lons[n],&dts[m],times[m]);
 		++total_num_not_missing;
 	    }
 	    else {
@@ -1278,6 +1280,13 @@ void scan_cf_non_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,D
   netCDFStream::VariableData times;
   if (istream.variable_data(vars[dgd.indexes.time_var].name,times) == netCDFStream::NcType::_NULL) {
     metautils::log_error("scan_cf_non_orthogonal_time_series_netcdf_file() returned error: unable to get time data","nc2xml",user,args.args_string);
+  }
+  netCDFStream::VariableData *time_bounds=nullptr;
+  if (dgd.indexes.time_bounds_var != 0xffffffff) {
+    time_bounds=new netCDFStream::VariableData;
+    if (istream.variable_data(vars[dgd.indexes.time_bounds_var].name,*time_bounds) == netCDFStream::NcType::_NULL) {
+	metautils::log_error("scan_cf_non_orthogonal_time_series_netcdf_file() returned error: unable to get time bounds data","nc2xml",user,args.args_string);
+    }
   }
   netCDFStream::VariableData lats;
   if (istream.variable_data(vars[dgd.indexes.lat_var].name,lats) == netCDFStream::NcType::_NULL) {
@@ -1349,13 +1358,15 @@ id_types.emplace_back("unknown");
 		ientry.key+=strutils::ftos(ids[n]);
 	    }
 	    else if (ids.type() == netCDFStream::NcType::CHAR) {
-		ientry.key+=std::string(&(reinterpret_cast<char *>(ids.get()))[n*id_len],id_len);
+		auto id=std::string(&(reinterpret_cast<char *>(ids.get()))[n*id_len],id_len);
+		strutils::trim(id);
+		ientry.key+=id;
 	    }
 	    for (size_t m=offset; m < end; ++m) {
 		netCDFStream::DataValue time_miss_val;
 		if (!found_missing(times[m],time_miss_val,var_data[m],miss_val)) {
 		  auto dt=compute_nc_time(times,m);
-		  update_ID_table(1,lats[n],lons[n],dt,times[m]);
+		  update_id_table(1,lats[n],lons[n],&dt,times[m]);
 		  ++total_num_not_missing;
 		}
 	    }
@@ -1387,12 +1398,21 @@ id_types.emplace_back("unknown");
 		ientry.key+=strutils::ftos(ids[idx]);
 	    }
 	    else if (ids.type() == netCDFStream::NcType::CHAR) {
-		ientry.key+=std::string(&(reinterpret_cast<char *>(ids.get()))[idx*id_len],id_len);
+		auto id=std::string(&(reinterpret_cast<char *>(ids.get()))[idx*id_len],id_len);
+		strutils::trim(id);
+		ientry.key+=id;
 	    }
 	    netCDFStream::DataValue time_miss_val;
 	    if (!found_missing(times[n],time_miss_val,var_data[n],miss_val)) {
-		auto dt=compute_nc_time(times,n);
-		update_ID_table(1,lats[idx],lons[idx],dt,times[n]);
+		if (dgd.indexes.time_bounds_var != 0xffffffff) {
+		  auto min_dt=compute_nc_time(*time_bounds,n*2);
+		  auto max_dt=compute_nc_time(*time_bounds,n*2+1);
+		  update_id_table(1,lats[idx],lons[idx],nullptr,times[n],&min_dt,&max_dt);
+		}
+		else {
+		  auto dt=compute_nc_time(times,n);
+		  update_id_table(1,lats[idx],lons[idx],&dt,times[n]);
+		}
 		++total_num_not_missing;
 	    }
 	  }
@@ -1427,13 +1447,15 @@ id_types.emplace_back("unknown");
 		  ientry.key+=strutils::ftos(ids[n]);
 		}
 		else if (ids.type() == netCDFStream::NcType::CHAR) {
-		  ientry.key+=std::string(&(reinterpret_cast<char *>(ids.get()))[n*id_len],id_len);
+		  auto id=std::string(&(reinterpret_cast<char *>(ids.get()))[n*id_len],id_len);
+		  strutils::trim(id);
+		  ientry.key+=id;
 		}
 		for (size_t m=0; m < num_obs; ++m) {
 		  auto idx=n*num_obs+m;
 		  if (!found_missing(times[idx],time_miss_val,var_data[idx],miss_val)) {
 		    auto dt=compute_nc_time(times,idx);
-		    update_ID_table(1,lats[n],lons[n],dt,times[idx]);
+		    update_id_table(1,lats[n],lons[n],&dt,times[idx]);
 		    ++total_num_not_missing;
 		  }
 		}
@@ -1447,12 +1469,14 @@ id_types.emplace_back("unknown");
 		    ientry.key+=strutils::ftos(ids[m]);
 		  }
 		  else if (ids.type() == netCDFStream::NcType::CHAR) {
-		    ientry.key+=std::string(&(reinterpret_cast<char *>(ids.get()))[m*id_len],id_len);
+		    auto id=std::string(&(reinterpret_cast<char *>(ids.get()))[m*id_len],id_len);
+		    strutils::trim(id);
+		    ientry.key+=id;
 		  }
 		  auto idx=n*num_stns+m;
 		  if (!found_missing(times[idx],time_miss_val,var_data[idx],miss_val)) {
 		    auto dt=compute_nc_time(times,idx);
-		    update_ID_table(1,lats[m],lons[m],dt,times[idx]);
+		    update_id_table(1,lats[m],lons[m],&dt,times[idx]);
 		    ++total_num_not_missing;
 		  }
 		}
@@ -1506,6 +1530,16 @@ void scan_cf_time_series_netcdf_file(InputNetCDFStream& istream,bool& found_map,
     for (size_t n=0; n < vars[dgd.indexes.time_var].attrs.size(); ++n) {
 	if (vars[dgd.indexes.time_var].attrs[n].name == "calendar") {
 	  time_data.calendar=*(reinterpret_cast<std::string *>(vars[dgd.indexes.time_var].attrs[n].values));
+	}
+	else if (vars[dgd.indexes.time_var].attrs[n].name == "bounds") {
+	  auto bounds_name=*(reinterpret_cast<std::string *>(vars[dgd.indexes.time_var].attrs[n].values));
+	  auto dims=istream.dimensions();
+	  for (size_t m=0; m < vars.size(); ++m) {
+	    if (vars[m].name == bounds_name && dims[vars[m].dimids.back()].length == 2) {
+		dgd.indexes.time_bounds_var=m;
+		break;
+	    }
+	  }
 	}
     }
   }
@@ -1625,7 +1659,7 @@ void scan_cf_orthogonal_profile_netcdf_file(InputNetCDFStream& istream,DiscreteG
 	    else if (ids.type() == netCDFStream::NcType::CHAR) {
 		ientry.key+=std::string(&(reinterpret_cast<char *>(ids.get()))[n*id_len],id_len);
 	    }
-	    update_ID_table(obs_type_index,lats[n],lons[n],dt,times[n]);
+	    update_id_table(obs_type_index,lats[n],lons[n],&dt,times[n]);
 	    if (de.data->vdata == nullptr) {
 		de.data->vdata.reset(new metadata::ObML::DataTypeEntry::Data::VerticalData);
 	    }
@@ -1814,7 +1848,7 @@ id_types.emplace_back("unknown");
 		else if (ids.type() == netCDFStream::NcType::CHAR) {
 		  ientry.key+=std::string(&(reinterpret_cast<char *>(ids.get()))[n*id_len],id_len);
 		}
-		update_ID_table(obs_type_index,lats[n],lons[n],dt,times[n]);
+		update_id_table(obs_type_index,lats[n],lons[n],&dt,times[n]);
 		fill_vertical_resolution_data(lvls,dgd.z_pos,dgd.z_units);
 		++total_num_not_missing;
 	    }
@@ -1853,7 +1887,7 @@ id_types.emplace_back("unknown");
 		else if (ids.type() == netCDFStream::NcType::CHAR) {
 		  ientry.key+=std::string(&(reinterpret_cast<char *>(ids.get()))[n*id_len],id_len);
 		}
-		update_ID_table(obs_type_index,lats[n],lons[n],dt,times[n]);
+		update_id_table(obs_type_index,lats[n],lons[n],&dt,times[n]);
 		fill_vertical_resolution_data(lvls,dgd.z_pos,dgd.z_units);
 		++total_num_not_missing;
 	    }
@@ -2045,7 +2079,7 @@ id_types.emplace_back("unknown");
 	    }
 	    if (lvls.size() > 0) {
 		ientry.key=platform_types[m]+"[!]"+id_types[m]+"[!]"+id_cache[m];
-		update_ID_table(obs_type_index,lats[m],lons[m],dt,times[n]);
+		update_id_table(obs_type_index,lats[m],lons[m],&dt,times[n]);
 		fill_vertical_resolution_data(lvls,dgd.z_pos,dgd.z_units);
 		++total_num_not_missing;
 	    }
@@ -2140,7 +2174,7 @@ id_types.emplace_back("unknown");
 	    }
 	    if (lvls.size() > 0) {
 		ientry.key=platform_types[station_indexes[n]]+"[!]"+id_types[station_indexes[n]]+"[!]"+id_cache[station_indexes[n]];
-		update_ID_table(obs_type_index,lats[station_indexes[n]],lons[station_indexes[n]],dt,times[n]);
+		update_id_table(obs_type_index,lats[station_indexes[n]],lons[station_indexes[n]],&dt,times[n]);
 		fill_vertical_resolution_data(lvls,dgd.z_pos,dgd.z_units);
 		++total_num_not_missing;
 	    }
@@ -2185,12 +2219,12 @@ id_types.emplace_back("unknown");
 		  ientry.key=platform_types[stn_idx]+"[!]"+id_types[stn_idx]+"[!]"+id_cache[stn_idx];
 		  if (times.size() == ntimes) {
 		    auto dt=compute_nc_time(times,m);
-		    update_ID_table(obs_type_index,lats[stn_idx],lons[stn_idx],dt,times[m]);
+		    update_id_table(obs_type_index,lats[stn_idx],lons[stn_idx],&dt,times[m]);
 		  }
 		  else {
 		    auto t_idx=stn_idx*ntimes+m;
 		    auto dt=compute_nc_time(times,t_idx);
-		    update_ID_table(obs_type_index,lats[stn_idx],lons[stn_idx],dt,times[t_idx]);
+		    update_id_table(obs_type_index,lats[stn_idx],lons[stn_idx],&dt,times[t_idx]);
 		  }
 		  fill_vertical_resolution_data(lvls,dgd.z_pos,dgd.z_units);
 		  ++total_num_not_missing;
@@ -3920,7 +3954,7 @@ void scan_prepbufr_netcdf_file(InputNetCDFStream& istream,bool& found_map,std::s
 	de.key=strutils::ftos(var_data[n*5+1]);
 	sdum=strutils::substitute(array[idx].valid_time,"_","");
 	date_time.set(std::stoll(sdum));
-	update_ID_table(obs_type_index,array[idx].lat,array[idx].lon,date_time,date_time.seconds_since(base_date_time));
+	update_id_table(obs_type_index,array[idx].lat,array[idx].lon,&date_time,date_time.seconds_since(base_date_time));
 	update_platform_table(obs_type_index,array[idx].lat,array[idx].lon);
     }
   }
@@ -4026,7 +4060,7 @@ void scan_idd_metar_netcdf_file(InputNetCDFStream& istream,bool found_map,DataTy
 		  }
 		}
 		if (lats[index] >= -90. && lats[index] <= 90. && lons[index] >= -180. && lons[index] <= 180.) {
-		  update_ID_table(1,lats[index],lons[index],dt,times[m]);
+		  update_id_table(1,lats[index],lons[index],&dt,times[m]);
 		  update_platform_table(1,lats[index],lons[index]);
 		}
 	    }
@@ -4126,7 +4160,7 @@ void scan_idd_buoy_netcdf_file(InputNetCDFStream& istream,bool found_map,DataTyp
 		}
 	    }
 	    if (lats[m] >= -90. && lats[m] <= 90. && lons[m] >= -180. && lons[m] <= 180.) {
-		update_ID_table(1,lats[m],lons[m],dt,times[m]);
+		update_id_table(1,lats[m],lons[m],&dt,times[m]);
 		update_platform_table(1,lats[m],lons[m]);
 	    }
 	  }
@@ -4204,7 +4238,7 @@ void scan_idd_surface_synoptic_netcdf_file(InputNetCDFStream& istream,bool found
 		}
 	    }
 	    if (lats[m] >= -90. && lats[m] <= 90. && lons[m] >= -180. && lons[m] <= 180.) {
-		update_ID_table(1,lats[m],lons[m],dt,times[m]);
+		update_id_table(1,lats[m],lons[m],&dt,times[m]);
 		update_platform_table(1,lats[m],lons[m]);
 	    }
 	  }
@@ -4317,7 +4351,7 @@ void scan_idd_upper_air_netcdf_file(InputNetCDFStream& istream,bool found_map,Da
 		}
 	    }
 	    if (lats[m] >= -90. && lats[m] <= 90. && lons[m] >= -180. && lons[m] <= 180.) {
-		update_ID_table(0,lats[m],lons[m],dt,times[m]);
+		update_id_table(0,lats[m],lons[m],&dt,times[m]);
 		update_platform_table(0,lats[m],lons[m]);
 	    }
 	  }
@@ -4509,7 +4543,7 @@ void scan_samos_netcdf_file(InputNetCDFStream& istream,DataTypeMap& datatype_map
 		}
 	    }
 	    de.key=vars[n].name;
-	    update_ID_table(1,lats[m],lon,dt,times[m]);
+	    update_id_table(1,lats[m],lon,&dt,times[m]);
 	    update_platform_table(1,lats[m],lon);
 	    if (lats[m] < min_lat) {
 		min_lat=lats[m];
