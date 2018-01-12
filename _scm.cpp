@@ -309,32 +309,31 @@ std::string grid_definition_parameters(const XMLElement& e)
   return def_params;
 }
 
-void build_wms_capabilities(const std::string& fpath)
+void open_xml_file(XMLDocument& xdoc,std::string filename)
+{
+  auto file=remote_web_file("https://rda.ucar.edu"+filename+".gz",temp_dir.name());
+  struct stat buf;
+  if (stat(file.c_str(),&buf) == 0) {
+    system(("gunzip "+file).c_str());
+    strutils::chop(file,3);
+  }
+  if (!xdoc.open(file)) {
+    file=remote_web_file("https://rda.ucar.edu"+filename,temp_dir.name());
+    if (!xdoc.open(file)) {
+	metautils::log_error("unable to open "+filename,"scm",user,args.args_string);
+    }
+  }
+}
+
+void build_wms_capabilities(XMLDocument& xdoc)
 {
   auto *tdir=new TempDir;
   if (!tdir->create("/glade/scratch/rdadata")) {
     metautils::log_error("build_wms_capabilities() could not create a temporary directory","scm",user,args.args_string);
   }
-  auto filename=fpath.substr(fpath.find("/wfmd/")+6);
-  struct stat buf;
-  auto wms_resource="/usr/local/www/server_root/web/datasets/ds"+args.dsnum+"/metadata/wfmd/"+filename;
-  if (stat((wms_resource+".gz").c_str(),&buf) == 0) {
-    std::stringstream oss,ess;
-    if (mysystem2("/bin/sh -c 'cp "+wms_resource+".gz "+tdir->name()+"/; gunzip -f "+tdir->name()+"/"+filename+".gz'",oss,ess) < 0) {
-	metautils::log_error("build_wms_capabilities() could not unzip '"+filename+"'","scm",user,args.args_string);
-    }
-    wms_resource=tdir->name()+"/"+filename;
-  }
-  if (stat(wms_resource.c_str(),&buf) != 0) {
-    metautils::log_error("build_wms_capabilities() could not find '"+filename+"'","scm",user,args.args_string);
-  }
   std::stringstream oss,ess;
   if (mysystem2("/bin/mkdir -p "+tdir->name()+"/metadata/wms",oss,ess) < 0) {
     metautils::log_error("build_wms_capabilities() could not create the directory tree","scm",user,args.args_string);
-  }
-  XMLDocument xdoc(wms_resource);
-  if (!xdoc) {
-    metautils::log_error("build_wms_capabilities() could not access '"+filename+"'","scm",user,args.args_string);
   }
   MySQL::Server server;
   if (!metautils::connect_to_metadata_server(server)) {
@@ -342,9 +341,19 @@ void build_wms_capabilities(const std::string& fpath)
   }
   xmlutils::LevelMapper lmapper;
   xmlutils::ParameterMapper pmapper;
+  auto filename=xdoc.element("GrML").attribute_value("uri")+".GrML";
+  if (!std::regex_search(filename,std::regex("^http(s){0,1}://rda.ucar.edu/"))) {
+    metautils::log_warning("build_wms_capabilities() found an invalid uri: "+filename,"scm",user,args.args_string);
+    return;
+  }
+  filename=filename.substr(filename.find("rda.ucar.edu")+12);
+  auto web_home=metautils::web_home();
+  strutils::replace_all(web_home,"/glade/p/rda","");
+  strutils::replace_all(filename,web_home+"/","");
+  strutils::replace_all(filename,"/","%");
   std::ofstream ofs((tdir->name()+"/metadata/wms/"+filename).c_str());
   if (!ofs.is_open()) {
-    metautils::log_error("build_wms_capabilities could not open the output file","scm",user,args.args_string);
+    metautils::log_error("build_wms_capabilities() could not open the output file","scm",user,args.args_string);
   }
   ofs.setf(std::ios::fixed);
   ofs.precision(4);
@@ -496,42 +505,13 @@ void build_wms_capabilities(const std::string& fpath)
   delete tdir;
 }
 
-void open_xml_file(XMLDocument& xdoc,std::string filename)
+void build_wms_capabilities(const std::string& fpath)
 {
-  auto file=remote_web_file("https://rda.ucar.edu"+filename+".gz",temp_dir.name());
-  struct stat buf;
-  if (stat(file.c_str(),&buf) == 0) {
-    system(("gunzip "+file).c_str());
-    strutils::chop(file,3);
-  }
-  if (!xdoc.open(file)) {
-    file=remote_web_file("https://rda.ucar.edu"+filename,temp_dir.name());
-    if (!xdoc.open(file)) {
-	metautils::log_error("unable to open "+filename,"scm",user,args.args_string);
-    }
-  }
+  XMLDocument xdoc;
+  open_xml_file(xdoc,fpath);
+  build_wms_capabilities(xdoc);
+  xdoc.close();
 }
-
-/*
-void insert_bitmap_value(size_t value,std::list<size_t>& values)
-{
-  bool inserted=false;
-
-  for (auto it=values.begin(),end=values.end(); it != end; ++it) {
-// catch values that are already in the list
-    if (value <= *it) {
-	if (value < *it) {
-	  values.insert(it,value);
-	}
-	inserted=true;
-	break;
-    }
-  }
-  if (!inserted) {
-    values.emplace_back(value);
-  }
-}
-*/
 
 struct ParameterMapEntry {
   std::string key;
@@ -956,10 +936,10 @@ void summarize_grml()
 	}
 	summarizeMetadata::grids::aggregate_grids(args.dsnum,database,"scm",user,args.args_string,file_ID_code);
     }
-    xdoc.close();
     if (fname.is_web_file) {
-	build_wms_capabilities(fname.path);
+	build_wms_capabilities(xdoc);
     }
+    xdoc.close();
     if (database == "GrML") {
 	summarizeMetadata::summarize_frequencies(args.dsnum,"scm",user,args.args_string,file_ID_code);
 	summarizeMetadata::grids::summarize_grid_resolutions(args.dsnum,"scm",user,args.args_string,file_ID_code);
@@ -2704,8 +2684,9 @@ int main(int argc,char **argv)
   args.args_string=unix_args_string(argc,argv,'`');
   metautils::read_config("scm",user,args.args_string);
   parse_args();
-  if (local_args.wms_only && local_args.cmd_directory != "wfmd") {
+  if (local_args.wms_only && !local_args.is_web_file) {
     std::cerr << "Terminating - WMS capabilities can only be generated for Web files" << std::endl;
+    exit(1);
   }
   metautils::connect_to_metadata_server(server);
   if (!server) {
