@@ -367,6 +367,11 @@ void build_wms_capabilities(XMLDocument& xdoc)
   else {
     metautils::log_error("build_wms_capabilities(): query '"+query.show()+"' failed","scm",user,args.args_string);
   }
+  std::string error;
+  auto tables=table_names(server,"IGrML","%ds%"+local_args.dsnum2+"_inventory_"+data_format_code+"!%",error);
+  if (tables.size() == 0) {
+    return;
+  }
   auto data_file=filename.substr(0,filename.rfind("."));
   strutils::replace_all(data_file,"%","/");
   auto grids=xdoc.element_list("GrML/grid");
@@ -498,7 +503,6 @@ void build_wms_capabilities(XMLDocument& xdoc)
   }
   ofs.close();
   mysystem2("/bin/sh -c 'gzip "+tdir->name()+"/metadata/wms/"+filename+"'",oss,ess);
-  std::string error;
   if (host_sync(tdir->name(),"metadata/wms/","/data/web/datasets/ds"+args.dsnum,error) < 0) {
     metautils::log_error("build_wms_capabilities() could not sync the capabilities file for '"+filename+"'","scm",user,args.args_string);
   }
