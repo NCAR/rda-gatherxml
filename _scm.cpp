@@ -306,6 +306,12 @@ std::string grid_definition_parameters(const XMLElement& e)
   else if (definition == "gaussLatLon") {
     def_params=e.attribute_value("numX")+":"+e.attribute_value("numY")+":"+e.attribute_value("startLat")+":"+e.attribute_value("startLon")+":"+e.attribute_value("endLat")+":"+e.attribute_value("endLon")+":"+e.attribute_value("xRes")+":"+e.attribute_value("circles");
   }
+  else if (definition == "polarStereographic") {
+    def_params=e.attribute_value("numX")+":"+e.attribute_value("numY")+":"+e.attribute_value("startLat")+":"+e.attribute_value("startLon")+":"+e.attribute_value("resLat")+":"+e.attribute_value("projLon")+":"+e.attribute_value("pole")+":"+e.attribute_value("xRes")+":"+e.attribute_value("yRes");
+  }
+  else if (definition == "lambertConformal") {
+    def_params=e.attribute_value("numX")+":"+e.attribute_value("numY")+":"+e.attribute_value("startLat")+":"+e.attribute_value("startLon")+":"+e.attribute_value("resLat")+":"+e.attribute_value("projLon")+":"+e.attribute_value("pole")+":"+e.attribute_value("xRes")+":"+e.attribute_value("yRes")+":"+e.attribute_value("stdParallel1")+":"+e.attribute_value("stdParallel2");
+  }
   return def_params;
 }
 
@@ -396,7 +402,8 @@ void build_wms_capabilities(XMLDocument& xdoc)
     }
     double west_lon,south_lat,east_lon,north_lat;
     if (!fill_spatial_domain_from_grid_definition(grid.attribute_value("definition")+"<!>"+def_params,"primeMeridian",west_lon,south_lat,east_lon,north_lat)) {
-	metautils::log_error("build_wms_capabilities() could not get the spatial domain from '"+filename+"'","scm",user,args.args_string);
+	metautils::log_info("build_wms_capabilities() could not get the spatial domain from '"+filename+"'","scm",user,args.args_string);
+	return;
     }
     ofs << "    <Layer>" << std::endl;
     ofs << "      <Title>" << grid.attribute_value("timeRange") << "</Title>" << std::endl;
