@@ -2492,10 +2492,6 @@ int main(int argc,char **argv)
   args.args_string=unix_args_string(argc,argv,'`');
   metautils::read_config("scm",user,args.args_string);
   parse_args();
-  if (!local_args.is_web_file) {
-    std::cerr << "Terminating - WMS capabilities can only be generated for Web files" << std::endl;
-    exit(1);
-  }
   metautils::connect_to_metadata_server(server);
   if (!server) {
     metautils::log_error("unable to connect to MySQL server on startup","scm",user,args.args_string);
