@@ -16,10 +16,11 @@
 metautils::Directives directives;
 metautils::Args args;
 struct LocalArgs {
-  LocalArgs() : dsnum2(),create_cache(false),notify(false),verbose(false) {}
+  LocalArgs() : dsnum2(),create_cache(false),notify(false),verbose(false),wms_only(false) {}
 
   std::string dsnum2;
   bool create_cache,notify,verbose;
+  bool wms_only;
 } local_args;
 struct StringEntry {
   StringEntry() : key() {}
@@ -70,6 +71,9 @@ void parse_args(int argc,char **argv)
     else if (sp[n] == "-V") {
 	local_args.verbose=true;
     }
+    else if (sp[n] == "--wms-only") {
+	local_args.wms_only=true;
+    }
   }
 }
 
@@ -84,6 +88,224 @@ struct TimeRangeEntry {
   std::string code;
   int hour_diff;
 };
+
+std::string grid_definition_parameters(const XMLElement& e)
+{
+  std::string def_params;
+  auto definition=e.attribute_value("definition");
+  if (definition == "latLon") {
+    def_params=e.attribute_value("numX")+":"+e.attribute_value("numY")+":"+e.attribute_value("startLat")+":"+e.attribute_value("startLon")+":"+e.attribute_value("endLat")+":"+e.attribute_value("endLon")+":"+e.attribute_value("xRes")+":"+e.attribute_value("yRes");
+  }
+  else if (definition == "gaussLatLon") {
+    def_params=e.attribute_value("numX")+":"+e.attribute_value("numY")+":"+e.attribute_value("startLat")+":"+e.attribute_value("startLon")+":"+e.attribute_value("endLat")+":"+e.attribute_value("endLon")+":"+e.attribute_value("xRes")+":"+e.attribute_value("circles");
+  }
+  else if (definition == "polarStereographic") {
+    def_params=e.attribute_value("numX")+":"+e.attribute_value("numY")+":"+e.attribute_value("startLat")+":"+e.attribute_value("startLon")+":"+e.attribute_value("resLat")+":"+e.attribute_value("projLon")+":"+e.attribute_value("pole")+":"+e.attribute_value("xRes")+":"+e.attribute_value("yRes");
+  }
+  else if (definition == "lambertConformal") {
+    def_params=e.attribute_value("numX")+":"+e.attribute_value("numY")+":"+e.attribute_value("startLat")+":"+e.attribute_value("startLon")+":"+e.attribute_value("resLat")+":"+e.attribute_value("projLon")+":"+e.attribute_value("pole")+":"+e.attribute_value("xRes")+":"+e.attribute_value("yRes")+":"+e.attribute_value("stdParallel1")+":"+e.attribute_value("stdParallel2");
+  }
+  return def_params;
+}
+
+void build_wms_capabilities()
+{
+  std::string wms_resource="https://rda.ucar.edu/datasets/ds"+args.dsnum+"/metadata/wfmd/"+strutils::substitute(args.filename,"_inv","");
+  auto file=remote_web_file(wms_resource+".gz",temp_dir.name());
+  struct stat buf;
+  if (stat(file.c_str(),&buf) == 0) {
+    system(("gunzip "+file).c_str());
+    strutils::chop(file,3);
+  }
+  XMLDocument xdoc;
+  if (!xdoc.open(file)) {
+    file=remote_web_file(wms_resource,temp_dir.name());
+    if (!xdoc.open(file)) {
+        metautils::log_error("unable to open "+wms_resource,"iinv",user,args.args_string);
+    }
+  }
+  auto *tdir=new TempDir;
+  if (!tdir->create("/glade/scratch/rdadata")) {
+    metautils::log_error("build_wms_capabilities() could not create a temporary directory","iinv",user,args.args_string);
+  }
+  std::stringstream oss,ess;
+  if (mysystem2("/bin/mkdir -p "+tdir->name()+"/metadata/wms",oss,ess) < 0) {
+    metautils::log_error("build_wms_capabilities() could not create the directory tree","iinv",user,args.args_string);
+  }
+  MySQL::Server server;
+  if (!metautils::connect_to_metadata_server(server)) {
+    metautils::log_error("build_wms_capabilities() could not connect to the metadata database","iinv",user,args.args_string);
+  }
+  xmlutils::LevelMapper lmapper;
+  xmlutils::ParameterMapper pmapper;
+  auto filename=xdoc.element("GrML").attribute_value("uri")+".GrML";
+  if (!std::regex_search(filename,std::regex("^http(s){0,1}://rda.ucar.edu/"))) {
+    metautils::log_warning("build_wms_capabilities() found an invalid uri: "+filename,"iinv",user,args.args_string);
+    return;
+  }
+  filename=filename.substr(filename.find("rda.ucar.edu")+12);
+  auto web_home=metautils::web_home();
+  strutils::replace_all(web_home,"/glade/p/rda","");
+  strutils::replace_all(filename,web_home+"/","");
+  strutils::replace_all(filename,"/","%");
+  std::ofstream ofs((tdir->name()+"/metadata/wms/"+filename).c_str());
+  if (!ofs.is_open()) {
+    metautils::log_error("build_wms_capabilities() could not open the output file","iinv",user,args.args_string);
+  }
+  ofs.setf(std::ios::fixed);
+  ofs.precision(4);
+  auto data_format=xdoc.element("GrML").attribute_value("format");
+  MySQL::LocalQuery query("code","WGrML.formats","format = '"+data_format+"'");
+  std::string data_format_code;
+  MySQL::Row row;
+  if (query.submit(server) == 0 && query.fetch_row(row)) {
+    data_format_code=row[0];
+  }
+  else {
+    metautils::log_error("build_wms_capabilities(): query '"+query.show()+"' failed","iinv",user,args.args_string);
+  }
+  std::string error;
+  auto tables=table_names(server,"IGrML","%ds%"+local_args.dsnum2+"_inventory_"+data_format_code+"!%",error);
+  if (tables.size() == 0) {
+    return;
+  }
+  auto data_file=filename.substr(0,filename.rfind("."));
+  strutils::replace_all(data_file,"%","/");
+  auto grids=xdoc.element_list("GrML/grid");
+  auto gcount=0;
+  for (const auto& grid : grids) {
+    query.set("code","WGrML.timeRanges","timeRange = '"+grid.attribute_value("timeRange")+"'");
+    std::string time_range_code;
+    if (query.submit(server) == 0 && query.fetch_row(row)) {
+	time_range_code=row[0];
+    }
+    else {
+	metautils::log_error("build_wms_capabilities(): query '"+query.show()+"' failed","iinv",user,args.args_string);
+    }
+    auto def_params=grid_definition_parameters(grid);
+    query.set("code","WGrML.gridDefinitions","definition = '"+grid.attribute_value("definition")+"' and defParams = '"+def_params+"'");
+    std::string grid_definition_code;
+    if (query.submit(server) == 0 && query.fetch_row(row)) {
+	grid_definition_code=row[0];
+    }
+    else {
+	metautils::log_error("build_wms_capabilities(): query '"+query.show()+"' failed","iinv",user,args.args_string);
+    }
+    double west_lon,south_lat,east_lon,north_lat;
+    if (!fill_spatial_domain_from_grid_definition(grid.attribute_value("definition")+"<!>"+def_params,"primeMeridian",west_lon,south_lat,east_lon,north_lat)) {
+	metautils::log_info("build_wms_capabilities() could not get the spatial domain from '"+filename+"'","iinv",user,args.args_string);
+	return;
+    }
+    ofs << "    <Layer>" << std::endl;
+    ofs << "      <Title>" << grid.attribute_value("timeRange") << "</Title>" << std::endl;
+    ofs << "      <EX_GeographicBoundingBox>" << std::endl;
+    ofs << "        <westBoundLongitude>" << west_lon << "</westBoundLongitude>" << std::endl;
+    ofs << "        <eastBoundLongitude>" << east_lon << "</eastBoundLongitude>" << std::endl;
+    ofs << "        <southBoundLatitude>" << south_lat << "</southBoundLatitude>" << std::endl;
+    ofs << "        <northBoundLatitude>" << north_lat << "</northBoundLatitude>" << std::endl;
+    ofs << "      </EX_GeographicBoundingBox>" << std::endl;;
+    ofs << "#REPEAT __CRS__" << gcount << "__" << std::endl;
+    ofs << "      <BoundingBox CRS=\"__CRS__" << gcount << "__.CRS\" minx=\"__CRS__" << gcount << "__." << west_lon << "\" miny=\"__CRS__" << gcount << "__." << south_lat << "\" maxx=\"__CRS__" << gcount << "__." << east_lon << "\" maxy=\"__CRS__" << gcount << "__." << north_lat << "\" />" << std::endl;
+    ofs << "      <CRS>__CRS__" << gcount << "__.CRS</CRS>" << std::endl;
+    ofs << "#ENDREPEAT __CRS__" << gcount << "__" << std::endl;
+    auto vlevels=grid.element_list("level");
+    for (const auto& vlevel : vlevels) {
+	auto lmap=vlevel.attribute_value("map");
+	auto ltype=vlevel.attribute_value("type");
+	auto lvalue=vlevel.attribute_value("value");
+	query.set("code","WGrML.levels","map = '"+lmap+"' and type = '"+ltype+"' and value = '"+lvalue+"'");
+	std::string level_code;
+	if (query.submit(server) == 0 && query.fetch_row(row)) {
+	    level_code=row[0];
+	}
+	else {
+	    metautils::log_error("build_wms_capabilities(): query '"+query.show()+"' failed","iinv",user,args.args_string);
+	}
+	auto level_title=lmapper.description(data_format,ltype,lmap);
+	if (level_title.empty()) {
+	    level_title=vlevel.attribute_value("type")+":"+vlevel.attribute_value("value");
+	}
+	else if (vlevel.attribute_value("value") != "0") {
+	    level_title+=": "+vlevel.attribute_value("value")+lmapper.units(data_format,ltype,lmap);
+	}
+	ofs << "      <Layer>" << std::endl;
+	ofs << "        <Title>" << level_title << "</Title>" << std::endl;
+	auto params=vlevel.element_list("parameter");
+	for (const auto& param : params) {
+	    auto pcode=param.attribute_value("map")+":"+param.attribute_value("value");
+	    ofs << "        <Layer>" << std::endl;
+	    ofs << "          <Title>" << pmapper.description(data_format,pcode) << "</Title>" << std::endl;
+	    query.set("select distinct valid_date from IGrML.`ds"+local_args.dsnum2+"_inventory_"+data_format_code+"!"+pcode+"` as i left join WGrML.ds"+local_args.dsnum2+"_webfiles as w on w.code = i.webID_code where timeRange_code = "+time_range_code+" and gridDefinition_code = "+grid_definition_code+" and level_code = "+level_code+" and webID = '"+data_file+"' order by valid_date");
+	    if (query.submit(server) == 0) {
+		while (query.fetch_row(row)) {
+		  ofs << "          <Layer queryable=\"0\">" << std::endl;
+		  ofs << "            <Name>" << time_range_code << ";" << grid_definition_code << ";" << level_code << ";" << data_format_code << "!" << pcode << ";" << row[0] << "</Name>" << std::endl;
+		  ofs << "            <Title>" << row[0].substr(0,4) << "-" << row[0].substr(4,2) << "-" << row[0].substr(6,2) << "T" << row[0].substr(8,2) << ":" << row[0].substr(10,2) << "Z</Title>" << std::endl;
+		  ofs << "          </Layer>" << std::endl;
+		}
+	    }
+	    else {
+		metautils::log_error("build_wms_capabilities(): query '"+query.show()+"' failed","iinv",user,args.args_string);
+	    }
+	    ofs << "        </Layer>" << std::endl;
+	}
+	ofs << "      </Layer>" << std::endl;
+    }
+    auto vlayers=grid.element_list("layer");
+    for (const auto& vlayer : vlayers) {
+	auto lmap=vlayer.attribute_value("map");
+	auto ltype=vlayer.attribute_value("type");
+	auto bottom=vlayer.attribute_value("bottom");
+	auto top=vlayer.attribute_value("top");
+	query.set("code","WGrML.levels","map = '"+lmap+"' and type = '"+ltype+"' and value = '"+bottom+","+top+"'");
+	std::string layer_code;
+	if (query.submit(server) == 0 && query.fetch_row(row)) {
+	    layer_code=row[0];
+	}
+	else {
+	    metautils::log_error("build_wms_capabilities(): query '"+query.show()+"' failed","iinv",user,args.args_string);
+	}
+	auto layer_title=lmapper.description(data_format,ltype,lmap);
+	if (layer_title.empty()) {
+	    layer_title=vlayer.attribute_value("type")+":"+vlayer.attribute_value("value");
+	}
+	else if (vlayer.attribute_value("value") != "0") {
+	    auto tparts=strutils::split(ltype,"-");
+	    layer_title+=": "+vlayer.attribute_value("bottom")+lmapper.units(data_format,tparts[0],lmap)+", "+vlayer.attribute_value("top")+lmapper.units(data_format,tparts[1],lmap);;
+	}
+	ofs << "      <Layer>" << std::endl;
+	ofs << "        <Title>" << layer_title << "</Title>" << std::endl;
+	auto params=vlayer.element_list("parameter");
+	for (const auto& param : params) {
+	    auto pcode=param.attribute_value("map")+":"+param.attribute_value("value");
+	    ofs << "        <Layer>" << std::endl;
+	    ofs << "          <Title>" << pmapper.description(data_format,pcode) << "</Title>" << std::endl;
+	    query.set("select distinct valid_date from IGrML.`ds"+local_args.dsnum2+"_inventory_"+data_format_code+"!"+pcode+"` as i left join WGrML.ds"+local_args.dsnum2+"_webfiles as w on w.code = i.webID_code where timeRange_code = "+time_range_code+" and gridDefinition_code = "+grid_definition_code+" and level_code = "+layer_code+" and webID = '"+data_file+"' order by valid_date");
+	    if (query.submit(server) == 0) {
+		while (query.fetch_row(row)) {
+		  ofs << "          <Layer queryable=\"0\">" << std::endl;
+		  ofs << "            <Name>" << time_range_code << ";" << grid_definition_code << ";" << layer_code << ";" << data_format_code << "!" << pcode << ";" << row[0] << "</Name>" << std::endl;
+		  ofs << "            <Title>" << row[0].substr(0,4) << "-" << row[0].substr(4,2) << "-" << row[0].substr(6,2) << "T" << row[0].substr(8,2) << ":" << row[0].substr(10,2) << "Z</Title>" << std::endl;
+		  ofs << "          </Layer>" << std::endl;
+		}
+	    }
+	    else {
+		metautils::log_error("build_wms_capabilities(): query '"+query.show()+"' failed","iinv",user,args.args_string);
+	    }
+	    ofs << "        </Layer>" << std::endl;
+	}
+	ofs << "      </Layer>" << std::endl;
+    }
+    ofs << "    </Layer>" << std::endl;
+    ++gcount;
+  }
+  ofs.close();
+  mysystem2("/bin/sh -c 'gzip "+tdir->name()+"/metadata/wms/"+filename+"'",oss,ess);
+  if (host_sync(tdir->name(),"metadata/wms/","/data/web/datasets/ds"+args.dsnum,error) < 0) {
+    metautils::log_error("build_wms_capabilities() could not sync the capabilities file for '"+filename+"'","iinv",user,args.args_string);
+  }
+  delete tdir;
+}
 
 void insert_grml_inventory()
 {
@@ -1426,7 +1648,10 @@ void insert_inventory()
   idx=args.filename.rfind(".");
   ext=args.filename.substr(idx+1);
   if (ext == "GrML_inv") {
-    insert_grml_inventory();
+    if (!local_args.wms_only) {
+	insert_grml_inventory();
+    }
+    build_wms_capabilities();
   }
   else if (ext == "ObML_inv") {
     insert_obml_inventory();
@@ -1444,9 +1669,10 @@ int main(int argc,char **argv)
     std::cerr << "-d nnn.n   specifies the dataset number" << std::endl;
     std::cerr << "-f file    summarize information for inventory file <file>" << std::endl;
     std::cerr << "\noptions:" << std::endl;
-    std::cerr << "-c/-C      create (default)/don't create file list cache" << std::endl;
-    std::cerr << "-N         notify with a message when " << argv[0] << " completes" << std::endl;
-    std::cerr << "-V         verbose mode" << std::endl;
+    std::cerr << "-c/-C       create (default)/don't create file list cache" << std::endl;
+    std::cerr << "-N          notify with a message when " << argv[0] << " completes" << std::endl;
+    std::cerr << "-V          verbose mode" << std::endl;
+    std::cerr << "--wms-only  only generate the WMS capabilities document for the file" << std::endl;
     exit(1);
   }
   auto t1=time(nullptr);
