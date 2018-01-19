@@ -173,15 +173,8 @@ void build_wms_capabilities()
   strutils::replace_all(data_file,"%","/");
   auto grids=xdoc.element_list("GrML/grid");
   auto gcount=0;
+  std::string last_grid_definition_code="-1";
   for (const auto& grid : grids) {
-    query.set("code","WGrML.timeRanges","timeRange = '"+grid.attribute_value("timeRange")+"'");
-    std::string time_range_code;
-    if (query.submit(server) == 0 && query.fetch_row(row)) {
-	time_range_code=row[0];
-    }
-    else {
-	metautils::log_error("build_wms_capabilities(): query '"+query.show()+"' failed","iinv",user,args.args_string);
-    }
     auto def_params=grid_definition_parameters(grid);
     query.set("code","WGrML.gridDefinitions","definition = '"+grid.attribute_value("definition")+"' and defParams = '"+def_params+"'");
     std::string grid_definition_code;
@@ -191,23 +184,47 @@ void build_wms_capabilities()
     else {
 	metautils::log_error("build_wms_capabilities(): query '"+query.show()+"' failed","iinv",user,args.args_string);
     }
-    double west_lon,south_lat,east_lon,north_lat;
-    if (!fill_spatial_domain_from_grid_definition(grid.attribute_value("definition")+"<!>"+def_params,"primeMeridian",west_lon,south_lat,east_lon,north_lat)) {
-	metautils::log_info("build_wms_capabilities() could not get the spatial domain from '"+filename+"'","iinv",user,args.args_string);
-	return;
+    if (grid_definition_code != last_grid_definition_code) {
+	double west_lon,south_lat,east_lon,north_lat;
+	if (!fill_spatial_domain_from_grid_definition(grid.attribute_value("definition")+"<!>"+def_params,"primeMeridian",west_lon,south_lat,east_lon,north_lat)) {
+	  metautils::log_info("build_wms_capabilities() could not get the spatial domain from '"+filename+"'","iinv",user,args.args_string);
+	  return;
+	}
+	if (last_grid_definition_code != "-1") {
+	  ofs << "    </Layer>" << std::endl;
+	}
+	ofs << "    <Layer>" << std::endl;
+	ofs << "      <Title>" << grid.attribute_value("definition") << "_" << grid.attribute_value("numX") << "x" << grid.attribute_value("numY") << "</Title>" << std::endl;
+	ofs << "      <EX_GeographicBoundingBox>" << std::endl;
+	ofs << "        <westBoundLongitude>" << west_lon << "</westBoundLongitude>" << std::endl;
+	ofs << "        <eastBoundLongitude>" << east_lon << "</eastBoundLongitude>" << std::endl;
+	ofs << "        <southBoundLatitude>" << south_lat << "</southBoundLatitude>" << std::endl;
+	ofs << "        <northBoundLatitude>" << north_lat << "</northBoundLatitude>" << std::endl;
+	ofs << "      </EX_GeographicBoundingBox>" << std::endl;;
+	ofs << "#REPEAT __CRS__" << gcount << "__" << std::endl;
+	ofs << "      <BoundingBox CRS=\"__CRS__" << gcount << "__.CRS\" minx=\"__CRS__" << gcount << "__." << west_lon << "\" miny=\"__CRS__" << gcount << "__." << south_lat << "\" maxx=\"__CRS__" << gcount << "__." << east_lon << "\" maxy=\"__CRS__" << gcount << "__." << north_lat << "\" />" << std::endl;
+	ofs << "      <CRS>__CRS__" << gcount << "__.CRS</CRS>" << std::endl;
+	ofs << "#ENDREPEAT __CRS__" << gcount << "__" << std::endl;
+	ofs << "      <Style>" << std::endl;
+	ofs << "        <Name>" << grid_definition_code << "</Name>" << std::endl;
+	ofs << "        <Title>Legend Graphic</Title>" << std::endl;
+	ofs << "        <LegendURL>" << std::endl;
+	ofs << "          <Format>image/png</Format>" << std::endl;
+	ofs << "          <OnlineResource xlink:type=\"simple\" xlink:href=\"__SERVICE_RESOURCE_GET_URL__\" />" << std::endl;
+	ofs << "        </LegendURL>" << std::endl;
+	ofs << "      </Style>" << std::endl;
+	last_grid_definition_code=grid_definition_code;
     }
-    ofs << "    <Layer>" << std::endl;
-    ofs << "      <Title>" << grid.attribute_value("timeRange") << "</Title>" << std::endl;
-    ofs << "      <EX_GeographicBoundingBox>" << std::endl;
-    ofs << "        <westBoundLongitude>" << west_lon << "</westBoundLongitude>" << std::endl;
-    ofs << "        <eastBoundLongitude>" << east_lon << "</eastBoundLongitude>" << std::endl;
-    ofs << "        <southBoundLatitude>" << south_lat << "</southBoundLatitude>" << std::endl;
-    ofs << "        <northBoundLatitude>" << north_lat << "</northBoundLatitude>" << std::endl;
-    ofs << "      </EX_GeographicBoundingBox>" << std::endl;;
-    ofs << "#REPEAT __CRS__" << gcount << "__" << std::endl;
-    ofs << "      <BoundingBox CRS=\"__CRS__" << gcount << "__.CRS\" minx=\"__CRS__" << gcount << "__." << west_lon << "\" miny=\"__CRS__" << gcount << "__." << south_lat << "\" maxx=\"__CRS__" << gcount << "__." << east_lon << "\" maxy=\"__CRS__" << gcount << "__." << north_lat << "\" />" << std::endl;
-    ofs << "      <CRS>__CRS__" << gcount << "__.CRS</CRS>" << std::endl;
-    ofs << "#ENDREPEAT __CRS__" << gcount << "__" << std::endl;
+    query.set("code","WGrML.timeRanges","timeRange = '"+grid.attribute_value("timeRange")+"'");
+    std::string time_range_code;
+    if (query.submit(server) == 0 && query.fetch_row(row)) {
+	time_range_code=row[0];
+    }
+    else {
+	metautils::log_error("build_wms_capabilities(): query '"+query.show()+"' failed","iinv",user,args.args_string);
+    }
+    ofs << "      <Layer>" << std::endl;
+    ofs << "        <Title>" << grid.attribute_value("timeRange") << "</Title>" << std::endl;
     auto vlevels=grid.element_list("level");
     for (const auto& vlevel : vlevels) {
 	auto lmap=vlevel.attribute_value("map");
@@ -228,28 +245,28 @@ void build_wms_capabilities()
 	else if (vlevel.attribute_value("value") != "0") {
 	    level_title+=": "+vlevel.attribute_value("value")+lmapper.units(data_format,ltype,lmap);
 	}
-	ofs << "      <Layer>" << std::endl;
-	ofs << "        <Title>" << level_title << "</Title>" << std::endl;
+	ofs << "        <Layer>" << std::endl;
+	ofs << "          <Title>" << level_title << "</Title>" << std::endl;
 	auto params=vlevel.element_list("parameter");
 	for (const auto& param : params) {
 	    auto pcode=param.attribute_value("map")+":"+param.attribute_value("value");
-	    ofs << "        <Layer>" << std::endl;
-	    ofs << "          <Title>" << pmapper.description(data_format,pcode) << "</Title>" << std::endl;
+	    ofs << "          <Layer>" << std::endl;
+	    ofs << "            <Title>" << pmapper.description(data_format,pcode) << "</Title>" << std::endl;
 	    query.set("select distinct valid_date from IGrML.`ds"+local_args.dsnum2+"_inventory_"+data_format_code+"!"+pcode+"` as i left join WGrML.ds"+local_args.dsnum2+"_webfiles as w on w.code = i.webID_code where timeRange_code = "+time_range_code+" and gridDefinition_code = "+grid_definition_code+" and level_code = "+level_code+" and webID = '"+data_file+"' order by valid_date");
 	    if (query.submit(server) == 0) {
 		while (query.fetch_row(row)) {
-		  ofs << "          <Layer queryable=\"0\">" << std::endl;
-		  ofs << "            <Name>" << time_range_code << ";" << grid_definition_code << ";" << level_code << ";" << data_format_code << "!" << pcode << ";" << row[0] << "</Name>" << std::endl;
-		  ofs << "            <Title>" << row[0].substr(0,4) << "-" << row[0].substr(4,2) << "-" << row[0].substr(6,2) << "T" << row[0].substr(8,2) << ":" << row[0].substr(10,2) << "Z</Title>" << std::endl;
-		  ofs << "          </Layer>" << std::endl;
+		  ofs << "            <Layer queryable=\"0\">" << std::endl;
+		  ofs << "              <Name>" << grid_definition_code << ";" << time_range_code << ";" << level_code << ";" << data_format_code << "!" << pcode << ";" << row[0] << "</Name>" << std::endl;
+		  ofs << "              <Title>" << row[0].substr(0,4) << "-" << row[0].substr(4,2) << "-" << row[0].substr(6,2) << "T" << row[0].substr(8,2) << ":" << row[0].substr(10,2) << "Z</Title>" << std::endl;
+		  ofs << "            </Layer>" << std::endl;
 		}
 	    }
 	    else {
 		metautils::log_error("build_wms_capabilities(): query '"+query.show()+"' failed","iinv",user,args.args_string);
 	    }
-	    ofs << "        </Layer>" << std::endl;
+	    ofs << "          </Layer>" << std::endl;
 	}
-	ofs << "      </Layer>" << std::endl;
+	ofs << "        </Layer>" << std::endl;
     }
     auto vlayers=grid.element_list("layer");
     for (const auto& vlayer : vlayers) {
@@ -273,32 +290,33 @@ void build_wms_capabilities()
 	    auto tparts=strutils::split(ltype,"-");
 	    layer_title+=": "+vlayer.attribute_value("bottom")+lmapper.units(data_format,tparts[0],lmap)+", "+vlayer.attribute_value("top")+lmapper.units(data_format,tparts[1],lmap);;
 	}
-	ofs << "      <Layer>" << std::endl;
-	ofs << "        <Title>" << layer_title << "</Title>" << std::endl;
+	ofs << "        <Layer>" << std::endl;
+	ofs << "          <Title>" << layer_title << "</Title>" << std::endl;
 	auto params=vlayer.element_list("parameter");
 	for (const auto& param : params) {
 	    auto pcode=param.attribute_value("map")+":"+param.attribute_value("value");
-	    ofs << "        <Layer>" << std::endl;
-	    ofs << "          <Title>" << pmapper.description(data_format,pcode) << "</Title>" << std::endl;
+	    ofs << "          <Layer>" << std::endl;
+	    ofs << "            <Title>" << pmapper.description(data_format,pcode) << "</Title>" << std::endl;
 	    query.set("select distinct valid_date from IGrML.`ds"+local_args.dsnum2+"_inventory_"+data_format_code+"!"+pcode+"` as i left join WGrML.ds"+local_args.dsnum2+"_webfiles as w on w.code = i.webID_code where timeRange_code = "+time_range_code+" and gridDefinition_code = "+grid_definition_code+" and level_code = "+layer_code+" and webID = '"+data_file+"' order by valid_date");
 	    if (query.submit(server) == 0) {
 		while (query.fetch_row(row)) {
-		  ofs << "          <Layer queryable=\"0\">" << std::endl;
-		  ofs << "            <Name>" << time_range_code << ";" << grid_definition_code << ";" << layer_code << ";" << data_format_code << "!" << pcode << ";" << row[0] << "</Name>" << std::endl;
-		  ofs << "            <Title>" << row[0].substr(0,4) << "-" << row[0].substr(4,2) << "-" << row[0].substr(6,2) << "T" << row[0].substr(8,2) << ":" << row[0].substr(10,2) << "Z</Title>" << std::endl;
-		  ofs << "          </Layer>" << std::endl;
+		  ofs << "            <Layer queryable=\"0\">" << std::endl;
+		  ofs << "              <Name>" << time_range_code << ";" << grid_definition_code << ";" << layer_code << ";" << data_format_code << "!" << pcode << ";" << row[0] << "</Name>" << std::endl;
+		  ofs << "              <Title>" << row[0].substr(0,4) << "-" << row[0].substr(4,2) << "-" << row[0].substr(6,2) << "T" << row[0].substr(8,2) << ":" << row[0].substr(10,2) << "Z</Title>" << std::endl;
+		  ofs << "            </Layer>" << std::endl;
 		}
 	    }
 	    else {
 		metautils::log_error("build_wms_capabilities(): query '"+query.show()+"' failed","iinv",user,args.args_string);
 	    }
-	    ofs << "        </Layer>" << std::endl;
+	    ofs << "          </Layer>" << std::endl;
 	}
-	ofs << "      </Layer>" << std::endl;
+	ofs << "        </Layer>" << std::endl;
     }
-    ofs << "    </Layer>" << std::endl;
+    ofs << "      </Layer>" << std::endl;
     ++gcount;
   }
+  ofs << "    </Layer>" << std::endl;
   ofs.close();
   mysystem2("/bin/sh -c 'gzip "+tdir->name()+"/metadata/wms/"+filename+"'",oss,ess);
   if (host_sync(tdir->name(),"metadata/wms/","/data/web/datasets/ds"+args.dsnum,error) < 0) {
