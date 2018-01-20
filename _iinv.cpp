@@ -16,7 +16,7 @@
 metautils::Directives directives;
 metautils::Args args;
 struct LocalArgs {
-  LocalArgs() : dsnum2(),create_cache(false),notify(false),verbose(false),wms_only(false) {}
+  LocalArgs() : dsnum2(),create_cache(true),notify(false),verbose(false),wms_only(false) {}
 
   std::string dsnum2;
   bool create_cache,notify,verbose;
@@ -46,9 +46,6 @@ TempDir temp_dir;
 
 void parse_args(int argc,char **argv)
 {
-  local_args.create_cache=true;
-  local_args.notify=false;
-  local_args.verbose=false;
   args.args_string=unix_args_string(argc,argv);
   auto sp=strutils::split(args.args_string,":");
   for (size_t n=0; n < sp.size(); ++n) {
@@ -73,6 +70,7 @@ void parse_args(int argc,char **argv)
     }
     else if (sp[n] == "--wms-only") {
 	local_args.wms_only=true;
+	local_args.create_cache=false;
     }
   }
 }
