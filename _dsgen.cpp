@@ -62,13 +62,19 @@ void generate_index(std::string type,std::string tdir_name)
 	metautils::log_error("unable to open dsOverview.xml for "+args.dsnum+"; parse error: '"+xdoc.parse_error()+"'","dsgen",user,args.args_string);
     }
     ofs << "<meta http-equiv=\"Content-type\" content=\"application/xml+xhtml;charset=UTF-8\" />" << std::endl;
-    ofs << "<meta name=\"fragment\" content=\"!\">" << std::endl;
+    ofs << "<meta name=\"fragment\" content=\"!\" />" << std::endl;
+    if (!metadataExport::export_to_dc_meta_tags(ofs,args.dsnum,xdoc,0)) {
+	metautils::log_error("unable to export DC meta tags","dsgen",user,args.args_string);
+    }
     auto e=xdoc.element("dsOverview/title");
     auto title=e.content();
     ofs << "<title>CISL RDA: " << title << "</title>" << std::endl;
     ofs << "<?php include (\"main/styles.inc\"); ?>" << std::endl;
     ofs << "<?php include (\"main/scripts.inc\"); ?>" << std::endl;
     ofs << "<?php include (\"main/ds_scripts.inc\"); ?>" << std::endl;
+    if (!metadataExport::export_to_json_ld(ofs,args.dsnum,xdoc,0)) {
+	metautils::log_error("unable to export JSON-LD metadata","dsgen",user,args.args_string);
+    }
     ofs << "</head>" << std::endl;
     ofs << "<body>" << std::endl;
     ofs << "<div id=\"window_container_inner\" style=\"background-color: rgba(255,255,255,0.4); width: 1000px; height: auto; padding: 0px 20px 20px 20px; border-radius: 0px 0px 20px 20px; margin: 0px auto 40px auto\">" << std::endl;
