@@ -3,9 +3,10 @@
 #include <sys/stat.h>
 #include <string>
 #include <sstream>
-#include <deque>
 #include <regex>
+#include <map>
 #include <unordered_map>
+#include <unordered_set>
 #include <MySQL.hpp>
 #include <metadata.hpp>
 #include <citation.hpp>
@@ -13,52 +14,24 @@
 #include <utils.hpp>
 #include <bitmap.hpp>
 #include <tempfile.hpp>
-#include <mymap.hpp>
 #include <search.hpp>
+#include <myerror.hpp>
 
 metautils::Directives directives;
 metautils::Args args;
+std::string myerror="";
+std::string mywarning="";
 
-struct StringEntry {
-  StringEntry() : key() {}
-
-  std::string key;
-};
-struct CoverageEntry {
-  CoverageEntry() : key(),groups(nullptr) {}
-
-  std::string key;
-  std::shared_ptr<my::map<StringEntry>> groups;
-};
-struct PeriodEntry {
-  PeriodEntry() : key(),start(),end() {}
-
-  std::string key;
-  std::string start,end;
-};
-struct GridDefinitionEntry {
-  GridDefinitionEntry() : key(),definition(),definition_parameters() {}
-
-  size_t key;
-  std::string definition,definition_parameters;
-};
-struct XEntry {
-  XEntry() : key(),a(nullptr) {}
-
-  std::string key;
-  std::shared_ptr<std::string> a;
-};
 std::string user=getenv("USER");
-std::string dsnum,server_root;
 TempDir temp_dir;
 XMLDocument xdoc;
 MySQL::Server server;
-int div_num=0;
+std::string dataset_type;
 
 void generate_index(std::string type,std::string tdir_name)
 {
   std::ofstream ofs;
-  if (type == "W") {
+  if (dataset_type == "W") {
     ofs.open((tdir_name+"/test_index.html").c_str());
   }
   else {
@@ -69,24 +42,24 @@ void generate_index(std::string type,std::string tdir_name)
   }
   ofs << "<!DOCTYPE html>" << std::endl;
   ofs << "<head>" << std::endl;
-  if (type == "I") {
-    ofs << "<meta http-equiv=\"Refresh\" content=\"0; url=/index.html?hash=error&code=404&url=/datasets/ds" << dsnum << "\" />" << std::endl;
+  if (dataset_type == "I") {
+    ofs << "<meta http-equiv=\"Refresh\" content=\"0; url=/index.html?hash=error&code=404&url=/datasets/ds" << args.dsnum << "\" />" << std::endl;
     ofs << "</head>" << std::endl;
   }
   else {
     struct stat buf;
     std::string ds_overview;
-    if (stat(("/data/web/datasets/ds"+dsnum+"/metadata/dsOverview.xml").c_str(),&buf) == 0) {
-	ds_overview="/data/web/datasets/ds"+dsnum+"/metadata/dsOverview.xml";
+    if (stat(("/data/web/datasets/ds"+args.dsnum+"/metadata/dsOverview.xml").c_str(),&buf) == 0) {
+	ds_overview="/data/web/datasets/ds"+args.dsnum+"/metadata/dsOverview.xml";
     }
     else {
-	ds_overview=remote_web_file("https://rda.ucar.edu/datasets/ds"+dsnum+"/metadata/dsOverview.xml",temp_dir.name());
+	ds_overview=remote_web_file("https://rda.ucar.edu/datasets/ds"+args.dsnum+"/metadata/dsOverview.xml",temp_dir.name());
 	if (ds_overview.empty()) {
-	  metautils::log_error("dsOverview.xml does not exist for "+dsnum,"dsgen",user,args.args_string);
+	  metautils::log_error("dsOverview.xml does not exist for "+args.dsnum,"dsgen",user,args.args_string);
 	}
     }
     if (!xdoc.open(ds_overview)) {
-	metautils::log_error("unable to open dsOverview.xml for "+dsnum+"; parse error: '"+xdoc.parse_error()+"'","dsgen",user,args.args_string);
+	metautils::log_error("unable to open dsOverview.xml for "+args.dsnum+"; parse error: '"+xdoc.parse_error()+"'","dsgen",user,args.args_string);
     }
     ofs << "<meta http-equiv=\"Content-type\" content=\"application/xml+xhtml;charset=UTF-8\" />" << std::endl;
     ofs << "<meta name=\"fragment\" content=\"!\">" << std::endl;
@@ -111,7 +84,7 @@ void generate_index(std::string type,std::string tdir_name)
     ofs << "    if ($conn) {" << std::endl;
     ofs << "      $db=mysql_select_db(\"dssdb\",$conn);" << std::endl;
     ofs << "      if ($db) {" << std::endl;
-    ofs << "        $query=\"select dsid from dsbookmarks where email = '\" . $duser . \"' and dsid = '" << dsnum << "'\";" << std::endl;
+    ofs << "        $query=\"select dsid from dsbookmarks where email = '\" . $duser . \"' and dsid = '" << args.dsnum << "'\";" << std::endl;
     ofs << "        $res=mysql_query($query,$conn);" << std::endl;
     ofs << "        if ($res && mysql_num_rows($res) > 0) {" << std::endl;
     ofs << "          $is_bookmarked=true;" << std::endl;
@@ -133,13 +106,13 @@ void generate_index(std::string type,std::string tdir_name)
     else {
 	ofs << "default_200_200.png\" width=\"70\"";
     }
-    ofs << " height=\"70\" /></td><td><span class=\"fs24px bold\">" << title << "</span><br /><span class=\"fs16px bold\"><span class=\"blue\">ds" << dsnum << "</span>";
-    MySQL::Query query("doi","dssdb.dsvrsn","dsid = 'ds"+dsnum+"' and status = 'A'");
+    ofs << " height=\"70\" /></td><td><span class=\"fs24px bold\">" << title << "</span><br /><span class=\"fs16px bold\"><span class=\"blue\">ds" << args.dsnum << "</span>";
+    MySQL::Query query("doi","dssdb.dsvrsn","dsid = 'ds"+args.dsnum+"' and status = 'A'");
     MySQL::Row row;
     if (query.submit(server) == 0 && query.fetch_row(row) && !row[0].empty()) {
 	ofs << "&nbsp;|&nbsp;<span class=\"blue\">DOI: " << row[0] << "</span>";
     }
-    ofs << "</span><div id=\"ds_bookmark\" style=\"display: inline; margin-left: 2px\"><?php if ($can_bookmark) { $dsid=\"" << dsnum << "\"; if ($is_bookmarked) { include(\"dsbookmarks/showunset.inc\"); } else { include(\"dsbookmarks/showset.inc\"); } } ?></div></td></tr>" << std::endl;
+    ofs << "</span><div id=\"ds_bookmark\" style=\"display: inline; margin-left: 2px\"><?php if ($can_bookmark) { $dsid=\"" << args.dsnum << "\"; if ($is_bookmarked) { include(\"dsbookmarks/showunset.inc\"); } else { include(\"dsbookmarks/showset.inc\"); } } ?></div></td></tr>" << std::endl;
     e=xdoc.element("dsOverview/contact");
     auto contact_parts=strutils::split(e.content());
     query.set("select logname,phoneno from dssdb.dssgrp where fstname = '"+contact_parts[0]+"' and lstname = '"+contact_parts[1]+"'");
@@ -155,7 +128,7 @@ void generate_index(std::string type,std::string tdir_name)
     ofs << "<tr valign=\"bottom\"><td align=\"right\"><span class=\"fs16px\">For assistance, contact <a class=\"blue\" href=\"mailto:"+row[0]+"@ucar.edu\">"+e.content()+"</a> <span class=\"mediumGrayText\">("+phoneno+").</span></span></td></tr>" << std::endl;
     ofs << "</table>" << std::endl;
     ofs << "<?php include(\"main/dstabs";
-    if (type == "D") {
+    if (dataset_type == "D") {
 	ofs << "-dead";
     }
     ofs << ".inc\"); ?>" << std::endl;
@@ -406,74 +379,60 @@ void insert_table(std::ofstream& ofs,std::list<std::string> list,int max_columns
   ofs << "</table>" << std::endl;
 }
 
-void insert_text_field(std::ofstream& ofs,std::string element_name,std::string section_title)
+void insert_text_field(std::ofstream& ofs,const XMLElement& e,std::string section_title)
 {
-  auto e=xdoc.element("dsOverview/"+element_name).to_string();
-  if (!e.empty()) {
-    strutils::replace_all(e,"<"+element_name+">","");
-    strutils::replace_all(e,"</"+element_name+">","");
-    strutils::trim(e);
+  auto s=e.to_string();
+  if (!s.empty()) {
+    strutils::replace_all(s,"<"+e.name()+">","");
+    strutils::replace_all(s,"</"+e.name()+">","");
+    strutils::trim(s);
     size_t idx;
-    if ( (idx=e.find("<p")) == std::string::npos) {
-	idx=e.find("<P");
+    if ( (idx=s.find("<p")) == std::string::npos) {
+	idx=s.find("<P");
     }
     if (idx == 0) {
-	auto idx2=e.find(">",idx);
-	e.insert(idx2," style=\"margin: 0px; padding: 0px\"");
+	auto idx2=s.find(">",idx);
+	s.insert(idx2," style=\"margin: 0px; padding: 0px\"");
     }
-    ofs << "<tr style=\"vertical-align: top\"><td class=\"bold\">" << section_title << ":</td><td>" << e << "</td></tr>" << std::endl;
+    ofs << "<tr style=\"vertical-align: top\"><td class=\"bold\">" << section_title << ":</td><td>" << s << "</td></tr>" << std::endl;
   }
 }
 
 void generate_description(std::string type,std::string tdir_name)
 {
-  MySQL::Row row,row2;
-  std::string start_date_time,end_date_time;
-  my::map<PeriodEntry> periods_table;
-  std::list<std::string> databases,formats,types,grids,levels;
-  PeriodEntry pe;
-  int n,m;
-  StringEntry se;
-  my::map<CoverageEntry> unique_grid_definitions_table;
-  CoverageEntry ce;
-  GridDefinitionEntry gde;
-  my::map<XEntry> groups_table,rda_files_table(99999),metadata_files_table(99999);
-  XEntry xe;
-  bool grouped_periods=false;
-  bool found_content_metadata=false;
-  bool started_pubs=false;
-  bool is_local;
-
-  std::string dsnum2=strutils::substitute(dsnum,".","");
+  std::string dsnum2=strutils::substitute(args.dsnum,".","");
   std::ofstream ofs;
   ofs.open((tdir_name+"/description.html").c_str());
   if (!ofs.is_open()) {
     metautils::log_error("unable to open output for 'description.html'","dsgen",user,args.args_string);
   }
-  if (type == "D") {
+  if (dataset_type == "D") {
     ofs << "<table class=\"fs16px\" width=\"100%\" cellspacing=\"10\" cellpadding=\"0\" border=\"0\">" << std::endl;
-    insert_text_field(ofs,"summary","Abstract");
+    insert_text_field(ofs,xdoc.element("dsOverview/summary"),"Abstract");
     ofs << "</table>" << std::endl;
     ofs.close();
     return;
   }
 /*
-  if (type == "I") {
+  if (dataset_type == "I") {
     ofs << "<ul>This dataset has been removed from public view.  If you have questions about this dataset, please contact the specialist that is named above.</ul>" << std::endl;
     ofs.close();
     return;
   }
 */
-  databases=metautils::cmd_databases("dsgen","x",dsnum);
+  auto databases=metautils::cmd_databases("dsgen","x",args.dsnum);
   if (databases.size() == 0) {
     metautils::log_error("empty CMD database list","dsgen",user,args.args_string);
   }
+  std::vector<std::string> formats,types;
+  auto found_content_metadata=false;
   for (const auto& db : databases) {
     if (db[0] != 'V' && table_exists(server,db+".ds"+dsnum2+"_primaries")) {
 	MySQL::LocalQuery query("select distinct format from "+db+".formats as f left join "+db+".ds"+dsnum2+"_primaries as d on d.format_code = f.code where !isnull(d.format_code)");
 	if (query.submit(server) < 0) {
 	  metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",user,args.args_string);
 	}
+	MySQL::Row row;
 	while (query.fetch_row(row)) {
 	  formats.emplace_back(row[0]+"<!>");
 	}
@@ -497,11 +456,11 @@ void generate_description(std::string type,std::string tdir_name)
   ofs << "  $cdg_guidance_path=\"\";" << std::endl;
   ofs << "  $conn=mysql_connect(\"rda-db.ucar.edu\",\"metadata\",\"metadata\");" << std::endl;
   ofs << "  if ($conn) {" << std::endl;
-  ofs << "    $res=mysql_query(\"select dsid from metautil.rda_blog where dsid = '" << dsnum << "'\");" << std::endl;
+  ofs << "    $res=mysql_query(\"select dsid from metautil.rda_blog where dsid = '" << args.dsnum << "'\");" << std::endl;
   ofs << "    if (mysql_numrows($res) > 0) {" << std::endl;
   ofs << "      $rda_blog=true;" << std::endl;
   ofs << "    }" << std::endl;
-  ofs << "    $res=mysql_query(\"select cdg_page_path,cdg_guidance_path from metautil.climate_data_guide where dsid = '" << dsnum << "'\");" << std::endl;
+  ofs << "    $res=mysql_query(\"select cdg_page_path,cdg_guidance_path from metautil.climate_data_guide where dsid = '" << args.dsnum << "'\");" << std::endl;
   ofs << "    if (mysql_numrows($res) > 0) {" << std::endl;
   ofs << "      @ $row=mysql_fetch_array($res,MYSQL_ASSOC);" << std::endl;
   ofs << "      $cdg_page_path=$row['cdg_page_path'];" << std::endl;
@@ -527,76 +486,70 @@ void generate_description(std::string type,std::string tdir_name)
 // YouTube tutorial
   ofs << "<tr style=\"vertical-align: bottom\"><td class=\"bold nowrap\">Help with this page:</td><td><a href=\"http://ncarrda.blogspot.com/search/label/Tutorial+YouTube+Description\" target=\"_tutorial\">RDA dataset description page video tour</a></td></tr>" << std::endl;
 // dataset summary (abstract)
-  insert_text_field(ofs,"summary","Abstract");
+  insert_text_field(ofs,xdoc.element("dsOverview/summary"),"Abstract");
 // acknowledgments
-  insert_text_field(ofs,"acknowledgement","Acknowledgments");
+  insert_text_field(ofs,xdoc.element("dsOverview/acknowledgement"),"Acknowledgments");
 // temporal range(s)
   ofs << "<tr style=\"vertical-align: top\"><td class=\"bold nowrap\">Temporal Range:</td><td>";
-  MySQL::LocalQuery query("select dsid from dssdb.dsgroup where dsid = 'ds"+dsnum+"'");
+  MySQL::LocalQuery query("select dsid from dssdb.dsgroup where dsid = 'ds"+args.dsnum+"'");
   if (query.submit(server) < 0) {
     metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",user,args.args_string);
   }
   if (query.num_rows() > 0) {
-    query.set("select p.date_start,p.time_start,p.start_flag,p.date_end,p.time_end,p.end_flag,p.time_zone,g.title,g.grpid from dssdb.dsperiod as p left join dssdb.dsgroup as g on (p.dsid = g.dsid and p.gindex = g.gindex) where p.dsid = 'ds"+dsnum+"' and g.pindex = 0 and date_start > '0000-00-00' and date_start < '3000-01-01' and date_end > '0000-00-00' and date_end < '3000-01-01' union select p.date_start,p.time_start,p.start_flag,p.date_end,p.time_end,p.end_flag,p.time_zone,g2.title,g.grpid from dssdb.dsperiod as p left join dssdb.dsgroup as g on (p.dsid = g.dsid and p.gindex = g.gindex) left join dssdb.dsgroup as g2 on (p.dsid = g2.dsid and g.pindex = g2.gindex) where p.dsid = 'ds"+dsnum+"' and date_start > '0000-00-00' and date_start < '3000-01-01' and date_end > '0000-00-00' and date_end < '3000-01-01' and !isnull(g2.title) order by title");
+    query.set("select p.date_start,p.time_start,p.start_flag,p.date_end,p.time_end,p.end_flag,p.time_zone,g.title,g.grpid from dssdb.dsperiod as p left join dssdb.dsgroup as g on (p.dsid = g.dsid and p.gindex = g.gindex) where p.dsid = 'ds"+args.dsnum+"' and g.pindex = 0 and date_start > '0000-00-00' and date_start < '3000-01-01' and date_end > '0000-00-00' and date_end < '3000-01-01' union select p.date_start,p.time_start,p.start_flag,p.date_end,p.time_end,p.end_flag,p.time_zone,g2.title,g.grpid from dssdb.dsperiod as p left join dssdb.dsgroup as g on (p.dsid = g.dsid and p.gindex = g.gindex) left join dssdb.dsgroup as g2 on (p.dsid = g2.dsid and g.pindex = g2.gindex) where p.dsid = 'ds"+args.dsnum+"' and date_start > '0000-00-00' and date_start < '3000-01-01' and date_end > '0000-00-00' and date_end < '3000-01-01' and !isnull(g2.title) order by title");
   }
   else {
-    query.set("select date_start,time_start,start_flag,date_end,time_end,end_flag,time_zone,NULL,NULL from dssdb.dsperiod where dsid = 'ds"+dsnum+"' and date_start > '0000-00-00' and date_start < '3000-01-01' and date_end > '0000-00-00' and date_end < '3000-01-01'");
+    query.set("select date_start,time_start,start_flag,date_end,time_end,end_flag,time_zone,NULL,NULL from dssdb.dsperiod where dsid = 'ds"+args.dsnum+"' and date_start > '0000-00-00' and date_start < '3000-01-01' and date_end > '0000-00-00' and date_end < '3000-01-01'");
   }
   if (query.submit(server) < 0) {
     metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",user,args.args_string);
   }
   if (query.num_rows() == 0) {
-    query.set("select date_start,time_start,start_flag,date_end,time_end,end_flag,time_zone,NULL,NULL from dssdb.dsperiod where dsid = 'ds"+dsnum+"' and date_start > '0000-00-00' and date_start < '3000-01-01' and date_end > '0000-00-00' and date_end < '3000-01-01'");
+    query.set("select date_start,time_start,start_flag,date_end,time_end,end_flag,time_zone,NULL,NULL from dssdb.dsperiod where dsid = 'ds"+args.dsnum+"' and date_start > '0000-00-00' and date_start < '3000-01-01' and date_end > '0000-00-00' and date_end < '3000-01-01'");
     if (query.submit(server) < 0) {
 	metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",user,args.args_string);
     }
   }
+  auto div_num=0;
+  std::unordered_map<std::string,std::string> groups_table,rda_files_table,metadata_files_table;
+  bool grouped_periods=false;
   if (query.num_rows() > 1) {
-    MySQL::LocalQuery query2("distinct gindex","dssdb.dsperiod","dsid = 'ds"+dsnum+"'");
+    MySQL::LocalQuery query2("distinct gindex","dssdb.dsperiod","dsid = 'ds"+args.dsnum+"'");
     if (query2.submit(server) < 0) {
 	metautils::log_error("query: "+query2.show()+" returned error: "+query2.error(),"dsgen",user,args.args_string);
     }
     if (query2.num_rows() > 1) {
 	grouped_periods=true;
-	query2.set("select gindex,title from dssdb.dsgroup where dsid = 'ds"+dsnum+"'");
+	query2.set("select gindex,title from dssdb.dsgroup where dsid = 'ds"+args.dsnum+"'");
 	if (query2.submit(server) < 0) {
 	  metautils::log_error("error: "+query2.error()+" while getting groups data","dsgen",user,args.args_string);
 	}
+	MySQL::Row row2;
 	while (query2.fetch_row(row2)) {
-	  xe.key=row2[0];
-	  xe.a.reset(new std::string);
-	  *(xe.a)=row2[1];
-	  groups_table.insert(xe);
+	  groups_table.emplace(row2[0],row2[1]);
 	}
-//	query2.set("select mssfile,tindex from dssdb.mssfile where dsid = 'ds"+dsnum+"' and property = 'P' and retention_days > 0");
-query2.set("select mssfile,tindex from dssdb.mssfile where dsid = 'ds"+dsnum+"' and type = 'P' and status = 'P'");
+	query2.set("select mssfile,tindex from dssdb.mssfile where dsid = 'ds"+args.dsnum+"' and type = 'P' and status = 'P'");
 	if (query2.submit(server) < 0) {
 	  metautils::log_error("error: "+query2.error()+" while getting RDA files data","dsgen",user,args.args_string);
 	}
 	while (query2.fetch_row(row2)) {
-	  xe.key=row2[0];
-	  xe.a.reset(new std::string);
-	  *(xe.a)=row2[1];
-	  rda_files_table.insert(xe);
+	  rda_files_table.emplace(row2[0],row2[1]);
 	}
 	query2.set("select code,mssID from GrML.ds"+dsnum2+"_primaries");
 	if (query2.submit(server) == 0) {
 	  while (query2.fetch_row(row2)) {
-	    xe.key=row2[0];
-	    xe.a.reset(new std::string);
-	    *(xe.a)=row2[1];
-	    metadata_files_table.insert(xe);
+	    metadata_files_table.emplace(row2[0],row2[1]);
 	  }
 	}
-	query2.set("select min(concat(date_start,' ',time_start)),min(start_flag),max(concat(date_end,' ',time_end)),min(end_flag),any_value(time_zone) from dssdb.dsperiod where dsid = 'ds"+dsnum+"' and date_start > '0000-00-00' and date_start < '3000-01-01' and date_end > '0000-00-00' and date_end < '3000-01-01' group by dsid");
+	query2.set("select min(concat(date_start,' ',time_start)),min(start_flag),max(concat(date_end,' ',time_end)),min(end_flag),any_value(time_zone) from dssdb.dsperiod where dsid = 'ds"+args.dsnum+"' and date_start > '0000-00-00' and date_start < '3000-01-01' and date_end > '0000-00-00' and date_end < '3000-01-01' group by dsid");
 	if (query2.submit(server) < 0) {
 	  metautils::log_error("query: "+query2.show()+" returned error: "+query2.error(),"dsgen",user,args.args_string);
 	}
 	query2.fetch_row(row2);
-	start_date_time=summarizeMetadata::set_date_time_string(row2[0],row2[1],row2[4]);
-	end_date_time=summarizeMetadata::set_date_time_string(row2[2],row2[3],row2[4]);
+	auto start_date_time=summarizeMetadata::set_date_time_string(row2[0],row2[1],row2[4]);
+	auto end_date_time=summarizeMetadata::set_date_time_string(row2[2],row2[3],row2[4]);
 	auto temporal=start_date_time;
-	if (end_date_time.length() > 0 && end_date_time != start_date_time) {
+	if (!end_date_time.empty() && end_date_time != start_date_time) {
 	  temporal+=" to "+end_date_time;
 	}
 	ofs << temporal << " <span class=\"fs13px\">(Entire dataset)</span>";
@@ -604,53 +557,45 @@ query2.set("select mssfile,tindex from dssdb.mssfile where dsid = 'ds"+dsnum+"' 
 	div_num+=2;
     }
   }
+  std::map<std::string,std::tuple<std::string,std::string>> periods_table;
+  MySQL::Row row;
   while (query.fetch_row(row)) {
-    start_date_time=summarizeMetadata::set_date_time_string(row[0]+" "+row[1],row[2],row[6]);
-    end_date_time=summarizeMetadata::set_date_time_string(row[3]+" "+row[4],row[5],row[6]);
-    if (row[7].length() > 0) {
-	pe.key=row[7];
+    auto start_date_time=summarizeMetadata::set_date_time_string(row[0]+" "+row[1],row[2],row[6]);
+    auto end_date_time=summarizeMetadata::set_date_time_string(row[3]+" "+row[4],row[5],row[6]);
+    std::string key;
+    if (!row[7].empty()) {
+	key=row[7];
     }
     else {
-	pe.key=row[8];
+	key=row[8];
     }
-    if (!periods_table.found(pe.key,pe)) {
-	pe.start=start_date_time;
-	pe.end=end_date_time;
-	periods_table.insert(pe);
+    if (periods_table.find(key) == periods_table.end()) {
+	periods_table.emplace(key,std::make_tuple(start_date_time,end_date_time));
     }
     else {
-	if (start_date_time < pe.start) {
-	  pe.start=start_date_time;
+	std::string &start=std::get<0>(periods_table[key]);
+	if (start_date_time < start) {
+	  start=start_date_time;
 	}
-	if (end_date_time > pe.end) {
-	  pe.end=end_date_time;
+	std::string &end=std::get<1>(periods_table[key]);
+	if (end_date_time > end) {
+	  end=end_date_time;
 	}
-	periods_table.replace(pe);
     }   
   }
-  n=0;
-  for (const auto& key : periods_table.keys()) {
-    periods_table.found(key,pe);
-    auto temporal=pe.start;
-    if (pe.end.length() > 0 && pe.end != pe.start) {
-	temporal+=" to "+pe.end;
+  for (const auto& e : periods_table) {
+    auto temporal=std::get<0>(e.second);
+    auto end=std::get<1>(e.second);
+    if (!end.empty() && end != temporal) {
+	temporal+=" to "+end;
     }
-//    if (key.length() > 0) {
-if (periods_table.size() > 1) {
-	temporal+=" ("+key+")";
-    }
-/*
-    if (grouped_periods || n > 0) {
-	ofs << "<br />";
-    }
-*/
     if (periods_table.size() > 1) {
+	temporal+=" ("+e.first+")";
 	ofs << "<div style=\"margin-left: 10px\">" << temporal << "</div>";
     }
     else {
 	ofs << temporal;
     }
-    ++n;
   }
   if (grouped_periods) {
     ofs << "</span></span>";
@@ -694,7 +639,7 @@ if (periods_table.size() > 1) {
   }
 // variables
   ofs << "<tr style=\"vertical-align: top\"><td class=\"bold\">Variables:</td><td>" << std::endl;
-  query.set("select substring_index(path,' > ',-1) as var from search.variables_new as v left join search.GCMD_sciencekeywords as g on g.uuid = v.keyword where v.vocabulary = 'GCMD' and v.dsid = '"+dsnum+"' order by var");
+  query.set("select substring_index(path,' > ',-1) as var from search.variables_new as v left join search.GCMD_sciencekeywords as g on g.uuid = v.keyword where v.vocabulary = 'GCMD' and v.dsid = '"+args.dsnum+"' order by var");
   if (query.submit(server) < 0) {
     metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",user,args.args_string);
   }
@@ -712,33 +657,33 @@ if (periods_table.size() > 1) {
 	}
     }
   }
-  if (exists_on_server(directives.web_server,"/data/web/datasets/ds"+dsnum+"/metadata/grib.html")) {
-    ofs << "<div>GRIB parameter table:  <a href=\"/datasets/ds" << dsnum << "/#metadata/grib.html?_do=y\">HTML</a>";
-    if (exists_on_server(directives.web_server,"/data/web/datasets/ds"+dsnum+"/metadata/grib.xml")) {
-	ofs << " | <a href=\"/datasets/ds" << dsnum << "/metadata/grib.xml\">XML</a></div>";
+  if (exists_on_server(directives.web_server,"/data/web/datasets/ds"+args.dsnum+"/metadata/grib.html")) {
+    ofs << "<div>GRIB parameter table:  <a href=\"/datasets/ds" << args.dsnum << "/#metadata/grib.html?_do=y\">HTML</a>";
+    if (exists_on_server(directives.web_server,"/data/web/datasets/ds"+args.dsnum+"/metadata/grib.xml")) {
+	ofs << " | <a href=\"/datasets/ds" << args.dsnum << "/metadata/grib.xml\">XML</a></div>";
     }
     ofs << std::endl;
   }
-  if (exists_on_server(directives.web_server,"/data/web/datasets/ds"+dsnum+"/metadata/grib2.html")) {
-    ofs << "<div>GRIB2 parameter table:  <a href=\"/datasets/ds" << dsnum << "/#metadata/grib2.html?_do=y\">HTML</a>";
-    if (exists_on_server(directives.web_server,"/data/web/datasets/ds"+dsnum+"/metadata/grib2.xml")) {
-	ofs << " | <a href=\"/datasets/ds" << dsnum << "/metadata/grib2.xml\">XML</a></div>"; 
+  if (exists_on_server(directives.web_server,"/data/web/datasets/ds"+args.dsnum+"/metadata/grib2.html")) {
+    ofs << "<div>GRIB2 parameter table:  <a href=\"/datasets/ds" << args.dsnum << "/#metadata/grib2.html?_do=y\">HTML</a>";
+    if (exists_on_server(directives.web_server,"/data/web/datasets/ds"+args.dsnum+"/metadata/grib2.xml")) {
+	ofs << " | <a href=\"/datasets/ds" << args.dsnum << "/metadata/grib2.xml\">XML</a></div>"; 
     }
     ofs << std::endl;
   }
-  if (exists_on_server(directives.web_server,"/data/web/datasets/ds"+dsnum+"/metadata/on84.html")) {
-    ofs << "<div>ON84 parameter table:  <a href=\"/datasets/ds" << dsnum << "/metadata/on84.html\">HTML</a>";
-    if (exists_on_server(directives.web_server,"/data/web/datasets/ds"+dsnum+"/metadata/on84.html")) {
-	ofs << " | <a href=\"/datasets/ds" << dsnum << "/metadata/on84.xml\">XML</a></div>";
+  if (exists_on_server(directives.web_server,"/data/web/datasets/ds"+args.dsnum+"/metadata/on84.html")) {
+    ofs << "<div>ON84 parameter table:  <a href=\"/datasets/ds" << args.dsnum << "/metadata/on84.html\">HTML</a>";
+    if (exists_on_server(directives.web_server,"/data/web/datasets/ds"+args.dsnum+"/metadata/on84.html")) {
+	ofs << " | <a href=\"/datasets/ds" << args.dsnum << "/metadata/on84.xml\">XML</a></div>";
     }
     ofs << std::endl;
   }
-  query.set("gindex,title","dssdb.dsgroup","dsid = 'ds"+dsnum+"' and pindex = 0 and pmsscnt > 0");
+  query.set("gindex,title","dssdb.dsgroup","dsid = 'ds"+args.dsnum+"' and pindex = 0 and pmsscnt > 0");
   if (query.submit(server) == 0) {
     std::stringstream vars_by_product;
     while (query.fetch_row(row)) {
-	if (exists_on_server(directives.web_server,"/data/web/datasets/ds"+dsnum+"/metadata/customize.GrML."+row[0])) {
-	  auto c_file=remote_web_file("https://rda.ucar.edu/datasets/ds"+dsnum+"/metadata/customize.GrML."+row[0],temp_dir.name());
+	if (exists_on_server(directives.web_server,"/data/web/datasets/ds"+args.dsnum+"/metadata/customize.GrML."+row[0])) {
+	  auto c_file=remote_web_file("https://rda.ucar.edu/datasets/ds"+args.dsnum+"/metadata/customize.GrML."+row[0],temp_dir.name());
 	  if (!c_file.empty()) {
 	    std::ifstream ifs;
 	    char line[32768];
@@ -780,8 +725,8 @@ if (periods_table.size() > 1) {
     for (const auto& type : types) {
 	if (type == "grid") {
 	  ofs << "<tr style=\"vertical-align: top\"><td class=\"bold nowrap\">Vertical Levels:</td><td>See the <a href=\"#metadata/detailed.html?_do=y&view=level\">detailed metadata</a> for level information";
-	  if (exists_on_server(directives.web_server,"/data/web/datasets/ds"+dsnum+"/metadata/grib2_levels.html")) {
-	    ofs << "<br /><a href=\"/datasets/ds" << dsnum << "/#metadata/grib2_levels.html?_do=y\">GRIB2 level table</a>"; 
+	  if (exists_on_server(directives.web_server,"/data/web/datasets/ds"+args.dsnum+"/metadata/grib2_levels.html")) {
+	    ofs << "<br /><a href=\"/datasets/ds" << args.dsnum << "/#metadata/grib2_levels.html?_do=y\">GRIB2 level table</a>"; 
 	  }
 	  ofs << "</td></tr>" << std::endl;
 	  break;
@@ -794,8 +739,9 @@ if (periods_table.size() > 1) {
     elist.insert(elist.end(),elist2.begin(),elist2.end());
     if (elist.size() > 0) {
 	ofs << "<tr style=\"vertical-align: top\"><td class=\"bold nowrap\">Vertical Levels:</td><td>";
+	std::list<std::string> levels;
 	for (const auto& ele : elist) {
-	  if ((ele.attribute_value("value") == "0" || (ele.attribute_value("top") == "0" && ele.attribute_value("bottom") == "0")) && ele.attribute_value("units").length() == 0) {
+	  if ((ele.attribute_value("value") == "0" || (ele.attribute_value("top") == "0" && ele.attribute_value("bottom") == "0")) && ele.attribute_value("units").empty()) {
 	    levels.emplace_back(ele.attribute_value("type"));
 	  }
 	  else {
@@ -834,7 +780,7 @@ if (periods_table.size() > 1) {
 // temporal frequency
   if (!found_content_metadata) {
     elist=xdoc.element_list("dsOverview/contentMetadata/temporalFrequency");
-    m=0;
+    auto m=0;
     if (elist.size() > 0) {
 	ofs << "<tr style=\"vertical-align: bottom\"><td class=\"bold\">Temporal Frequencies:</td><td>";
 	for (const auto& ele : elist) {
@@ -843,7 +789,7 @@ if (periods_table.size() > 1) {
 	    ofs << ", ";
 	  }
 	  if (tfreq_type == "regular") {
-	    n=std::stoi(ele.attribute_value("number"));
+	    auto n=std::stoi(ele.attribute_value("number"));
 	    ofs << "Every ";
 	    if (n > 1) {
 		ofs << n << " ";
@@ -938,8 +884,9 @@ if (periods_table.size() > 1) {
     }
   }
 // spatial coverage
+  std::unordered_map<std::string,std::shared_ptr<std::unordered_set<std::string>>> unique_grid_definitions_table;
   if (found_content_metadata) {
-    my::map<GridDefinitionEntry> grid_definition_table;
+    std::unordered_map<size_t,std::tuple<std::string,std::string>> grid_definition_table;
     for (const auto& type : types) {
 	if (type == "grid") {
 	  if (grouped_periods) {
@@ -948,43 +895,50 @@ if (periods_table.size() > 1) {
 	  else {
 	    query.set("select distinct gridDefinition_codes from GrML.ds"+dsnum2+"_agrids");
 	  }
-	  if (query.submit(server) < 0)
+	  if (query.submit(server) < 0) {
 	    metautils::log_error("error: "+query.error()+" while getting grid definitions","dsgen",user,args.args_string);
+	  }
 	  while (query.fetch_row(row)) {
 	    std::vector<size_t> values;
 	    bitmap::uncompress_values(row[0],values);
 	    for (const auto& value : values) {
-		gde.key=value;
-		if (!grid_definition_table.found(gde.key,gde)) {
-		  MySQL::LocalQuery query2("definition,defParams","GrML.gridDefinitions","code = "+strutils::itos(gde.key));
+		std::string ugd_key;
+		if (grid_definition_table.find(value) == grid_definition_table.end()) {
+		  MySQL::LocalQuery query2("definition,defParams","GrML.gridDefinitions","code = "+strutils::itos(value));
 		  if (query2.submit(server) < 0) {
 		    metautils::log_error("query: "+query2.show()+" returned error: "+query2.error(),"dsgen",user,args.args_string);
 		  }
+		  MySQL::Row row2;
 		  query2.fetch_row(row2);
-		  gde.definition=row2[0];
-		  gde.definition_parameters=row2[1];
-		  grid_definition_table.insert(gde);
+		  grid_definition_table.emplace(value,std::make_tuple(row2[0],row2[1]));
+		  ugd_key=row2[0]+"<!>"+row2[1];
 		}
-		ce.key=gde.definition+"<!>"+gde.definition_parameters;
-		se.key="";
+		else {
+		  auto kval=grid_definition_table[value];
+		  ugd_key=std::get<0>(kval)+"<!>"+std::get<1>(kval);
+		}
+		std::string group="";
 		if (query.length() > 1) {
-		  if (metadata_files_table.found(row[1],xe) && rda_files_table.found(*(xe.a),xe) && groups_table.found(*(xe.a),xe)) {
-		    se.key=*(xe.a);
+		  std::unordered_map<std::string,std::string>::iterator m,r,g;
+		  if ( (m=metadata_files_table.find(row[1])) != metadata_files_table.end() && (r=rda_files_table.find(m->second)) != rda_files_table.end() && (g=groups_table.find(r->second)) != groups_table.end()) {
+		    group=g->second;
 		  }
 		}
-		if (!unique_grid_definitions_table.found(ce.key,ce)) {
-		  if (se.key.length() > 0) {
-		    ce.groups.reset(new my::map<StringEntry>);
-		    ce.groups->insert(se);
+		auto u=unique_grid_definitions_table.find(ugd_key);
+		if (u == unique_grid_definitions_table.end()) {
+		  std::shared_ptr<std::unordered_set<std::string>> g;
+		  if (!group.empty()) {
+		    g.reset(new std::unordered_set<std::string>);
+		    g->emplace(group);
 		  }
-		  unique_grid_definitions_table.insert(ce);
+		  unique_grid_definitions_table.emplace(ugd_key,g);
 		}
-		else if (se.key.length() > 0) {
-		  if (ce.groups == nullptr) {
-		    ce.groups.reset(new my::map<StringEntry>);
+		else if (!group.empty()) {
+		  if (u->second == nullptr) {
+		    u->second.reset(new std::unordered_set<std::string>);
 		  }
-		  if (!ce.groups->found(se.key,se)) {
-		    ce.groups->insert(se);
+		  if (u->second->find(group) == u->second->end()) {
+		    u->second->emplace(group);
 		  }
 		}
 	    }
@@ -996,30 +950,30 @@ if (periods_table.size() > 1) {
   else {
     elist=xdoc.element_list("dsOverview/contentMetadata/geospatialCoverage/grid");
     for (const auto& ele : elist) {
-	ce.key=ele.attribute_value("definition")+"<!>"+ele.attribute_value("numX")+":"+ele.attribute_value("numY");
-	if (std::regex_search(ce.key,std::regex("^latLon"))) {
-	  ce.key+=":"+ele.attribute_value("startLat")+":"+ele.attribute_value("startLon")+":"+ele.attribute_value("endLat")+":"+ele.attribute_value("endLon")+":"+ele.attribute_value("xRes")+":"+ele.attribute_value("yRes");
+	auto ugd_key=ele.attribute_value("definition")+"<!>"+ele.attribute_value("numX")+":"+ele.attribute_value("numY");
+	if (std::regex_search(ugd_key,std::regex("^latLon"))) {
+	  ugd_key+=":"+ele.attribute_value("startLat")+":"+ele.attribute_value("startLon")+":"+ele.attribute_value("endLat")+":"+ele.attribute_value("endLon")+":"+ele.attribute_value("xRes")+":"+ele.attribute_value("yRes");
 	}
-	else if (std::regex_search(ce.key,std::regex("^gaussLatLon"))) {
-	  ce.key+=":"+ele.attribute_value("startLat")+":"+ele.attribute_value("startLon")+":"+ele.attribute_value("endLat")+":"+ele.attribute_value("endLon")+":"+ele.attribute_value("xRes")+":"+ele.attribute_value("numY");
+	else if (std::regex_search(ugd_key,std::regex("^gaussLatLon"))) {
+	  ugd_key+=":"+ele.attribute_value("startLat")+":"+ele.attribute_value("startLon")+":"+ele.attribute_value("endLat")+":"+ele.attribute_value("endLon")+":"+ele.attribute_value("xRes")+":"+ele.attribute_value("numY");
 	}
-	else if (std::regex_search(ce.key,std::regex("^polarStereographic"))) {
-	  ce.key+=":"+ele.attribute_value("startLat")+":"+ele.attribute_value("startLon")+":60"+ele.attribute_value("pole")+":"+ele.attribute_value("projLon")+":"+ele.attribute_value("pole")+":"+ele.attribute_value("xRes")+":"+ele.attribute_value("yRes");
+	else if (std::regex_search(ugd_key,std::regex("^polarStereographic"))) {
+	  ugd_key+=":"+ele.attribute_value("startLat")+":"+ele.attribute_value("startLon")+":60"+ele.attribute_value("pole")+":"+ele.attribute_value("projLon")+":"+ele.attribute_value("pole")+":"+ele.attribute_value("xRes")+":"+ele.attribute_value("yRes");
 	}
-	else if (std::regex_search(ce.key,std::regex("^mercator"))) {
-	  ce.key+=":"+ele.attribute_value("startLat")+":"+ele.attribute_value("startLon")+":"+ele.attribute_value("endLat")+":"+ele.attribute_value("endLon")+":"+ele.attribute_value("xRes")+":"+ele.attribute_value("yRes")+":"+ele.attribute_value("resLat");
+	else if (std::regex_search(ugd_key,std::regex("^mercator"))) {
+	  ugd_key+=":"+ele.attribute_value("startLat")+":"+ele.attribute_value("startLon")+":"+ele.attribute_value("endLat")+":"+ele.attribute_value("endLon")+":"+ele.attribute_value("xRes")+":"+ele.attribute_value("yRes")+":"+ele.attribute_value("resLat");
 	}
-	else if (std::regex_search(ce.key,std::regex("^lambertConformal"))) {
-	  ce.key+=":"+ele.attribute_value("startLat")+":"+ele.attribute_value("startLon")+":"+ele.attribute_value("resLat")+":"+ele.attribute_value("projLon")+":"+ele.attribute_value("pole")+":"+ele.attribute_value("xRes")+":"+ele.attribute_value("yRes")+":"+ele.attribute_value("stdParallel1")+":"+ele.attribute_value("stdParallel2");
+	else if (std::regex_search(ugd_key,std::regex("^lambertConformal"))) {
+	  ugd_key+=":"+ele.attribute_value("startLat")+":"+ele.attribute_value("startLon")+":"+ele.attribute_value("resLat")+":"+ele.attribute_value("projLon")+":"+ele.attribute_value("pole")+":"+ele.attribute_value("xRes")+":"+ele.attribute_value("yRes")+":"+ele.attribute_value("stdParallel1")+":"+ele.attribute_value("stdParallel2");
 	}
-	unique_grid_definitions_table.insert(ce);
+	unique_grid_definitions_table.emplace(ugd_key,nullptr);
     }
   }
   double min_west_lon=9999.,max_east_lon=-9999.,min_south_lat=9999.,max_north_lat=-9999.;
   std::list<double> straddle_east_lons;
-  for (const auto& grid : unique_grid_definitions_table.keys()) {
+  for (const auto& e : unique_grid_definitions_table) {
     double west_lon,east_lon,south_lat,north_lat;
-    if (fill_spatial_domain_from_grid_definition(grid,"primeMeridian",west_lon,south_lat,east_lon,north_lat)) {
+    if (fill_spatial_domain_from_grid_definition(e.first,"primeMeridian",west_lon,south_lat,east_lon,north_lat)) {
 	if (east_lon < 0. && east_lon < west_lon) {
 // data straddle the date line
 	  straddle_east_lons.emplace_back(east_lon);
@@ -1089,25 +1043,21 @@ if (periods_table.size() > 1) {
     ofs << north << std::endl;
     ofs << "<br /><span id=\"D" << div_num << "\"><a href=\"javascript:swapDivs(" << div_num << "," << div_num+1 << ")\" title=\"Expand coverage details\"><img src=\"/images/triangle.gif\" width=\"12\" height=\"15\" border=\"0\"><span class=\"fs13px\">Detailed coverage information</span></a></span><span style=\"visibility: hidden; position: absolute; top: 0\" id=\"D" << div_num+1 << "\"><a href=\"javascript:swapDivs(" << div_num+1 << "," << div_num << ")\"><img src=\"/images/triangle90.gif\" width=\"15\" height=\"12\" border=\"0\" title=\"Collapse coverage details\"></a><span class=\"fs13px\">Detailed coverage information:" << std::endl;
     div_num+=2;
-    my::map<CoverageEntry> grid_definitions;
-    for (const auto& key : unique_grid_definitions_table.keys()) {
-	unique_grid_definitions_table.found(key,ce);
-	ce.key=convert_grid_definition(key);
-	grid_definitions.insert(ce);
+    std::map<std::string,std::shared_ptr<std::unordered_set<std::string>>> grid_definitions;
+    for (const auto& e : unique_grid_definitions_table) {
+	grid_definitions.emplace(convert_grid_definition(e.first),e.second);
     }
-    grid_definitions.keysort(compare_strings);
-    for (const auto& key : grid_definitions.keys()) {
-	ofs << "<div style=\"margin-left: 10px\">" << key;
+    for (const auto& e : grid_definitions) {
+	ofs << "<div style=\"margin-left: 10px\">" << e.first;
 	if (grid_definitions.size() > 1) {
-	  grid_definitions.found(key,ce);
-	  if (ce.groups != nullptr) {
+	  if (e.second != nullptr) {
 	    ofs << "<div style=\"margin-left: 15px; color: #6a6a6a\">(";
 	    auto n=0;
-	    for (const auto& gkey : ce.groups->keys()) {
+	    for (const auto& group : *e.second) {
 		if (n++ > 0) {
 		  ofs << ", ";
 		}
-		ofs << gkey;
+		ofs << group;
 	    }
 	    ofs << ")</div>";
 	  }
@@ -1117,12 +1067,12 @@ if (periods_table.size() > 1) {
     ofs << "</span></span></td></tr>" << std::endl;
   }
 // data contributors
-  query.set("select g.path from search.contributors_new as c left join search.GCMD_providers as g on g.uuid = c.keyword where c.dsid = '"+dsnum+"' and c.vocabulary = 'GCMD'");
+  query.set("select g.path from search.contributors_new as c left join search.GCMD_providers as g on g.uuid = c.keyword where c.dsid = '"+args.dsnum+"' and c.vocabulary = 'GCMD'");
   if (query.submit(server) < 0) {
     metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",user,args.args_string);
   }
   ofs << "<tr style=\"vertical-align: top\"><td class=\"bold nowrap\">Data Contributors:</td><td>";
-  n=0;
+  auto n=0;
   while (query.fetch_row(row)) {
     if (n > 0) {
 	ofs << " | ";
@@ -1170,7 +1120,7 @@ if (periods_table.size() > 1) {
 	  strutils::chop(description);
 	}
 	ofs << "<a href=\"" << ele.attribute_value("url") << "\">";
-	is_local=false;
+	auto is_local=false;
 	auto url=ele.attribute_value("url");
 	if (std::regex_search(url,std::regex("^http://rda.ucar.edu")) || std::regex_search(url,std::regex("^https://rda.ucar.edu")) || std::regex_search(url,std::regex("^http://dss.ucar.edu")) || std::regex_search(url,std::regex("^https://dss.ucar.edu"))) {
 	  is_local=true;
@@ -1188,12 +1138,13 @@ if (periods_table.size() > 1) {
   }
 // WRF Preprocessing System
   ofs << "<?php" << std::endl;
-  ofs << "  if (file_exists(\"/usr/local/www/server_root/web/datasets/ds" << dsnum << "/metadata/Vtable.RDA_ds" << dsnum << "\")) {" << std::endl;
-  ofs << "    print \"<tr style=\\\"vertical-align: bottom\\\"><td class=\\\"bold\\\">WRF Preprocessing System (WPS):</td><td>The GRIB-formatted data in this dataset can be used to initialize the Weather Research and Forecasting (WRF) Model.<br /><!--<a target=\\\"_vtable\\\" href=\\\"/datasets/ds" << dsnum << "/metadata/Vtable.RDA_ds" << dsnum << "\\\">Vtable</a>&nbsp;|&nbsp;--><a target=\\\"_wrf\\\" href=\\\"http://www2.mmm.ucar.edu/wrf/users/download/free_data.html\\\"><em>WRF Vtables</em></a></td></tr>\";" << std::endl;
+  ofs << "  if (file_exists(\"/usr/local/www/server_root/web/datasets/ds" << args.dsnum << "/metadata/Vtable.RDA_ds" << args.dsnum << "\")) {" << std::endl;
+  ofs << "    print \"<tr style=\\\"vertical-align: bottom\\\"><td class=\\\"bold\\\">WRF Preprocessing System (WPS):</td><td>The GRIB-formatted data in this dataset can be used to initialize the Weather Research and Forecasting (WRF) Model.<br /><!--<a target=\\\"_vtable\\\" href=\\\"/datasets/ds" << args.dsnum << "/metadata/Vtable.RDA_ds" << args.dsnum << "\\\">Vtable</a>&nbsp;|&nbsp;--><a target=\\\"_wrf\\\" href=\\\"http://www2.mmm.ucar.edu/wrf/users/download/free_data.html\\\"><em>WRF Vtables</em></a></td></tr>\";" << std::endl;
   ofs << "  }" << std::endl;
   ofs << "?>" << std::endl;
 // publications
   elist=xdoc.element_list("dsOverview/reference");
+  auto started_pubs=false;
   if (elist.size() > 0) {
     ofs << "<tr style=\"vertical-align: top\"><td class=\"bold\">Publications:</td><td>";
     started_pubs=true;
@@ -1337,7 +1288,7 @@ if (periods_table.size() > 1) {
   if (started_pubs)
     ofs << "</td></tr>" << std::endl;
 // citation
-  ofs << "<tr style=\"vertical-align: top\"><td class=\"bold\">How to Cite This Dataset:<div style=\"background-color: #2a70ae; color: white; width: 40px; padding: 1px; margin-top: 3px; font-size: 16px; font-weight: bold; border-radius: 5px 5px 5px 5px; text-align: center; cursor: pointer\" onClick=\"javascript:location='/cgi-bin/datasets/citation?dsnum=" << dsnum << "&style=ris'\" title=\"download citation in RIS format\">RIS</div><div style=\"background-color: #2a70ae; color: white; width: 60px; padding: 2px 8px 2px 8px; font-size: 16px; font-weight: bold; font-family: serif; border-radius: 5px 5px 5px 5px; text-align: center; cursor: pointer; margin-top: 5px\" onClick=\"location='/cgi-bin/datasets/citation?dsnum=" << dsnum << "&style=bibtex'\" title=\"download citation in BibTeX format\">BibTeX</div></td><td><div id=\"citation\" style=\"border: thin solid black; padding: 5px\"><img src=\"/images/transpace.gif\" width=\"1\" height=\"1\" onLoad=\"getAjaxContent('GET',null,'/cgi-bin/datasets/citation?dsnum=" << dsnum << "&style=esip','citation')\" /></div>" << std::endl;
+  ofs << "<tr style=\"vertical-align: top\"><td class=\"bold\">How to Cite This Dataset:<div style=\"background-color: #2a70ae; color: white; width: 40px; padding: 1px; margin-top: 3px; font-size: 16px; font-weight: bold; border-radius: 5px 5px 5px 5px; text-align: center; cursor: pointer\" onClick=\"javascript:location='/cgi-bin/datasets/citation?dsnum=" << args.dsnum << "&style=ris'\" title=\"download citation in RIS format\">RIS</div><div style=\"background-color: #2a70ae; color: white; width: 60px; padding: 2px 8px 2px 8px; font-size: 16px; font-weight: bold; font-family: serif; border-radius: 5px 5px 5px 5px; text-align: center; cursor: pointer; margin-top: 5px\" onClick=\"location='/cgi-bin/datasets/citation?dsnum=" << args.dsnum << "&style=bibtex'\" title=\"download citation in BibTeX format\">BibTeX</div></td><td><div id=\"citation\" style=\"border: thin solid black; padding: 5px\"><img src=\"/images/transpace.gif\" width=\"1\" height=\"1\" onLoad=\"getAjaxContent('GET',null,'/cgi-bin/datasets/citation?dsnum=" << args.dsnum << "&style=esip','citation')\" /></div>" << std::endl;
   ofs << "<?php" << std::endl;
   ofs << "  $signedin=false;" << std::endl;
   ofs << "  if (isSet($_SERVER[\"HTTP_COOKIE\"])) {" << std::endl;
@@ -1351,7 +1302,7 @@ if (periods_table.size() > 1) {
   ofs << "    }" << std::endl;
   ofs << "  }" << std::endl;
   ofs << "  if ($signedin)" << std::endl;
-  ofs << "    print \"<a href=\\\"javascript:void(0)\\\" onClick=\\\"getAjaxContent('GET',null,'/php/ajax/mydatacitation.php?tab=ds_history&dsid=ds" << dsnum << "&b=no','content_container')\\\">\";" << std::endl;
+  ofs << "    print \"<a href=\\\"javascript:void(0)\\\" onClick=\\\"getAjaxContent('GET',null,'/php/ajax/mydatacitation.php?tab=ds_history&dsid=ds" << args.dsnum << "&b=no','content_container')\\\">\";" << std::endl;
   ofs << "  else" << std::endl;
   ofs << "    print \"<span style=\\\"color: #a0a0a0\\\">\";" << std::endl;
   ofs << "  print \"Get a customized data citation\";" << std::endl;
@@ -1363,17 +1314,17 @@ if (periods_table.size() > 1) {
   ofs << "</td></tr>" << std::endl;
 // volume
   ofs << "<tr style=\"vertical-align: top\"><td class=\"bold nowrap\">Total Volume:</td><td>";
-  query.set("primary_size","dssdb.dataset","dsid = 'ds"+dsnum+"'");
+  query.set("primary_size","dssdb.dataset","dsid = 'ds"+args.dsnum+"'");
   if (query.submit(server) < 0) {
     metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",user,args.args_string);
   }
-  MySQL::LocalQuery query2("select primary_size,title,grpid from dssdb.dsgroup where dsid = 'ds"+dsnum+"' and pindex = 0 and primary_size > 0");
+  MySQL::LocalQuery query2("select primary_size,title,grpid from dssdb.dsgroup where dsid = 'ds"+args.dsnum+"' and pindex = 0 and primary_size > 0");
   if (query2.submit(server) < 0) {
     metautils::log_error("query: "+query2.show()+" returned error: "+query2.error(),"dsgen",user,args.args_string);
   }
   const int VOLUME_LEN=4;
   const char *v[VOLUME_LEN]={"MB","GB","TB","PB"};
-  if (query.fetch_row(row) && row[0].length() > 0) {
+  if (query.fetch_row(row) && !row[0].empty()) {
     auto volume=std::stof(row[0])/1000000.;
     n=0;
     while (volume > 1000. && n < VOLUME_LEN) {
@@ -1385,6 +1336,7 @@ if (periods_table.size() > 1) {
   if (query2.num_rows() > 1) {
     ofs << " <span class=\"fs13px\">(Entire dataset)</span><br /><span id=\"D" << div_num << "\"><a href=\"javascript:swapDivs(" << div_num << "," << div_num+1 << ")\"><img src=\"/images/bluetriangle.gif\" width=\"12\" height=\"15\" border=\"0\" title=\"Expand dataset product volume list\"><font size=\"-1\">Volume details by dataset product</font></a></span><span style=\"visibility: hidden; position: absolute; top: 0\" id=\"D" << div_num+1 << "\"><a href=\"javascript:swapDivs(" << div_num+1 << "," << div_num << ")\" title=\"Collapse dataset product volume list\"><img src=\"/images/bluetriangle90.gif\" width=\"15\" height=\"12\" border=\"0\"></a><span class=\"fs13px\">Volume details by dataset product:";
     div_num+=2;
+    MySQL::Row row2;
     while (query2.fetch_row(row2)) {
 	auto volume=std::stof(row2[0])/1000000.;
 	n=0;
@@ -1393,7 +1345,7 @@ if (periods_table.size() > 1) {
 	  ++n;
 	}
 	ofs << "<div style=\"margin-left: 10px\">";
-	if (row2[1].length() > 0) {
+	if (!row2[1].empty()) {
 	  ofs << row2[1];
 	}
 	else {
@@ -1414,8 +1366,8 @@ if (periods_table.size() > 1) {
   }
   struct stat buf;
   XMLDocument fdoc;
-  if (stat(("/"+server_root+"/web/metadata").c_str(),&buf) == 0) {
-    fdoc.open("/"+server_root+"/web/metadata/FormatReferences.xml");
+  if (stat("/usr/local/www/server_root/web/metadata",&buf) == 0) {
+    fdoc.open("/usr/local/www/server_root/web/metadata/FormatReferences.xml");
   }
   else {
     auto file=remote_web_file("https://rda.ucar.edu/metadata/FormatReferences.xml",temp_dir.name());
@@ -1494,19 +1446,19 @@ if (periods_table.size() > 1) {
     ofs << "</table></td></tr>" << std::endl;
   }
 // more details
-  if (exists_on_server(directives.web_server,"/data/web/datasets/ds"+dsnum+"/metadata/detailed.html")) {
+  if (exists_on_server(directives.web_server,"/data/web/datasets/ds"+args.dsnum+"/metadata/detailed.html")) {
     ofs << "<tr style=\"vertical-align: top\"><td class=\"bold nowrap\">More Details:</td><td>View <a href=\"#metadata/detailed.html?_do=y\">more details</a> for this dataset, including dataset citation, data contributors, and other detailed metadata</td></tr>" << std::endl;
   }
 // RDA blog
   ofs << "<?php" << std::endl;
   ofs << "  if ($rda_blog) {" << std::endl;
-  ofs << "    print \"<tr style=\\\"vertical-align: top\\\"><td class=\\\"bold nowrap\\\">RDA Blog:</td><td>Read <a href=\\\"http://ncarrda.blogspot.com/search/label/ds" << dsnum << "\\\" target=\\\"_rdablog\\\">posts</a> on the RDA blog that are related to this dataset</td></tr>\n\";" << std::endl;
+  ofs << "    print \"<tr style=\\\"vertical-align: top\\\"><td class=\\\"bold nowrap\\\">RDA Blog:</td><td>Read <a href=\\\"http://ncarrda.blogspot.com/search/label/ds" << args.dsnum << "\\\" target=\\\"_rdablog\\\">posts</a> on the RDA blog that are related to this dataset</td></tr>\n\";" << std::endl;
   ofs << "  }" << std::endl;
   ofs << "?>" << std::endl;
 // data access
   ofs << "<tr style=\"vertical-align: top\"><td class=\"bold nowrap\">Data Access:</td><td><div style=\"display: inline; float: left\">Click the </div><a class=\"clean\" href=\"#access\"><div class=\"dstab dstab-off\" style=\"width: 100px; margin: 0px 5px 0px 5px; text-align: center\">Data Access</div></a><div style=\"display: inline; float: left\"> tab here or in the navigation bar near the top of the page</div></td></tr>" << std::endl;
 // metadata record
-  ofs << "<tr style=\"vertical-align: top\"><td class=\"bold nowrap\">Metadata Record:</td><td><div id=\"meta_record\" style=\"display: inline; float: left\"></div><img src=\"/images/transpace.gif\" width=\"1\" height=\"1\" onload=\"getAjaxContent('GET',null,'/cgi-bin/datasets/showMetadata?dsnum=" << dsnum << "','meta_record')\" /></td></tr>" << std::endl;
+  ofs << "<tr style=\"vertical-align: top\"><td class=\"bold nowrap\">Metadata Record:</td><td><div id=\"meta_record\" style=\"display: inline; float: left\"></div><img src=\"/images/transpace.gif\" width=\"1\" height=\"1\" onload=\"getAjaxContent('GET',null,'/cgi-bin/datasets/showMetadata?dsnum=" << args.dsnum << "','meta_record')\" /></td></tr>" << std::endl;
   ofs << "</table>" << std::endl;
   ofs.close();
 }
@@ -1517,9 +1469,9 @@ int main(int argc,char **argv)
     std::cerr << "usage: dsgen nnn.n" << std::endl;
     exit(1);
   }
-  dsnum=argv[1];
-  if (std::regex_search(dsnum,std::regex("^ds"))) {
-    dsnum=dsnum.substr(2);
+  args.dsnum=argv[1];
+  if (std::regex_search(args.dsnum,std::regex("^ds"))) {
+    args.dsnum=args.dsnum.substr(2);
   }
   args.args_string=unix_args_string(argc,argv);
   metautils::read_config("dsgen",user,args.args_string);
@@ -1527,27 +1479,27 @@ int main(int argc,char **argv)
     metautils::log_error("unable to create temporary directory","dsgen",user,args.args_string);
   }
   metautils::connect_to_metadata_server(server);
-  MySQL::LocalQuery query("select type from search.datasets where dsid = '"+dsnum+"'");
+  MySQL::LocalQuery query("select type from search.datasets where dsid = '"+args.dsnum+"'");
   MySQL::Row row;
   if (query.submit(server) < 0 || !query.fetch_row(row)) {
     metautils::log_error("unable to determine dataset type","dsgen",user,args.args_string);
   }
-  auto type=row[0];
+  dataset_type=row[0];
   TempDir dataset_doc_dir;
   if (!dataset_doc_dir.create(directives.temp_path)) {
     metautils::log_error("unable to create temporary document directory","dsgen",user,args.args_string);
   }
-  generate_index(type,dataset_doc_dir.name());
-  if (type != "I") {
-    generate_description(type,dataset_doc_dir.name());
+  generate_index(dataset_type,dataset_doc_dir.name());
+  if (dataset_type != "I") {
+    generate_description(dataset_type,dataset_doc_dir.name());
     xdoc.close();
   }
   server.disconnect();
   std::string remote_path="/data/web";
-  if (type == "W") {
+  if (dataset_type == "W") {
     remote_path+="/internal";
   }
-  remote_path+="/datasets/ds"+dsnum;
+  remote_path+="/datasets/ds"+args.dsnum;
   std::string error;
   if (host_sync(dataset_doc_dir.name(),".",remote_path,error) < 0) {
     metautils::log_warning("couldn't sync dataset files - host_sync error(s): '"+error+"'","dsgen",user,args.args_string);
