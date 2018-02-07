@@ -21,7 +21,7 @@
 
 metautils::Directives directives;
 metautils::Args args;
-my::map<metadata::ObML::IDEntry> **ID_table;
+my::map<metadata::ObML::IDEntry> **id_table;
 metadata::ObML::IDEntry ientry;
 my::map<metadata::ObML::PlatformEntry> platform_table[metadata::ObML::NUM_OBS_TYPES];
 metadata::ObML::PlatformEntry pentry;
@@ -32,6 +32,7 @@ TempDir *tdir,*inv_dir=nullptr;
 std::ofstream inv_stream;
 size_t num_not_missing=0;
 std::string myerror="";
+bool verbose_operation=false;
 
 extern "C" void clean_up()
 {
@@ -91,6 +92,9 @@ void parse_args()
     else if (sp[n] == "-U") {
 	args.update_DB=false;
     }
+    else if (sp[n] == "-V") {
+	verbose_operation=true;
+    }
     else if (sp[n] == "-NC") {
 	if (user == "dattore") {
 	  args.override_primary_check=true;
@@ -123,7 +127,7 @@ void parse_args()
   args.filename=sp.back().substr(n+1);
 }
 
-size_t getISDPlatformAndStationInformation(Observation *obs,std::string& ientry_key,DateTime& start_date,DateTime& end_date,int& obs_type_index,std::list<float>& lats,std::list<float>& lons)
+size_t isd_platform_and_station_information(Observation *obs,std::string& ientry_key,DateTime& start_date,DateTime& end_date,int& obs_type_index,std::list<float>& lats,std::list<float>& lons)
 {
   ISDObservation *o=reinterpret_cast<ISDObservation *>(obs);
   std::string rpt_type=o->report_type();
@@ -161,7 +165,7 @@ size_t getISDPlatformAndStationInformation(Observation *obs,std::string& ientry_
   return 1;
 }
 
-size_t getADPPlatformAndStationInformation(Observation *obs,std::string& ientry_key,DateTime& start_date,DateTime& end_date,int& obs_type_index,std::list<float>& lats,std::list<float>& lons)
+size_t adp_platform_and_station_information(Observation *obs,std::string& ientry_key,DateTime& start_date,DateTime& end_date,int& obs_type_index,std::list<float>& lats,std::list<float>& lons)
 {
   ADPObservation *o=reinterpret_cast<ADPObservation *>(obs);
 
@@ -273,7 +277,7 @@ size_t getADPPlatformAndStationInformation(Observation *obs,std::string& ientry_
   return 1;
 }
 
-size_t getCPCSummaryPlatformAndStationInformation(Observation *obs,std::string& ientry_key,DateTime& start_date,DateTime& end_date,int& obs_type_index,std::list<float>& lats,std::list<float>& lons)
+size_t cpc_summary_platform_and_station_information(Observation *obs,std::string& ientry_key,DateTime& start_date,DateTime& end_date,int& obs_type_index,std::list<float>& lats,std::list<float>& lons)
 {
   std::string ID=obs->location().ID;
 
@@ -295,26 +299,26 @@ size_t getCPCSummaryPlatformAndStationInformation(Observation *obs,std::string& 
   return 1;
 }
 
-std::string cleanIMMAID(std::string ID)
+std::string clean_imma_id(std::string id)
 {
-  if (ID.length() == 0) {
-    return ID;
+  if (id.empty()) {
+    return id;
   }
-  std::string cleanID=ID;
-  strutils::trim(cleanID);
-  strutils::replace_all(cleanID,"\"","'");
-  strutils::replace_all(cleanID,"&","&amp;");
-  strutils::replace_all(cleanID,">","&gt;");
-  strutils::replace_all(cleanID,"<","&lt;");
-  auto sp=strutils::split(cleanID);
+  std::string clean_id=id;
+  strutils::trim(clean_id);
+  strutils::replace_all(clean_id,"\"","'");
+  strutils::replace_all(clean_id,"&","&amp;");
+  strutils::replace_all(clean_id,">","&gt;");
+  strutils::replace_all(clean_id,"<","&lt;");
+  auto sp=strutils::split(clean_id);
   return strutils::to_upper(sp[0]);
 }
 
-size_t getIMMAPlatformAndStationInformation(Observation *obs,std::string& ientry_key,DateTime& start_date,DateTime& end_date,int& obs_type_index,std::list<float>& lats,std::list<float>& lons)
+size_t imma_platform_and_station_information(Observation *obs,std::string& ientry_key,DateTime& start_date,DateTime& end_date,int& obs_type_index,std::list<float>& lats,std::list<float>& lons)
 {
   IMMAObservation *o=reinterpret_cast<IMMAObservation *>(obs);
-  auto ID=cleanIMMAID(obs->location().ID);
-  if (ID.length() == 0) {
+  auto id=clean_imma_id(obs->location().ID);
+  if (id.empty()) {
     return 0;
   }
   switch (o->platform_type().atti) {
@@ -454,7 +458,7 @@ size_t getIMMAPlatformAndStationInformation(Observation *obs,std::string& ientry
 	ientry_key+="NDBC";
 	break;
     case 6:
-	if (strutils::is_numeric(ID))
+	if (strutils::is_numeric(id))
 	  ientry_key+="number";
 	else
 	  ientry_key+="name";
@@ -469,20 +473,20 @@ size_t getIMMAPlatformAndStationInformation(Observation *obs,std::string& ientry
 	ientry_key+="number";
 	break;
     case 10:
-      if (ID.length() == 8) {
-	  if (strutils::is_numeric(ID)) {
-	    ID=ID.substr(0,4);
+      if (id.length() == 8) {
+	  if (strutils::is_numeric(id)) {
+	    id=id.substr(0,4);
 	    ientry_key+="number";
 	  }
-	  else if (strutils::is_numeric(ID.substr(2)) && ID[0] >= 'A' && ID[0] <= 'Z' && ID[1] >= 'A' && ID[1] <= 'Z') {
-	    ID=ID.substr(0,2);
+	  else if (strutils::is_numeric(id.substr(2)) && id[0] >= 'A' && id[0] <= 'Z' && id[1] >= 'A' && id[1] <= 'Z') {
+	    id=id.substr(0,2);
 	    ientry_key+="generic";
 	  }
 	  else
 	    ientry_key+="name";
       }
       else {
-	  if (strutils::is_numeric(ID)) {
+	  if (strutils::is_numeric(id)) {
 	    ientry_key+="number";
 	  }
 	  else {
@@ -493,14 +497,14 @@ size_t getIMMAPlatformAndStationInformation(Observation *obs,std::string& ientry
     default:
 	metautils::log_error("ID type "+strutils::itos(o->ID_type())+" not recognized - obs date: "+obs->date_time().to_string(),"obs2xml",user,args.args_string);
   }
-  ientry_key+="[!]"+ID;
+  ientry_key+="[!]"+id;
   obs_type_index=1;
   lats.emplace_back(obs->location().latitude);
   lons.emplace_back(obs->location().longitude);
   return 1;
 }
 
-size_t getNODCBTPlatformAndStationInformation(Observation *obs,std::string& ientry_key,DateTime& start_date,DateTime& end_date,int& obs_type_index,std::list<float>& lats,std::list<float>& lons)
+size_t nodc_bt_platform_and_station_information(Observation *obs,std::string& ientry_key,DateTime& start_date,DateTime& end_date,int& obs_type_index,std::list<float>& lats,std::list<float>& lons)
 {
   pentry.key="roving_ship";
   start_date=end_date=obs->date_time();
@@ -511,24 +515,24 @@ size_t getNODCBTPlatformAndStationInformation(Observation *obs,std::string& ient
   return 1;
 }
 
-size_t getTD32PlatformAndStationInformation(Observation *obs,std::string& ientry_key,DateTime& start_date,DateTime& end_date,int& obs_type_index,std::list<float>& lats,std::list<float>& lons)
+size_t td32_platform_and_station_information(Observation *obs,std::string& ientry_key,DateTime& start_date,DateTime& end_date,int& obs_type_index,std::list<float>& lats,std::list<float>& lons)
 {
   TD32Data *o=reinterpret_cast<TD32Data *>(obs);
-  static my::map<metadata::ObML::DataTypeEntry> uniqueObservationTable(999999);
+  static my::map<metadata::ObML::DataTypeEntry> unique_observation_table(999999);
   metadata::ObML::DataTypeEntry de;
   size_t nsteps=0;
-  std::string ID=obs->location().ID;
+  std::string id=obs->location().ID;
   float last_lat=999.,last_lon=9999.;
 
   pentry.key="land_station";
   TD32Data::Header header=o->header();
   if (args.format == "td3210" || args.format == "td3280") {
-    ID=ID.substr(3);
-    ientry_key=pentry.key+"[!]WBAN[!]"+ID;
+    id=id.substr(3);
+    ientry_key=pentry.key+"[!]WBAN[!]"+id;
   }
   else {
-    ID=ID.substr(0,6);
-    ientry_key=pentry.key+"[!]COOP[!]"+ID;
+    id=id.substr(0,6);
+    ientry_key=pentry.key+"[!]COOP[!]"+id;
   }
   obs_type_index=1;
   std::vector<TD32Data::Report> reports=o->reports();
@@ -538,30 +542,30 @@ size_t getTD32PlatformAndStationInformation(Observation *obs,std::string& ientry
     if (reports[n].flag1 != 'M') {
 	DateTime start,end;
 	if (header.type == "DLY") {
-	  de.key=ID+reports[n].date_time.to_string("%Y-%m-%d");
+	  de.key=id+reports[n].date_time.to_string("%Y-%m-%d");
 	  start.set(reports[n].date_time.year(),reports[n].date_time.month(),reports[n].date_time.day(),reports[n].date_time.time()/10000+9999);
 	  start.set_utc_offset(-2400);
 	}
 	else if (header.type == "MLY") {
 	  if (reports[n].date_time.month() == 13) {
-	    de.key=ID+reports[n].date_time.to_string("%Y");
+	    de.key=id+reports[n].date_time.to_string("%Y");
 	  }
 	  else {
-	    de.key=ID+reports[n].date_time.to_string("%Y-%m");
+	    de.key=id+reports[n].date_time.to_string("%Y-%m");
 	  }
 	  start.set(reports[n].date_time.year(),reports[n].date_time.month(),reports[n].date_time.day(),999999);
 	}
 	else {
-	  de.key=ID+reports[n].date_time.to_string("%Y-%m-%d %H:%MM");
+	  de.key=id+reports[n].date_time.to_string("%Y-%m-%d %H:%MM");
 	  start.set(reports[n].date_time.year(),reports[n].date_time.month(),reports[n].date_time.day(),reports[n].date_time.time()/10000+99);
 	  if (start.time() == 240099 || start.time() == 250099) {
 	    start.set_time(99);
 	    start.add_days(1);
 	  }
 	}
-	if (!uniqueObservationTable.found(de.key,de)) {
+	if (!unique_observation_table.found(de.key,de)) {
 	  ++nsteps;
-	  uniqueObservationTable.insert(de);
+	  unique_observation_table.insert(de);
 	}
 	end=start;
 	if (start.month() == 13) {
@@ -605,48 +609,48 @@ size_t getTD32PlatformAndStationInformation(Observation *obs,std::string& ientry
   return nsteps;
 }
 
-size_t getDSSTsrPlatformAndStationInformation(Observation *obs,std::string& ientry_key,DateTime& start_date,DateTime& end_date,int& obs_type_index,std::list<float>& lats,std::list<float>& lons)
+size_t dss_tsr_platform_and_station_information(Observation *obs,std::string& ientry_key,DateTime& start_date,DateTime& end_date,int& obs_type_index,std::list<float>& lats,std::list<float>& lons)
 {
   short source;
-  std::string ID=obs->location().ID;
+  std::string id=obs->location().ID;
 
-  if (std::regex_search(ID,std::regex("^0"))) {
-    ID=ID.substr(1);
+  if (std::regex_search(id,std::regex("^0"))) {
+    id=id.substr(1);
   }
   source=reinterpret_cast<Tsraob *>(obs)->flags().source;
   switch (source) {
     case 15:
-	if (ID.length() == 5 && ID < "03000") {
-	  if (ID < "00026" || ID == "00091" || ID == "00092") {
+	if (id.length() == 5 && id < "03000") {
+	  if (id < "00026" || id == "00091" || id == "00092") {
 	    pentry.key="ocean_station";
-	    ientry_key=pentry.key+"[!]WBAN[!]"+ID;
+	    ientry_key=pentry.key+"[!]WBAN[!]"+id;
 	  }
 	  else {
 	    pentry.key="roving_ship";
-	    ientry_key=pentry.key+"[!]other[!]"+ID;
+	    ientry_key=pentry.key+"[!]other[!]"+id;
 	  }
 	}
-	else if (ID.length() == 6 && ID >= "116000") {
+	else if (id.length() == 6 && id >= "116000") {
 	  pentry.key="roving_ship";
-	  ientry_key=pentry.key+"[!]other[!]"+ID;
+	  ientry_key=pentry.key+"[!]other[!]"+id;
 	}
 	else {
 	  pentry.key="land_station";
-	  ientry_key=pentry.key+"[!]WBAN[!]"+ID;
+	  ientry_key=pentry.key+"[!]WBAN[!]"+id;
 	}
 	break;
     case 36:
-	if (ID >= "47000" && ID <= "47999") {
+	if (id >= "47000" && id <= "47999") {
 	  pentry.key="land_station";
-	  ientry_key=pentry.key+"[!]WMO[!]"+ID;
+	  ientry_key=pentry.key+"[!]WMO[!]"+id;
 	}
 	else
-	  metautils::log_error("no platform and station mapping for source "+strutils::itos(source)+" and ID '"+ID+"'","obs2xml",user,args.args_string);
+	  metautils::log_error("no platform and station mapping for source "+strutils::itos(source)+" and ID '"+id+"'","obs2xml",user,args.args_string);
 	break;
     case 37:
     case 38:
 	pentry.key="land_station";
-	ientry_key=pentry.key+"[!]WMO[!]"+ID;
+	ientry_key=pentry.key+"[!]WMO[!]"+id;
 	break;
     default:
 	metautils::log_error("no platform and station mapping for source "+strutils::itos(source),"obs2xml","x","x");
@@ -658,43 +662,43 @@ size_t getDSSTsrPlatformAndStationInformation(Observation *obs,std::string& ient
   return 1;
 }
 
-size_t getUADBPlatformAndStationInformation(Observation *obs,std::string& ientry_key,DateTime& start_date,DateTime& end_date,int& obs_type_index,std::list<float>& lats,std::list<float>& lons)
+size_t uadb_raob_platform_and_station_information(Observation *obs,std::string& ientry_key,DateTime& start_date,DateTime& end_date,int& obs_type_index,std::list<float>& lats,std::list<float>& lons)
 {
-  std::string ID=obs->location().ID;
+  std::string id=obs->location().ID;
 
   switch (reinterpret_cast<UADBRaob *>(obs)->ID_type()) {
     case 1:
 	pentry.key="land_station";
-	ientry_key=pentry.key+"[!]WMO[!]"+ID;
+	ientry_key=pentry.key+"[!]WMO[!]"+id;
 	break;
     case 2:
 	pentry.key="land_station";
-	ientry_key=pentry.key+"[!]WBAN[!]"+ID;
+	ientry_key=pentry.key+"[!]WBAN[!]"+id;
 	break;
     case 3:
 	pentry.key="land_station";
-	ientry_key=pentry.key+"[!]callSign[!]"+ID;
+	ientry_key=pentry.key+"[!]callSign[!]"+id;
 	break;
     case 4:
 	pentry.key="land_station";
-	ientry_key=pentry.key+"[!]COOP[!]"+ID;
+	ientry_key=pentry.key+"[!]COOP[!]"+id;
 	break;
     case 5:
 	pentry.key="land_station";
-	ientry_key=pentry.key+"[!]name[!]"+ID;
+	ientry_key=pentry.key+"[!]name[!]"+id;
 	break;
     case 6:
 	pentry.key="land_station";
-	ientry_key=pentry.key+"[!]other[!]"+ID;
+	ientry_key=pentry.key+"[!]other[!]"+id;
 	break;
     case 7:
     case 8:
 	pentry.key="land_station";
-	ientry_key=pentry.key+"[!]WMO+6[!]"+ID;
+	ientry_key=pentry.key+"[!]WMO+6[!]"+id;
 	break;
     case 9:
 	pentry.key="land_station";
-	ientry_key=pentry.key+"[!]CHUAN[!]"+ID;
+	ientry_key=pentry.key+"[!]CHUAN[!]"+id;
 	break;
     default:
 	metautils::log_error("no platform and station mapping for observation type "+strutils::itos(reinterpret_cast<UADBRaob *>(obs)->ID_type()),"obs2xml","x","x");
@@ -706,7 +710,7 @@ size_t getUADBPlatformAndStationInformation(Observation *obs,std::string& ientry
   return 1;
 }
 
-size_t getWMSSCPlatformAndStationInformation(Observation *obs,std::string& ientry_key,DateTime& start_date,DateTime& end_date,int& obs_type_index,std::list<float>& lats,std::list<float>& lons)
+size_t wmssc_platform_and_station_information(Observation *obs,std::string& ientry_key,DateTime& start_date,DateTime& end_date,int& obs_type_index,std::list<float>& lats,std::list<float>& lons)
 {
   WMSSCObservation *o=reinterpret_cast<WMSSCObservation *>(obs);
   size_t nsteps=0;
@@ -768,38 +772,38 @@ size_t getWMSSCPlatformAndStationInformation(Observation *obs,std::string& ientr
   return nsteps;
 }
 
-size_t getPlatformAndStationInformation(Observation *obs,std::string& ientry_key,DateTime& start_date,DateTime& end_date,int& obs_type_index,std::list<float>& lats,std::list<float>& lons)
+size_t platform_and_station_information(Observation *obs,std::string& ientry_key,DateTime& start_date,DateTime& end_date,int& obs_type_index,std::list<float>& lats,std::list<float>& lons)
 {
   size_t nsteps;
 
   lats.clear();
   lons.clear();
   if (args.format == "isd") {
-    nsteps=getISDPlatformAndStationInformation(obs,ientry_key,start_date,end_date,obs_type_index,lats,lons);
+    nsteps=isd_platform_and_station_information(obs,ientry_key,start_date,end_date,obs_type_index,lats,lons);
   }
   else if (args.format == "on29" || args.format == "on124") {
-    nsteps=getADPPlatformAndStationInformation(obs,ientry_key,start_date,end_date,obs_type_index,lats,lons);
+    nsteps=adp_platform_and_station_information(obs,ientry_key,start_date,end_date,obs_type_index,lats,lons);
   }
   else if (args.format == "cpcsumm") {
-    nsteps=getCPCSummaryPlatformAndStationInformation(obs,ientry_key,start_date,end_date,obs_type_index,lats,lons);
+    nsteps=cpc_summary_platform_and_station_information(obs,ientry_key,start_date,end_date,obs_type_index,lats,lons);
   }
   else if (args.format == "imma") {
-    nsteps=getIMMAPlatformAndStationInformation(obs,ientry_key,start_date,end_date,obs_type_index,lats,lons);
+    nsteps=imma_platform_and_station_information(obs,ientry_key,start_date,end_date,obs_type_index,lats,lons);
   }
   else if (args.format == "nodcbt") {
-    nsteps=getNODCBTPlatformAndStationInformation(obs,ientry_key,start_date,end_date,obs_type_index,lats,lons);
+    nsteps=nodc_bt_platform_and_station_information(obs,ientry_key,start_date,end_date,obs_type_index,lats,lons);
   }
   else if (std::regex_search(args.format,std::regex("^td32"))) {
-    nsteps=getTD32PlatformAndStationInformation(obs,ientry_key,start_date,end_date,obs_type_index,lats,lons);
+    nsteps=td32_platform_and_station_information(obs,ientry_key,start_date,end_date,obs_type_index,lats,lons);
   }
   else if (args.format == "tsr") {
-    nsteps=getDSSTsrPlatformAndStationInformation(obs,ientry_key,start_date,end_date,obs_type_index,lats,lons);
+    nsteps=dss_tsr_platform_and_station_information(obs,ientry_key,start_date,end_date,obs_type_index,lats,lons);
   }
   else if (args.format == "uadb") {
-    nsteps=getUADBPlatformAndStationInformation(obs,ientry_key,start_date,end_date,obs_type_index,lats,lons);
+    nsteps=uadb_raob_platform_and_station_information(obs,ientry_key,start_date,end_date,obs_type_index,lats,lons);
   }
   else if (args.format == "wmssc") {
-    nsteps=getWMSSCPlatformAndStationInformation(obs,ientry_key,start_date,end_date,obs_type_index,lats,lons);
+    nsteps=wmssc_platform_and_station_information(obs,ientry_key,start_date,end_date,obs_type_index,lats,lons);
   }
   else {
     std::cerr << "Error: unable to get platform and station information from format " << args.format << std::endl;
@@ -808,7 +812,7 @@ size_t getPlatformAndStationInformation(Observation *obs,std::string& ientry_key
   return nsteps;
 }
 
-void addISDDataTypeToEntry(Observation *obs,metadata::ObML::IDEntry& entry)
+void add_isd_data_type_to_entry(Observation *obs,metadata::ObML::IDEntry& entry)
 {
   std::list<std::string> addl_data_codes=reinterpret_cast<ISDObservation *>(obs)->additional_data_codes();
   metadata::ObML::DataTypeEntry de;
@@ -827,7 +831,7 @@ void addISDDataTypeToEntry(Observation *obs,metadata::ObML::IDEntry& entry)
   }
 }
 
-void addADPDataTypeToEntry(Observation *obs,metadata::ObML::IDEntry& entry)
+void add_adp_data_type_to_entry(Observation *obs,metadata::ObML::IDEntry& entry)
 {
   metadata::ObML::DataTypeEntry de;
 
@@ -845,20 +849,20 @@ void addADPDataTypeToEntry(Observation *obs,metadata::ObML::IDEntry& entry)
   }
 }
 
-void addCPCDailySummaryDataTypeToEntry(Observation *obs,metadata::ObML::IDEntry& entry) {
+void add_cpc_daily_summary_data_type_to_entry(Observation *obs,metadata::ObML::IDEntry& entry) {
   CPCSummaryObservation *cpcobs=reinterpret_cast<CPCSummaryObservation *>(obs);
   metadata::ObML::DataTypeEntry de;
   const size_t NUM_DATA_TYPES=16;
-  static const std::string dataTypes[NUM_DATA_TYPES]={"RMAX","RMIN","RPRCP","EPRCP","VP","POTEV","VPD","SLP06","SLP12","SLP18","SLP00","APTMX","CHILLM","RAD","MXRH","MNRH"};
+  static const std::string data_types[NUM_DATA_TYPES]={"RMAX","RMIN","RPRCP","EPRCP","VP","POTEV","VPD","SLP06","SLP12","SLP18","SLP00","APTMX","CHILLM","RAD","MXRH","MNRH"};
   CPCSummaryObservation::CPCDailySummaryData cpcrpt=cpcobs->CPC_daily_summary_data();
   SurfaceObservation::SurfaceAdditionalData addl_data=cpcobs->additional_data();
-  float dataTypeValues[NUM_DATA_TYPES]={addl_data.data.tmax,addl_data.data.tmin,addl_data.data.pcp_amt,cpcrpt.eprcp,cpcrpt.vp,cpcrpt.potev,cpcrpt.vpd,cpcrpt.slp06,cpcrpt.slp12,cpcrpt.slp18,cpcrpt.slp00,cpcrpt.aptmx,cpcrpt.chillm,cpcrpt.rad,static_cast<float>(cpcrpt.mxrh),static_cast<float>(cpcrpt.mnrh)};
+  float data_type_values[NUM_DATA_TYPES]={addl_data.data.tmax,addl_data.data.tmin,addl_data.data.pcp_amt,cpcrpt.eprcp,cpcrpt.vp,cpcrpt.potev,cpcrpt.vpd,cpcrpt.slp06,cpcrpt.slp12,cpcrpt.slp18,cpcrpt.slp00,cpcrpt.aptmx,cpcrpt.chillm,cpcrpt.rad,static_cast<float>(cpcrpt.mxrh),static_cast<float>(cpcrpt.mnrh)};
   float missing[NUM_DATA_TYPES]={-99.,-99.,-99.,-99.,-9.,-9.,-9.,-99.,-99.,-99,-99.,-99.,-99.,-9.,-90.,-90.};
   size_t n;
 
   for (n=0; n < NUM_DATA_TYPES; n++) {
-    de.key=dataTypes[n];
-    if (dataTypeValues[n] > missing[n]) {
+    de.key=data_types[n];
+    if (data_type_values[n] > missing[n]) {
 	if (!entry.data->data_types_table.found(de.key,de)) {
 	  de.data.reset(new metadata::ObML::DataTypeEntry::Data);
 	  de.data->nsteps=1;
@@ -871,18 +875,18 @@ void addCPCDailySummaryDataTypeToEntry(Observation *obs,metadata::ObML::IDEntry&
   }
 }
 
-void addCPCMonthlySummaryDataTypeToEntry(Observation *obs,metadata::ObML::IDEntry& entry) {
+void add_cpc_monthly_summary_data_type_to_entry(Observation *obs,metadata::ObML::IDEntry& entry) {
   CPCSummaryObservation *cpcobs=reinterpret_cast<CPCSummaryObservation *>(obs);
   metadata::ObML::DataTypeEntry de;
   const size_t NUM_DATA_TYPES=24;
-  static const std::string dataTypes[NUM_DATA_TYPES]={"TMEAN","TMAX","TMIN","HMAX","RMINL","CTMEAN","APTMAX","WCMIN","HMAXAPT","WCLMINL","RPCP","EPCP","CPCP","EPCPMX","AHS","AVP","APET","AVPD","TRAD","AMAXRH","AMINRH","IHDD","ICDD","IGDD"};
+  static const std::string data_types[NUM_DATA_TYPES]={"TMEAN","TMAX","TMIN","HMAX","RMINL","CTMEAN","APTMAX","WCMIN","HMAXAPT","WCLMINL","RPCP","EPCP","CPCP","EPCPMX","AHS","AVP","APET","AVPD","TRAD","AMAXRH","AMINRH","IHDD","ICDD","IGDD"};
   CPCSummaryObservation::CPCMonthlySummaryData cpcrpt=cpcobs->CPC_monthly_summary_data();
-  float dataTypeValues[NUM_DATA_TYPES]={cpcrpt.tmean,cpcrpt.tmax,cpcrpt.tmin,cpcrpt.hmax,cpcrpt.rminl,cpcrpt.ctmean,cpcrpt.aptmax,cpcrpt.wcmin,cpcrpt.hmaxapt,cpcrpt.wclminl,cpcrpt.rpcp,cpcrpt.epcp,cpcrpt.cpcp,cpcrpt.epcpmax,cpcrpt.ahs,cpcrpt.avp,cpcrpt.apet,cpcrpt.avpd,cpcrpt.trad,static_cast<float>(cpcrpt.amaxrh),static_cast<float>(cpcrpt.aminrh),static_cast<float>(cpcrpt.ihdd),static_cast<float>(cpcrpt.icdd),static_cast<float>(cpcrpt.igdd)};
+  float data_type_values[NUM_DATA_TYPES]={cpcrpt.tmean,cpcrpt.tmax,cpcrpt.tmin,cpcrpt.hmax,cpcrpt.rminl,cpcrpt.ctmean,cpcrpt.aptmax,cpcrpt.wcmin,cpcrpt.hmaxapt,cpcrpt.wclminl,cpcrpt.rpcp,cpcrpt.epcp,cpcrpt.cpcp,cpcrpt.epcpmax,cpcrpt.ahs,cpcrpt.avp,cpcrpt.apet,cpcrpt.avpd,cpcrpt.trad,static_cast<float>(cpcrpt.amaxrh),static_cast<float>(cpcrpt.aminrh),static_cast<float>(cpcrpt.ihdd),static_cast<float>(cpcrpt.icdd),static_cast<float>(cpcrpt.igdd)};
   float missing[NUM_DATA_TYPES]={-99.,-99.,-99.,-99.,-99.,-99.,-99.,-99.,-99.,-99.,-99.,-99.,-99.,-99.,-9.,-9.,-9.,-9.,-9.,-990.,-990.,-990.,-990.,-990.};
 
   for (size_t n=0; n < NUM_DATA_TYPES; ++n) {
-    de.key=dataTypes[n];
-    if (dataTypeValues[n] > missing[n]) {
+    de.key=data_types[n];
+    if (data_type_values[n] > missing[n]) {
 	if (!entry.data->data_types_table.found(de.key,de)) {
 	  de.data.reset(new metadata::ObML::DataTypeEntry::Data);
 	  de.data->nsteps=1;
@@ -895,23 +899,23 @@ void addCPCMonthlySummaryDataTypeToEntry(Observation *obs,metadata::ObML::IDEntr
   }
 }
 
-void addCPCSummaryDataTypeToEntry(Observation *obs,metadata::ObML::IDEntry& entry)
+void add_cpc_summary_data_type_to_entry(Observation *obs,metadata::ObML::IDEntry& entry)
 {
   if (obs->date_time().day() > 0) {
-    addCPCDailySummaryDataTypeToEntry(obs,entry);
+    add_cpc_daily_summary_data_type_to_entry(obs,entry);
   }
   else {
-    addCPCMonthlySummaryDataTypeToEntry(obs,entry);
+    add_cpc_monthly_summary_data_type_to_entry(obs,entry);
   }
 }
 
-void addIMMADataTypeToEntry(Observation *obs,metadata::ObML::IDEntry& entry)
+void add_imma_data_type_to_entry(Observation *obs,metadata::ObML::IDEntry& entry)
 {
   metadata::ObML::DataTypeEntry de;
-  std::list<short> attm_IDs=reinterpret_cast<IMMAObservation *>(obs)->attachment_ID_list();
+  std::list<short> attm_ids=reinterpret_cast<IMMAObservation *>(obs)->attachment_ID_list();
 
-  attm_IDs.push_front(0);
-  for (auto& item : attm_IDs) {
+  attm_ids.emplace_front(0);
+  for (auto& item : attm_ids) {
     de.key=strutils::itos(item);
     if (!entry.data->data_types_table.found(de.key,de)) {
 	de.data.reset(new metadata::ObML::DataTypeEntry::Data);
@@ -924,7 +928,7 @@ void addIMMADataTypeToEntry(Observation *obs,metadata::ObML::IDEntry& entry)
   }
 }
 
-void addNODCBTDataTypeToEntry(Observation *obs,metadata::ObML::IDEntry& entry)
+void add_nodc_bt_data_type_to_entry(Observation *obs,metadata::ObML::IDEntry& entry)
 {
   metadata::ObML::DataTypeEntry de;
   NODCBTObservation *nodcobs=reinterpret_cast<NODCBTObservation *>(obs);
@@ -968,7 +972,7 @@ void addNODCBTDataTypeToEntry(Observation *obs,metadata::ObML::IDEntry& entry)
   }
 }
 
-void addTD32DataTypeToEntry(Observation *obs,metadata::ObML::IDEntry& entry)
+void add_td32_data_type_to_entry(Observation *obs,metadata::ObML::IDEntry& entry)
 {
   TD32Data *t=reinterpret_cast<TD32Data *>(obs);
   metadata::ObML::DataTypeEntry de,de2;
@@ -1032,7 +1036,7 @@ void addTD32DataTypeToEntry(Observation *obs,metadata::ObML::IDEntry& entry)
   }
 }
 
-void addDSSTsrDataTypeToEntry(Observation *obs,metadata::ObML::IDEntry& entry)
+void add_dss_tsr_data_type_to_entry(Observation *obs,metadata::ObML::IDEntry& entry)
 {
   metadata::ObML::DataTypeEntry de;
 
@@ -1051,7 +1055,7 @@ void addDSSTsrDataTypeToEntry(Observation *obs,metadata::ObML::IDEntry& entry)
   }
 }
 
-void addUADBRaobDataTypeToEntry(Observation *obs,metadata::ObML::IDEntry& entry)
+void add_uadb_raob_data_type_to_entry(Observation *obs,metadata::ObML::IDEntry& entry)
 {
   metadata::ObML::DataTypeEntry de;
 
@@ -1066,7 +1070,7 @@ void addUADBRaobDataTypeToEntry(Observation *obs,metadata::ObML::IDEntry& entry)
   }
 }
 
-void addWMSSCDataTypeToEntry(Observation *obs,metadata::ObML::IDEntry& entry)
+void add_wmssc_data_type_to_entry(Observation *obs,metadata::ObML::IDEntry& entry)
 {
   WMSSCObservation *o=reinterpret_cast<WMSSCObservation *>(obs);
   metadata::ObML::DataTypeEntry de;
@@ -1114,34 +1118,34 @@ void addWMSSCDataTypeToEntry(Observation *obs,metadata::ObML::IDEntry& entry)
   }
 }
 
-void addDataTypeToEntry(Observation *obs,metadata::ObML::IDEntry& entry)
+void add_data_type_to_entry(Observation *obs,metadata::ObML::IDEntry& entry)
 {
   if (args.format == "isd") {
-    addISDDataTypeToEntry(obs,entry);
+    add_isd_data_type_to_entry(obs,entry);
   }
   else if (args.format == "on29" || args.format == "on124") {
-    addADPDataTypeToEntry(obs,entry);
+    add_adp_data_type_to_entry(obs,entry);
   }
   else if (args.format == "cpcsumm") {
-    addCPCSummaryDataTypeToEntry(obs,entry);
+    add_cpc_summary_data_type_to_entry(obs,entry);
   }
   else if (args.format == "imma") {
-    addIMMADataTypeToEntry(obs,entry);
+    add_imma_data_type_to_entry(obs,entry);
   }
   else if (args.format == "nodcbt") {
-    addNODCBTDataTypeToEntry(obs,entry);
+    add_nodc_bt_data_type_to_entry(obs,entry);
   }
   else if (std::regex_search(args.format,std::regex("^td32"))) {
-    addTD32DataTypeToEntry(obs,entry);
+    add_td32_data_type_to_entry(obs,entry);
   }
   else if (args.format == "tsr") {
-    addDSSTsrDataTypeToEntry(obs,entry);
+    add_dss_tsr_data_type_to_entry(obs,entry);
   }
   else if (args.format == "uadb") {
-    addUADBRaobDataTypeToEntry(obs,entry);
+    add_uadb_raob_data_type_to_entry(obs,entry);
   }
   else if (args.format == "wmssc") {
-    addWMSSCDataTypeToEntry(obs,entry);
+    add_wmssc_data_type_to_entry(obs,entry);
   }
   else {
     std::cerr << "Error: unable to add data type for format " << args.format << std::endl;
@@ -1164,16 +1168,16 @@ void scan_file()
   int status;
   Observation *obs;
   size_t l,k;
-  float lat,lon,trueLon;
+  float lat,lon,true_lon;
   DateTime start_date,end_date;
   std::string file_format,error,sdum;
   int obs_type_index=-1;
   size_t nsteps;
   std::list<float> lats,lons;
-  bool addedDataType;
-  my::map<metautils::StringEntry> missing_ID_table;
+  bool add_data_type;
+  my::map<metautils::StringEntry> missing_id_table;
   metautils::StringEntry se;
-  metadata::ObML::ObservationTypes obsTypes;
+  metadata::ObML::ObservationTypes obs_types;
   my::map<InvEntry> inv_O_table,inv_P_table,inv_I_table;
   InvEntry ie;
   std::list<std::string> inv_lines;
@@ -1224,185 +1228,206 @@ void scan_file()
     std::cerr << "Error: format " << args.format << " not recognized" << std::endl;
     exit(1);
   }
-  ID_table=new my::map<metadata::ObML::IDEntry> *[metadata::ObML::NUM_OBS_TYPES];
+  id_table=new my::map<metadata::ObML::IDEntry> *[metadata::ObML::NUM_OBS_TYPES];
   for (size_t n=0; n < metadata::ObML::NUM_OBS_TYPES; ++n) {
-    ID_table[n]=new my::map<metadata::ObML::IDEntry>(999999);
+    id_table[n]=new my::map<metadata::ObML::IDEntry>(999999);
   }
   tfile=new TempFile;
   tfile->open(args.temp_loc);
   tdir=new TempDir;
   tdir->create(args.temp_loc);
-  if (!primaryMetadata::prepare_file_for_metadata_scanning(*tfile,*tdir,NULL,file_format,error)) {
+  std::list<std::string> filelist;
+  if (verbose_operation) {
+    std::cout << "Preparing file for metadata scanning ..." << std::endl;
+  }
+  if (!primaryMetadata::prepare_file_for_metadata_scanning(*tfile,*tdir,&filelist,file_format,error)) {
     metautils::log_error("prepare_file_for_metadata_scanning() returned error: '"+error+"'","obs2xml",user,args.args_string);
   }
-  if (!primaryMetadata::open_file_for_metadata_scanning(istream,tfile->name(),error)) {
-    metautils::log_error("open_file_for_metadata_scanning() returned error: '"+error+"'","obs2xml",user,args.args_string);
+  if (verbose_operation) {
+    std::cout << "... preparation complete." << std::endl;
   }
-  if (file_format.length() == 0 && args.format == "isd") {
-    metadata::open_inventory(inv_file,&inv_dir,inv_stream,"ObML","obs2xml",user);
+  if (filelist.size() == 0) {
+    filelist.emplace_back(tfile->name());
   }
-  else if (args.inventory_only) {
-    metautils::log_error("scan_file returned error: unable to inventory "+args.path+"/"+args.filename+" because archive format is '"+file_format+"' and data format is '"+args.format+"'","obs2xml",user,args.args_string);
+  if (verbose_operation) {
+    std::cout << "Ready to scan " << filelist.size() << " files." << std::endl;
   }
-  while ( (status=istream->read(buffer,BUF_LEN)) != bfstream::eof) {
-    if (status > 0) {
-	obs->fill(buffer,Observation::full_report);
-	nsteps=getPlatformAndStationInformation(obs,ientry.key,start_date,end_date,obs_type_index,lats,lons);
-	std::list<float>::iterator it_lat,it_lon;
-	std::list<float>::iterator end=lats.end();
-	addedDataType=false;
-	for (it_lat=lats.begin(),it_lon=lons.begin(); it_lat != end; ++it_lat,++it_lon) {
-	  lat=*it_lat;
-	  lon=*it_lon;
+  for (const auto& file : filelist) {
+    if (verbose_operation) {
+	std::cout << "Beginning scan of " << file << "..." << std::endl;
+    }
+    if (!primaryMetadata::open_file_for_metadata_scanning(istream,file,error)) {
+	metautils::log_error("open_file_for_metadata_scanning() returned error: '"+error+"'","obs2xml",user,args.args_string);
+    }
+    if (file_format.empty() && args.format == "isd") {
+	metadata::open_inventory(inv_file,&inv_dir,inv_stream,"ObML","obs2xml",user);
+    }
+    else if (args.inventory_only) {
+	metautils::log_error("scan_file returned error: unable to inventory "+args.path+"/"+args.filename+" because archive format is '"+file_format+"' and data format is '"+args.format+"'","obs2xml",user,args.args_string);
+    }
+    while ( (status=istream->read(buffer,BUF_LEN)) != bfstream::eof) {
+	if (status > 0) {
+	  obs->fill(buffer,Observation::full_report);
+	  nsteps=platform_and_station_information(obs,ientry.key,start_date,end_date,obs_type_index,lats,lons);
+	  std::list<float>::iterator it_lat,it_lon;
+	  std::list<float>::iterator end=lats.end();
+	  add_data_type=false;
+	  for (it_lat=lats.begin(),it_lon=lons.begin(); it_lat != end; ++it_lat,++it_lon) {
+	    lat=*it_lat;
+	    lon=*it_lon;
 // handle longitudes that are expressed as 0-360
-	  trueLon= (lon > 180.) ? (lon-360.) : lon;
-	  if (pentry.key.length() > 0) {
-	    if (!ID_table[obs_type_index]->found(ientry.key,ientry)) {
-		if (lat > -90.01 && lat < 90.01 && trueLon > -180.01 && trueLon < 180.01) {
-		  num_not_missing++;
-		  ientry.data.reset(new metadata::ObML::IDEntry::Data);
-		  ientry.data->S_lat=ientry.data->N_lat=lat;
-		  ientry.data->min_lon_bitmap.reset(new float[360]);
-		  ientry.data->max_lon_bitmap.reset(new float[360]);
-		  for (size_t n=0; n < 360; ++n) {
-		    ientry.data->min_lon_bitmap[n]=ientry.data->max_lon_bitmap[n]=999.;
+	    true_lon= (lon > 180.) ? (lon-360.) : lon;
+	    if (pentry.key.length() > 0) {
+		if (!id_table[obs_type_index]->found(ientry.key,ientry)) {
+		  if (lat > -90.01 && lat < 90.01 && true_lon > -180.01 && true_lon < 180.01) {
+		    num_not_missing++;
+		    ientry.data.reset(new metadata::ObML::IDEntry::Data);
+		    ientry.data->S_lat=ientry.data->N_lat=lat;
+		    ientry.data->min_lon_bitmap.reset(new float[360]);
+		    ientry.data->max_lon_bitmap.reset(new float[360]);
+		    for (size_t n=0; n < 360; ++n) {
+			ientry.data->min_lon_bitmap[n]=ientry.data->max_lon_bitmap[n]=999.;
+		    }
+		    ientry.data->W_lon=ientry.data->E_lon=true_lon;
+		    convert_lat_lon_to_box(1,0.,true_lon,l,k);
+		    ientry.data->min_lon_bitmap[k]=ientry.data->max_lon_bitmap[k]=true_lon;
+		    ientry.data->start=start_date;
+		    ientry.data->end=end_date;
+		    ientry.data->nsteps=nsteps;
+		    add_data_type_to_entry(obs,ientry);
+		    add_data_type=true;
+		    id_table[obs_type_index]->insert(ientry);
 		  }
-		  ientry.data->W_lon=ientry.data->E_lon=trueLon;
-		  convert_lat_lon_to_box(1,0.,trueLon,l,k);
-		  ientry.data->min_lon_bitmap[k]=ientry.data->max_lon_bitmap[k]=trueLon;
-		  ientry.data->start=start_date;
-		  ientry.data->end=end_date;
-		  ientry.data->nsteps=nsteps;
-		  addDataTypeToEntry(obs,ientry);
-		  addedDataType=true;
-		  ID_table[obs_type_index]->insert(ientry);
 		}
-	    }
-	    else {
-		if (ientry.data->S_lat != lat || ientry.data->W_lon != trueLon) {
-		  if (lat > -90.01 && lat < 90.01 && trueLon > -180.01 && trueLon < 180.01) {
-		    if (lat < ientry.data->S_lat) {
-			ientry.data->S_lat=lat;
+		else {
+		  if (ientry.data->S_lat != lat || ientry.data->W_lon != true_lon) {
+		    if (lat > -90.01 && lat < 90.01 && true_lon > -180.01 && true_lon < 180.01) {
+			if (lat < ientry.data->S_lat) {
+			  ientry.data->S_lat=lat;
+			}
+			if (lat > ientry.data->N_lat) {
+			  ientry.data->N_lat=lat;
+			}
+			if (true_lon < ientry.data->W_lon) {
+			  ientry.data->W_lon=true_lon;
+			}
+			if (true_lon > ientry.data->E_lon) {
+			  ientry.data->E_lon=true_lon;
+			}
+			convert_lat_lon_to_box(1,0.,true_lon,l,k);
+			if (ientry.data->min_lon_bitmap[k] > 900.) {
+			  ientry.data->min_lon_bitmap[k]=ientry.data->max_lon_bitmap[k]=true_lon;
+			}
+			else {
+			  if (true_lon < ientry.data->min_lon_bitmap[k]) {
+			    ientry.data->min_lon_bitmap[k]=true_lon;
+			  }
+			  if (true_lon > ientry.data->max_lon_bitmap[k]) {
+			    ientry.data->max_lon_bitmap[k]=true_lon;
+			  }
+			}
 		    }
-		    if (lat > ientry.data->N_lat) {
-			ientry.data->N_lat=lat;
+		  }
+		  if (lat > -90.01 && lat < 90.01 && true_lon > -180.01 && true_lon < 180.01) {
+		    ++num_not_missing;
+		    if (start_date < ientry.data->start) {
+			ientry.data->start=start_date;
 		    }
-		    if (trueLon < ientry.data->W_lon) {
-			ientry.data->W_lon=trueLon;
+		    if (end_date > ientry.data->end) {
+			ientry.data->end=end_date;
 		    }
-		    if (trueLon > ientry.data->E_lon) {
-			ientry.data->E_lon=trueLon;
+		    ientry.data->nsteps+=nsteps;
+		    if (!add_data_type) {
+			add_data_type_to_entry(obs,ientry);
+			add_data_type=true;
 		    }
-		    convert_lat_lon_to_box(1,0.,trueLon,l,k);
-		    if (ientry.data->min_lon_bitmap[k] > 900.) {
-			ientry.data->min_lon_bitmap[k]=ientry.data->max_lon_bitmap[k]=trueLon;
+		  }
+		}
+		if (!platform_table[obs_type_index].found(pentry.key,pentry)) {
+		  if (lat > -90.01 && lat < 90.01 && true_lon > -180.01 && true_lon < 180.01) {
+		    pentry.boxflags.reset(new summarizeMetadata::BoxFlags);
+		    pentry.boxflags->initialize(361,180,0,0);
+		    if (lat == -90.) {
+			pentry.boxflags->spole=1;
+		    }
+		    else if (lat == 90.) {
+			pentry.boxflags->npole=1;
 		    }
 		    else {
-			if (trueLon < ientry.data->min_lon_bitmap[k]) {
-			  ientry.data->min_lon_bitmap[k]=trueLon;
-			}
-			if (trueLon > ientry.data->max_lon_bitmap[k]) {
-			  ientry.data->max_lon_bitmap[k]=trueLon;
-			}
+			convert_lat_lon_to_box(1,lat,true_lon,l,k);
+			pentry.boxflags->flags[l-1][k]=1;
+			pentry.boxflags->flags[l-1][360]=1;
+		    }
+		    platform_table[obs_type_index].insert(pentry);
+		  }
+		  else {
+		    if (!missing_id_table.found(ientry.key,se)) {
+			se.key=ientry.key;
+			missing_id_table.insert(se);
+			metautils::log_warning("no location for ID: "+ientry.key+" date: "+obs->date_time().to_string(),"obs2xml",user,args.args_string);
 		    }
 		  }
 		}
-		if (lat > -90.01 && lat < 90.01 && trueLon > -180.01 && trueLon < 180.01) {
-		  ++num_not_missing;
-		  if (start_date < ientry.data->start) {
-		    ientry.data->start=start_date;
-		  }
-		  if (end_date > ientry.data->end) {
-		    ientry.data->end=end_date;
-		  }
-		  ientry.data->nsteps+=nsteps;
-		  if (!addedDataType) {
-		    addDataTypeToEntry(obs,ientry);
-		    addedDataType=true;
-		  }
-		}
-	    }
-	    if (!platform_table[obs_type_index].found(pentry.key,pentry)) {
-		if (lat > -90.01 && lat < 90.01 && trueLon > -180.01 && trueLon < 180.01) {
-		  pentry.boxflags.reset(new summarizeMetadata::BoxFlags);
-		  pentry.boxflags->initialize(361,180,0,0);
-		  if (lat == -90.) {
-		    pentry.boxflags->spole=1;
-		  }
-		  else if (lat == 90.) {
-		    pentry.boxflags->npole=1;
+		else {
+		  if (lat > -90.01 && lat < 90.01 && true_lon > -180.01 && true_lon < 180.01) {
+		    if (lat == -90.) {
+			pentry.boxflags->spole=1;
+		    }
+		    else if (lat == 90.) {
+			pentry.boxflags->npole=1;
+		    }
+		    else {
+			convert_lat_lon_to_box(1,lat,true_lon,l,k);
+			pentry.boxflags->flags[l-1][k]=1;
+			pentry.boxflags->flags[l-1][360]=1;
+		    }
 		  }
 		  else {
-		    convert_lat_lon_to_box(1,lat,trueLon,l,k);
-		    pentry.boxflags->flags[l-1][k]=1;
-		    pentry.boxflags->flags[l-1][360]=1;
+		    if (!missing_id_table.found(ientry.key,se)) {
+			se.key=ientry.key;
+			missing_id_table.insert(se);
+			metautils::log_warning("no location for ID: "+ientry.key+" date: "+obs->date_time().to_string(),"obs2xml",user,args.args_string);
+		    }
 		  }
-		  platform_table[obs_type_index].insert(pentry);
 		}
-		else {
-		  if (!missing_ID_table.found(ientry.key,se)) {
-		    se.key=ientry.key;
-		    missing_ID_table.insert(se);
-		    metautils::log_warning("no location for ID: "+ientry.key+" date: "+obs->date_time().to_string(),"obs2xml",user,args.args_string);
+		if (inv_stream.is_open() && lat > -90.01 && lat < 90.01 && true_lon > -180.01 && true_lon < 180.01) {
+		  std::stringstream inv_line;
+		  inv_line << istream->current_record_offset() << "|" << status << "|" << obs->date_time().to_string("%Y%m%d%H%MM");
+		  if (!inv_O_table.found(obs_types.types[obs_type_index],ie)) {
+		    ie.key=obs_types.types[obs_type_index];
+		    ie.num=inv_O_table.size();
+		    inv_O_table.insert(ie);
 		  }
+		  inv_line << "|" << ie.num;
+		  std::deque<std::string> sp=strutils::split(ientry.key,"[!]");
+		  if (!inv_P_table.found(sp[0],ie)) {
+		    ie.key=sp[0];
+		    ie.num=inv_P_table.size();
+		    inv_P_table.insert(ie);
+		  }
+		  inv_line << "|" << ie.num;
+		  ie.key=sp[1]+"|"+sp[2];
+		  if (!inv_I_table.found(ie.key,ie)) {
+		    ie.num=inv_I_table.size();
+		    inv_I_table.insert(ie);
+		  }
+		  inv_line << "|" << ie.num;
+		  inv_line << "|" << strutils::ftos(lat,4) << "|" << strutils::ftos(lon,4);
+		  inv_lines.emplace_back(inv_line.str());
 		}
 	    }
-	    else {
-		if (lat > -90.01 && lat < 90.01 && trueLon > -180.01 && trueLon < 180.01) {
-		  if (lat == -90.) {
-		    pentry.boxflags->spole=1;
-		  }
-		  else if (lat == 90.) {
-		    pentry.boxflags->npole=1;
-		  }
-		  else {
-		    convert_lat_lon_to_box(1,lat,trueLon,l,k);
-		    pentry.boxflags->flags[l-1][k]=1;
-		    pentry.boxflags->flags[l-1][360]=1;
-		  }
-		}
-		else {
-		  if (!missing_ID_table.found(ientry.key,se)) {
-		    se.key=ientry.key;
-		    missing_ID_table.insert(se);
-		    metautils::log_warning("no location for ID: "+ientry.key+" date: "+obs->date_time().to_string(),"obs2xml",user,args.args_string);
-		  }
-		}
-	    }
-	    if (inv_stream.is_open() && lat > -90.01 && lat < 90.01 && trueLon > -180.01 && trueLon < 180.01) {
-		std::stringstream inv_line;
-		inv_line << istream->current_record_offset() << "|" << status << "|" << obs->date_time().to_string("%Y%m%d%H%MM");
-		if (!inv_O_table.found(obsTypes.types[obs_type_index],ie)) {
-		  ie.key=obsTypes.types[obs_type_index];
-		  ie.num=inv_O_table.size();
-		  inv_O_table.insert(ie);
-		}
-		inv_line << "|" << ie.num;
-		std::deque<std::string> sp=strutils::split(ientry.key,"[!]");
-		if (!inv_P_table.found(sp[0],ie)) {
-		  ie.key=sp[0];
-		  ie.num=inv_P_table.size();
-		  inv_P_table.insert(ie);
-		}
-		inv_line << "|" << ie.num;
-		ie.key=sp[1]+"|"+sp[2];
-		if (!inv_I_table.found(ie.key,ie)) {
-		  ie.num=inv_I_table.size();
-		  inv_I_table.insert(ie);
-		}
-		inv_line << "|" << ie.num;
-		inv_line << "|" << strutils::ftos(lat,4) << "|" << strutils::ftos(lon,4);
-		inv_lines.emplace_back(inv_line.str());
-	    }
+	    nsteps=0;
 	  }
-	  nsteps=0;
+	} 
+ 	else {
+	  metautils::log_error("unable to read observation "+strutils::itos(istream->number_read()+1)+"; error: '"+myerror+"'","obs2xml",user,args.args_string);
 	}
     }
-    else {
-	metautils::log_error("unable to read observation "+strutils::itos(istream->number_read()+1)+"; error: '"+myerror+"'","obs2xml",user,args.args_string);
+    istream->close();
+    if (verbose_operation) {
+	std::cout << "  ...scan of " << file << " completed." << std::endl;
     }
   }
-  istream->close();
   clean_up();
   if (inv_lines.size() > 0) {
     for (auto& key : inv_O_table.keys()) {
@@ -1489,7 +1514,7 @@ int main(int argc,char **argv)
   scan_file();
   if (!args.inventory_only) {
     if (num_not_missing > 0) {
-	metadata::ObML::write_ObML(ID_table,platform_table,"obs2xml",user);
+	metadata::ObML::write_ObML(id_table,platform_table,"obs2xml",user);
     }
     else {
 	metautils::log_error("all stations have missing location information - no usable data found; no content metadata will be saved for this file","obs2xml",user,args.args_string);
