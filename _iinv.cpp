@@ -286,6 +286,9 @@ void build_wms_capabilities()
 	}
 	else if (vlayer.attribute_value("value") != "0") {
 	    auto tparts=strutils::split(ltype,"-");
+	    if (tparts.size() == 1) {
+		tparts.emplace_back(tparts.front());
+	    }
 	    layer_title+=": "+vlayer.attribute_value("bottom")+lmapper.units(data_format,tparts[0],lmap)+", "+vlayer.attribute_value("top")+lmapper.units(data_format,tparts[1],lmap);;
 	}
 	ofs << "        <Layer>" << std::endl;
@@ -1532,7 +1535,6 @@ void insert_obml_inventory()
 /*
   while (!ifs.eof()) {
     std::string sline=line;
-std::cerr << sline << std::endl;
     if (std::regex_search(sline,std::regex("<!>"))) {
 	auto sp=strutils::split(sline,"<!>");
 	switch (sp[0][0]) {
@@ -1546,8 +1548,6 @@ std::cerr << sline << std::endl;
 	  }
 	  case 'I':
 	  {
-std::cerr << "A" << std::endl;
-std::cerr << sp[2] << std::endl;
 	    auto spx=strutils::split(sp[2],"[!]");
 	    query.set("select i.code from WObML.ds"+local_args.dsnum2+"_IDs2 as i left join WObML.IDTypes as t on t.code = i.IDType_code where t.IDType= '"+spx[0]+"' and i.ID = '"+spx[1]+"'");
 	    if (query.submit(server) < 0) {
