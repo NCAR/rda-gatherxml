@@ -1503,6 +1503,9 @@ int main(int argc,char **argv)
     generate_description(dataset_type,dataset_doc_dir.name());
     xdoc.close();
   }
+  if (server.insert("metautil.dset_waf","'"+args.dsnum+"',''","update dsid = values(dsid)") < 0) {
+    metautils::log_warning("not marked for DSET WAF update","dsgen",user,args.args_string);
+  }
   server.disconnect();
   std::string remote_path="/data/web";
   if (dataset_type == "W") {
