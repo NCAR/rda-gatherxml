@@ -496,7 +496,6 @@ void generate_description(std::string type,std::string tdir_name)
 // acknowledgments
   insert_text_field(ofs,xdoc.element("dsOverview/acknowledgement"),"Acknowledgments");
 // temporal range(s)
-  ofs << "<tr style=\"vertical-align: top\"><td class=\"bold nowrap\">Temporal Range:</td><td>";
   MySQL::LocalQuery query("select dsid from dssdb.dsgroup where dsid = 'ds"+args.dsnum+"'");
   if (query.submit(server) < 0) {
     metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",user,args.args_string);
@@ -517,96 +516,99 @@ void generate_description(std::string type,std::string tdir_name)
     }
   }
   auto div_num=0;
-  std::unordered_map<std::string,std::string> groups_table,rda_files_table,metadata_files_table;
   bool grouped_periods=false;
-  if (query.num_rows() > 1) {
-    MySQL::LocalQuery query2("distinct gindex","dssdb.dsperiod","dsid = 'ds"+args.dsnum+"'");
-    if (query2.submit(server) < 0) {
-	metautils::log_error("query: "+query2.show()+" returned error: "+query2.error(),"dsgen",user,args.args_string);
-    }
-    if (query2.num_rows() > 1) {
-	grouped_periods=true;
-	query2.set("select gindex,title from dssdb.dsgroup where dsid = 'ds"+args.dsnum+"'");
-	if (query2.submit(server) < 0) {
-	  metautils::log_error("error: "+query2.error()+" while getting groups data","dsgen",user,args.args_string);
-	}
-	MySQL::Row row2;
-	while (query2.fetch_row(row2)) {
-	  groups_table.emplace(row2[0],row2[1]);
-	}
-	query2.set("select mssfile,tindex from dssdb.mssfile where dsid = 'ds"+args.dsnum+"' and type = 'P' and status = 'P'");
-	if (query2.submit(server) < 0) {
-	  metautils::log_error("error: "+query2.error()+" while getting RDA files data","dsgen",user,args.args_string);
-	}
-	while (query2.fetch_row(row2)) {
-	  rda_files_table.emplace(row2[0],row2[1]);
-	}
-	query2.set("select code,mssID from GrML.ds"+dsnum2+"_primaries");
-	if (query2.submit(server) == 0) {
-	  while (query2.fetch_row(row2)) {
-	    metadata_files_table.emplace(row2[0],row2[1]);
-	  }
-	}
-	query2.set("select min(concat(date_start,' ',time_start)),min(start_flag),max(concat(date_end,' ',time_end)),min(end_flag),any_value(time_zone) from dssdb.dsperiod where dsid = 'ds"+args.dsnum+"' and date_start > '0000-00-00' and date_start < '3000-01-01' and date_end > '0000-00-00' and date_end < '3000-01-01' group by dsid");
+  std::unordered_map<std::string,std::string> groups_table,rda_files_table,metadata_files_table;
+  if (query.num_rows() > 0) {
+    ofs << "<tr style=\"vertical-align: top\"><td class=\"bold nowrap\">Temporal Range:</td><td>";
+    if (query.num_rows() > 1) {
+	MySQL::LocalQuery query2("distinct gindex","dssdb.dsperiod","dsid = 'ds"+args.dsnum+"'");
 	if (query2.submit(server) < 0) {
 	  metautils::log_error("query: "+query2.show()+" returned error: "+query2.error(),"dsgen",user,args.args_string);
 	}
-	query2.fetch_row(row2);
-	auto start_date_time=summarizeMetadata::set_date_time_string(row2[0],row2[1],row2[4]);
-	auto end_date_time=summarizeMetadata::set_date_time_string(row2[2],row2[3],row2[4]);
-	auto temporal=start_date_time;
-	if (!end_date_time.empty() && end_date_time != start_date_time) {
-	  temporal+=" to "+end_date_time;
+	if (query2.num_rows() > 1) {
+	  grouped_periods=true;
+	  query2.set("select gindex,title from dssdb.dsgroup where dsid = 'ds"+args.dsnum+"'");
+	  if (query2.submit(server) < 0) {
+	    metautils::log_error("error: "+query2.error()+" while getting groups data","dsgen",user,args.args_string);
+	  }
+	  MySQL::Row row2;
+	  while (query2.fetch_row(row2)) {
+	    groups_table.emplace(row2[0],row2[1]);
+	  }
+	  query2.set("select mssfile,tindex from dssdb.mssfile where dsid = 'ds"+args.dsnum+"' and type = 'P' and status = 'P'");
+	  if (query2.submit(server) < 0) {
+	    metautils::log_error("error: "+query2.error()+" while getting RDA files data","dsgen",user,args.args_string);
+	  }
+	  while (query2.fetch_row(row2)) {
+	    rda_files_table.emplace(row2[0],row2[1]);
+	  }
+	  query2.set("select code,mssID from GrML.ds"+dsnum2+"_primaries");
+	  if (query2.submit(server) == 0) {
+	    while (query2.fetch_row(row2)) {
+		metadata_files_table.emplace(row2[0],row2[1]);
+	    }
+	  }
+	  query2.set("select min(concat(date_start,' ',time_start)),min(start_flag),max(concat(date_end,' ',time_end)),min(end_flag),any_value(time_zone) from dssdb.dsperiod where dsid = 'ds"+args.dsnum+"' and date_start > '0000-00-00' and date_start < '3000-01-01' and date_end > '0000-00-00' and date_end < '3000-01-01' group by dsid");
+	  if (query2.submit(server) < 0) {
+	    metautils::log_error("query: "+query2.show()+" returned error: "+query2.error(),"dsgen",user,args.args_string);
+	  }
+	  query2.fetch_row(row2);
+	  auto start_date_time=summarizeMetadata::set_date_time_string(row2[0],row2[1],row2[4]);
+	  auto end_date_time=summarizeMetadata::set_date_time_string(row2[2],row2[3],row2[4]);
+	  auto temporal=start_date_time;
+	  if (!end_date_time.empty() && end_date_time != start_date_time) {
+	    temporal+=" to "+end_date_time;
+	  }
+	  ofs << temporal << " <span class=\"fs13px\">(Entire dataset)</span>";
+	  ofs << "<br /><span id=\"D" << div_num << "\"><a href=\"javascript:swapDivs(" << div_num << "," << div_num+1 << ")\" title=\"Expand dataset product period list\"><img src=\"/images/bluetriangle.gif\" width=\"12\" height=\"15\" border=\"0\"><span class=\"fs13px\">Period details by dataset product</span></a></span><span style=\"visibility: hidden; position: absolute; top: 0\" id=\"D" << div_num+1 << "\"><a href=\"javascript:swapDivs(" << div_num+1 << "," << div_num << ")\"><img src=\"/images/bluetriangle90.gif\" width=\"15\" height=\"12\" border=\"0\" title=\"Collapse dataset product period list\"></a><span class=\"fs13px\">Period details by dataset product:";
+	  div_num+=2;
 	}
-	ofs << temporal << " <span class=\"fs13px\">(Entire dataset)</span>";
-	ofs << "<br /><span id=\"D" << div_num << "\"><a href=\"javascript:swapDivs(" << div_num << "," << div_num+1 << ")\" title=\"Expand dataset product period list\"><img src=\"/images/bluetriangle.gif\" width=\"12\" height=\"15\" border=\"0\"><span class=\"fs13px\">Period details by dataset product</span></a></span><span style=\"visibility: hidden; position: absolute; top: 0\" id=\"D" << div_num+1 << "\"><a href=\"javascript:swapDivs(" << div_num+1 << "," << div_num << ")\"><img src=\"/images/bluetriangle90.gif\" width=\"15\" height=\"12\" border=\"0\" title=\"Collapse dataset product period list\"></a><span class=\"fs13px\">Period details by dataset product:";
-	div_num+=2;
     }
-  }
-  std::map<std::string,std::tuple<std::string,std::string>> periods_table;
-  MySQL::Row row;
-  while (query.fetch_row(row)) {
-    auto start_date_time=summarizeMetadata::set_date_time_string(row[0]+" "+row[1],row[2],row[6]);
-    auto end_date_time=summarizeMetadata::set_date_time_string(row[3]+" "+row[4],row[5],row[6]);
-    std::string key;
-    if (!row[7].empty()) {
-	key=row[7];
-    }
-    else {
-	key=row[8];
-    }
-    if (periods_table.find(key) == periods_table.end()) {
-	periods_table.emplace(key,std::make_tuple(start_date_time,end_date_time));
-    }
-    else {
-	std::string &start=std::get<0>(periods_table[key]);
-	if (start_date_time < start) {
-	  start=start_date_time;
+    std::map<std::string,std::tuple<std::string,std::string>> periods_table;
+    MySQL::Row row;
+    while (query.fetch_row(row)) {
+	auto start_date_time=summarizeMetadata::set_date_time_string(row[0]+" "+row[1],row[2],row[6]);
+	auto end_date_time=summarizeMetadata::set_date_time_string(row[3]+" "+row[4],row[5],row[6]);
+	std::string key;
+	if (!row[7].empty()) {
+	  key=row[7];
 	}
-	std::string &end=std::get<1>(periods_table[key]);
-	if (end_date_time > end) {
-	  end=end_date_time;
+	else {
+	  key=row[8];
 	}
-    }   
-  }
-  for (const auto& e : periods_table) {
-    auto temporal=std::get<0>(e.second);
-    auto end=std::get<1>(e.second);
-    if (!end.empty() && end != temporal) {
-	temporal+=" to "+end;
+	if (periods_table.find(key) == periods_table.end()) {
+	  periods_table.emplace(key,std::make_tuple(start_date_time,end_date_time));
+	}
+	else {
+	  std::string &start=std::get<0>(periods_table[key]);
+	  if (start_date_time < start) {
+	    start=start_date_time;
+	  }
+	  std::string &end=std::get<1>(periods_table[key]);
+	  if (end_date_time > end) {
+	    end=end_date_time;
+	  }
+	}   
     }
-    if (periods_table.size() > 1) {
-	temporal+=" ("+e.first+")";
-	ofs << "<div style=\"margin-left: 10px\">" << temporal << "</div>";
+    for (const auto& e : periods_table) {
+	auto temporal=std::get<0>(e.second);
+	auto end=std::get<1>(e.second);
+	if (!end.empty() && end != temporal) {
+	  temporal+=" to "+end;
+	}
+	if (periods_table.size() > 1) {
+	  temporal+=" ("+e.first+")";
+	  ofs << "<div style=\"margin-left: 10px\">" << temporal << "</div>";
+	}
+	else {
+	  ofs << temporal;
+	}
     }
-    else {
-	ofs << temporal;
+    if (grouped_periods) {
+	ofs << "</span></span>";
     }
+    ofs << "</td></tr>" << std::endl;
   }
-  if (grouped_periods) {
-    ofs << "</span></span>";
-  }
-  ofs << "</td></tr>" << std::endl;
 // update frequency
   auto e=xdoc.element("dsOverview/continuingUpdate");
   if (e.attribute_value("value") == "yes") {
@@ -650,6 +652,7 @@ void generate_description(std::string type,std::string tdir_name)
     metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",user,args.args_string);
   }
   std::list<std::string> strings;
+  MySQL::Row row;
   while (query.fetch_row(row)) {
     strings.emplace_back(strutils::capitalize(row[0]));
   }
