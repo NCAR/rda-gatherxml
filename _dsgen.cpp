@@ -27,6 +27,7 @@ TempDir temp_dir;
 XMLDocument xdoc;
 MySQL::Server server;
 std::string dataset_type;
+bool no_dset_waf=false;
 
 void generate_index(std::string type,std::string tdir_name)
 {
@@ -1474,11 +1475,18 @@ void generate_description(std::string type,std::string tdir_name)
 
 int main(int argc,char **argv)
 {
-  if (argc != 2) {
+  if (argc != 2 && argc != 3) {
     std::cerr << "usage: dsgen nnn.n" << std::endl;
+    std::cerr << "\noptions:" << std::endl;
+    std::cerr << "--no-dset-waf  don't add the dataset to the queue for the DSET WAF" << std::endl;
     exit(1);
   }
-  args.dsnum=argv[1];
+  auto next=1;
+  if (std::string(argv[next]) == "--no-dset-waf") {
+    no_dset_waf=true;
+    ++next;
+  }
+  args.dsnum=argv[next];
   if (std::regex_search(args.dsnum,std::regex("^ds"))) {
     args.dsnum=args.dsnum.substr(2);
   }
@@ -1503,8 +1511,10 @@ int main(int argc,char **argv)
     generate_description(dataset_type,dataset_doc_dir.name());
     xdoc.close();
   }
-  if (server.insert("metautil.dset_waf","'"+args.dsnum+"',''","update dsid = values(dsid)") < 0) {
-    metautils::log_warning("not marked for DSET WAF update","dsgen",user,args.args_string);
+  if (!no_dset_waf) {
+    if (server.insert("metautil.dset_waf","'"+args.dsnum+"',''","update dsid = values(dsid)") < 0) {
+	metautils::log_warning("not marked for DSET WAF update","dsgen",user,args.args_string);
+    }
   }
   server.disconnect();
   std::string remote_path="/data/web";
