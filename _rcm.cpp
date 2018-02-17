@@ -41,9 +41,9 @@ bool verified_new_file_is_archived(std::string& error)
     qstring="select wfile from wfile where dsid = 'ds"+new_dsnum+"' and wfile = '"+nname+"' and type = 'D' and status = 'P'";
   }
   MySQL::LocalQuery query(qstring);
-  if (query.submit(server) < 0)
-    metautils::log_error("verified_new_file_is_archived returned error: "+query.error(),"rcm",user,args.args_string);
-  MySQL::Row row;
+  if (query.submit(server) < 0) {
+    metautils::log_error("verified_new_file_is_archived() returned error: "+query.error(),"rcm",user,args.args_string);
+  }
   if (query.num_rows() == 0) {
     if (column == "mssid") {
 	error="Error: "+new_name+" is not a primary for ds"+new_dsnum;
@@ -60,7 +60,7 @@ bool verified_new_file_is_archived(std::string& error)
   }
 }
 
-void replace_URI(std::string& sline,std::string cmdir,std::string member_name = "")
+void replace_uri(std::string& sline,std::string cmdir,std::string member_name = "")
 {
   auto sline2=sline.substr(0,sline.find("\"")+1);
   if (cmdir == "fmd") {
@@ -76,7 +76,7 @@ void replace_URI(std::string& sline,std::string cmdir,std::string member_name = 
   sline=sline2;
 }
 
-void rewrite_URI_in_CMD_file(std::string db)
+void rewrite_uri_in_cmd_file(std::string db)
 {
   MySQL::Server server;
   MySQL::LocalQuery query;
@@ -111,7 +111,7 @@ void rewrite_URI_in_CMD_file(std::string db)
   else if (std::regex_search(old_name,std::regex("^http(s){0,1}://(rda|dss)\\.ucar\\.edu/"))) {
     cmdir="wfmd";
     db_prefix="W";
-    if (old_web_home.length() > 0) {
+    if (!old_web_home.empty()) {
 	strutils::replace_all(oname,"http://rda.ucar.edu","");
 	strutils::replace_all(oname,"http://dss.ucar.edu","");
 	strutils::replace_all(oname,(old_web_home+"/"),"");
@@ -123,10 +123,10 @@ void rewrite_URI_in_CMD_file(std::string db)
   }
   std::stringstream oss,ess;
   if (mysystem2("/bin/mkdir -p "+tdir.name()+"/metadata/"+cmdir,oss,ess) < 0) {
-    metautils::log_error("rewrite_URI_in_CMD_file() returned error: unable to create temporary directory tree (1)","rcm",user,args.args_string);
+    metautils::log_error("rewrite_uri_in_cmd_file() returned error: unable to create temporary directory tree (1)","rcm",user,args.args_string);
   }
   if (db == "WGrML" && mysystem2("/bin/mkdir -p "+tdir.name()+"/metadata/inv",oss,ess) < 0) {
-    metautils::log_error("rewrite_URI_in_CMD_file() returned error: unable to create temporary directory tree (2)","rcm",user,args.args_string);
+    metautils::log_error("rewrite_uri_in_cmd_file() returned error: unable to create temporary directory tree (2)","rcm",user,args.args_string);
   }
   strutils::replace_all(oname,"/","%");
   strutils::replace_all(nname,"/","%");
@@ -146,16 +146,16 @@ void rewrite_URI_in_CMD_file(std::string db)
   if (db == (db_prefix+"GrML")) {
     for (const auto& file : file_list) {
 	sp=strutils::split(file,"<!>");
-	auto GrML_filename=remote_web_file("https://rda.ucar.edu/datasets/ds"+args.dsnum+"/metadata/"+cmdir+"/"+sp[0]+".GrML.gz",tdir.name());
-	if (stat(GrML_filename.c_str(),&buf) == 0) {
-	  system(("gunzip "+GrML_filename).c_str());
-	  strutils::chop(GrML_filename,3);
+	auto grml_filename=remote_web_file("https://rda.ucar.edu/datasets/ds"+args.dsnum+"/metadata/"+cmdir+"/"+sp[0]+".GrML.gz",tdir.name());
+	if (stat(grml_filename.c_str(),&buf) == 0) {
+	  system(("gunzip "+grml_filename).c_str());
+	  strutils::chop(grml_filename,3);
 	  old_is_gzipped=true;
 	}
 	else {
-	  GrML_filename=remote_web_file("https://rda.ucar.edu/datasets/ds"+args.dsnum+"/metadata/"+cmdir+"/"+sp[0]+".GrML",tdir.name());
+	  grml_filename=remote_web_file("https://rda.ucar.edu/datasets/ds"+args.dsnum+"/metadata/"+cmdir+"/"+sp[0]+".GrML",tdir.name());
 	}
-	ifs.open(GrML_filename.c_str());
+	ifs.open(grml_filename.c_str());
 	if (!ifs.is_open()) {
 	  metautils::log_error("unable to open old file for input","rcm",user,args.args_string);
 	}
@@ -169,10 +169,10 @@ void rewrite_URI_in_CMD_file(std::string db)
 	  if (strutils::contains(sline,"uri=")) {
 	    sp2=strutils::split(sp[0],"..m..");
 	    if (sp2.size() == 2) {
-		replace_URI(sline,cmdir,sp2[1]);
+		replace_uri(sline,cmdir,sp2[1]);
 	    }
 	    else {
-		replace_URI(sline,cmdir);
+		replace_uri(sline,cmdir);
 	    }
 	  }
 	  ofs << sline << std::endl;
@@ -185,12 +185,12 @@ void rewrite_URI_in_CMD_file(std::string db)
 // remove the old file
 	  if (old_is_gzipped) {
  	    if (host_unsync("/__HOST__/web/datasets/ds"+args.dsnum+"/metadata/"+cmdir+"/"+sp[0]+".GrML.gz",error) < 0) {
-		metautils::log_warning("rewrite_URI_in_CMD_file() could not remove "+sp[0]+".GrML - host_unsync error(s): '"+error+"'","rcm",user,args.args_string);
+		metautils::log_warning("rewrite_uri_in_cmd_file() could not remove "+sp[0]+".GrML - host_unsync error(s): '"+error+"'","rcm",user,args.args_string);
 	    }
 	  }
 	  else {
  	    if (host_unsync("/__HOST__/web/datasets/ds"+args.dsnum+"/metadata/"+cmdir+"/"+sp[0]+".GrML",error) < 0) {
-		metautils::log_warning("rewrite_URI_in_CMD_file() could not remove "+sp[0]+".GrML - host_unsync error(s): '"+error+"'","rcm",user,args.args_string);
+		metautils::log_warning("rewrite_uri_in_cmd_file() could not remove "+sp[0]+".GrML - host_unsync error(s): '"+error+"'","rcm",user,args.args_string);
 	    }
 	  }
 	}
@@ -204,25 +204,25 @@ void rewrite_URI_in_CMD_file(std::string db)
 	  }
 	  if (!inv_filename.empty() && stat(inv_filename.c_str(),&buf) == 0 && mysystem2("/bin/mv "+inv_filename+" "+tdir.name()+"/metadata/inv/"+sp[1]+".GrML_inv"+ext,oss,ess) == 0) {
 	    if (host_unsync("/__HOST__/web/datasets/ds"+args.dsnum+"/metadata/inv/"+sp[0]+".GrML_inv"+ext,error) < 0) {
-		metautils::log_warning("rewrite_URI_in_CMD_file() could not remove "+sp[0]+".GrML_inv"+ext+" - host_unsync error(s): '"+error+"'","rcm",user,args.args_string);
+		metautils::log_warning("rewrite_uri_in_cmd_file() could not remove "+sp[0]+".GrML_inv"+ext+" - host_unsync error(s): '"+error+"'","rcm",user,args.args_string);
 	    }
 	  }
 	}
     }
   }
   else if (db == (db_prefix+"ObML")) {
-    std::string ObML_filename="";
+    std::string obml_filename="";
     if (exists_on_server("rda-web-prod.ucar.edu","/data/web/datasets/ds"+args.dsnum+"/metadata/"+cmdir+"/"+oname+".ObML.gz")) {
-	ObML_filename=remote_web_file("https://rda.ucar.edu/datasets/ds"+args.dsnum+"/metadata/"+cmdir+"/"+oname+".ObML.gz",tdir.name());
-	system(("gunzip "+ObML_filename).c_str());
-	strutils::chop(ObML_filename,3);
+	obml_filename=remote_web_file("https://rda.ucar.edu/datasets/ds"+args.dsnum+"/metadata/"+cmdir+"/"+oname+".ObML.gz",tdir.name());
+	system(("gunzip "+obml_filename).c_str());
+	strutils::chop(obml_filename,3);
 	old_is_gzipped=true;
     }
     else if (exists_on_server("rda-web-prod.ucar.edu","/data/web/datasets/ds"+args.dsnum+"/metadata/"+cmdir+"/"+oname+".ObML")) {
-	ObML_filename=remote_web_file("https://rda.ucar.edu/datasets/ds"+args.dsnum+"/metadata/"+cmdir+"/"+oname+".ObML",tdir.name());
+	obml_filename=remote_web_file("https://rda.ucar.edu/datasets/ds"+args.dsnum+"/metadata/"+cmdir+"/"+oname+".ObML",tdir.name());
     }
-    if (!ObML_filename.empty()) {
-	ifs.open(ObML_filename.c_str());
+    if (!obml_filename.empty()) {
+	ifs.open(obml_filename.c_str());
     }
     if (!ifs.is_open()) {
 	metautils::log_error("unable to open old file for input","rcm",user,args.args_string);
@@ -235,7 +235,7 @@ void rewrite_URI_in_CMD_file(std::string db)
     while (!ifs.eof()) {
 	sline=line;
 	if (strutils::contains(sline,"uri=")) {
-	  replace_URI(sline,cmdir);
+	  replace_uri(sline,cmdir);
 	}
 	else if (oname != nname && strutils::contains(sline,"ref=")) {
 	  ref_file=sline.substr(sline.find("ref=")+5);
@@ -262,12 +262,12 @@ void rewrite_URI_in_CMD_file(std::string db)
 		ofs2.close();
 // remove the old ref file
 		if (host_unsync("/__HOST__/web/datasets/ds"+args.dsnum+"/metadata/"+cmdir+"/"+ref_file,error) < 0) {
-		  metautils::log_warning("rewrite_URI_in_CMD_file() could not remove old reference file '"+ref_file+"'","rcm",user,args.args_string);
+		  metautils::log_warning("rewrite_uri_in_cmd_file() could not remove old reference file '"+ref_file+"'","rcm",user,args.args_string);
 		}
 		strutils::replace_all(sline,oname,nname);
 	    }
 	    else {
-		metautils::log_error("rewrite_URI_in_CMD_file() could not open reference file '"+ref_file+"'","rcm",user,args.args_string);
+		metautils::log_error("rewrite_uri_in_cmd_file() could not open reference file '"+ref_file+"'","rcm",user,args.args_string);
 	    }
 	  }
 	}
@@ -281,12 +281,12 @@ void rewrite_URI_in_CMD_file(std::string db)
 // remove the old file
  	if (old_is_gzipped) {
  	  if (host_unsync("/__HOST__/web/datasets/ds"+args.dsnum+"/metadata/"+cmdir+"/"+oname+".ObML.gz",error) < 0) {
-	    metautils::log_warning("rewrite_URI_in_CMD_file() could not remove "+oname+".ObML - host_unsync error(s): '"+error+"'","rcm",user,args.args_string);
+	    metautils::log_warning("rewrite_uri_in_cmd_file() could not remove "+oname+".ObML - host_unsync error(s): '"+error+"'","rcm",user,args.args_string);
 	  }
 	}
 	else {
  	  if (host_unsync("/__HOST__/web/datasets/ds"+args.dsnum+"/metadata/"+cmdir+"/"+oname+".ObML",error) < 0) {
-	    metautils::log_warning("rewrite_URI_in_CMD_file() could not remove "+oname+".ObML - host_unsync error(s): '"+error+"'","rcm",user,args.args_string);
+	    metautils::log_warning("rewrite_uri_in_cmd_file() could not remove "+oname+".ObML - host_unsync error(s): '"+error+"'","rcm",user,args.args_string);
 	  }
 	}
     }
@@ -304,11 +304,11 @@ void rewrite_URI_in_CMD_file(std::string db)
     while (!ifs.eof()) {
 	sline=line;
 	if (strutils::contains(sline,"uri=")) {
-	  replace_URI(sline,cmdir);
+	  replace_uri(sline,cmdir);
 	}
 	else if (oname != nname && strutils::contains(sline,"classification stage=")) {
 	  se.key=sline.substr(sline.find("classification stage=")+22);
-	  if (se.key.length() > 0 && (idx=se.key.find("\"")) != std::string::npos) {
+	  if (!se.key.empty() && (idx=se.key.find("\"")) != std::string::npos) {
 	    se.key=se.key.substr(0,idx);
 	    if (!unique_stage_table.found(se.key,se)) {
 		unique_stage_table.insert(se);
@@ -323,23 +323,23 @@ void rewrite_URI_in_CMD_file(std::string db)
     if (oname != nname) {
 // remove the old file
  	if (host_unsync("/__HOST__/web/datasets/ds"+args.dsnum+"/metadata/"+cmdir+"/"+oname+".FixML",error) < 0) {
-	  metautils::log_warning("rewrite_URI_in_CMD_file() could not remove "+oname+".FixML - host_unsync error(s): '"+error+"'","rcm",user,args.args_string);
+	  metautils::log_warning("rewrite_uri_in_cmd_file() could not remove "+oname+".FixML - host_unsync error(s): '"+error+"'","rcm",user,args.args_string);
 	}
     }
   }
   else {
-    metautils::log_error("rewrite_URI_in_CMD_file() returned error: unable to rename files in database "+db,"rcm",user,args.args_string);
+    metautils::log_error("rewrite_uri_in_cmd_file() returned error: unable to rename files in database "+db,"rcm",user,args.args_string);
   }
 // sync all of the new files
   if (host_sync(tdir.name(),"metadata/","/data/web/datasets/ds"+new_dsnum,error) < 0) {
-    metautils::log_error("rewrite_URI_in_CMD_file() could not sync new file(s) - host_sync error(s): '"+error+"'","rcm",user,args.args_string);
+    metautils::log_error("rewrite_uri_in_cmd_file() could not sync new file(s) - host_sync error(s): '"+error+"'","rcm",user,args.args_string);
   }
 }
 
-bool renamed_CMD()
+bool renamed_cmd()
 {
   MySQL::Server server,server_d;
-  std::list<std::string> databases,table_names;
+  std::list<std::string> databases;
   std::string dsnum2=strutils::substitute(args.dsnum,".","");
   std::string new_dsnum2=strutils::substitute(new_dsnum,".","");
   std::string filetable,dfiletable,column,dcolumn,cmd_dir,error;
@@ -363,7 +363,7 @@ bool renamed_CMD()
     filetable="_webfiles";
     column="webID";
     dcolumn="wfile";
-    if (old_web_home.length() > 0) {
+    if (!old_web_home.empty()) {
 	oname=strutils::substitute(old_name,"http://rda.ucar.edu","");
 	strutils::replace_all(oname,"http://dss.ucar.edu","");
 	strutils::replace_all(oname,old_web_home+"/","");
@@ -385,7 +385,7 @@ bool renamed_CMD()
   }
   databases=server.db_names();
   for (const auto& db : databases) {
-    table_names=MySQL::table_names(server,db,"ds"+dsnum2+filetable,error);
+    auto table_names=MySQL::table_names(server,db,"ds"+dsnum2+filetable,error);
     for (const auto& table : table_names) {
 	if (std::regex_search(strutils::to_lower(oname),std::regex("\\.htar$"))) {
 	  query.set("code,"+column,db+"."+table,column+" like '"+oname+"..m..%'");
@@ -394,7 +394,7 @@ bool renamed_CMD()
 	  query.set("code",db+"."+table,column+" = '"+oname+"'");
 	}
 	if (query.submit(server) < 0) {
-	  metautils::log_error("renamed_CMD() returned error: "+query.error(),"rcm",user,args.args_string);
+	  metautils::log_error("renamed_cmd() returned error: "+query.error(),"rcm",user,args.args_string);
 	}
 	if (query.num_rows() > 0) {
 	  if (std::regex_search(strutils::to_lower(oname),std::regex("\\.htar$"))) {
@@ -404,29 +404,29 @@ bool renamed_CMD()
 	    query2.set("code",db+"."+strutils::substitute(table,dsnum2,new_dsnum2),"binary "+column+" = '"+nname+"'");
 	  }
 	  if (query2.submit(server) < 0) {
-	    metautils::log_error("renamed_CMD() returned error: "+query2.error(),"rcm",user,args.args_string);
+	    metautils::log_error("renamed_cmd() returned error: "+query2.error(),"rcm",user,args.args_string);
 	  }
 	  if (query2.num_rows() > 0) {
-	    if (old_web_home.length() > 0 && oname == nname) {
-		rewrite_URI_in_CMD_file(db);
+	    if (!old_web_home.empty() && oname == nname) {
+		rewrite_uri_in_cmd_file(db);
 		exit(0);
 	    }
 	    else {
-		metautils::log_error("renamed_CMD() returned error: "+new_name+" is already in the content metadata database","rcm",user,args.args_string);
+		metautils::log_error("renamed_cmd() returned error: "+new_name+" is already in the content metadata database","rcm",user,args.args_string);
 	    }
 	  }
-	  rewrite_URI_in_CMD_file(db);
+	  rewrite_uri_in_cmd_file(db);
 	  if (new_dsnum == args.dsnum) {
 	    while (query.fetch_row(row)) {
 		if (query.num_rows() == 1) {
 		  if (server.update(db+"."+table,column+" = '"+nname+"'","code = "+row[0]) < 0) {
-		    metautils::log_error("renamed_CMD() returned error: "+server.error(),"rcm",user,args.args_string);
+		    metautils::log_error("renamed_cmd() returned error: "+server.error(),"rcm",user,args.args_string);
 		  }
 		}
 		else {
 		  sp=strutils::split(row[1],"..m..");
 		  if (server.update(db+"."+table,column+" = '"+nname+"..m.."+sp[1]+"'","code = "+row[0]) < 0) {
-		    metautils::log_error("renamed_CMD() returned error: "+server.error(),"rcm",user,args.args_string);
+		    metautils::log_error("renamed_cmd() returned error: "+server.error(),"rcm",user,args.args_string);
 		  }
 		}
 	    }
@@ -461,7 +461,7 @@ bool renamed_CMD()
 	    sdum=sdum.substr(1);
 	  }
 	  if (server_d.update(dcolumn,"meta_link = '"+sdum+"'","dsid = 'ds"+args.dsnum+"' and "+dcolumn+" = '"+nname+"'") < 0) {
-	    metautils::log_warning("renamed_CMD() returned warning: "+server_d.error(),"rcm",user,args.args_string);
+	    metautils::log_warning("renamed_cmd() returned warning: "+server_d.error(),"rcm",user,args.args_string);
 	  }
 	  server.disconnect();
 	  server_d.disconnect();
@@ -528,14 +528,19 @@ int main(int argc,char **argv)
   }
   old_name=sp[sp.size()-2];
   new_name=sp[sp.size()-1];
-  if (!std::regex_search(old_name,std::regex("^(/FS){0,1}/DSS")) && !std::regex_search(old_name,std::regex("^http(s){0,1}://rda.ucar.edu"))) {
-    std::cerr << "Error: old_name must begin with '/FS/DSS', '/DSS', 'https://rda.ucar.edu', or 'http://dss.ucar.edu'" << std::endl;
+/*
+  if (!std::regex_search(old_name,std::regex("^(/FS){0,1}/DSS")) && !std::regex_search(old_name,std::regex("^http(s){0,1}://rda\\.ucar\\.edu/"))) {
+    std::cerr << "Error: old_name must begin with '/FS/DSS', '/DSS', or 'https://rda.ucar.edu'" << std::endl;
     exit(1);
+  }
+*/
+  if (!std::regex_search(old_name,std::regex("^(/FS){0,1}/DSS"))) {
+    old_name="https://rda.ucar.edu"+directives.data_root_alias+"/ds"+args.dsnum+"/"+old_name;
   }
   if (std::regex_search(old_name,std::regex("^(/FS){0,1}/DSS"))) {
     cmd_dir="fmd";
   }
-  else if (std::regex_search(old_name,std::regex("^http(s){0,1}://(rda|dss)\\.ucar\\.edu/"))) {
+  else if (std::regex_search(old_name,std::regex("^http(s){0,1}://rda\\.ucar\\.edu/"))) {
     cmd_dir="wfmd";
   }
   if (!exists_on_server("rda-web-prod.ucar.edu","/data/web/datasets/ds"+args.dsnum+"/metadata/"+cmd_dir)) {
@@ -565,7 +570,7 @@ int main(int argc,char **argv)
   if (!verified_new_file_is_archived(error))
     metautils::log_error("rcm main returned error: "+error,"rcm",user,args.args_string);
   else {
-    if (!renamed_CMD()) {
+    if (!renamed_cmd()) {
 	metautils::log_error("rcm main retured error: no content metadata were found for "+old_name,"rcm",user,args.args_string);
     }
     if (!no_cache) {
