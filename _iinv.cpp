@@ -193,6 +193,9 @@ void build_wms_capabilities()
 	}
 	ofs << "    <Layer>" << std::endl;
 	ofs << "      <Title>" << grid.attribute_value("definition") << "_" << grid.attribute_value("numX") << "x" << grid.attribute_value("numY") << "</Title>" << std::endl;
+	ofs << "#REPEAT __CRS__" << gcount << "__" << std::endl;
+	ofs << "      <CRS>__CRS__" << gcount << "__.CRS</CRS>" << std::endl;
+	ofs << "#ENDREPEAT __CRS__" << gcount << "__" << std::endl;
 	ofs << "      <EX_GeographicBoundingBox>" << std::endl;
 	ofs << "        <westBoundLongitude>" << west_lon << "</westBoundLongitude>" << std::endl;
 	ofs << "        <eastBoundLongitude>" << east_lon << "</eastBoundLongitude>" << std::endl;
@@ -201,16 +204,7 @@ void build_wms_capabilities()
 	ofs << "      </EX_GeographicBoundingBox>" << std::endl;;
 	ofs << "#REPEAT __CRS__" << gcount << "__" << std::endl;
 	ofs << "      <BoundingBox CRS=\"__CRS__" << gcount << "__.CRS\" minx=\"__CRS__" << gcount << "__." << west_lon << "\" miny=\"__CRS__" << gcount << "__." << south_lat << "\" maxx=\"__CRS__" << gcount << "__." << east_lon << "\" maxy=\"__CRS__" << gcount << "__." << north_lat << "\" />" << std::endl;
-	ofs << "      <CRS>__CRS__" << gcount << "__.CRS</CRS>" << std::endl;
 	ofs << "#ENDREPEAT __CRS__" << gcount << "__" << std::endl;
-	ofs << "      <Style>" << std::endl;
-	ofs << "        <Name>" << grid_definition_code << "</Name>" << std::endl;
-	ofs << "        <Title>Legend Graphic</Title>" << std::endl;
-	ofs << "        <LegendURL>" << std::endl;
-	ofs << "          <Format>image/png</Format>" << std::endl;
-	ofs << "          <OnlineResource xlink:type=\"simple\" xlink:href=\"__SERVICE_RESOURCE_GET_URL__\" />" << std::endl;
-	ofs << "        </LegendURL>" << std::endl;
-	ofs << "      </Style>" << std::endl;
 	last_grid_definition_code=grid_definition_code;
     }
     query.set("code","WGrML.timeRanges","timeRange = '"+grid.attribute_value("timeRange")+"'");
@@ -254,8 +248,17 @@ void build_wms_capabilities()
 	    if (query.submit(server) == 0) {
 		while (query.fetch_row(row)) {
 		  ofs << "            <Layer queryable=\"0\">" << std::endl;
-		  ofs << "              <Name>" << grid_definition_code << ";" << time_range_code << ";" << level_code << ";" << data_format_code << "!" << pcode << ";" << row[0] << "</Name>" << std::endl;
+		  auto wms_layer_name=grid_definition_code+";"+time_range_code+";"+level_code+";"+data_format_code+"!"+pcode+";"+row[0];
+		  ofs << "              <Name>" << wms_layer_name << "</Name>" << std::endl;
 		  ofs << "              <Title>" << row[0].substr(0,4) << "-" << row[0].substr(4,2) << "-" << row[0].substr(6,2) << "T" << row[0].substr(8,2) << ":" << row[0].substr(10,2) << "Z</Title>" << std::endl;
+		  ofs << "              <Style>" << std::endl;
+		  ofs << "                <Name>Legend</Name>" << std::endl;
+		  ofs << "                <Title>Legend Graphic</Title>" << std::endl;
+		  ofs << "                <LegendURL>" << std::endl;
+		  ofs << "                  <Format>image/png</Format>" << std::endl;
+		  ofs << "                  <OnlineResource xlink:type=\"simple\" xlink:href=\"__SERVICE_RESOURCE_GET_URL__/legend/" << wms_layer_name << "\" />" << std::endl;
+		  ofs << "                </LegendURL>" << std::endl;
+		  ofs << "              </Style>" << std::endl;
 		  ofs << "            </Layer>" << std::endl;
 		}
 	    }
@@ -302,8 +305,17 @@ void build_wms_capabilities()
 	    if (query.submit(server) == 0) {
 		while (query.fetch_row(row)) {
 		  ofs << "            <Layer queryable=\"0\">" << std::endl;
-		  ofs << "              <Name>" << time_range_code << ";" << grid_definition_code << ";" << layer_code << ";" << data_format_code << "!" << pcode << ";" << row[0] << "</Name>" << std::endl;
+		  auto wms_layer_name=grid_definition_code+";"+time_range_code+";"+layer_code+";"+data_format_code+"!"+pcode+";"+row[0];
+		  ofs << "              <Name>" << wms_layer_name << "</Name>" << std::endl;
 		  ofs << "              <Title>" << row[0].substr(0,4) << "-" << row[0].substr(4,2) << "-" << row[0].substr(6,2) << "T" << row[0].substr(8,2) << ":" << row[0].substr(10,2) << "Z</Title>" << std::endl;
+		  ofs << "              <Style>" << std::endl;
+		  ofs << "                <Name>Legend</Name>" << std::endl;
+		  ofs << "                <Title>Legend Graphic</Title>" << std::endl;
+		  ofs << "                <LegendURL>" << std::endl;
+		  ofs << "                  <Format>image/png</Format>" << std::endl;
+		  ofs << "                  <OnlineResource xlink:type=\"simple\" xlink:href=\"__SERVICE_RESOURCE_GET_URL__/legend/" << wms_layer_name << "\" />" << std::endl;
+		  ofs << "                </LegendURL>" << std::endl;
+		  ofs << "              </Style>" << std::endl;
 		  ofs << "            </Layer>" << std::endl;
 		}
 	    }
