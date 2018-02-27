@@ -123,7 +123,7 @@ void build_wms_capabilities()
     }
   }
   auto *tdir=new TempDir;
-  if (!tdir->create("/glade/scratch/rdadata")) {
+  if (!tdir->create(directives.temp_path)) {
     metautils::log_error("build_wms_capabilities() could not create a temporary directory","iinv",user,args.args_string);
   }
   std::stringstream oss,ess;
@@ -143,7 +143,7 @@ void build_wms_capabilities()
   }
   filename=filename.substr(filename.find("rda.ucar.edu")+12);
   auto web_home=metautils::web_home();
-  strutils::replace_all(web_home,"/glade/p/rda","");
+  strutils::replace_all(web_home,directives.data_root,directives.data_root_alias);
   strutils::replace_all(filename,web_home+"/","");
   strutils::replace_all(filename,"/","%");
   std::ofstream ofs((tdir->name()+"/metadata/wms/"+filename).c_str());
