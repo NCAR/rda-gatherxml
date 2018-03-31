@@ -14,7 +14,6 @@
 #include <utils.hpp>
 #include <xmlutils.hpp>
 #include <metadata.hpp>
-#include <config.hpp>
 #include <netcdf.hpp>
 #include <MySQL.hpp>
 #include <myerror.hpp>
