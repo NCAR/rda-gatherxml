@@ -11,7 +11,6 @@
 #include <hdf.hpp>
 #include <netcdf.hpp>
 #include <metadata.hpp>
-#include <config.hpp>
 #include <strutils.hpp>
 #include <utils.hpp>
 #include <myerror.hpp>
