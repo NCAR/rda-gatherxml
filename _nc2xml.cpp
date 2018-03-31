@@ -2984,13 +2984,6 @@ else {
 	}
 	for (const auto& tr_key : tr_table.keys()) {
 	  tr_table.found(tr_key,tre);
-std::cerr << "XX" << std::endl;
-std::cerr << tre.data->unit << std::endl;
-std::cerr << tre.data->num_steps << std::endl;
-std::cerr << tre.data->instantaneous.first_valid_datetime.to_string() << std::endl;
-std::cerr << tre.data->instantaneous.last_valid_datetime.to_string() << std::endl;
-std::cerr << tre.data->bounded.first_valid_datetime.to_string() << std::endl;
-std::cerr << tre.data->bounded.last_valid_datetime.to_string() << std::endl;
 	  for (size_t k=0; k < latdimids.size(); ++k) {
 	    std::list<std::string> gentry_keys;
 	    add_gridded_lat_lon_keys(gentry_keys,grid_dims[k],grid_defs[k],timeid,timedimid,levdimids[m],latdimids[k],londimids[k],tre,vars);
