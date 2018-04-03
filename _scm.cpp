@@ -507,6 +507,8 @@ void summarize_grml()
 	server._delete(database+".ds"+local_args.dsnum2+"_ensembles",file_ID_type+"ID_code = "+file_ID_code);
 	grid_list=xdoc.element_list("GrML/grid");
 	my::map<ParameterElement> parameter_element_table(9999);
+	auto checked_for_process_table=false;
+	auto checked_for_ensemble_table=false;
 	for (const auto& grid : grid_list) {
 	  time_range=grid.attribute_value("timeRange");
 	  se.key=strutils::to_lower(time_range);
@@ -543,7 +545,7 @@ void summarize_grml()
 	  else {
 	    time_range_code=entry.code;
 	  }
-	  entry.key+=":"+definition+":"+definition_parameters;
+	  entry.key=definition+":"+definition_parameters;
 	  if (!grid_definition_table.found(entry.key,entry)) {
 	    find_in_ancillary_table(server,database+".gridDefinitions","definition = '"+definition+"' AND defParams = '"+definition_parameters+"'",query);
 	    query.fetch_row(row);
@@ -564,11 +566,14 @@ void summarize_grml()
 	  for (const auto& grid_element : grid_elements_list) {
 	    sdum=(grid_element.p)->name();
 	    if (sdum == "process") {
-		if (!MySQL::table_exists(server,database+".ds"+local_args.dsnum2+"_processes")) {
-		  std::string result;
-		  if (server.command("create table "+database+".ds"+local_args.dsnum2+"_processes like "+database+".template_processes",result) < 0) {
-		    metautils::log_error("summarize_grml() returned error: "+server.error()+" while creating table "+database+".ds"+local_args.dsnum2+"_processes","scm",user);
+		if (!checked_for_process_table) {
+		  if (!MySQL::table_exists(server,database+".ds"+local_args.dsnum2+"_processes")) {
+		    std::string result;
+		    if (server.command("create table "+database+".ds"+local_args.dsnum2+"_processes like "+database+".template_processes",result) < 0) {
+			metautils::log_error("summarize_grml() returned error: "+server.error()+" while creating table "+database+".ds"+local_args.dsnum2+"_processes","scm",user);
+		    }
 		  }
+		  checked_for_process_table=true;
 		}
 		if (server.insert(database+".ds"+local_args.dsnum2+"_processes",file_ID_code+","+time_range_code+","+grid_definition_code+",'"+(grid_element.p)->attribute_value("value")+"'") < 0) {
 		  error=server.error();
@@ -578,11 +583,14 @@ void summarize_grml()
 		}
 	    }
 	    else if (sdum == "ensemble") {
-		if (!MySQL::table_exists(server,database+".ds"+local_args.dsnum2+"_ensembles")) {
-		  std::string result;
-		  if (server.command("create table "+database+".ds"+local_args.dsnum2+"_ensembles like "+database+".template_ensembles",result) < 0) {
-		    metautils::log_error("summarize_grml() returned error: "+server.error()+" while creating table "+database+".ds"+local_args.dsnum2+"_ensembles","scm",user);
+		if (!checked_for_ensemble_table) {
+		  if (!MySQL::table_exists(server,database+".ds"+local_args.dsnum2+"_ensembles")) {
+		    std::string result;
+		    if (server.command("create table "+database+".ds"+local_args.dsnum2+"_ensembles like "+database+".template_ensembles",result) < 0) {
+			metautils::log_error("summarize_grml() returned error: "+server.error()+" while creating table "+database+".ds"+local_args.dsnum2+"_ensembles","scm",user);
+		    }
 		  }
+		  checked_for_ensemble_table=true;
 		}
 		sdum=(grid_element.p)->attribute_value("size");
 		if (sdum.empty()) {
