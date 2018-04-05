@@ -358,9 +358,6 @@ void scan_file()
 		gentry.key+="<!>"+strutils::ftos(griddef.stdparallel1,3)+"<!>"+strutils::ftos(griddef.stdparallel2);
 	    }
 	  }
-	  else if (griddef.type == Grid::mercatorType) {
-	    gentry.key+="<!>"+strutils::ftos(griddef.stdparallel1,3);
-	  }
 	}
 	else {
 	  gentry.key+=strutils::itos(griddef.trunc1)+"<!>"+strutils::itos(griddef.trunc2)+"<!>"+strutils::itos(griddef.trunc3);
