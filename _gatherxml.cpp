@@ -10,9 +10,13 @@
 #include <utils.hpp>
 #include <metadata.hpp>
 #include <MySQL.hpp>
+#include <myerror.hpp>
 
-metautils::Directives directives;
-metautils::Args args;
+metautils::Directives meta_directives;
+metautils::Args meta_args;
+std::string myerror="";
+std::string mywarning="";
+
 bool showinfo;
 struct Entry {
   Entry() : key(),string() {}
@@ -24,8 +28,8 @@ std::string user=getenv("USER");
 
 std::string webhome()
 {
-  if (!directives.data_root_alias.empty()) {
-    return directives.data_root_alias+"/ds"+args.dsnum;
+  if (!meta_directives.data_root_alias.empty()) {
+    return meta_directives.data_root_alias+"/ds"+meta_args.dsnum;
   }
   else {
     return metautils::web_home();
@@ -34,18 +38,17 @@ std::string webhome()
 
 void inventory_all()
 {
-  MySQL::Server server;
   MySQL::LocalQuery query;
   MySQL::Row row;
-  std::string dsnum=strutils::substitute(args.dsnum,".","");
+  std::string dsnum=strutils::substitute(meta_args.dsnum,".","");
   std::stringstream output,error;
 
-  if (args.format != "grib" && args.format != "grib2" && args.format != "grib0" && args.format != "cfnetcdf" && args.format != "hdf5nc4") {
-    metautils::log_error("unable to inventory '"+args.format+"' files","gatherxml",user,args.args_string);
+  if (meta_args.data_format != "grib" && meta_args.data_format != "grib2" && meta_args.data_format != "grib0" && meta_args.data_format != "cfnetcdf" && meta_args.data_format != "hdf5nc4") {
+    metautils::log_error("unable to inventory '"+meta_args.data_format+"' files","gatherxml",user);
   }
-  metautils::connect_to_metadata_server(server);
+  MySQL::Server server(meta_directives.database_server,meta_directives.metadb_username,meta_directives.metadb_password,"");
   if (!server) {
-    metautils::log_error("unable to connected to RDA metadata database server","gatherxml",user,args.args_string);
+    metautils::log_error("unable to connected to RDA metadata database server","gatherxml",user);
   }
   if (MySQL::table_exists(server,"IGrML.ds"+dsnum+"_inventory_summary")) {
     query.set("select w.webID,f.format from WGrML.ds"+dsnum+"_webfiles as w left join IGrML.ds"+dsnum+"_inventory_summary as i on i.webID_code = w.code left join WGrML.formats as f on f.code = w.format_code where isnull(i.webID_code) or isnull(inv)");
@@ -60,7 +63,7 @@ void inventory_all()
     query.set("select w.webID,f.format from WObML.ds"+dsnum+"_webfiles as w left join WObML.formats as f on f.code = w.format_code");
   }
   if (query.submit(server) < 0) {
-    metautils::log_error("inventory_all() returned error: '"+query.error()+"'","gatherxml",user,args.args_string);
+    metautils::log_error("inventory_all() returned error: '"+query.error()+"'","gatherxml",user);
   }
   server.disconnect();
   size_t n=0;
@@ -75,13 +78,13 @@ void inventory_all()
 	format="hdf5nc4";
     }
     ++n;
-    if (format == args.format || (format == "netcdf" && args.format == "cfnetcdf")) {
-	std::string command=directives.local_root+"/bin/gatherxml";
+    if (format == meta_args.data_format || (format == "netcdf" && meta_args.data_format == "cfnetcdf")) {
+	std::string command=meta_directives.local_root+"/bin/gatherxml";
 	if (n != query.num_rows() && (n % 100) != 0) {
 	  command+=" -R -S";
 	}
-	command+=" -d "+args.dsnum+" -f "+args.format+" -I https://rda.ucar.edu"+webhome()+"/"+row[0];
-	mysystem2(command,output,error);
+	command+=" -d "+meta_args.dsnum+" -f "+meta_args.data_format+" -I https://rda.ucar.edu"+webhome()+"/"+row[0];
+	unixutils::mysystem2(command,output,error);
     }
   }
 }
@@ -105,12 +108,12 @@ int main(int argc,char **argv)
   }
   if (argc == 3) {
     separator=argv[1];
-    args.args_string=argv[2];
+    meta_args.args_string=argv[2];
     ignore_local_file=true;
   }
   else {
     separator="%";
-    args.args_string=unix_args_string(argc,argv,'%');
+    meta_args.args_string=unixutils::unix_args_string(argc,argv,'%');
     if (argc == 2) {
 	ignore_local_file=true;
     }
@@ -121,10 +124,10 @@ std::cerr << "Terminating." << std::endl;
 exit(1);
 }
 */
-  metautils::read_config("gatherxml",user,args.args_string);
-  ifs.open((directives.dss_root+"/bin/conf/gatherxml.conf").c_str());
+  metautils::read_config("gatherxml",user,meta_args.args_string);
+  ifs.open((meta_directives.dss_root+"/bin/conf/gatherxml.conf").c_str());
   if (!ifs.is_open()) {
-    metautils::log_error("unable to open "+directives.dss_root+"/bin/conf/gatherxml.conf","gatherxml",user,args.args_string);
+    metautils::log_error("unable to open "+meta_directives.dss_root+"/bin/conf/gatherxml.conf","gatherxml",user);
   }
   ifs.getline(line,256);
   while (!ifs.eof()) {
@@ -154,33 +157,33 @@ exit(1);
   }
   ifs.close();
   showinfo=false;
-  sp=strutils::split(args.args_string,separator);
+  sp=strutils::split(meta_args.args_string,separator);
   size_t num_parts=sp.size();
   if (sp.size() == 1) {
     num_parts++;
   }
   for (size_t n=0; n < num_parts-1; ++n) {
     if (sp[n] == "-f") {
-	args.format=sp[++n];
+	meta_args.data_format=sp[++n];
     }
     else if (sp[n] == "-d") {
-	args.dsnum=sp[++n];
-	if (std::regex_search(args.dsnum,std::regex("^ds"))) {
-	  args.dsnum=args.dsnum.substr(2);
+	meta_args.dsnum=sp[++n];
+	if (std::regex_search(meta_args.dsnum,std::regex("^ds"))) {
+	  meta_args.dsnum=meta_args.dsnum.substr(2);
 	}
     }
     else if (sp[n] == "-l") {
 	if (!ignore_local_file) {
-	  args.local_name=sp[++n];
+	  meta_args.local_name=sp[++n];
 	}
 	else {
-	  size_t idx1=args.args_string.find("-l");
-	  size_t idx2=args.args_string.find("%",idx1+3);
-	  args.args_string=args.args_string.substr(0,idx1)+args.args_string.substr(idx2+1);
+	  size_t idx1=meta_args.args_string.find("-l");
+	  size_t idx2=meta_args.args_string.find("%",idx1+3);
+	  meta_args.args_string=meta_args.args_string.substr(0,idx1)+meta_args.args_string.substr(idx2+1);
 	}
     }
     else if (sp[n] == "-m") {
-	args.member_name=sp[++n];
+	meta_args.member_name=sp[++n];
     }
     else if (sp[n] == "-showinfo") {
 	showinfo=true;
@@ -188,10 +191,10 @@ exit(1);
   }
   if (showinfo) {
     for (const auto& key : utility_table.keys()) {
-	p=popen((directives.dss_bindir+"/"+key+" 2>&1").c_str(),"r");
+	p=popen((meta_directives.dss_bindir+"/"+key+" 2>&1").c_str(),"r");
 	std::cerr << "\nutility:" << strutils::substitute(key,"_"," ") << std::endl;
 	std::cerr << "supported formats (\"-f\" flag):" << std::endl;
-	while (fgets(line,256,p) != NULL) {
+	while (fgets(line,256,p) != nullptr) {
 	  sline=line;
 	  if (std::regex_search(sline,std::regex("^-f"))) {
 	    strutils::chop(sline);
@@ -214,103 +217,105 @@ exit(1);
     }
   }
   else {
-    if (args.format.empty()) {
+    if (meta_args.data_format.empty()) {
 	std::cerr << "Error: no format specified" << std::endl;
 	exit(1);
     }
     else {
-	args.format=strutils::to_lower(args.format);
+	meta_args.data_format=strutils::to_lower(meta_args.data_format);
     }
-    if (args.format == "grib1") {
-	args.format="grib";
+    if (meta_args.data_format == "grib1") {
+	meta_args.data_format="grib";
     }
-    if (args.dsnum.empty()) {
+    if (meta_args.dsnum.empty()) {
 	std::cerr << "Error: no dataset number specified" << std::endl;
 	exit(1);
     }
-    args.path=sp.back();
-    if (!std::regex_search(args.path,std::regex("^(/FS){0,1}/DSS/")) && !std::regex_search(args.path,std::regex("^https://rda.ucar.edu"))) {
-	if (args.path.length() > 128) {
+    meta_args.path=sp.back();
+    if (!std::regex_search(meta_args.path,std::regex("^(/FS){0,1}/DSS/")) && !std::regex_search(meta_args.path,std::regex("^https://rda.ucar.edu"))) {
+	if (meta_args.path.length() > 128) {
 	  std::cerr << "Error: filename exceeds 128 characters in length" << std::endl;
 	  exit(1);
 	}
-	if (args.path == "invall") {
+	if (meta_args.path == "invall") {
 	  inventory_all();
 	  exit(0);
 	}
 	else {
-	  std::string sdum= (args.path[0] == '/') ? "https://rda.ucar.edu"+webhome()+args.path : "https://rda.ucar.edu"+webhome()+"/"+args.path;
-	  strutils::replace_all(args.args_string,args.path,sdum);
-	  args.path=sdum;
+	  std::string sdum= (meta_args.path[0] == '/') ? "https://rda.ucar.edu"+webhome()+meta_args.path : "https://rda.ucar.edu"+webhome()+"/"+meta_args.path;
+	  strutils::replace_all(meta_args.args_string,meta_args.path,sdum);
+	  meta_args.path=sdum;
 	}
     }
-    if (std::regex_search(args.path,std::regex("^(/FS){0,1}/DSS/")) && std::regex_search(host_name(),std::regex("^r([0-9]){1,}i([0-9]){1,}n([0-9]){1,}$"))) {
+    if (std::regex_search(meta_args.path,std::regex("^(/FS){0,1}/DSS/")) && std::regex_search(unixutils::host_name(),std::regex("^r([0-9]){1,}i([0-9]){1,}n([0-9]){1,}$"))) {
 	std::cerr << "Terminating: cheyenne compute nodes do not have access to the HPSS" << std::endl;
 	exit(1);
     }
-    sp=strutils::split(args.path,"..m..");
+    sp=strutils::split(meta_args.path,"..m..");
     if (sp.size() > 1) {
-	args.path=sp[0];
-	if (args.member_name.empty()) {
-	  args.member_name=sp[1];
+	meta_args.path=sp[0];
+	if (meta_args.member_name.empty()) {
+	  meta_args.member_name=sp[1];
 	}
-	else if (args.member_name != sp[1]) {
+	else if (meta_args.member_name != sp[1]) {
 	  std::cerr << "Error: two different member name specifications" << std::endl;
 	  exit(1);
 	}
-	sp=strutils::split(args.args_string,"%");
-	args.args_string=sp[0];
+	sp=strutils::split(meta_args.args_string,"%");
+	meta_args.args_string=sp[0];
 	for (size_t n=1; n < sp.size()-1; ++n) {
-	  args.args_string+="%"+sp[n];
+	  meta_args.args_string+="%"+sp[n];
 	}
-	args.args_string+="%-m%"+args.member_name+"%"+args.path;
+	meta_args.args_string+="%-m%"+meta_args.member_name+"%"+meta_args.path;
     }
-    if (!args.member_name.empty()) {
-	if (!std::regex_search(strutils::to_lower(args.path),std::regex("\\.htar$"))) {
+    if (!meta_args.member_name.empty()) {
+	if (!std::regex_search(strutils::to_lower(meta_args.path),std::regex("\\.htar$"))) {
 	  std::cerr << "Error: a member name is not valid for the specified data file" << std::endl;
 	  exit(1);
 	}
     }
     else {
-	if (std::regex_search(strutils::to_lower(args.path),std::regex("\\.htar$"))) {
+	if (std::regex_search(strutils::to_lower(meta_args.path),std::regex("\\.htar$"))) {
 	  std::cerr << "Error: a member name MUST be specified for an HTAR data file" << std::endl;
 	  exit(1);
 	}
     }
-    if (utility_lookup_table.found(args.format,e)) {
+    if (utility_lookup_table.found(meta_args.data_format,e)) {
 	auto t1=std::time(nullptr);
-	if (mysystem2(directives.dss_bindir+"/"+e.string+" "+strutils::substitute(args.args_string,"%"," "),oss,ess) < 0) {
+	if (unixutils::mysystem2(meta_directives.dss_bindir+"/"+e.string+" "+strutils::substitute(meta_args.args_string,"%"," "),oss,ess) < 0) {
 	  if (std::regex_search(ess.str(),std::regex("^Terminating"))) {
 	    std::cerr << ess.str() << std::endl;
 	  }
 	  else {
-	    metautils::log_error("-q"+ess.str(),"gatherxml",user,args.args_string);
+	    metautils::log_error("-q"+ess.str(),"gatherxml",user);
 	  }
 	}
 	auto t2=std::time(nullptr);
-	metautils::log_warning("execution time: "+strutils::ftos(t2-t1)+" seconds","gatherxml.time",user,args.args_string);
+	metautils::log_warning("execution time: "+strutils::ftos(t2-t1)+" seconds","gatherxml.time",user);
     }
     else {
-	if (alias_table.found(args.format,e)) {
+	if (alias_table.found(meta_args.data_format,e)) {
 	  if (utility_lookup_table.found(e.string,e)) {
-	    strutils::replace_all(args.args_string,"-f%"+args.format,"-f%"+e.key);
+	    strutils::replace_all(meta_args.args_string,"-f%"+meta_args.data_format,"-f%"+e.key);
 	    auto t1=std::time(nullptr);
-	    if (mysystem2(directives.dss_bindir+"/"+e.string+" "+strutils::substitute(args.args_string,"%"," "),oss,ess) < 0) {
+	    if (unixutils::mysystem2(meta_directives.dss_bindir+"/"+e.string+" "+strutils::substitute(meta_args.args_string,"%"," "),oss,ess) < 0) {
 		if (std::regex_search(ess.str(),std::regex("^Terminating"))) {
 		  std::cerr << ess.str() << std::endl;
 		}
 		else {
-		  metautils::log_error("-q"+ess.str(),"gatherxml",user,args.args_string);
+		  metautils::log_error("-q"+ess.str(),"gatherxml",user);
 		}
 	    }
 	    auto t2=std::time(nullptr);
-	    metautils::log_warning("execution time: "+strutils::ftos(t2-t1)+" seconds","gatherxml.time",user,args.args_string);
+	    metautils::log_warning("execution time: "+strutils::ftos(t2-t1)+" seconds","gatherxml.time",user);
 	  }
-	  else
-	    std::cerr << "format '" << args.format << "' does not map to a content metadata utility" << std::endl;
+	  else {
+	    std::cerr << "format '" << meta_args.data_format << "' does not map to a content metadata utility" << std::endl;
+	  }
 	}
-	else
-	  std::cerr << "format '" << args.format << "' does not map to a content metadata utility" << std::endl;
+	else {
+	  std::cerr << "format '" << meta_args.data_format << "' does not map to a content metadata utility" << std::endl;
+	}
     }
   }
   return 0;
