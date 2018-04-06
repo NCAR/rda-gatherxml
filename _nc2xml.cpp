@@ -583,13 +583,9 @@ bool is_polar_stereographic_grid_variable(const netCDFStream::Variable& var,size
 
 std::string gridded_time_method(const netCDFStream::Variable& var,std::string timeid)
 {
-  std::string cell_methods,time_method;
-  size_t m;
-  int idx;
-
-  for (m=0; m < var.attrs.size(); ++m) {
-    if (var.attrs[m].name == "cell_methods") {
-	cell_methods=*(reinterpret_cast<std::string *>(var.attrs[m].values));
+  for (size_t n=0; n < var.attrs.size(); ++n) {
+    if (var.attrs[n].name == "cell_methods") {
+	auto cell_methods=*(reinterpret_cast<std::string *>(var.attrs[n].values));
 	auto re=std::regex("  ");
 	while (std::regex_search(cell_methods,re)) {
 	  strutils::replace_all(cell_methods,"  "," ");
@@ -599,20 +595,27 @@ std::string gridded_time_method(const netCDFStream::Variable& var,std::string ti
 	strutils::replace_all(cell_methods,"comment:","");
 	strutils::replace_all(cell_methods,"comments:","");
 	if (!cell_methods.empty() && std::regex_search(cell_methods,std::regex(strutils::substitute(timeid,".","\\.")+":"))) {
-	  idx=cell_methods.find(timeid+":");
-	  if (idx != 0) {
+	  auto idx=cell_methods.find(timeid+":");
+	  if (idx != std::string::npos) {
 	    cell_methods=cell_methods.substr(idx);
 	  }
 	  strutils::replace_all(cell_methods,timeid+":","");
 	  strutils::trim(cell_methods);
 	  idx=cell_methods.find(":");
-	  if (idx < 0) {
+	  if (idx == std::string::npos) {
 	    return cell_methods;
 	  }
 	  else {
+// filter out other coordinates for this cell method
+	    auto idx2=cell_methods.find(" ");
+	    while (idx2 != std::string::npos && idx2 > idx) {
+		cell_methods=cell_methods.substr(idx2+1);
+		idx=cell_methods.find(":");
+		idx2=cell_methods.find(" ");
+	    }
 	    idx=cell_methods.find(")");
 // no extra information in parentheses
-	    if (idx < 0) {
+	    if (idx == std::string::npos) {
 		idx=cell_methods.find(" ");
 		return cell_methods.substr(0,idx);
 	    }
@@ -2825,7 +2828,7 @@ else {
 	  }
 	}
     }
-    while (levdimids.back() == 0xffffffff) {
+    while (levdimids.size() > 0 && levdimids.back() == 0xffffffff) {
 	levdimids.pop_back();
     }
     if (levdimids.size() > 0) {
