@@ -8,7 +8,6 @@
 #include <sys/stat.h>
 #include <MySQL.hpp>
 #include <metadata.hpp>
-#include <config.hpp>
 #include <strutils.hpp>
 #include <utils.hpp>
 #include <myerror.hpp>
