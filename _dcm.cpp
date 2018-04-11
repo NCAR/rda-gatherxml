@@ -479,7 +479,7 @@ extern "C" void *t_summarize_grid_resolutions(void *)
 
 extern "C" void *t_create_file_list_cache(void *)
 {
-  summarizeMetadata::create_file_list_cache("MSS","dcm",user,meta_args.args_string);
+  summarizeMetadata::create_file_list_cache("MSS","dcm",user);
   return nullptr;
 }
 

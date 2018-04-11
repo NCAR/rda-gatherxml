@@ -8,6 +8,7 @@
 #include <sys/stat.h>
 #include <MySQL.hpp>
 #include <metadata.hpp>
+#include <config.hpp>
 #include <strutils.hpp>
 #include <utils.hpp>
 #include <myerror.hpp>
@@ -576,10 +577,10 @@ int main(int argc,char **argv)
     }
     if (!no_cache) {
 	if (std::regex_search(new_name,std::regex("^(/FS){0,1}/DSS"))) {
-	  summarizeMetadata::create_file_list_cache("MSS","rcm",user,"-d:"+meta_args.dsnum+":"+old_name+":"+new_name);
+	  summarizeMetadata::create_file_list_cache("MSS","rcm",user);
 	}
 	else {
-	  summarizeMetadata::create_file_list_cache("Web","rcm",user,"-d:"+meta_args.dsnum+":"+old_name+":"+new_name);
+	  summarizeMetadata::create_file_list_cache("Web","rcm",user);
 	}
     }
     return 0;
