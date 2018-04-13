@@ -963,7 +963,7 @@ void generate_description(std::string type,std::string tdir_name)
     elist=xdoc.element_list("dsOverview/contentMetadata/geospatialCoverage/grid");
     for (const auto& ele : elist) {
 	auto ugd_key=ele.attribute_value("definition")+"<!>"+ele.attribute_value("numX")+":"+ele.attribute_value("numY");
-	if (std::regex_search(ugd_key,std::regex("^latLon"))) {
+	if (std::regex_search(ugd_key,std::regex("^(latLon|mercator)"))) {
 	  ugd_key+=":"+ele.attribute_value("startLat")+":"+ele.attribute_value("startLon")+":"+ele.attribute_value("endLat")+":"+ele.attribute_value("endLon")+":"+ele.attribute_value("xRes")+":"+ele.attribute_value("yRes");
 	}
 	else if (std::regex_search(ugd_key,std::regex("^gaussLatLon"))) {
@@ -971,9 +971,6 @@ void generate_description(std::string type,std::string tdir_name)
 	}
 	else if (std::regex_search(ugd_key,std::regex("^polarStereographic"))) {
 	  ugd_key+=":"+ele.attribute_value("startLat")+":"+ele.attribute_value("startLon")+":60"+ele.attribute_value("pole")+":"+ele.attribute_value("projLon")+":"+ele.attribute_value("pole")+":"+ele.attribute_value("xRes")+":"+ele.attribute_value("yRes");
-	}
-	else if (std::regex_search(ugd_key,std::regex("^mercator"))) {
-	  ugd_key+=":"+ele.attribute_value("startLat")+":"+ele.attribute_value("startLon")+":"+ele.attribute_value("endLat")+":"+ele.attribute_value("endLon")+":"+ele.attribute_value("xRes")+":"+ele.attribute_value("yRes")+":"+ele.attribute_value("resLat");
 	}
 	else if (std::regex_search(ugd_key,std::regex("^lambertConformal"))) {
 	  ugd_key+=":"+ele.attribute_value("startLat")+":"+ele.attribute_value("startLon")+":"+ele.attribute_value("resLat")+":"+ele.attribute_value("projLon")+":"+ele.attribute_value("pole")+":"+ele.attribute_value("xRes")+":"+ele.attribute_value("yRes")+":"+ele.attribute_value("stdParallel1")+":"+ele.attribute_value("stdParallel2");
