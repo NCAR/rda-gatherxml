@@ -528,10 +528,15 @@ void summarize_grml()
 	  for (const auto& attribute : attribute_list) {
 	    aname=attribute.name;
 	    if (aname != "timeRange" && aname != "definition") {
-		if (!definition_parameters.empty()) {
-		  definition_parameters+=":";
+		if (aname == "isCell") {
+		  definition+="Cell";
 		}
-		definition_parameters+=grid.attribute_value(aname);
+		else {
+		  if (!definition_parameters.empty()) {
+		    definition_parameters+=":";
+		  }
+		  definition_parameters+=grid.attribute_value(aname);
+		}
 	    }
 	  }
 	  entry.key=time_range;
