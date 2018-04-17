@@ -962,7 +962,11 @@ void generate_description(std::string type,std::string tdir_name)
   else {
     elist=xdoc.element_list("dsOverview/contentMetadata/geospatialCoverage/grid");
     for (const auto& ele : elist) {
-	auto ugd_key=ele.attribute_value("definition")+"<!>"+ele.attribute_value("numX")+":"+ele.attribute_value("numY");
+	auto definition=ele.attribute_value("definition");
+	if (ele.attribute_value("isCell") == "true") {
+	  definition+="Cell";
+	}
+	auto ugd_key=definition+"<!>"+ele.attribute_value("numX")+":"+ele.attribute_value("numY");
 	if (std::regex_search(ugd_key,std::regex("^(latLon|mercator)"))) {
 	  ugd_key+=":"+ele.attribute_value("startLat")+":"+ele.attribute_value("startLon")+":"+ele.attribute_value("endLat")+":"+ele.attribute_value("endLon")+":"+ele.attribute_value("xRes")+":"+ele.attribute_value("yRes");
 	}
