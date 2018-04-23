@@ -443,7 +443,7 @@ void summarize_grml()
     }
     if (fname.is_mss_file || fname.is_web_file) {
 	start="3000-12-31 23:59 +0000";
-	end="1000-01-01 00:00 +0000";
+	end="0001-01-01 00:00 +0000";
 	num_grids=0;
 	entry.key=fname.name;
 	if (!file_table.found(entry.key,entry)) {
