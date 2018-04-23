@@ -4,6 +4,7 @@
 #include <sstream>
 #include <regex>
 #include <little_r.hpp>
+#include <marine.hpp>
 #include <metadata.hpp>
 #include <strutils.hpp>
 #include <utils.hpp>
@@ -22,7 +23,7 @@ metadata::ObML::PlatformEntry pentry;
 my::map<metadata::ObML::IDEntry> **id_table=nullptr;
 metadata::ObML::IDEntry ientry;
 size_t total_num_not_missing=0;
-enum {GrML_type=1,ObML_type};
+enum {grml_type=1,obml_type};
 int write_type=-1;
 
 extern "C" void clean_up()
@@ -491,7 +492,61 @@ void scan_little_r_file(std::list<std::string>& filelist)
   }
 }
 
-void scanFile()
+void scan_nodc_sea_level_file(std::list<std::string>& filelist)
+{
+  initialize_for_observations();
+  std::unique_ptr<unsigned char[]> buffer(nullptr);
+  for (const auto& file : filelist) {
+    InputNODCSeaLevelObservationStream istream;
+    if (!istream.open(file)) {
+	myerror="Error opening '"+file+"'";
+	exit(1);
+    }
+    if (buffer == nullptr) {
+	buffer.reset(new unsigned char[InputNODCSeaLevelObservationStream::RECORD_LEN]);
+    }
+    while (istream.read(buffer.get(),InputNODCSeaLevelObservationStream::RECORD_LEN) > 0) {
+	NODCSeaLevelObservation obs;
+	obs.fill(buffer.get(),false);
+	if (obs.sea_level_height() < 99999) {
+	  if (meta_args.data_format == "nodcsl") {
+	    meta_args.data_format=obs.data_format();
+	  }
+	  else if (meta_args.data_format != obs.data_format()) {
+	    metautils::log_error("scan_nodc_sea_level_file(): data format changed","ascii2xml",user);
+	  }
+	  pentry.key="tide_station";
+	  update_platform_table(1,obs.location().latitude,obs.location().longitude);
+	  ientry.key=pentry.key+"[!]NODC[!]"+obs.location().ID;
+	  if (obs.data_format() == "F186") {
+	    auto max_date_time=obs.date_time();
+	    auto min_date_time=max_date_time;
+	    min_date_time.set_day(1);
+	    update_id_table(1,obs.location().latitude,obs.location().longitude,nullptr,&min_date_time,&max_date_time);
+	  }
+	  else {
+	    auto date_time=obs.date_time();
+	    update_id_table(1,obs.location().latitude,obs.location().longitude,date_time);
+	  }
+	  metadata::ObML::DataTypeEntry de;
+	  de.key="Sea Level Data";
+	  if (!ientry.data->data_types_table.found(de.key,de)) {
+	    de.data.reset(new metadata::ObML::DataTypeEntry::Data);
+	    de.data->nsteps=1;
+	    ientry.data->data_types_table.insert(de);
+	  }
+	  else {
+	    ++(de.data->nsteps);
+	  }
+	  ++total_num_not_missing;
+	}
+    }
+    istream.close();
+  }
+  meta_args.data_format.insert(0,"NODC_");
+}
+
+void scan_file()
 {
   std::string file_format,error;
   std::list<std::string> filelist;
@@ -508,11 +563,15 @@ void scanFile()
   }
   if (meta_args.data_format == "ghcnmv3") {
     scan_ghcnv3_file(filelist);
-    write_type=ObML_type;
+    write_type=obml_type;
   }
   else if (meta_args.data_format == "little_r") {
     scan_little_r_file(filelist);
-    write_type=ObML_type;
+    write_type=obml_type;
+  }
+  else if (meta_args.data_format == "nodcsl") {
+    scan_nodc_sea_level_file(filelist);
+    write_type=obml_type;
   }
 }
 
@@ -524,6 +583,7 @@ int main(int argc,char **argv)
     std::cerr << "required (choose one):" << std::endl;
     std::cerr << "-f ghcnmv3    GHCN Monthly V3 format" << std::endl;
     std::cerr << "-f little_r   LITTLE_R for WRFDA format" << std::endl;
+    std::cerr << "-f nodcsl     NODC Sea Level Data Formats" << std::endl;
     std::cerr << std::endl;
     std::cerr << "required:" << std::endl;
     std::cerr << "<path>        full HPSS path or URL of the file to read" << std::endl;
@@ -542,12 +602,12 @@ int main(int argc,char **argv)
   }
   atexit(clean_up);
   metautils::cmd_register("ascii2xml",user);
-  scanFile();
+  scan_file();
   std::string ext;
-  if (write_type == GrML_type) {
+  if (write_type == grml_type) {
     ext="GrML";
   }
-  else if (write_type == ObML_type) {
+  else if (write_type == obml_type) {
     ext="ObML";
     if (total_num_not_missing > 0) {
 	metadata::ObML::write_obml(id_table,platform_table,"ascii2xml",user);
