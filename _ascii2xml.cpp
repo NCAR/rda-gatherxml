@@ -526,9 +526,11 @@ void scan_nodc_sea_level_file(std::list<std::string>& filelist)
 	    update_id_table(1,obs.location().latitude,obs.location().longitude,nullptr,&min_date_time,&max_date_time);
 	  }
 	  else if (obs.data_format() == "F185") {
-	    auto date_time=obs.date_time();
-	    date_time.set_time(999999);
-	    update_id_table(1,obs.location().latitude,obs.location().longitude,date_time);
+	    auto max_date_time=obs.date_time();
+	    max_date_time.set_time(max_date_time.time()+99);
+	    auto min_date_time=max_date_time;
+	    min_date_time.set_time(99);
+	    update_id_table(1,obs.location().latitude,obs.location().longitude,nullptr,&min_date_time,&max_date_time);
 	  }
 	  else {
 	    auto date_time=obs.date_time();
