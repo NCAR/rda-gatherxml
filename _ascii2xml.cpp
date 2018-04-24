@@ -508,7 +508,7 @@ void scan_nodc_sea_level_file(std::list<std::string>& filelist)
     while (istream.read(buffer.get(),InputNODCSeaLevelObservationStream::RECORD_LEN) > 0) {
 	NODCSeaLevelObservation obs;
 	obs.fill(buffer.get(),false);
-	if (obs.sea_level_height() < 99999) {
+	if (obs.sea_level_height() < 99999 && obs.sea_level_height() > -9999) {
 	  if (meta_args.data_format == "nodcsl") {
 	    meta_args.data_format=obs.data_format();
 	  }
@@ -520,12 +520,19 @@ void scan_nodc_sea_level_file(std::list<std::string>& filelist)
 	  ientry.key=pentry.key+"[!]NODC[!]"+obs.location().ID;
 	  if (obs.data_format() == "F186") {
 	    auto max_date_time=obs.date_time();
+	    max_date_time.set_time(999999);
 	    auto min_date_time=max_date_time;
 	    min_date_time.set_day(1);
 	    update_id_table(1,obs.location().latitude,obs.location().longitude,nullptr,&min_date_time,&max_date_time);
 	  }
+	  else if (obs.data_format() == "F185") {
+	    auto date_time=obs.date_time();
+	    date_time.set_time(999999);
+	    update_id_table(1,obs.location().latitude,obs.location().longitude,date_time);
+	  }
 	  else {
 	    auto date_time=obs.date_time();
+	    date_time.set_time(date_time.time()+99);
 	    update_id_table(1,obs.location().latitude,obs.location().longitude,date_time);
 	  }
 	  metadata::ObML::DataTypeEntry de;
