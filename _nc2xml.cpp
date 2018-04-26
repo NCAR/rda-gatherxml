@@ -4802,10 +4802,10 @@ void scan_file()
 	}
 	ifs.close();
 	map_contents.pop_back();
+	std::stringstream oss,ess;
+	unixutils::mysystem2("/bin/rm "+map_name,oss,ess);
     }
-    else {
-	map_name=tdir->name()+"/netCDF.ds"+meta_args.dsnum+".xml";
-    }
+    map_name=tdir->name()+"/netCDF.ds"+meta_args.dsnum+".xml";
     std::ofstream ofs(map_name.c_str());
     if (!ofs.is_open()) {
 	metautils::log_error("scan_file() returned error: can't open parameter map file for output","nc2xml",user);
