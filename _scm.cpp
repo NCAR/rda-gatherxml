@@ -2506,7 +2506,7 @@ int main(int argc,char **argv)
   local_args.summarized_hpss_file=false;
   local_args.summarized_web_file=false;
   meta_args.args_string=unixutils::unix_args_string(argc,argv,'`');
-  metautils::read_config("scm",user,meta_args.args_string);
+  metautils::read_config("scm",user);
   parse_args();
   server.connect(meta_directives.database_server,meta_directives.metadb_username,meta_directives.metadb_password,"");
   if (!server) {
@@ -2775,7 +2775,7 @@ query.set("select distinct tindex from dssdb.wfile where dsid = 'ds"+meta_args.d
 	for (const auto& gindex : local_args.gindex_list) {
 	  summarizeMetadata::create_file_list_cache("inv","scm",user,gindex);
 	}
-	summarizeMetadata::create_file_list_cache("inv","scm",user,meta_args.args_string);
+	summarizeMetadata::create_file_list_cache("inv","scm",user);
     }
   }
   ThreadStruct *tkml=nullptr;
