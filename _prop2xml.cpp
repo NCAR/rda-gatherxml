@@ -139,6 +139,11 @@ DateTime fill_date(std::string date_s,const std::string& line)
 void process_variable_list(const std::string& line,std::unordered_map<std::string,std::tuple<std::string,std::set<std::string>>>& variables)
 {
   auto fields=strutils::split(line,",");
+  for (auto& field : fields) {
+    strutils::trim(field);
+    strutils::replace_all(field,"__COMMA__",",");
+    strutils::replace_all(field,"__SLASH__","\\");
+  }
   auto varlist_id=fields[0].substr(fields[0].find("=")+1);
   if (!std::regex_search(fields[1],std::regex("^description="))) {
     std::cerr << "Error: missing variable list description on line:\n" << line << std::endl;
