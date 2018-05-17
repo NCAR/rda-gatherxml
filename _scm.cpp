@@ -235,7 +235,7 @@ exit(1);
     std::cerr << "Exiting - nothing to do" << std::endl;
     exit(1);
   }
-  if (local_args.update_graphics && !strutils::has_ending(local_args.file,"ObML") && !strutils::has_ending(local_args.file,"FixML")) {
+  if (local_args.update_graphics && !local_args.file.empty() && !std::regex_search(local_args.file,std::regex("(Ob|Fix)ML$"))) {
     local_args.update_graphics=false;
   }
 }
@@ -2692,10 +2692,11 @@ int main(int argc,char **argv)
 	  }
 	}
 	if (local_args.update_graphics) {
+	  std::stringstream output,error;
 	  for (const auto& gindex : local_args.gindex_list) {
-	    std::stringstream output,error;
 	    unixutils::mysystem2(meta_directives.local_root+"/bin/gsi -g "+gindex+" "+meta_args.dsnum,output,error);
 	  }
+	  unixutils::mysystem2(meta_directives.local_root+"/bin/gsi "+meta_args.dsnum,output,error);
 	}
 	for (const auto& gindex : local_args.gindex_list) {
 	  summarizeMetadata::create_file_list_cache("MSS","scm",user,gindex);
