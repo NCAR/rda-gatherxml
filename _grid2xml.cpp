@@ -884,12 +884,12 @@ int main(int argc,char **argv)
     std::cerr << "-f jraieeemm     JRA IEEE Monthly Mean grid format" << std::endl;
     std::cerr << "-f ll            DSS 5-degree Lat/Lon grid format" << std::endl;
     std::cerr << "-f oct           DSS Octagonal grid format" << std::endl;
-    std::cerr << "-f tropical      DSS Tropical grid format" << std::endl;
     std::cerr << "-f on84          NCEP Office Note 84 grid format" << std::endl;
     std::cerr << "-f navy          DSS Navy grid format" << std::endl;
 //    std::cerr << "-f netcdf        netCDF format" << std::endl;
     std::cerr << "-f noaaoi2       NOAA OI2 SST format" << std::endl;
     std::cerr << "-f slp           DSS Sea-Level Pressure grid format" << std::endl;
+    std::cerr << "-f tropical      DSS Tropical grid format" << std::endl;
     std::cerr << "-f ussrslp       USSR Sea-Level Pressure grid format" << std::endl;
     std::cerr << std::endl;
     std::cerr << "required:" << std::endl;
@@ -920,7 +920,7 @@ int main(int argc,char **argv)
   signal(SIGSEGV,segv_handler);
   signal(SIGINT,int_handler);
   meta_args.args_string=unixutils::unix_args_string(argc,argv,'!');
-  metautils::read_config("grid2xml",user,meta_args.args_string);
+  metautils::read_config("grid2xml",user);
   parse_args();
   flags="-f";
   if (!meta_args.inventory_only && strutils::has_beginning(meta_args.path,"https://rda.ucar.edu")) {
