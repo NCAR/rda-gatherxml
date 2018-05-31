@@ -290,13 +290,47 @@ void scan_input_file(metadata::ObML::ObservationData& obs_data)
   if (!tdir.create(meta_directives.temp_path) || unixutils::mysystem2("/bin/mkdir -p "+tdir.name()+"/metadata/ParameterTables",oss,ess) < 0) {
     metautils::log_error("can't create temporary directory for data type map","prop2xml",user);
   }
+  auto existing_datatype_map=unixutils::remote_web_file("https://rda.ucar.edu/metadata/ParameterTables/"+meta_args.data_format+".ds"+meta_args.dsnum+".xml",tdir.name());
+  std::vector<std::string> existing_map_contents;
+  if (!existing_datatype_map.empty()) {
+    std::ifstream ifs(existing_datatype_map.c_str());
+    char line[32768];
+    ifs.getline(line,32768);
+    while (!ifs.eof()) {
+	existing_map_contents.emplace_back(line);
+	ifs.getline(line,32768);
+    }
+    ifs.close();
+    existing_map_contents.pop_back();
+  }
   std::string datatype_map=tdir.name()+"/metadata/ParameterTables/"+meta_args.data_format+".ds"+meta_args.dsnum+".xml";
   std::ofstream ofs(datatype_map.c_str());
   if (!ofs.is_open()) {
     metautils::log_error("unable to write data type map to temporary directory","prop2xml",user);
   }
-  ofs << "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>" << std::endl;
-  ofs << "<dataTypeMap>" << std::endl;
+  if (existing_map_contents.size() == 0) {
+    ofs << "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>" << std::endl;
+    ofs << "<dataTypeMap>" << std::endl;
+  }
+  else {
+    std::regex code_re(" code=\"");
+    std::regex dt_end_re("</dataType>");
+    auto no_write=false;
+    for (const auto& line : existing_map_contents) {
+	if (std::regex_search(line,code_re)) {
+	  auto parts=strutils::split(line,"\"");
+	  if (unique_datatypes.find(parts[1]) != unique_datatypes.end()) {
+	    no_write=true;
+	  }
+	}
+	if (!no_write) {
+	  ofs << line << std::endl;
+	}
+	if (std::regex_search(line,dt_end_re)) {
+	  no_write=false;
+	}
+    }
+  }
   for (const auto& datatype : unique_datatypes) {
     ofs << "  <dataType code=\"" << datatype.first << "\">" << std::endl;
     ofs << "    <description>";
