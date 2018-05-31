@@ -229,16 +229,6 @@ void process_observation(const std::string& line,const std::unordered_set<std::s
     auto ts=(std::stod(start_date.to_string("%Y%m%d%H%MM%SS"))+std::stod(end_date.to_string("%Y%m%d%H%MM%SS")))/2.;
     obs_data.add_to_ids(fields[0],ientry,dtype_parts.front(),lat,lon,ts,&start_date,&end_date);
   }
-  metadata::ObML::DataTypeEntry de;
-  if (!ientry.data->data_types_table.found(dtype_parts.front(),de)) {
-    de.key=dtype_parts.front();
-    de.data.reset(new metadata::ObML::DataTypeEntry::Data);
-    de.data->nsteps=1;
-    ientry.data->data_types_table.insert(de);
-  }
-  else {
-    ++(de.data->nsteps);
-  }
   if (unique_datatypes.find(dtype_parts.front()) == unique_datatypes.end()) {
     unique_datatypes.emplace(dtype_parts.front(),dtype_parts.back());
   }
@@ -371,14 +361,16 @@ int main(int argc,char **argv)
     MySQL::Server server(meta_directives.database_server,meta_directives.rdadb_username,meta_directives.rdadb_password,"dssdb");
     MySQL::LocalQuery query("dsid","mssfile","mssfile = '"+meta_args.path+"/"+meta_args.filename+"'");
     if (query.submit(server) == 0) {
-	MySQL::Row row;
-	if (query.fetch_row(row)) {
-	  if (row[0] == "ds"+meta_args.dsnum) {
-	    verified_hpss_file=true;
+	if (query.num_rows() > 0) {
+	  MySQL::Row row;
+	  if (query.fetch_row(row)) {
+	    if (row[0] == "ds"+meta_args.dsnum) {
+		verified_hpss_file=true;
+	    }
 	  }
-	}
-	else {
-	  metautils::log_error("database fetch error","prop2xml",user);
+	  else {
+	    metautils::log_error("database fetch error","prop2xml",user);
+	  }
 	}
     }
     else {
