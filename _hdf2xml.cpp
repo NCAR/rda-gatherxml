@@ -940,6 +940,7 @@ void scan_ispd_hdf5_file(InputHDF5Stream& istream,metadata::ObML::ObservationDat
 
 void scan_usarray_transportable_hdf5_file(InputHDF5Stream& istream,ScanData& scan_data,metadata::ObML::ObservationData& obs_data)
 {
+  obs_data.set_track_unique_observations(false);
 // load the pressure dataset
   auto ds=istream.dataset("/obsdata/presdata");
   if (ds == nullptr || ds->datatype.class_ != 6) {
@@ -1032,6 +1033,9 @@ void scan_usarray_transportable_hdf5_file(InputHDF5Stream& istream,ScanData& sca
 	++num_not_missing;
     }
   }
+  metadata::ObML::DataTypeEntry dte;
+  ientry.data->data_types_table.found(datatype,dte);
+  ientry.data->nsteps=dte.data->nsteps=num_not_missing;
   scan_data.map_name=unixutils::remote_web_file("https://rda.ucar.edu/metadata/ParameterTables/HDF5.ds"+meta_args.dsnum+".xml",scan_data.tdir->name());
   scan_data.found_map=(!scan_data.map_name.empty());
   se.key=datatype+"<!>"+se.key+"<!>Hz";
