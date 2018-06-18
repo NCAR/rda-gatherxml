@@ -4,7 +4,7 @@
 #include <signal.h>
 #include <sstream>
 #include <regex>
-#include <forward_list>
+#include <thread>
 #include <unordered_set>
 #include <grid.hpp>
 #include <mymap.hpp>
@@ -23,16 +23,26 @@ metautils::Args meta_args;
 std::string myerror="";
 std::string mywarning="";
 
+struct NetCDFVariables {
+  NetCDFVariables() : map_name(),parameter_map(),datatype_map(),netcdf_variables(),changed_variables(),map_filled(false) {}
 
+  std::string map_name;
+  ParameterMap parameter_map;
+  DataTypeMap datatype_map;
+  std::vector<std::string> netcdf_variables;
+  std::unordered_set<std::string> changed_variables;
+  bool map_filled;
+};
+struct NetCDFVariableAttributeData {
+  NetCDFVariableAttributeData() : long_name(),units(),missing_value() {}
+
+  std::string long_name,units;
+  netCDFStream::DataValue missing_value;
+};
 metautils::NcTime::Time time_s;
 metautils::NcTime::TimeBounds time_bounds_s;
 metautils::NcTime::TimeData time_data;
-my::map<metadata::ObML::PlatformEntry> platform_table[metadata::ObML::NUM_OBS_TYPES];
-metadata::ObML::PlatformEntry pentry;
-my::map<metadata::ObML::IDEntry> **ID_table=NULL;
 metadata::ObML::IDEntry ientry;
-my::map<metautils::StringEntry> unique_observation_table(999999),unique_datatype_observation_table(999999),datatype_table;
-metadata::ObML::DataTypeEntry de;
 my::map<metadata::GrML::GridEntry> grid_table;
 metadata::GrML::ParameterEntry param_entry;
 metadata::GrML::LevelEntry lentry;
@@ -53,7 +63,7 @@ struct InvTimeEntry {
   size_t key;
   std::string dt;
 };
-std::list<std::string> inv_lines;
+std::vector<std::string> inv_lines;
 TempFile inv_lines2("/tmp");
 std::unordered_set<std::string> unknown_IDs;
 bool is_large_offset=false;
@@ -175,156 +185,6 @@ void parse_args()
   meta_args.filename=sp.back().substr(n+1);
 }
 
-void initialize_for_observations()
-{
-  if (ID_table == NULL) {
-    ID_table=new my::map<metadata::ObML::IDEntry> *[metadata::ObML::NUM_OBS_TYPES];
-    for (size_t n=0; n < metadata::ObML::NUM_OBS_TYPES; ++n) {
-	ID_table[n]=new my::map<metadata::ObML::IDEntry>(999999);
-    }
-  }
-}
-
-void update_id_table(size_t obs_type_index,float lat,float lon,DateTime *datetime,double unique_timestamp,DateTime *min_datetime = nullptr,DateTime *max_datetime = nullptr)
-{
-  if (lat < -90. || lat > 90. || lon < -180. || lon > 360.) {
-    return;
-  }
-  if (!ID_table[obs_type_index]->found(ientry.key,ientry)) {
-    ientry.data.reset(new metadata::ObML::IDEntry::Data);
-    ientry.data->N_lat=ientry.data->S_lat=lat;
-    ientry.data->W_lon=ientry.data->E_lon=lon;
-    ientry.data->min_lon_bitmap.reset(new float[360]);
-    ientry.data->max_lon_bitmap.reset(new float[360]);
-    for (size_t n=0; n < 360; ++n) {
-	ientry.data->min_lon_bitmap[n]=ientry.data->max_lon_bitmap[n]=999.;
-    }
-    size_t n,m;
-    geoutils::convert_lat_lon_to_box(1,0.,ientry.data->W_lon,n,m);
-    ientry.data->min_lon_bitmap[m]=ientry.data->max_lon_bitmap[m]=ientry.data->W_lon;
-    if (min_datetime == nullptr) {
-	ientry.data->start=*datetime;
-    }
-    else {
-	ientry.data->start=*min_datetime;
-    }
-    if (max_datetime == nullptr) {
-	ientry.data->end=ientry.data->start;
-    }
-    else {
-	ientry.data->end=*max_datetime;
-    }
-    ientry.data->nsteps=1;
-    de.data.reset(new metadata::ObML::DataTypeEntry::Data);
-    de.data->nsteps=1;
-    ientry.data->data_types_table.insert(de);
-    ID_table[obs_type_index]->insert(ientry);
-    metautils::StringEntry se;
-    se.key=strutils::itos(obs_type_index)+";"+ientry.key+"-"+strutils::dtos(unique_timestamp);
-    unique_observation_table.insert(se);
-    se.key+=":"+de.key;
-    unique_datatype_observation_table.insert(se);
-  }
-  else {
-    if (lat != ientry.data->S_lat || lon != ientry.data->W_lon) {
-	if (lat < ientry.data->S_lat) {
-	  ientry.data->S_lat=lat;
-	}
-	if (lat > ientry.data->N_lat) {
-	  ientry.data->N_lat=lat;
-	}
-	if (lon < ientry.data->W_lon) {
-	  ientry.data->W_lon=lon;
-	}
-	if (lon > ientry.data->E_lon) {
-	  ientry.data->E_lon=lon;
-	}
-	size_t n,m;
-	geoutils::convert_lat_lon_to_box(1,0.,lon,n,m);
-	if (ientry.data->min_lon_bitmap[m] > 900.) {
-	  ientry.data->min_lon_bitmap[m]=ientry.data->max_lon_bitmap[m]=lon;
-	}
-	else {
-	  if (lon < ientry.data->min_lon_bitmap[m]) {
-	    ientry.data->min_lon_bitmap[m]=lon;
-	  }
-	  if (lon > ientry.data->max_lon_bitmap[m]) {
-	    ientry.data->max_lon_bitmap[m]=lon;
-	  }
-	}
-    }
-    if (min_datetime == nullptr) {
-	if (*datetime < ientry.data->start) {
-	  ientry.data->start=*datetime;
-	}
-    }
-    else {
-	if (*min_datetime < ientry.data->start) {
-	  ientry.data->start=*min_datetime;
-	}
-    }
-    if (max_datetime == nullptr) {
-	if (*datetime > ientry.data->end) {
-	  ientry.data->end=*datetime;
-	}
-    }
-    else {
-	if (*max_datetime > ientry.data->end) {
-	  ientry.data->end=*max_datetime;
-	}
-    }
-    metautils::StringEntry se;
-    se.key=strutils::itos(obs_type_index)+";"+ientry.key+"-"+strutils::dtos(unique_timestamp);
-    if (!unique_observation_table.found(se.key,se)) {
-	++(ientry.data->nsteps);
-	unique_observation_table.insert(se);
-    }
-    se.key+=":"+de.key;
-    if (!ientry.data->data_types_table.found(de.key,de)) {
-	de.data.reset(new metadata::ObML::DataTypeEntry::Data);
-	ientry.data->data_types_table.insert(de);
-    }
-    if (!unique_datatype_observation_table.found(se.key,se)) {
-	++(de.data->nsteps);
-	unique_datatype_observation_table.insert(se);
-    }
-  }
-  if (std::regex_search(ientry.key,std::regex("unknown"))) {
-    unknown_IDs.emplace(ientry.key);
-  }
-}
-
-/*
-void update_id_table(size_t obs_type_index,float lat,float lon,DateTime& datetime,double unique_timestamp)
-{
-  update_id_table(obs_type_index,lat,lon,datetime,unique_timestamp,nullptr,nullptr);
-}
-*/
-
-void update_platform_table(size_t obs_type_index,float lat,float lon)
-{
-  if (lat < -90. || lat > 90. || lon < -180. || lon > 360.) {
-    return;
-  }
-  if (!platform_table[obs_type_index].found(pentry.key,pentry)) {
-    pentry.boxflags.reset(new summarizeMetadata::BoxFlags);
-    pentry.boxflags->initialize(361,180,0,0);
-    platform_table[obs_type_index].insert(pentry);
-  }
-  if (lat == -90.) {
-    pentry.boxflags->spole=1;
-  }
-  else if (lat == 90.) {
-    pentry.boxflags->npole=1;
-  }
-  else {
-    size_t n,m;
-    geoutils::convert_lat_lon_to_box(1,lat,lon,n,m);
-    pentry.boxflags->flags[n-1][m]=1;
-    pentry.boxflags->flags[n-1][360]=1;
-  }
-}
-
 void fill_nc_time_data(const InputNetCDFStream::Attribute& attr)
 {
   auto u=*(reinterpret_cast<std::string *>(attr.values));
@@ -428,41 +288,41 @@ DateTime compute_nc_time(netCDFStream::VariableData& times,size_t index)
   return dt;
 }
 
-void extract_from_variable_attribute(const std::vector<InputNetCDFStream::Attribute>& attr,std::string& long_name,std::string& units,netCDFStream::NcType nc_type,netCDFStream::DataValue& miss_val)
+void extract_from_variable_attribute(const std::vector<InputNetCDFStream::Attribute>& attribute_list,netCDFStream::NcType nc_type,NetCDFVariableAttributeData& nc_attribute_data)
 {
-  long_name="";
-  units="";
-  miss_val.clear();
-  for (size_t n=0; n < attr.size(); ++n) {
-    if (attr[n].name == "long_name") {
-	long_name=*(reinterpret_cast<std::string *>(attr[n].values));
-	strutils::trim(long_name);
+  nc_attribute_data.long_name="";
+  nc_attribute_data.units="";
+  nc_attribute_data.missing_value.clear();
+  for (const auto& attr : attribute_list) {
+    if (attr.name == "long_name") {
+	nc_attribute_data.long_name=*(reinterpret_cast<std::string *>(attr.values));
+	strutils::trim(nc_attribute_data.long_name);
     }
-    else if (attr[n].name == "units") {
-	units=*(reinterpret_cast<std::string *>(attr[n].values));
-	strutils::trim(units);
+    else if (attr.name == "units") {
+	nc_attribute_data.units=*(reinterpret_cast<std::string *>(attr.values));
+	strutils::trim(nc_attribute_data.units);
     }
-    else if (attr[n].name == "_FillValue" || attr[n].name == "missing_value") {
-	miss_val.resize(nc_type);
+    else if (attr.name == "_FillValue" || attr.name == "missing_value") {
+	nc_attribute_data.missing_value.resize(nc_type);
 	switch (nc_type) {
 	  case netCDFStream::NcType::CHAR:
 	  {
-	    miss_val.set(*(reinterpret_cast<char *>(attr[n].values)));
+	    nc_attribute_data.missing_value.set(*(reinterpret_cast<char *>(attr.values)));
 	    break;
 	  }
 	  case netCDFStream::NcType::INT:
 	  {
-	    miss_val.set(*(reinterpret_cast<int *>(attr[n].values)));
+	    nc_attribute_data.missing_value.set(*(reinterpret_cast<int *>(attr.values)));
 	    break;
 	  }
 	  case netCDFStream::NcType::FLOAT:
 	  {
-	    miss_val.set(*(reinterpret_cast<float *>(attr[n].values)));
+	    nc_attribute_data.missing_value.set(*(reinterpret_cast<float *>(attr.values)));
 	    break;
 	  }
 	  case netCDFStream::NcType::DOUBLE:
 	  {
-	    miss_val.set(*(reinterpret_cast<double *>(attr[n].values)));
+	    nc_attribute_data.missing_value.set(*(reinterpret_cast<double *>(attr.values)));
 	    break;
 	  }
 	  default: {}
@@ -471,15 +331,14 @@ void extract_from_variable_attribute(const std::vector<InputNetCDFStream::Attrib
   }
 }
 
-bool found_missing(const double& time,const netCDFStream::DataValue& time_miss_val,const double& var_value,const netCDFStream::DataValue& miss_val)
+bool found_missing(const double& time,const netCDFStream::DataValue *time_missing_value,const double& var_value,const netCDFStream::DataValue& var_missing_value)
 {
   bool missing;
-  if (time_miss_val.type() == netCDFStream::NcType::_NULL) {
+  if (time_missing_value == nullptr) {
     missing=false;
   }
   else {
-//    if (floatutils::myequalf(times[index/num_vals_at_each_time],time_miss_val.get())) {
-if (floatutils::myequalf(time,time_miss_val.get())) {
+    if (floatutils::myequalf(time,time_missing_value->get())) {
 	missing=true;
     }
     else {
@@ -489,20 +348,19 @@ if (floatutils::myequalf(time,time_miss_val.get())) {
   if (missing) {
     return true;
   }
-  if (miss_val.type() == netCDFStream::NcType::_NULL) {
+  if (var_missing_value.type() == netCDFStream::NcType::_NULL) {
     missing=false;
   }
   else {
     missing=true;
-//    if (var_data[index] != miss_val.get()) {
-if (var_value != miss_val.get()) {
+    if (var_value != var_missing_value.get()) {
 	missing=false;
     }
   }
   return missing;
 }
 
-void add_gridded_netcdf_parameter(const netCDFStream::Variable& var,const bool& found_map,const DateTime& first_valid_date_time,const DateTime& last_valid_date_time,int nsteps,my::map<metautils::StringEntry>& parameter_table,std::list<std::string>& var_list,my::map<metautils::StringEntry>& changed_var_table,ParameterMap& parameter_map)
+void add_gridded_netcdf_parameter(const netCDFStream::Variable& var,const DateTime& first_valid_date_time,const DateTime& last_valid_date_time,int nsteps,std::unordered_set<std::string>& parameter_table,NetCDFVariables& nc_vars)
 {
   std::string descr="";
   std::string units="";
@@ -522,19 +380,17 @@ void add_gridded_netcdf_parameter(const netCDFStream::Variable& var,const bool& 
 	}
     }
   }
-  metautils::StringEntry se;
-  se.key=var.name+"<!>"+descr+"<!>"+units;
-  if (!parameter_table.found(se.key,se)) {
-    auto short_name=parameter_map.short_name(var.name);
-    if (!found_map || short_name.empty()) {
-	parameter_table.insert(se);
-	var_list.emplace_back(se.key);
+  auto param_key=var.name+"<!>"+descr+"<!>"+units;
+  if (parameter_table.find(param_key) == parameter_table.end()) {
+    auto short_name=nc_vars.parameter_map.short_name(var.name);
+    if (short_name.empty()) {
+	parameter_table.emplace(param_key);
+	nc_vars.netcdf_variables.emplace_back(param_key);
     }
     else {
-	parameter_table.insert(se);
-	var_list.emplace_back(se.key);
-	se.key=var.name;
-	changed_var_table.insert(se);
+	parameter_table.insert(param_key);
+	nc_vars.netcdf_variables.emplace_back(param_key);
+	nc_vars.changed_variables.emplace(var.name);
     }
   }
   param_entry.start_date_time=first_valid_date_time;
@@ -675,7 +531,7 @@ void add_level_to_inventory(std::string lentry_key,std::string gentry_key,size_t
   }
 }
 
-void add_gridded_parameters_to_netcdf_level_entry(const std::vector<netCDFStream::Variable>& vars,std::string gentry_key,std::string timeid,size_t timedimid,int levdimid,size_t latdimid,size_t londimid,const bool& found_map,const metautils::NcTime::TimeRangeEntry& tre,my::map<metautils::StringEntry>& parameter_table,std::list<std::string>& var_list,my::map<metautils::StringEntry>& changed_var_table,ParameterMap& parameter_map)
+void add_gridded_parameters_to_netcdf_level_entry(const std::vector<netCDFStream::Variable>& vars,std::string gentry_key,std::string timeid,size_t timedimid,int levdimid,size_t latdimid,size_t londimid,const metautils::NcTime::TimeRangeEntry& tre,std::unordered_set<std::string>& parameter_table,NetCDFVariables& nc_vars)
 {
 // find all of the parameters
   for (size_t n=0; n < vars.size(); ++n) {
@@ -705,7 +561,7 @@ void add_gridded_parameters_to_netcdf_level_entry(const std::vector<netCDFStream
 	  if (std::regex_search(gentry_key,std::regex("^[12]<!>1<!>"))) {
 	    if (is_zonal_mean_grid_variable(vars[n],timedimid,levdimid,latdimid)) {
 		param_entry.key="ds"+meta_args.dsnum+":"+vars[n].name;
-		add_gridded_netcdf_parameter(vars[n],found_map,first_valid_date_time,last_valid_date_time,tre.data->num_steps,parameter_table,var_list,changed_var_table,parameter_map);
+		add_gridded_netcdf_parameter(vars[n],first_valid_date_time,last_valid_date_time,tre.data->num_steps,parameter_table,nc_vars);
 		if (inv_stream.is_open()) {
 		  add_grid_to_inventory(gentry_key);
 		}
@@ -715,7 +571,7 @@ void add_gridded_parameters_to_netcdf_level_entry(const std::vector<netCDFStream
 	    if (is_regular_lat_lon_grid_variable(vars[n],timedimid,levdimid,latdimid,londimid)) {
 // check as a regular lat/lon grid variable
 		param_entry.key="ds"+meta_args.dsnum+":"+vars[n].name;
-		add_gridded_netcdf_parameter(vars[n],found_map,first_valid_date_time,last_valid_date_time,tre.data->num_steps,parameter_table,var_list,changed_var_table,parameter_map);
+		add_gridded_netcdf_parameter(vars[n],first_valid_date_time,last_valid_date_time,tre.data->num_steps,parameter_table,nc_vars);
 		if (inv_stream.is_open()) {
 		  add_grid_to_inventory(gentry_key);
 		}
@@ -723,7 +579,7 @@ void add_gridded_parameters_to_netcdf_level_entry(const std::vector<netCDFStream
 	    else if (is_polar_stereographic_grid_variable(vars[n],timedimid,levdimid,latdimid)) {
 // check as a polar-stereographic grid variable
 		param_entry.key="ds"+meta_args.dsnum+":"+vars[n].name;
-		add_gridded_netcdf_parameter(vars[n],found_map,first_valid_date_time,last_valid_date_time,tre.data->num_steps,parameter_table,var_list,changed_var_table,parameter_map);
+		add_gridded_netcdf_parameter(vars[n],first_valid_date_time,last_valid_date_time,tre.data->num_steps,parameter_table,nc_vars);
 		if (inv_stream.is_open()) {
 		  add_grid_to_inventory(gentry_key);
 		}
@@ -734,7 +590,7 @@ void add_gridded_parameters_to_netcdf_level_entry(const std::vector<netCDFStream
   }
 }
 
-void add_gridded_time_range(std::string key_start,std::list<std::string>& gentry_keys,std::string timeid,size_t timedimid,int levdimid,size_t latdimid,size_t londimid,const metautils::NcTime::TimeRangeEntry& tre,std::vector<netCDFStream::Variable>& vars)
+void add_gridded_time_range(std::string key_start,std::vector<std::string>& gentry_keys,std::string timeid,size_t timedimid,int levdimid,size_t latdimid,size_t londimid,const metautils::NcTime::TimeRangeEntry& tre,std::vector<netCDFStream::Variable>& vars)
 {
   std::string gentry_key;
   std::unordered_set<std::string> unique_gentry_keys;
@@ -769,7 +625,7 @@ void add_gridded_time_range(std::string key_start,std::list<std::string>& gentry
   }
 }
 
-void add_gridded_lat_lon_keys(std::list<std::string>& gentry_keys,Grid::GridDimensions dim,Grid::GridDefinition def,std::string timeid,size_t timedimid,int levdimid,size_t latdimid,size_t londimid,const metautils::NcTime::TimeRangeEntry& tre,std::vector<netCDFStream::Variable>& vars)
+void add_gridded_lat_lon_keys(std::vector<std::string>& gentry_keys,Grid::GridDimensions dim,Grid::GridDefinition def,std::string timeid,size_t timedimid,int levdimid,size_t latdimid,size_t londimid,const metautils::NcTime::TimeRangeEntry& tre,std::vector<netCDFStream::Variable>& vars)
 {
   std::string key_start;
   switch (def.type) {
@@ -804,7 +660,7 @@ void add_gridded_lat_lon_keys(std::list<std::string>& gentry_keys,Grid::GridDime
   }
 }
 
-void add_gridded_zonal_mean_keys(std::list<std::string>& gentry_keys,Grid::GridDimensions dim,Grid::GridDefinition def,std::string timeid,size_t timedimid,int levdimid,size_t latdimid,size_t londimid,metautils::NcTime::TimeRangeEntry &tre,std::vector<netCDFStream::Variable>& vars)
+void add_gridded_zonal_mean_keys(std::vector<std::string>& gentry_keys,Grid::GridDimensions dim,Grid::GridDefinition def,std::string timeid,size_t timedimid,int levdimid,size_t latdimid,size_t londimid,metautils::NcTime::TimeRangeEntry &tre,std::vector<netCDFStream::Variable>& vars)
 {
   std::string key_start;
 
@@ -816,7 +672,6 @@ bool found_netcdf_time_from_patch(const netCDFStream::Variable& var)
 {
   size_t m;
   long long dt;
-  std::string sdum;
   std::deque<std::string> sp;
   int status;
 
@@ -829,8 +684,8 @@ bool found_netcdf_time_from_patch(const netCDFStream::Variable& var)
 	  ++status;
 	}
 	else if (var.attrs[m].name == "comment") {
-	  sdum=*(reinterpret_cast<std::string *>(var.attrs[m].values));
-	  sp=strutils::split(sdum);
+	  auto comment_value=*(reinterpret_cast<std::string *>(var.attrs[m].values));
+	  sp=strutils::split(comment_value);
 	  dt=std::stoll(sp[sp.size()-1])*10000000000+100000000+1000000;
 	  time_data.reference.set(dt);
 	  ++status;
@@ -926,12 +781,11 @@ void process_units_attribute(const std::vector<netCDFStream::Variable>& vars,siz
   }
 }
 
-void scan_cf_point_netcdf_file(InputNetCDFStream& istream,bool& found_map,DataTypeMap& datatype_map,std::list<std::string>& var_list)
+void scan_cf_point_netcdf_file(InputNetCDFStream& istream,std::string platform_type,metadata::ObML::ObservationData& obs_data,NetCDFVariables& nc_vars)
 {
   if (verbose_operation) {
     std::cout << "...beginning function scan_cf_point_netcdf_file()..." << std::endl;
   }
-  initialize_for_observations();
   auto vars=istream.variables();
   DiscreteGeometriesData dgd;
   for (size_t n=0; n < vars.size(); ++n) {
@@ -975,19 +829,16 @@ void scan_cf_point_netcdf_file(InputNetCDFStream& istream,bool& found_map,DataTy
 	metautils::log_error("scan_cf_point_netcdf_file() returned error: unable to get longitude data","nc2xml",user);
     }
   }
-  netCDFStream::DataValue time_miss_val;
   std::vector<DateTime> date_times;
   std::vector<std::string> IDs;
   for (const auto& var : vars) {
     if (var.name != vars[dgd.indexes.time_var].name && var.name != vars[dgd.indexes.lat_var].name && var.name != vars[dgd.indexes.lon_var].name) {
-	de.key=var.name;
 	netCDFStream::VariableData var_data;
 	if (istream.variable_data(var.name,var_data) == netCDFStream::NcType::_NULL) {
 	  metautils::log_error("scan_cf_point_netcdf_file() returned error: unable to get variable data for '"+var.name+"'","nc2xml",user);
 	}
-	std::string long_name,units;
-	netCDFStream::DataValue miss_val;
-	extract_from_variable_attribute(var.attrs,long_name,units,var.nc_type,miss_val);
+	NetCDFVariableAttributeData nc_va_data;
+	extract_from_variable_attribute(var.attrs,var.nc_type,nc_va_data);
 	for (size_t n=0; n < times.size(); ++n) {
 	  if (n == date_times.size()) {
 	    date_times.emplace_back(compute_nc_time(times,n));
@@ -1009,11 +860,14 @@ void scan_cf_point_netcdf_file(InputNetCDFStream& istream,bool& found_map,DataTy
 	    }
 	    IDs.emplace_back(lat+lon);
 	  }
-	  if (!found_missing(times[n],time_miss_val,var_data[n],miss_val)) {
-	    pentry.key="unknown";
-	    update_platform_table(1,lats[n],lons[n]);
-	    ientry.key=pentry.key+"[!]latlon[!]"+IDs[n];
-	    update_id_table(1,lats[n],lons[n],&date_times[n],times[n]);
+	  if (!found_missing(times[n],nullptr,var_data[n],nc_va_data.missing_value)) {
+	    if (!obs_data.added_to_platforms("surface",platform_type,lats[n],lons[n])) {
+		metautils::log_error("scan_cf_point_netcdf_file() returned error: '"+myerror+"' when adding platform "+platform_type,"nc2xml",user);
+	    }
+	    ientry.key=platform_type+"[!]latlon[!]"+IDs[n];
+	    if (!obs_data.added_to_ids("surface",ientry,var.name,lats[n],lons[n],times[n],&date_times[n])) {
+		metautils::log_error("scan_cf_point_netcdf_file() returned error: '"+myerror+"' when adding ID "+ientry.key,"nc2xml",user);
+	    }
 	    ++total_num_not_missing;
 	  }
 	}
@@ -1025,7 +879,7 @@ void scan_cf_point_netcdf_file(InputNetCDFStream& istream,bool& found_map,DataTy
   }
 }
 
-void scan_cf_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,DiscreteGeometriesData& dgd,std::unordered_map<size_t,std::string>& T_map)
+void scan_cf_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,std::string platform_type,DiscreteGeometriesData& dgd,std::unordered_map<size_t,std::string>& T_map,metadata::ObML::ObservationData& obs_data)
 {
   if (verbose_operation) {
     std::cout << "...beginning function scan_cf_orthogonal_time_series_netcdf_file()..." << std::endl;
@@ -1084,8 +938,9 @@ void scan_cf_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,Discr
 	    }
 	  }
 	}
-	pentry.key=platform_types.back();
-	update_platform_table(1,lats[0],lons[0]);
+	if (!obs_data.added_to_platforms("surface",platform_types.back(),lats[0],lons[0])) {
+	  metautils::log_error("scan_cf_point_netcdf_file() returned error: '"+myerror+"' when adding platform "+platform_types.back(),"nc2xml",user);
+	}
 	if (inv_stream.is_open()) {
 	  auto I_key=id_types.back()+"[!]"+id_cache.back();
 	  if (I_map.find(I_key) == I_map.end()) {
@@ -1124,6 +979,8 @@ void scan_cf_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,Discr
   if (lats.type() == netCDFStream::NcType::_NULL && istream.variable_data(vars[dgd.indexes.lat_var].name,lats) == netCDFStream::NcType::_NULL) {
     metautils::log_error("scan_cf_orthogonal_time_series_netcdf_file() returned error: unable to get latitude data","nc2xml",user);
   }
+for (size_t n=0; n < lats.size(); ++n) {
+}
   if (lons.type() == netCDFStream::NcType::_NULL && istream.variable_data(vars[dgd.indexes.lon_var].name,lons) == netCDFStream::NcType::_NULL) {
     metautils::log_error("scan_cf_orthogonal_time_series_netcdf_file() returned error: unable to get longitude data","nc2xml",user);
   }
@@ -1137,7 +994,7 @@ void scan_cf_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,Discr
   auto stn_dim=-1;
   size_t num_stns=0;
   if (dgd.indexes.stn_id_var != 0xffffffff) {
-    if (vars[dgd.indexes.stn_id_var].dimids.size() > 1) {
+    if (vars[dgd.indexes.stn_id_var].dimids.size() >= 1) {
 	stn_dim=vars[dgd.indexes.stn_id_var].dimids.front();
 	if (vars[dgd.indexes.stn_id_var].is_rec) {
 	  num_stns=istream.num_records();
@@ -1162,11 +1019,12 @@ void scan_cf_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,Discr
 	else {
 	  metautils::log_error("scan_cf_orthogonal_time_series_netcdf_file() returned error: unable to determine platform type","nc2xml",user);
 	}
-	platform_types.emplace_back("unknown");
+	platform_types.emplace_back(platform_type);
 	id_types.emplace_back("unknown");
 	id_cache.emplace_back(id);
-	pentry.key=platform_types[n];
-	update_platform_table(1,lats[n],lons[n]);
+	if (!obs_data.added_to_platforms("surface",platform_types[n],lats[n],lons[n])) {
+	  metautils::log_error("scan_cf_point_netcdf_file() returned error: '"+myerror+"' when adding platform "+platform_types[n],"nc2xml",user);
+	}
 	if (inv_stream.is_open()) {
 	  auto I_key=id_types[n]+"[!]"+id_cache[n];
 	  if (I_map.find(I_key) == I_map.end()) {
@@ -1188,7 +1046,6 @@ void scan_cf_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,Discr
 	if (verbose_operation) {
 	  std::cout << "Scanning netCDF variable '" << var.name << "' ..." << std::endl;
 	}
-	de.key=var.name;
 	if (inv_stream.is_open()) {
 	  if (D_map.find(var.name) == D_map.end()) {
 	    auto bsize=1;
@@ -1221,9 +1078,8 @@ void scan_cf_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,Discr
 	if (istream.variable_data(var.name,var_data) == netCDFStream::NcType::_NULL) {
 	  metautils::log_error("scan_cf_orthogonal_time_series_netcdf_file() returned error: unable to get data for variable '"+var.name+"'","nc2xml",user);
 	}
-	std::string long_name,units;
-	netCDFStream::DataValue miss_val;
-	extract_from_variable_attribute(var.attrs,long_name,units,var.nc_type,miss_val);
+	NetCDFVariableAttributeData nc_va_data;
+	extract_from_variable_attribute(var.attrs,var.nc_type,nc_va_data);
 	size_t num_times;
 	bool time_is_unlimited;
 	if (dims[vars[dgd.indexes.time_var].dimids[0]].is_rec) {
@@ -1241,15 +1097,16 @@ void scan_cf_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,Discr
 	    if (dts.size() != num_times) {
 		dts.emplace_back(compute_nc_time(times,m));
 	    }
-	    netCDFStream::DataValue time_miss_val;
 	    auto vidx= (time_is_unlimited) ? n+m*num_stns : n*num_times+m;
-	    if (!found_missing(times[m],time_miss_val,var_data[vidx],miss_val)) {
+	    if (!found_missing(times[m],nullptr,var_data[vidx],nc_va_data.missing_value)) {
 		if (inv_stream.is_open()) {
 		  if (T_map.find(m) == T_map.end()) {
 		    T_map.emplace(m,dts[m].to_string("%Y%m%d%H%MM"));
 		  }
 		}
-		update_id_table(1,lats[n],lons[n],&dts[m],times[m]);
+		if (!obs_data.added_to_ids("surface",ientry,var.name,lats[n],lons[n],times[m],&dts[m])) {
+		  metautils::log_error("scan_cf_orthogonal_time_series_netcdf_file() returned error: '"+myerror+"' when adding ID "+ientry.key,"nc2xml",user);
+		}
 		++total_num_not_missing;
 	    }
 	    else {
@@ -1278,7 +1135,7 @@ void scan_cf_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,Discr
   }
 }
 
-void scan_cf_non_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,DiscreteGeometriesData& dgd,std::unordered_map<size_t,std::string>& T_map)
+void scan_cf_non_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,std::string platform_type,DiscreteGeometriesData& dgd,std::unordered_map<size_t,std::string>& T_map,metadata::ObML::ObservationData& obs_data)
 {
   if (verbose_operation) {
     std::cout << "...beginning function scan_cf_non_orthogonal_time_series_netcdf_file()..." << std::endl;
@@ -1321,10 +1178,11 @@ void scan_cf_non_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,D
   if (ids.type() == netCDFStream::NcType::INT || ids.type() == netCDFStream::NcType::FLOAT || ids.type() == netCDFStream::NcType::DOUBLE) {
     for (size_t n=0; n < num_stns; ++n) {
 //	int id=ids[n];
-platform_types.emplace_back("unknown");
+platform_types.emplace_back(platform_type);
 id_types.emplace_back("unknown");
-	pentry.key=platform_types[n];
-	update_platform_table(1,lats[n],lons[n]);
+	if (!obs_data.added_to_platforms("surface",platform_types[n],lats[n],lons[n])) {
+	  metautils::log_error("scan_cf_point_netcdf_file() returned error: '"+myerror+"' when adding platform "+platform_types[n],"nc2xml",user);
+	}
     }
   }
   else if (ids.type() == netCDFStream::NcType::CHAR) {
@@ -1334,8 +1192,9 @@ id_types.emplace_back("unknown");
 	std::string id(&idbuf[n*id_len],id_len);
 platform_types.emplace_back("unknown");
 id_types.emplace_back("unknown");
-	pentry.key=platform_types[n];
-	update_platform_table(1,lats[n],lons[n]);
+	if (!obs_data.added_to_platforms("surface",platform_types[n],lats[n],lons[n])) {
+	  metautils::log_error("scan_cf_point_netcdf_file() returned error: '"+myerror+"' when adding platform "+platform_types[n],"nc2xml",user);
+	}
     }
   }
   else {
@@ -1350,14 +1209,12 @@ id_types.emplace_back("unknown");
     }
     for (const auto& var : vars) {
 	if (var.name != vars[dgd.indexes.time_var].name && var.dimids.size() == 1 && var.dimids[0] == obs_dim) {
-	  de.key=var.name;
 	  netCDFStream::VariableData var_data;
 	  if (istream.variable_data(var.name,var_data) == netCDFStream::NcType::_NULL) {
 	    metautils::log_error("scan_cf_non_orthogonal_time_series_netcdf_file() returned error: unable to get data for variable '"+var.name+"'","nc2xml",user);
 	  }
-	  std::string long_name,units;
-	  netCDFStream::DataValue miss_val;
-	  extract_from_variable_attribute(var.attrs,long_name,units,var.nc_type,miss_val);
+	  NetCDFVariableAttributeData nc_va_data;
+	  extract_from_variable_attribute(var.attrs,var.nc_type,nc_va_data);
 	  long long offset=0;
 	  for (size_t n=0; n < dims[stn_dim].length; ++n) {
 	    auto end=offset+row_sizes[n];
@@ -1371,10 +1228,11 @@ id_types.emplace_back("unknown");
 		ientry.key+=id;
 	    }
 	    for (size_t m=offset; m < end; ++m) {
-		netCDFStream::DataValue time_miss_val;
-		if (!found_missing(times[m],time_miss_val,var_data[m],miss_val)) {
+		if (!found_missing(times[m],nullptr,var_data[m],nc_va_data.missing_value)) {
 		  auto dt=compute_nc_time(times,m);
-		  update_id_table(1,lats[n],lons[n],&dt,times[m]);
+		  if (!obs_data.added_to_ids("surface",ientry,var.name,lats[n],lons[n],times[m],&dt)) {
+		    metautils::log_error("scan_cf_non_orthogonal_time_series_netcdf_file() returned error: '"+myerror+"' when adding ID "+ientry.key,"nc2xml",user);
+		  }
 		  ++total_num_not_missing;
 		}
 	    }
@@ -1391,14 +1249,12 @@ id_types.emplace_back("unknown");
     }
     for (const auto& var : vars) {
 	if (var.name != vars[dgd.indexes.time_var].name && var.name != vars[dgd.indexes.instance_dim_var].name && var.dimids.size() == 1 && var.dimids[0] == obs_dim) {
-	  de.key=var.name;
 	  netCDFStream::VariableData var_data;
 	  if (istream.variable_data(var.name,var_data) == netCDFStream::NcType::_NULL) {
 	    metautils::log_error("scan_cf_non_orthogonal_time_series_netcdf_file() returned error: unable to get data for variable '"+var.name+"'","nc2xml",user);
 	  }
-	  std::string long_name,units;
-	  netCDFStream::DataValue miss_val;
-	  extract_from_variable_attribute(var.attrs,long_name,units,var.nc_type,miss_val);
+	  NetCDFVariableAttributeData nc_va_data;
+	  extract_from_variable_attribute(var.attrs,var.nc_type,nc_va_data);
 	  for (size_t n=0; n < station_indexes.size(); ++n) {
 	    size_t idx=station_indexes[n];
 	    ientry.key=platform_types[idx]+"[!]"+id_types[idx]+"[!]";
@@ -1410,16 +1266,19 @@ id_types.emplace_back("unknown");
 		strutils::trim(id);
 		ientry.key+=id;
 	    }
-	    netCDFStream::DataValue time_miss_val;
-	    if (!found_missing(times[n],time_miss_val,var_data[n],miss_val)) {
+	    if (!found_missing(times[n],nullptr,var_data[n],nc_va_data.missing_value)) {
 		if (dgd.indexes.time_bounds_var != 0xffffffff) {
 		  auto min_dt=compute_nc_time(*time_bounds,n*2);
 		  auto max_dt=compute_nc_time(*time_bounds,n*2+1);
-		  update_id_table(1,lats[idx],lons[idx],nullptr,times[n],&min_dt,&max_dt);
+		  if (!obs_data.added_to_ids("surface",ientry,var.name,lats[idx],lons[idx],times[n],&min_dt,&max_dt)) {
+		    metautils::log_error("scan_cf_non_orthogonal_time_series_netcdf_file() returned error: '"+myerror+"' when adding ID "+ientry.key,"nc2xml",user);
+		  }
 		}
 		else {
 		  auto dt=compute_nc_time(times,n);
-		  update_id_table(1,lats[idx],lons[idx],&dt,times[n]);
+		  if (!obs_data.added_to_ids("surface",ientry,var.name,lats[idx],lons[idx],times[n],&dt)) {
+		    metautils::log_error("scan_cf_non_orthogonal_time_series_netcdf_file() returned error: '"+myerror+"' when adding ID "+ientry.key,"nc2xml",user);
+		  }
 		}
 		++total_num_not_missing;
 	    }
@@ -1429,9 +1288,8 @@ id_types.emplace_back("unknown");
   }
   else {
 // incomplete multidimensional array H.3
-    std::string long_name,units;
-    netCDFStream::DataValue time_miss_val;
-    extract_from_variable_attribute(vars[dgd.indexes.time_var].attrs,long_name,units,vars[dgd.indexes.time_var].nc_type,time_miss_val);
+    NetCDFVariableAttributeData nc_ta_data;
+    extract_from_variable_attribute(vars[dgd.indexes.time_var].attrs,vars[dgd.indexes.time_var].nc_type,nc_ta_data);
     size_t num_obs;
     if (vars[dgd.indexes.stn_id_var].is_rec) {
 	num_obs=dims[obs_dim].length;
@@ -1441,13 +1299,12 @@ id_types.emplace_back("unknown");
     }
     for (const auto& var : vars) {
 	if (var.name != vars[dgd.indexes.time_var].name && var.dimids.size() == 2 && ((var.dimids[0] == stn_dim && var.dimids[1] == obs_dim) || (var.dimids[0] == obs_dim && var.dimids[1] == stn_dim))) {
-	  de.key=var.name;
 	  netCDFStream::VariableData var_data;
 	  if (istream.variable_data(var.name,var_data) == netCDFStream::NcType::_NULL) {
 	    metautils::log_error("scan_cf_non_orthogonal_time_series_netcdf_file() returned error: unable to get data for variable '"+var.name+"'","nc2xml",user);
 	  }
-	  netCDFStream::DataValue miss_val;
-	  extract_from_variable_attribute(var.attrs,long_name,units,var.nc_type,miss_val);
+	  NetCDFVariableAttributeData nc_va_data;
+	  extract_from_variable_attribute(var.attrs,var.nc_type,nc_va_data);
 	  if (var.dimids.front() == stn_dim) {
 	    for (size_t n=0; n < num_stns; ++n) {
 		ientry.key=platform_types[n]+"[!]"+id_types[n]+"[!]";
@@ -1461,9 +1318,11 @@ id_types.emplace_back("unknown");
 		}
 		for (size_t m=0; m < num_obs; ++m) {
 		  auto idx=n*num_obs+m;
-		  if (!found_missing(times[idx],time_miss_val,var_data[idx],miss_val)) {
+		  if (!found_missing(times[idx],&nc_ta_data.missing_value,var_data[idx],nc_va_data.missing_value)) {
 		    auto dt=compute_nc_time(times,idx);
-		    update_id_table(1,lats[n],lons[n],&dt,times[idx]);
+		    if (!obs_data.added_to_ids("surface",ientry,var.name,lats[n],lons[n],times[idx],&dt)) {
+			metautils::log_error("scan_cf_non_orthogonal_time_series_netcdf_file() returned error: '"+myerror+"' when adding ID "+ientry.key,"nc2xml",user);
+		    }
 		    ++total_num_not_missing;
 		  }
 		}
@@ -1482,9 +1341,11 @@ id_types.emplace_back("unknown");
 		    ientry.key+=id;
 		  }
 		  auto idx=n*num_stns+m;
-		  if (!found_missing(times[idx],time_miss_val,var_data[idx],miss_val)) {
+		  if (!found_missing(times[idx],&nc_ta_data.missing_value,var_data[idx],nc_va_data.missing_value)) {
 		    auto dt=compute_nc_time(times,idx);
-		    update_id_table(1,lats[m],lons[m],&dt,times[idx]);
+		    if (!obs_data.added_to_ids("surface",ientry,var.name,lats[m],lons[m],times[idx],&dt)) {
+			metautils::log_error("scan_cf_non_orthogonal_time_series_netcdf_file() returned error: '"+myerror+"' when adding ID "+ientry.key,"nc2xml",user);
+		    }
 		    ++total_num_not_missing;
 		  }
 		}
@@ -1498,12 +1359,11 @@ id_types.emplace_back("unknown");
   }
 }
 
-void scan_cf_time_series_netcdf_file(InputNetCDFStream& istream,bool& found_map,DataTypeMap& datatype_map,std::list<std::string>& var_list)
+void scan_cf_time_series_netcdf_file(InputNetCDFStream& istream,std::string platform_type,metadata::ObML::ObservationData& obs_data,NetCDFVariables& nc_vars)
 {
   if (verbose_operation) {
     std::cout << "...beginning function scan_cf_time_series_netcdf_file()..." << std::endl;
   }
-  initialize_for_observations();
   auto vars=istream.variables();
   DiscreteGeometriesData dgd;
   for (size_t n=0; n < vars.size(); ++n) {
@@ -1554,7 +1414,7 @@ void scan_cf_time_series_netcdf_file(InputNetCDFStream& istream,bool& found_map,
   std::unordered_map<size_t,std::string> T_map;
   if (vars[dgd.indexes.time_var].is_coord) {
 // ex. H.2, H.4 (single version of H.2), H.5 (precise locations) stns w/same times
-    scan_cf_orthogonal_time_series_netcdf_file(istream,dgd,T_map);
+    scan_cf_orthogonal_time_series_netcdf_file(istream,platform_type,dgd,T_map,obs_data);
   }
   else {
 // ex. H.3 stns w/varying times but same # of obs
@@ -1569,7 +1429,7 @@ void scan_cf_time_series_netcdf_file(InputNetCDFStream& istream,bool& found_map,
     if (dgd.indexes.lon_var == 0xffffffff) {
 	metautils::log_error("scan_cf_time_series_netcdf_file() returned error: unable to determine longitude variable","nc2xml",user);
     }
-    scan_cf_non_orthogonal_time_series_netcdf_file(istream,dgd,T_map);
+    scan_cf_non_orthogonal_time_series_netcdf_file(istream,platform_type,dgd,T_map,obs_data);
   }
   write_type=ObML_type;
   if (inv_stream.is_open()) {
@@ -1596,10 +1456,9 @@ void scan_cf_time_series_netcdf_file(InputNetCDFStream& istream,bool& found_map,
   }
 }
 
-void scan_cf_orthogonal_profile_netcdf_file(InputNetCDFStream& istream,DiscreteGeometriesData& dgd,size_t obs_type_index)
+void scan_cf_orthogonal_profile_netcdf_file(InputNetCDFStream& istream,std::string platform_type,DiscreteGeometriesData& dgd,metadata::ObML::ObservationData& obs_data,std::string obs_type)
 {
   size_t id_len=1;
-  std::string platform_type="unknown";
   std::string id_type="unknown";
   netCDFStream::VariableData times,lats,lons,ids,levels;
   auto vars=istream.variables();
@@ -1625,24 +1484,22 @@ void scan_cf_orthogonal_profile_netcdf_file(InputNetCDFStream& istream,DiscreteG
   if (times.size() != lats.size() || lats.size() != lons.size() || lons.size() != ids.size()/id_len) {
     metautils::log_error("scan_cf_orthogonal_profile_netcdf_file() returned error: profile data does not follow the CF conventions","nc2xml",user);
   }
-  std::string long_name,units;
-  netCDFStream::DataValue time_miss_val;
-  extract_from_variable_attribute(vars[dgd.indexes.time_var].attrs,long_name,units,vars[dgd.indexes.time_var].nc_type,time_miss_val);
+  NetCDFVariableAttributeData nc_ta_data;
+  extract_from_variable_attribute(vars[dgd.indexes.time_var].attrs,vars[dgd.indexes.time_var].nc_type,nc_ta_data);
   for (const auto& var : vars) {
     if (var.name != vars[dgd.indexes.z_var].name && var.dimids.size() > 0 && var.dimids.back() == vars[dgd.indexes.z_var].dimids.front()) {
-	de.key=var.name;
 	netCDFStream::VariableData var_data;
 	if (istream.variable_data(var.name,var_data) == netCDFStream::NcType::_NULL) {
 	  metautils::log_error("scan_cf_non_orthogonal_profile_netcdf_file() returned error: unable to get data for variable '"+var.name+"'","nc2xml",user);
 	}
-	netCDFStream::DataValue miss_val;
-	extract_from_variable_attribute(var.attrs,long_name,units,var.nc_type,miss_val);
+	NetCDFVariableAttributeData nc_va_data;
+	extract_from_variable_attribute(var.attrs,var.nc_type,nc_va_data);
 	for (size_t n=0; n < times.size(); ++n) {
 	  auto nlvls=0,last_level=-1;
 	  auto avg_vres=0.;
 	  auto min=1.e38,max=-1.e38;
 	  for (size_t m=0; m < levels.size(); ++m) {
-	    if (!found_missing(times[n],time_miss_val,var_data[n*levels.size()+m],miss_val)) {
+	    if (!found_missing(times[n],&nc_ta_data.missing_value,var_data[n*levels.size()+m],nc_va_data.missing_value)) {
 		if (levels[m] < min) {
 		  min=levels[m];
 		}
@@ -1657,8 +1514,9 @@ void scan_cf_orthogonal_profile_netcdf_file(InputNetCDFStream& istream,DiscreteG
 	    }
 	  }
 	  if (nlvls > 0) {
-	    pentry.key=platform_type;
-	    update_platform_table(obs_type_index,lats[n],lons[n]);
+	    if (!obs_data.added_to_platforms(obs_type,platform_type,lats[n],lons[n])) {
+		metautils::log_error("scan_cf_point_netcdf_file() returned error: '"+myerror+"' when adding platform "+obs_type+" "+platform_type,"nc2xml",user);
+	    }
 	    auto dt=compute_nc_time(times,n);
 	    ientry.key=platform_type+"[!]"+id_type+"[!]";
 	    if (ids.type() == netCDFStream::NcType::INT || ids.type() == netCDFStream::NcType::FLOAT || ids.type() == netCDFStream::NcType::DOUBLE) {
@@ -1667,36 +1525,40 @@ void scan_cf_orthogonal_profile_netcdf_file(InputNetCDFStream& istream,DiscreteG
 	    else if (ids.type() == netCDFStream::NcType::CHAR) {
 		ientry.key+=std::string(&(reinterpret_cast<char *>(ids.get()))[n*id_len],id_len);
 	    }
-	    update_id_table(obs_type_index,lats[n],lons[n],&dt,times[n]);
-	    if (de.data->vdata == nullptr) {
-		de.data->vdata.reset(new metadata::ObML::DataTypeEntry::Data::VerticalData);
+	    if (!obs_data.added_to_ids(obs_type,ientry,var.name,lats[n],lons[n],times[n],&dt)) {
+		metautils::log_error("scan_cf_non_orthogonal_profile_netcdf_file() returned error: '"+myerror+"' when adding ID "+ientry.key,"nc2xml",user);
+	    }
+	    metadata::ObML::DataTypeEntry dte;
+	    ientry.data->data_types_table.found(var.name,dte);
+	    if (dte.data->vdata == nullptr) {
+		dte.data->vdata.reset(new metadata::ObML::DataTypeEntry::Data::VerticalData);
 	    }
 	    if (dgd.z_pos == "down") {
-		if (de.data->vdata->min_altitude > 1.e37) {
-		  de.data->vdata->min_altitude=-de.data->vdata->min_altitude;
+		if (dte.data->vdata->min_altitude > 1.e37) {
+		  dte.data->vdata->min_altitude=-dte.data->vdata->min_altitude;
 		}
-		if (de.data->vdata->max_altitude < -1.e37) {
-		  de.data->vdata->max_altitude=-de.data->vdata->max_altitude;
+		if (dte.data->vdata->max_altitude < -1.e37) {
+		  dte.data->vdata->max_altitude=-dte.data->vdata->max_altitude;
 		}
-		if (max > de.data->vdata->min_altitude) {
-		  de.data->vdata->min_altitude=max;
+		if (max > dte.data->vdata->min_altitude) {
+		  dte.data->vdata->min_altitude=max;
 		}
-		if (min < de.data->vdata->max_altitude) {
-		  de.data->vdata->max_altitude=min;
+		if (min < dte.data->vdata->max_altitude) {
+		  dte.data->vdata->max_altitude=min;
 		}
 	    }
 	    else {
-		if (min < de.data->vdata->min_altitude) {
-		  de.data->vdata->min_altitude=min;
+		if (min < dte.data->vdata->min_altitude) {
+		  dte.data->vdata->min_altitude=min;
 		}
-		if (max > de.data->vdata->max_altitude) {
-		  de.data->vdata->max_altitude=max;
+		if (max > dte.data->vdata->max_altitude) {
+		  dte.data->vdata->max_altitude=max;
 		}
 	    }
-	    de.data->vdata->units=dgd.z_units;
-	    de.data->vdata->avg_nlev+=nlvls;
-	    de.data->vdata->avg_res+=(avg_vres/(nlvls-1));
-	    ++de.data->vdata->res_cnt;
+	    dte.data->vdata->units=dgd.z_units;
+	    dte.data->vdata->avg_nlev+=nlvls;
+	    dte.data->vdata->avg_res+=(avg_vres/(nlvls-1));
+	    ++dte.data->vdata->res_cnt;
 	    ++total_num_not_missing;
 	  }
 	}
@@ -1724,7 +1586,7 @@ bool compare_z_up(const double& left,const double& right)
   }
 }
 
-void fill_vertical_resolution_data(std::vector<double>& lvls,std::string z_pos,std::string z_units)
+void fill_vertical_resolution_data(std::vector<double>& lvls,std::string z_pos,std::string z_units,metadata::ObML::DataTypeEntry& datatype_entry)
 {
   auto min=1.e38,max=-1.e38;
   for (size_t n=0; n < lvls.size(); ++n) {
@@ -1735,44 +1597,44 @@ void fill_vertical_resolution_data(std::vector<double>& lvls,std::string z_pos,s
 	max=lvls[n];
     }
   }
-  if (de.data->vdata == nullptr) {
-    de.data->vdata.reset(new metadata::ObML::DataTypeEntry::Data::VerticalData);
+  if (datatype_entry.data->vdata == nullptr) {
+    datatype_entry.data->vdata.reset(new metadata::ObML::DataTypeEntry::Data::VerticalData);
   }
   if (z_pos == "down") {
     std::sort(lvls.begin(),lvls.end(),compare_z_down);
-    if (de.data->vdata->min_altitude > 1.e37) {
-	de.data->vdata->min_altitude=-de.data->vdata->min_altitude;
+    if (datatype_entry.data->vdata->min_altitude > 1.e37) {
+	datatype_entry.data->vdata->min_altitude=-datatype_entry.data->vdata->min_altitude;
     }
-    if (de.data->vdata->max_altitude < -1.e37) {
-	de.data->vdata->max_altitude=-de.data->vdata->max_altitude;
+    if (datatype_entry.data->vdata->max_altitude < -1.e37) {
+	datatype_entry.data->vdata->max_altitude=-datatype_entry.data->vdata->max_altitude;
     }
-    if (max > de.data->vdata->min_altitude) {
-	de.data->vdata->min_altitude=max;
+    if (max > datatype_entry.data->vdata->min_altitude) {
+	datatype_entry.data->vdata->min_altitude=max;
     }
-    if (min < de.data->vdata->max_altitude) {
-	de.data->vdata->max_altitude=min;
+    if (min < datatype_entry.data->vdata->max_altitude) {
+	datatype_entry.data->vdata->max_altitude=min;
     }
   }
   else {
     std::sort(lvls.begin(),lvls.end(),compare_z_up);
-    if (min < de.data->vdata->min_altitude) {
-	de.data->vdata->min_altitude=min;
+    if (min < datatype_entry.data->vdata->min_altitude) {
+	datatype_entry.data->vdata->min_altitude=min;
     }
-    if (max > de.data->vdata->max_altitude) {
-	de.data->vdata->max_altitude=max;
+    if (max > datatype_entry.data->vdata->max_altitude) {
+	datatype_entry.data->vdata->max_altitude=max;
     }
   }
-  de.data->vdata->units=z_units;
-  de.data->vdata->avg_nlev+=lvls.size();
+  datatype_entry.data->vdata->units=z_units;
+  datatype_entry.data->vdata->avg_nlev+=lvls.size();
   auto avg_vres=0.;
   for (size_t n=1; n < lvls.size(); ++n) {
     avg_vres+=fabs(lvls[n]-lvls[n-1]);
   }
-  de.data->vdata->avg_res+=(avg_vres/(lvls.size()-1));
-  ++de.data->vdata->res_cnt;
+  datatype_entry.data->vdata->avg_res+=(avg_vres/(lvls.size()-1));
+  ++datatype_entry.data->vdata->res_cnt;
 }
 
-void scan_cf_non_orthogonal_profile_netcdf_file(InputNetCDFStream& istream,DiscreteGeometriesData& dgd,size_t obs_type_index)
+void scan_cf_non_orthogonal_profile_netcdf_file(InputNetCDFStream& istream,std::string platform_type,DiscreteGeometriesData& dgd,metadata::ObML::ObservationData& obs_data,std::string obs_type)
 {
   size_t id_len=1;
   auto vars=istream.variables();
@@ -1794,10 +1656,11 @@ void scan_cf_non_orthogonal_profile_netcdf_file(InputNetCDFStream& istream,Discr
   if (ids.type() == netCDFStream::NcType::INT || ids.type() == netCDFStream::NcType::FLOAT || ids.type() == netCDFStream::NcType::DOUBLE) {
     for (size_t n=0; n < times.size(); ++n) {
 //	int id=ids[n];
-platform_types.emplace_back("unknown");
+platform_types.emplace_back(platform_type);
 id_types.emplace_back("unknown");
-	pentry.key=platform_types[n];
-	update_platform_table(obs_type_index,lats[n],lons[n]);
+	if (!obs_data.added_to_platforms(obs_type,platform_types[n],lats[n],lons[n])) {
+	  metautils::log_error("scan_cf_point_netcdf_file() returned error: '"+myerror+"' when adding platform "+obs_type+" "+platform_types[n],"nc2xml",user);
+	}
     }
   }
   else if (ids.type() == netCDFStream::NcType::CHAR) {
@@ -1805,10 +1668,11 @@ id_types.emplace_back("unknown");
     char *idbuf=reinterpret_cast<char *>(ids.get());
     for (size_t n=0; n < times.size(); ++n) {
 	std::string id(&idbuf[n*id_len],id_len);
-platform_types.emplace_back("unknown");
+platform_types.emplace_back(platform_type);
 id_types.emplace_back("unknown");
-	pentry.key=platform_types[n];
-	update_platform_table(obs_type_index,lats[n],lons[n]);
+	if (!obs_data.added_to_platforms(obs_type,platform_types[n],lats[n],lons[n])) {
+	  metautils::log_error("scan_cf_point_netcdf_file() returned error: '"+myerror+"' when adding platform "+obs_type+" "+platform_types[n],"nc2xml",user);
+	}
     }
   }
   else {
@@ -1820,9 +1684,8 @@ id_types.emplace_back("unknown");
   if (times.size() != lats.size() || lats.size() != lons.size() || lons.size() != ids.size()/id_len) {
     metautils::log_error("scan_cf_non_orthogonal_profile_netcdf_file() returned error: profile data does not follow the CF conventions","nc2xml",user);
   }
-  std::string long_name,units;
-  netCDFStream::DataValue time_miss_val;
-  extract_from_variable_attribute(vars[dgd.indexes.time_var].attrs,long_name,units,vars[dgd.indexes.time_var].nc_type,time_miss_val);
+  NetCDFVariableAttributeData nc_ta_data;
+  extract_from_variable_attribute(vars[dgd.indexes.time_var].attrs,vars[dgd.indexes.time_var].nc_type,nc_ta_data);
   if (dgd.indexes.sample_dim_var != 0xffffffff) {
 // continuous ragged array H.10
     netCDFStream::VariableData row_sizes;
@@ -1831,18 +1694,17 @@ id_types.emplace_back("unknown");
     }
     for (const auto& var : vars) {
 	if (var.name != vars[dgd.indexes.z_var].name && var.dimids.size() > 0 && var.dimids.back() == vars[dgd.indexes.z_var].dimids.front()) {
-	  de.key=var.name;
 	  netCDFStream::VariableData var_data;
 	  if (istream.variable_data(var.name,var_data) == netCDFStream::NcType::_NULL) {
 	    metautils::log_error("scan_cf_non_orthogonal_profile_netcdf_file() returned error: unable to get data for variable '"+var.name+"'","nc2xml",user);
 	  }
-	  netCDFStream::DataValue miss_val;
-	  extract_from_variable_attribute(var.attrs,long_name,units,var.nc_type,miss_val);
+	  NetCDFVariableAttributeData nc_va_data;
+	  extract_from_variable_attribute(var.attrs,var.nc_type,nc_va_data);
 	  auto off=0;
 	  for (size_t n=0; n < times.size(); ++n) {
 	    std::vector<double> lvls;
 	    for (size_t m=0; m < row_sizes[n]; ++m) {
-		if (!found_missing(times[n],time_miss_val,var_data[off],miss_val)) {
+		if (!found_missing(times[n],&nc_ta_data.missing_value,var_data[off],nc_va_data.missing_value)) {
 		  lvls.emplace_back(levels[off]);
 		}
 		++off;
@@ -1856,8 +1718,12 @@ id_types.emplace_back("unknown");
 		else if (ids.type() == netCDFStream::NcType::CHAR) {
 		  ientry.key+=std::string(&(reinterpret_cast<char *>(ids.get()))[n*id_len],id_len);
 		}
-		update_id_table(obs_type_index,lats[n],lons[n],&dt,times[n]);
-		fill_vertical_resolution_data(lvls,dgd.z_pos,dgd.z_units);
+		if (!obs_data.added_to_ids(obs_type,ientry,var.name,lats[n],lons[n],times[n],&dt)) {
+		  metautils::log_error("scan_cf_non_orthogonal_profile_netcdf_file() returned error: '"+myerror+"' when adding ID "+ientry.key,"nc2xml",user);
+		}
+		metadata::ObML::DataTypeEntry dte;
+		ientry.data->data_types_table.found(var.name,dte);
+		fill_vertical_resolution_data(lvls,dgd.z_pos,dgd.z_units,dte);
 		++total_num_not_missing;
 	    }
 	  }
@@ -1872,17 +1738,16 @@ id_types.emplace_back("unknown");
     }
     for (const auto& var : vars) {
 	if (var.name != vars[dgd.indexes.z_var].name && var.name != vars[dgd.indexes.instance_dim_var].name && var.dimids.size() > 0 && var.dimids.back() == vars[dgd.indexes.z_var].dimids.front()) {
-	  de.key=var.name;
 	  netCDFStream::VariableData var_data;
 	  if (istream.variable_data(var.name,var_data) == netCDFStream::NcType::_NULL) {
 	    metautils::log_error("scan_cf_non_orthogonal_profile_netcdf_file() returned error: unable to get data for variable '"+var.name+"'","nc2xml",user);
 	  }
-	  netCDFStream::DataValue miss_val;
-	  extract_from_variable_attribute(var.attrs,long_name,units,var.nc_type,miss_val);
+	  NetCDFVariableAttributeData nc_va_data;
+	  extract_from_variable_attribute(var.attrs,var.nc_type,nc_va_data);
 	  for (size_t n=0; n < times.size(); ++n) {
 	    std::vector<double> lvls;
 	    for (size_t m=0; m < profile_indexes.size(); ++m) {
-		if (profile_indexes[m] == n && !found_missing(times[n],time_miss_val,var_data[m],miss_val)) {
+		if (profile_indexes[m] == n && !found_missing(times[n],&nc_ta_data.missing_value,var_data[m],nc_va_data.missing_value)) {
 		  lvls.emplace_back(levels[m]);
 		}
 	    }
@@ -1895,8 +1760,12 @@ id_types.emplace_back("unknown");
 		else if (ids.type() == netCDFStream::NcType::CHAR) {
 		  ientry.key+=std::string(&(reinterpret_cast<char *>(ids.get()))[n*id_len],id_len);
 		}
-		update_id_table(obs_type_index,lats[n],lons[n],&dt,times[n]);
-		fill_vertical_resolution_data(lvls,dgd.z_pos,dgd.z_units);
+		if (!obs_data.added_to_ids(obs_type,ientry,var.name,lats[n],lons[n],times[n],&dt)) {
+		  metautils::log_error("scan_cf_non_orthogonal_profile_netcdf_file() returned error: '"+myerror+"' when adding ID "+ientry.key,"nc2xml",user);
+		}
+		metadata::ObML::DataTypeEntry dte;
+		ientry.data->data_types_table.found(var.name,dte);
+		fill_vertical_resolution_data(lvls,dgd.z_pos,dgd.z_units,dte);
 		++total_num_not_missing;
 	    }
 	  }
@@ -1905,8 +1774,9 @@ id_types.emplace_back("unknown");
   }
 }
 
-void process_vertical_coordinate_variable(const std::vector<netCDFStream::Attribute>& attrs,DiscreteGeometriesData& dgd,size_t& obs_type_index)
+void process_vertical_coordinate_variable(const std::vector<netCDFStream::Attribute>& attrs,DiscreteGeometriesData& dgd,std::string& obs_type)
 {
+  obs_type="";
   for (size_t n=0; n < attrs.size(); ++n) {
     if (attrs[n].name == "units") {
 	dgd.z_units=*(reinterpret_cast<std::string *>(attrs[n].values));
@@ -1922,31 +1792,30 @@ void process_vertical_coordinate_variable(const std::vector<netCDFStream::Attrib
     auto z_units_l=strutils::to_lower(dgd.z_units);
     if (std::regex_search(dgd.z_units,std::regex("Pa$")) || std::regex_search(z_units_l,std::regex("^mb(ar){0,1}$")) || z_units_l == "millibars") {
 	dgd.z_pos="down";
-	obs_type_index=0;
+	obs_type="upper_air";
     }
   }
   if (dgd.z_pos.empty()) {
     metautils::log_error("process_vertical_coordinate_variable() returned error: unable to determine vertical coordinate direction","nc2xml",user);
   }
-  else if (obs_type_index == 0xffffffff) {
+  else if (obs_type.empty()) {
     if (dgd.z_pos == "up") {
-	obs_type_index=0;
+	obs_type="upper_air";
     }
     else if (dgd.z_pos == "down") {
 	auto z_units_l=strutils::to_lower(dgd.z_units);
 	if (dgd.z_pos == "down" && (std::regex_search(dgd.z_units,std::regex("Pa$")) || std::regex_search(z_units_l,std::regex("^mb(ar){0,1}$")) || z_units_l == "millibars")) {
-	  obs_type_index=0;
+	  obs_type="upper_air";
 	}
     }
   }
 }
 
-void scan_cf_profile_netcdf_file(InputNetCDFStream& istream,bool& found_map,DataTypeMap& datatype_map,std::list<std::string>& var_list)
+void scan_cf_profile_netcdf_file(InputNetCDFStream& istream,std::string platform_type,metadata::ObML::ObservationData& obs_data,NetCDFVariables& nc_vars)
 {
   if (verbose_operation) {
     std::cout << "...beginning function scan_cf_profile_netcdf_file()..." << std::endl;
   }
-  initialize_for_observations();
   auto vars=istream.variables();
   DiscreteGeometriesData dgd;
   for (size_t n=0; n < vars.size(); ++n) {
@@ -1990,23 +1859,23 @@ void scan_cf_profile_netcdf_file(InputNetCDFStream& istream,bool& found_map,Data
 	}
     }
   }
-  size_t obs_type_index=0xffffffff;
+  std::string obs_type;
   if (dgd.indexes.z_var == 0xffffffff) {
     metautils::log_error("scan_cf_profile_netcdf_file() returned error: unable to determine vertical coordinate variable","nc2xml",user);
   }
   else {
-    process_vertical_coordinate_variable(vars[dgd.indexes.z_var].attrs,dgd,obs_type_index);
+    process_vertical_coordinate_variable(vars[dgd.indexes.z_var].attrs,dgd,obs_type);
   }
-  if (obs_type_index == 0xffffffff) {
+  if (obs_type.empty()) {
     metautils::log_error("scan_cf_profile_netcdf_file() returned error: unable to determine observation type","nc2xml",user);
   }
   if (dgd.indexes.sample_dim_var != 0xffffffff || dgd.indexes.instance_dim_var != 0xffffffff) {
 // ex. H.10, H.11
-    scan_cf_non_orthogonal_profile_netcdf_file(istream,dgd,obs_type_index);
+    scan_cf_non_orthogonal_profile_netcdf_file(istream,platform_type,dgd,obs_data,obs_type);
   }
   else {
 // ex. H.8, H.9
-    scan_cf_orthogonal_profile_netcdf_file(istream,dgd,obs_type_index);
+    scan_cf_orthogonal_profile_netcdf_file(istream,platform_type,dgd,obs_data,obs_type);
   }
   write_type=ObML_type;
   if (verbose_operation) {
@@ -2014,10 +1883,9 @@ void scan_cf_profile_netcdf_file(InputNetCDFStream& istream,bool& found_map,Data
   }
 }
 
-void scan_cf_orthogonal_time_series_profile_netcdf_file(InputNetCDFStream& istream,DiscreteGeometriesData& dgd,size_t obs_type_index)
+void scan_cf_orthogonal_time_series_profile_netcdf_file(InputNetCDFStream& istream,std::string platform_type,DiscreteGeometriesData& dgd,metadata::ObML::ObservationData& obs_data,std::string obs_type)
 {
   size_t id_len=1;
-  std::string platform_type="unknown";
   std::string id_type="unknown";
   netCDFStream::VariableData times,lats,lons,ids,levels;
   auto vars=istream.variables();
@@ -2040,8 +1908,9 @@ void scan_cf_orthogonal_time_series_profile_netcdf_file(InputNetCDFStream& istre
 	id_cache.emplace_back(strutils::ftos(ids[n]));
 platform_types.emplace_back("unknown");
 id_types.emplace_back("unknown");
-	pentry.key=platform_types[n];
-	update_platform_table(obs_type_index,lats[n],lons[n]);
+	if (!obs_data.added_to_platforms(obs_type,platform_types[n],lats[n],lons[n])) {
+	  metautils::log_error("scan_cf_point_netcdf_file() returned error: '"+myerror+"' when adding platform "+obs_type+" "+platform_types[n],"nc2xml",user);
+	}
     }
   }
   else if (ids.type() == netCDFStream::NcType::CHAR) {
@@ -2051,8 +1920,9 @@ id_types.emplace_back("unknown");
 	id_cache.emplace_back(&idbuf[n*id_len],id_len);
 platform_types.emplace_back("unknown");
 id_types.emplace_back("unknown");
-	pentry.key=platform_types[n];
-	update_platform_table(obs_type_index,lats[n],lons[n]);
+	if (!obs_data.added_to_platforms(obs_type,platform_types[n],lats[n],lons[n])) {
+	  metautils::log_error("scan_cf_point_netcdf_file() returned error: '"+myerror+"' when adding platform "+obs_type+" "+platform_types[n],"nc2xml",user);
+	}
     }
   }
   else {
@@ -2061,17 +1931,14 @@ id_types.emplace_back("unknown");
   if (istream.variable_data(vars[dgd.indexes.z_var].name,levels) == netCDFStream::NcType::_NULL) {
     metautils::log_error("scan_cf_orthogonal_time_series_profile_netcdf_file() returned error: unable to get level data","nc2xml",user);
   }
-  netCDFStream::DataValue time_miss_val;
   for (const auto& var : vars) {
     if (var.dimids.size() == 3 && var.dimids[0] == vars[dgd.indexes.time_var].dimids[0] && var.dimids[1] == vars[dgd.indexes.z_var].dimids[0] && var.dimids[2] == vars[dgd.indexes.stn_id_var].dimids[0]) {
-	de.key=var.name;
 	netCDFStream::VariableData var_data;
 	if (istream.variable_data(var.name,var_data) == netCDFStream::NcType::_NULL) {
 	  metautils::log_error("scan_cf_non_orthogonal_profile_netcdf_file() returned error: unable to get data for variable '"+var.name+"'","nc2xml",user);
 	}
-	std::string long_name,units;
-	netCDFStream::DataValue miss_val;
-	extract_from_variable_attribute(var.attrs,long_name,units,var.nc_type,miss_val);
+	NetCDFVariableAttributeData nc_va_data;
+	extract_from_variable_attribute(var.attrs,var.nc_type,nc_va_data);
 	for (size_t n=0; n < times.size(); ++n) {
 	  auto dt=compute_nc_time(times,n);
 	  size_t num_stns=ids.size()/id_len;
@@ -2080,15 +1947,19 @@ id_types.emplace_back("unknown");
 	    std::vector<double> lvls;
 	    auto vidx=voff+m;
 	    for (size_t l=0; l < levels.size(); ++l) {
-		if (!found_missing(times[n],time_miss_val,var_data[vidx],miss_val)) {
+		if (!found_missing(times[n],nullptr,var_data[vidx],nc_va_data.missing_value)) {
 		  lvls.emplace_back(levels[l]);
 		}
 		vidx+=num_stns;
 	    }
 	    if (lvls.size() > 0) {
 		ientry.key=platform_types[m]+"[!]"+id_types[m]+"[!]"+id_cache[m];
-		update_id_table(obs_type_index,lats[m],lons[m],&dt,times[n]);
-		fill_vertical_resolution_data(lvls,dgd.z_pos,dgd.z_units);
+		if (!obs_data.added_to_ids(obs_type,ientry,var.name,lats[m],lons[m],times[n],&dt)) {
+		  metautils::log_error("scan_cf_non_orthogonal_profile_netcdf_file() returned error: '"+myerror+"' when adding ID "+ientry.key,"nc2xml",user);
+		}
+		metadata::ObML::DataTypeEntry dte;
+		ientry.data->data_types_table.found(var.name,dte);
+		fill_vertical_resolution_data(lvls,dgd.z_pos,dgd.z_units,dte);
 		++total_num_not_missing;
 	    }
 	  }
@@ -2097,10 +1968,9 @@ id_types.emplace_back("unknown");
   }
 }
 
-void scan_cf_non_orthogonal_time_series_profile_netcdf_file(InputNetCDFStream& istream,DiscreteGeometriesData& dgd,size_t obs_type_index)
+void scan_cf_non_orthogonal_time_series_profile_netcdf_file(InputNetCDFStream& istream,std::string platform_type,DiscreteGeometriesData& dgd,metadata::ObML::ObservationData& obs_data,std::string obs_type)
 {
   size_t id_len=1;
-  std::string platform_type="unknown";
   std::string id_type="unknown";
   netCDFStream::VariableData times,lats,lons,ids,levels;
   auto vars=istream.variables();
@@ -2123,8 +1993,9 @@ void scan_cf_non_orthogonal_time_series_profile_netcdf_file(InputNetCDFStream& i
 	id_cache.emplace_back(strutils::ftos(ids[n]));
 platform_types.emplace_back("unknown");
 id_types.emplace_back("unknown");
-	pentry.key=platform_types[n];
-	update_platform_table(obs_type_index,lats[n],lons[n]);
+	if (!obs_data.added_to_platforms(obs_type,platform_types[n],lats[n],lons[n])) {
+	  metautils::log_error("scan_cf_point_netcdf_file() returned error: '"+myerror+"' when adding platform "+obs_type+" "+platform_types[n],"nc2xml",user);
+	}
     }
   }
   else if (ids.type() == netCDFStream::NcType::CHAR) {
@@ -2134,8 +2005,9 @@ id_types.emplace_back("unknown");
 	id_cache.emplace_back(&idbuf[n*id_len],id_len);
 platform_types.emplace_back("unknown");
 id_types.emplace_back("unknown");
-	pentry.key=platform_types[n];
-	update_platform_table(obs_type_index,lats[n],lons[n]);
+	if (!obs_data.added_to_platforms(obs_type,platform_types[n],lats[n],lons[n])) {
+	  metautils::log_error("scan_cf_point_netcdf_file() returned error: '"+myerror+"' when adding platform "+obs_type+" "+platform_types[n],"nc2xml",user);
+	}
     }
   }
   else {
@@ -2159,31 +2031,32 @@ id_types.emplace_back("unknown");
     if (row_sizes.size() != station_indexes.size()) {
 	metautils::log_error("scan_cf_non_orthogonal_time_series_profile_netcdf_file() returned error: sample dimension and instance dimension have different sizes","nc2xml",user);
     }
-    netCDFStream::DataValue time_miss_val;
     for (const auto& var : vars) {
 	if (var.dimids.front() == vars[dgd.indexes.z_var].dimids.front() && var.name != vars[dgd.indexes.z_var].name) {
-	  de.key=var.name;
 	  netCDFStream::VariableData var_data;
 	  if (istream.variable_data(var.name,var_data) == netCDFStream::NcType::_NULL) {
 	    metautils::log_error("scan_cf_non_orthogonal_profile_netcdf_file() returned error: unable to get data for variable '"+var.name+"'","nc2xml",user);
 	  }
-	  std::string long_name,units;
-	  netCDFStream::DataValue miss_val;
-	  extract_from_variable_attribute(var.attrs,long_name,units,var.nc_type,miss_val);
+	  NetCDFVariableAttributeData nc_va_data;
+	  extract_from_variable_attribute(var.attrs,var.nc_type,nc_va_data);
 	  auto off=0;
 	  for (size_t n=0; n < row_sizes.size(); ++n) {
 	    auto dt=compute_nc_time(times,n);
 	    std::vector<double> lvls;
 	    for (size_t m=0; m < row_sizes[n]; ++m) {
-		if (!found_missing(times[n],time_miss_val,var_data[off],miss_val)) {
+		if (!found_missing(times[n],nullptr,var_data[off],nc_va_data.missing_value)) {
 		  lvls.emplace_back(levels[off]);
 		}
 		++off;
 	    }
 	    if (lvls.size() > 0) {
 		ientry.key=platform_types[station_indexes[n]]+"[!]"+id_types[station_indexes[n]]+"[!]"+id_cache[station_indexes[n]];
-		update_id_table(obs_type_index,lats[station_indexes[n]],lons[station_indexes[n]],&dt,times[n]);
-		fill_vertical_resolution_data(lvls,dgd.z_pos,dgd.z_units);
+		if (!obs_data.added_to_ids(obs_type,ientry,var.name,lats[station_indexes[n]],lons[station_indexes[n]],times[n],&dt)) {
+		  metautils::log_error("scan_cf_non_orthogonal_profile_netcdf_file() returned error: '"+myerror+"' when adding ID "+ientry.key,"nc2xml",user);
+		}
+		metadata::ObML::DataTypeEntry dte;
+		ientry.data->data_types_table.found(var.name,dte);
+		fill_vertical_resolution_data(lvls,dgd.z_pos,dgd.z_units,dte);
 		++total_num_not_missing;
 	    }
 	  }
@@ -2195,23 +2068,20 @@ id_types.emplace_back("unknown");
     auto ntimes=dims[vars[dgd.indexes.time_var].dimids.back()].length;
     auto nlvls=dims[vars[dgd.indexes.z_var].dimids.back()].length;
     auto stn_size=ntimes*nlvls;
-    netCDFStream::DataValue time_miss_val;
     for (const auto& var : vars) {
 	if (var.name != vars[dgd.indexes.z_var].name && ((var.dimids.size() == 3 && var.dimids[0] == vars[dgd.indexes.stn_id_var].dimids.front() && var.dimids[1] == vars[dgd.indexes.time_var].dimids.back() && var.dimids[2] == vars[dgd.indexes.z_var].dimids.back()) || (var.dimids.size() == 2 && var.dimids[0] == vars[dgd.indexes.time_var].dimids.back() && var.dimids[1] == vars[dgd.indexes.z_var].dimids.back()))) {
-	  de.key=var.name;
 	  netCDFStream::VariableData var_data;
 	  if (istream.variable_data(var.name,var_data) == netCDFStream::NcType::_NULL) {
 	    metautils::log_error("scan_cf_non_orthogonal_profile_netcdf_file() returned error: unable to get data for variable '"+var.name+"'","nc2xml",user);
 	  }
-	  std::string long_name,units;
-	  netCDFStream::DataValue miss_val;
-	  extract_from_variable_attribute(var.attrs,long_name,units,var.nc_type,miss_val);
+	  NetCDFVariableAttributeData nc_va_data;
+	  extract_from_variable_attribute(var.attrs,var.nc_type,nc_va_data);
 	  for (size_t n=0; n < var_data.size(); ) {
 	    auto stn_idx=n/stn_size;
 	    for (size_t m=0; m < ntimes; ++m) {
 		std::vector<double> lvls;
 		for (size_t l=0; l < nlvls; ++l,++n) {
-		  if (!found_missing(times[n],time_miss_val,var_data[n],miss_val)) {
+		  if (!found_missing(times[n],nullptr,var_data[n],nc_va_data.missing_value)) {
 		    if (levels.size() == var_data.size()) {
 			lvls.emplace_back(levels[n]);
 		    }
@@ -2227,14 +2097,20 @@ id_types.emplace_back("unknown");
 		  ientry.key=platform_types[stn_idx]+"[!]"+id_types[stn_idx]+"[!]"+id_cache[stn_idx];
 		  if (times.size() == ntimes) {
 		    auto dt=compute_nc_time(times,m);
-		    update_id_table(obs_type_index,lats[stn_idx],lons[stn_idx],&dt,times[m]);
+		    if (!obs_data.added_to_ids(obs_type,ientry,var.name,lats[stn_idx],lons[stn_idx],times[m],&dt)) {
+			metautils::log_error("scan_cf_non_orthogonal_profile_netcdf_file() returned error: '"+myerror+"' when adding ID "+ientry.key,"nc2xml",user);
+		    }
 		  }
 		  else {
 		    auto t_idx=stn_idx*ntimes+m;
 		    auto dt=compute_nc_time(times,t_idx);
-		    update_id_table(obs_type_index,lats[stn_idx],lons[stn_idx],&dt,times[t_idx]);
+		    if (!obs_data.added_to_ids(obs_type,ientry,var.name,lats[stn_idx],lons[stn_idx],times[t_idx],&dt)) {
+			metautils::log_error("scan_cf_non_orthogonal_profile_netcdf_file() returned error: '"+myerror+"' when adding ID "+ientry.key,"nc2xml",user);
+		    }
 		  }
-		  fill_vertical_resolution_data(lvls,dgd.z_pos,dgd.z_units);
+		  metadata::ObML::DataTypeEntry dte;
+		  ientry.data->data_types_table.found(var.name,dte);
+		  fill_vertical_resolution_data(lvls,dgd.z_pos,dgd.z_units,dte);
 		  ++total_num_not_missing;
 		}
 	    }
@@ -2244,12 +2120,11 @@ id_types.emplace_back("unknown");
   }
 }
 
-void scan_cf_time_series_profile_netcdf_file(InputNetCDFStream& istream,bool& found_map,DataTypeMap& datatype_map,std::list<std::string>& var_list)
+void scan_cf_time_series_profile_netcdf_file(InputNetCDFStream& istream,std::string platform_type,metadata::ObML::ObservationData& obs_data,NetCDFVariables& nc_vars)
 {
   if (verbose_operation) {
     std::cout << "...beginning function scan_cf_time_series_profile_netcdf_file()..." << std::endl;
   }
-  initialize_for_observations();
   auto vars=istream.variables();
   DiscreteGeometriesData dgd;
   for (size_t n=0; n < vars.size(); ++n) {
@@ -2293,23 +2168,23 @@ void scan_cf_time_series_profile_netcdf_file(InputNetCDFStream& istream,bool& fo
 	}
     }
   }
-  size_t obs_type_index=0xffffffff;
+  std::string obs_type;
   if (dgd.indexes.z_var == 0xffffffff) {
     metautils::log_error("scan_cf_time_series_profile_netcdf_file() returned error: unable to determine vertical coordinate variable","nc2xml",user);
   }
   else {
-    process_vertical_coordinate_variable(vars[dgd.indexes.z_var].attrs,dgd,obs_type_index);
+    process_vertical_coordinate_variable(vars[dgd.indexes.z_var].attrs,dgd,obs_type);
   }
-  if (obs_type_index == 0xffffffff) {
+  if (obs_type.empty()) {
     metautils::log_error("scan_cf_time_series_profile_netcdf_file() returned error: unable to determine observation type","nc2xml",user);
   }
   if (vars[dgd.indexes.time_var].is_coord && vars[dgd.indexes.z_var].is_coord) {
 // ex. H.17
-    scan_cf_orthogonal_time_series_profile_netcdf_file(istream,dgd,obs_type_index);
+    scan_cf_orthogonal_time_series_profile_netcdf_file(istream,platform_type,dgd,obs_data,obs_type);
   }
   else {
 // ex. H.16, H.18, H.19
-    scan_cf_non_orthogonal_time_series_profile_netcdf_file(istream,dgd,obs_type_index);
+    scan_cf_non_orthogonal_time_series_profile_netcdf_file(istream,platform_type,dgd,obs_data,obs_type);
   }
   write_type=ObML_type;
   if (verbose_operation) {
@@ -2389,7 +2264,7 @@ void fill_grid_projection(Grid::GridDimensions& dim,double *lats,double *lons,Gr
   }
 }
 
-void scan_cf_grid_netcdf_file(InputNetCDFStream& istream,bool& found_map,ParameterMap& parameter_map,std::list<std::string>& var_list,my::map<metautils::StringEntry>& changed_var_table)
+void scan_cf_grid_netcdf_file(InputNetCDFStream& istream,NetCDFVariables& nc_vars)
 {
   std::string sdum;
   std::string timeid;
@@ -2404,7 +2279,7 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream,bool& found_map,Paramet
   std::vector<Grid::GridDefinition> grid_defs;
   DateTime first_valid_date_time(30001231235959),last_valid_date_time(10000101000000);
   LevelMap level_map;
-  my::map<metautils::StringEntry> parameter_table,unique_level_id_table;
+  std::unordered_set<std::string> parameter_table,unique_level_id_table;
   std::string timeboundsid,climo_bounds_name;
   my::map<metautils::NcTime::TimeRangeEntry> tr_table;
   metautils::NcTime::TimeRangeEntry tre;
@@ -2594,7 +2469,7 @@ else {
 		}
 		else {
 		  metautils::StringEntry se;
-		  if (!unique_level_id_table.found(vars[n].name,se)) {
+		  if (unique_level_id_table.find(vars[n].name) == unique_level_id_table.end()) {
 		    levids.emplace_back(vars[n].name+"@@"+sdum);
 		    levtypes.emplace_back(vars[n].nc_type);
 		    levdimids.emplace_back(vars[n].dimids[0]);
@@ -2605,8 +2480,7 @@ else {
 			  descr.emplace_back(*(reinterpret_cast<std::string *>(vars[n].attrs[l].values)));
 			}
 		    }
-		    se.key=vars[n].name;
-		    unique_level_id_table.insert(se);
+		    unique_level_id_table.emplace(vars[n].name);
 		  }
 		}
 	    }
@@ -2988,7 +2862,7 @@ else {
 	for (const auto& tr_key : tr_table.keys()) {
 	  tr_table.found(tr_key,tre);
 	  for (size_t k=0; k < latdimids.size(); ++k) {
-	    std::list<std::string> gentry_keys;
+	    std::vector<std::string> gentry_keys;
 	    add_gridded_lat_lon_keys(gentry_keys,grid_dims[k],grid_defs[k],timeid,timedimid,levdimids[m],latdimids[k],londimids[k],tre,vars);
 	    for (const auto& g_key : gentry_keys) {
 		gentry.key=g_key;
@@ -3002,7 +2876,7 @@ else {
 		  gentry.level_table.clear();
 		  lentry.parameter_code_table.clear();
 		  param_entry.num_time_steps=0;
-		  add_gridded_parameters_to_netcdf_level_entry(vars,gentry.key,timeid,timedimid,levdimids[m],latdimids[k],londimids[k],found_map,tre,parameter_table,var_list,changed_var_table,parameter_map);
+		  add_gridded_parameters_to_netcdf_level_entry(vars,gentry.key,timeid,timedimid,levdimids[m],latdimids[k],londimids[k],tre,parameter_table,nc_vars);
 		  for (size_t n=0; n < num_levels; ++n) {
 		    lentry.key="ds"+meta_args.dsnum+","+levids[m]+":";
 		    switch (levtypes[m]) {
@@ -3061,7 +2935,7 @@ else {
 		    }
 		    if (!gentry.level_table.found(lentry.key,lentry)) {
 			lentry.parameter_code_table.clear();
-			add_gridded_parameters_to_netcdf_level_entry(vars,gentry.key,timeid,timedimid,levdimids[m],latdimids[k],londimids[k],found_map,tre,parameter_table,var_list,changed_var_table,parameter_map);
+			add_gridded_parameters_to_netcdf_level_entry(vars,gentry.key,timeid,timedimid,levdimids[m],latdimids[k],londimids[k],tre,parameter_table,nc_vars);
 			if (lentry.parameter_code_table.size() > 0) {
 			  gentry.level_table.insert(lentry);
 			  if (inv_stream.is_open()) {
@@ -3079,13 +2953,13 @@ else {
 			    time_method=strutils::capitalize(time_method);
 			    if (!lentry.parameter_code_table.found(param_entry.key,param_entry)) {
 				if (time_method.empty() || (floatutils::myequalf(time_bounds_s.t1,0,0.0001) && floatutils::myequalf(time_bounds_s.t1,time_bounds_s.t2,0.0001))) {
-				  add_gridded_netcdf_parameter(vars[l],found_map,tre.data->instantaneous.first_valid_datetime,tre.data->instantaneous.last_valid_datetime,tre.data->num_steps,parameter_table,var_list,changed_var_table,parameter_map);
+				  add_gridded_netcdf_parameter(vars[l],tre.data->instantaneous.first_valid_datetime,tre.data->instantaneous.last_valid_datetime,tre.data->num_steps,parameter_table,nc_vars);
 				}
 				else {
 				  if (time_bounds_s.changed) {
 				    metautils::log_error("time bounds changed","nc2xml",user);
 				  }
-				  add_gridded_netcdf_parameter(vars[l],found_map,tre.data->bounded.first_valid_datetime,tre.data->bounded.last_valid_datetime,tre.data->num_steps,parameter_table,var_list,changed_var_table,parameter_map);
+				  add_gridded_netcdf_parameter(vars[l],tre.data->bounded.first_valid_datetime,tre.data->bounded.last_valid_datetime,tre.data->num_steps,parameter_table,nc_vars);
 				}
 				gentry.level_table.replace(lentry);
 				if (inv_stream.is_open()) {
@@ -3135,10 +3009,10 @@ else {
 	  }
 	}
     }
-    std::list<std::string> map_contents;
-    sdum=unixutils::remote_web_file("https://rda.ucar.edu/metadata/LevelTables/netCDF.ds"+meta_args.dsnum+".xml",tdir->name());
-    if (level_map.fill(sdum)) {
-	std::ifstream ifs(sdum.c_str());
+    std::vector<std::string> map_contents;
+    auto level_map_file=unixutils::remote_web_file("https://rda.ucar.edu/metadata/LevelTables/netCDF.ds"+meta_args.dsnum+".xml",tdir->name());
+    if (level_map.fill(level_map_file)) {
+	std::ifstream ifs(level_map_file.c_str());
 	char line[32768];
 	ifs.getline(line,32768);
 	while (!ifs.eof()) {
@@ -3210,7 +3084,8 @@ struct LIDEntry {
   size_t key;
 };
 
-void scan_wrf_simulation_netcdf_file(InputNetCDFStream& istream,bool& found_map,std::string& map_name,std::list<std::string>& var_list,my::map<metautils::StringEntry>& changed_var_table)
+/*
+void scan_wrf_simulation_netcdf_file(InputNetCDFStream& istream,bool& found_map,std::string& map_name,std::vector<std::string>& var_list,my::map<metautils::StringEntry>& changed_var_table)
 {
   std::ifstream ifs;
   char line[32768];
@@ -3228,10 +3103,10 @@ void scan_wrf_simulation_netcdf_file(InputNetCDFStream& istream,bool& found_map,
   netCDFStream::VariableData var_data;
   double *lats=NULL,*lons=NULL;
   size_t nlats,nlons;
-  std::list<std::string> gentry_keys,map_contents;
+  std::vector<std::string> gentry_keys,map_contents;
   metautils::NcTime::TimeRangeEntry tre;
   my::map<LIDEntry> unique_levdimids_table;
-  std::list<int> levdimids_list;
+  std::vector<int> levdimids;
   LIDEntry lide;
   TempFile *tmpfile=NULL;
   int idx;
@@ -3381,7 +3256,7 @@ void scan_wrf_simulation_netcdf_file(InputNetCDFStream& istream,bool& found_map,
 	  }
 	  if (!unique_levdimids_table.found(lide.key,lide)) {
 	    unique_levdimids_table.insert(lide);
-	    levdimids_list.emplace_back(lide.key);
+	    levdimids.emplace_back(lide.key);
 	  }
 	}
     }
@@ -3400,7 +3275,7 @@ void scan_wrf_simulation_netcdf_file(InputNetCDFStream& istream,bool& found_map,
     ofs << "<?xml version=\"1.0\" ?>" << std::endl;
     ofs << "<levelMap>" << std::endl;
   }
-  for (const auto& levdimid : levdimids_list) {
+  for (const auto& levdimid : levdimids) {
     add_gridded_lat_lon_keys(gentry_keys,dim,def,timeid,timedimid,levdimid,latdimid,londimid,tre,vars);
     if (levdimid == -1) {
 	if (map_contents.size() == 0 || (map_contents.size() > 0 && level_map.is_layer("sfc") < 0)) {
@@ -3449,7 +3324,7 @@ void scan_wrf_simulation_netcdf_file(InputNetCDFStream& istream,bool& found_map,
 	gentry.level_table.clear();
 	lentry.parameter_code_table.clear();
 	param_entry.num_time_steps=0;
-	for (const auto& levdimid : levdimids_list) {
+	for (const auto& levdimid : levdimids) {
 	  add_gridded_parameters_to_netcdf_level_entry(vars,gentry.key,timeid,timedimid,levdimid,latdimid,londimid,found_map,tre,parameter_table,var_list,changed_var_table,parameter_map);
 	  if (lentry.parameter_code_table.size() > 0) {
 	    if (levdimid < 0) {
@@ -3496,7 +3371,7 @@ void scan_wrf_simulation_netcdf_file(InputNetCDFStream& istream,bool& found_map,
     }
     else {
 // existing grid - needs update
-	for (const auto& levdimid : levdimids_list) {
+	for (const auto& levdimid : levdimids) {
 	  if (levdimid < 0) {
 	    lentry.key="ds"+meta_args.dsnum+",sfc:0";
 	    if (!gentry.level_table.found(lentry.key,lentry)) {
@@ -3561,149 +3436,131 @@ void scan_wrf_simulation_netcdf_file(InputNetCDFStream& istream,bool& found_map,
     std::cout << "...function scan_wrf_simulation_netcdf_file() done." << std::endl;
   }
 }
+*/
 
-void scan_cf_netcdf_file(InputNetCDFStream& istream,bool& found_map,std::string& map_name,std::list<std::string>& var_list,my::map<metautils::StringEntry>& changed_var_table)
+void scan_cf_netcdf_file(InputNetCDFStream& istream,metadata::ObML::ObservationData& obs_data,NetCDFVariables& nc_vars)
 {
   auto attrs=istream.global_attributes();
-  std::string feature_type;
+  std::string feature_type,platform;
   for (size_t n=0; n < attrs.size(); ++n) {
     if (attrs[n].name == "featureType") {
 	feature_type=*(reinterpret_cast<std::string *>(attrs[n].values));
+	strutils::trim(feature_type);
+    }
+    else if (attrs[n].name == "platform") {
+	platform=*(reinterpret_cast<std::string *>(attrs[n].values));
+	strutils::trim(platform);
     }
   }
 // rename the parameter map so that it is not overwritten by the level map,
 //   which has the same name
-  if (!map_name.empty()) {
+  if (!nc_vars.map_name.empty()) {
     std::stringstream oss,ess;
-    unixutils::mysystem2("/bin/mv "+map_name+" "+map_name+".p",oss,ess);
+    unixutils::mysystem2("/bin/mv "+nc_vars.map_name+" "+nc_vars.map_name+".p",oss,ess);
     if (!ess.str().empty()) {
 	metautils::log_error("unable to rename parameter map; error - '"+ess.str()+"'","nc2xml",user);
     }
-    map_name+=".p";
+    nc_vars.map_name+=".p";
   }
   if (!feature_type.empty()) {
-    DataTypeMap datatype_map;
-    if (!map_name.empty() && datatype_map.fill(map_name)) {
-	found_map=true;
+    if (!nc_vars.map_name.empty() && nc_vars.datatype_map.fill(nc_vars.map_name)) {
+	nc_vars.map_filled=true;
     }
-    else {
-	found_map=false;
+    std::string platform_type="unknown";
+    if (!platform.empty()) {
+	MySQL::Server server(meta_directives.database_server,meta_directives.metadb_username,meta_directives.metadb_password,"");
+	if (server) {
+	  MySQL::LocalQuery query("ObML_platformType","search.GCMD_platforms","path = '"+platform+"'");
+	  if (query.submit(server) == 0) {
+	    MySQL::Row row;
+	    if (query.fetch_row(row)) {
+		platform_type=row[0];
+	    }
+	  }
+	  server.disconnect();
+	}
     }
     if (feature_type == "point") {
-	scan_cf_point_netcdf_file(istream,found_map,datatype_map,var_list);
+	scan_cf_point_netcdf_file(istream,platform_type,obs_data,nc_vars);
     }
     else if (feature_type == "timeSeries") {
-	scan_cf_time_series_netcdf_file(istream,found_map,datatype_map,var_list);
+	scan_cf_time_series_netcdf_file(istream,platform_type,obs_data,nc_vars);
     }
     else if (feature_type == "profile") {
-	scan_cf_profile_netcdf_file(istream,found_map,datatype_map,var_list);
+	scan_cf_profile_netcdf_file(istream,platform_type,obs_data,nc_vars);
     }
     else if (feature_type == "timeSeriesProfile") {
-	scan_cf_time_series_profile_netcdf_file(istream,found_map,datatype_map,var_list);
+	scan_cf_time_series_profile_netcdf_file(istream,platform_type,obs_data,nc_vars);
     }
     else {
 	metautils::log_error("featureType '"+feature_type+"' not recognized","nc2xml",user);
     }
   }
   else {
-    ParameterMap parameter_map;
-    if (!map_name.empty() && parameter_map.fill(map_name)) {
-	found_map=true;
+    if (!nc_vars.map_name.empty() && nc_vars.parameter_map.fill(nc_vars.map_name)) {
+	nc_vars.map_filled=true;
     }
-    else {
-	found_map=false;
-    }
-    scan_cf_grid_netcdf_file(istream,found_map,parameter_map,var_list,changed_var_table);
+    scan_cf_grid_netcdf_file(istream,nc_vars);
   }
 }
 
-void scan_raf_aircraft_netcdf_file(InputNetCDFStream& istream,bool& found_map,std::string& map_name,std::list<std::string>& var_list,my::map<metautils::StringEntry>& changed_var_table)
+void scan_raf_aircraft_netcdf_file(InputNetCDFStream& istream,metadata::ObML::ObservationData& obs_data,NetCDFVariables& nc_vars)
 {
-  int obs_type_index=-1;
-  size_t n,m,l,k;
-  std::string sdum,timevarname,timeunits,long_name,units,vunits;
-  std::deque<std::string> sp,sp2;
+  std::string timevarname,timeunits,long_name,units,vunits;
   my::map<metautils::StringEntry> coords_table;
-  netCDFStream::VariableData var_data;
-  int time;
-  short yr,mo,dy;
-  DateTime reftime,dt_start,dt_end;
-  double a=0,b=0,*lats=NULL,*lons=NULL,*alts=NULL,max_altitude=-99999.,min_altitude=999999.;
+  DateTime reftime;
   metautils::StringEntry se;
-  std::list<std::string> datatypes_list;
+  std::vector<std::string> datatypes_list;
   bool ignore_as_datatype,ignore_altitude=false;
-  DataTypeMap datatype_map;
 
-  initialize_for_observations();
   auto attrs=istream.global_attributes();
-  for (n=0; n < attrs.size(); ++n) {
+  std::string obs_type,platform_type;
+  for (size_t n=0; n < attrs.size(); ++n) {
     if (attrs[n].name == "Aircraft") {
-	obs_type_index=0;
-	pentry.key="aircraft";
-	sdum=*(reinterpret_cast<std::string *>(attrs[n].values));
-	sp=strutils::split(sdum);
-	ientry.key=pentry.key+"[!]callSign[!]"+metautils::clean_id(sp[0]);
+	obs_type="upper_air";
+	platform_type="aircraft";
+	auto attr_val=*(reinterpret_cast<std::string *>(attrs[n].values));
+	auto val_parts=strutils::split(attr_val);
+	ientry.key=platform_type+"[!]callSign[!]"+metautils::clean_id(val_parts.front());
     }
     else if (attrs[n].name == "coordinates") {
-	sdum=*(reinterpret_cast<std::string *>(attrs[n].values));
-	sp=strutils::split(sdum);
-	for (m=0; m < sp.size(); ++m) {
-	  se.key=sp[m];
+	auto attr_val=*(reinterpret_cast<std::string *>(attrs[n].values));
+	auto val_parts=strutils::split(attr_val);
+	for (size_t m=0; m < val_parts.size(); ++m) {
+	  se.key=val_parts[m];
 	  coords_table.insert(se);
 	}
     }
   }
-  if (obs_type_index >= 0) {
+  if (!obs_type.empty()) {
     if (coords_table.size() == 0) {
 	metautils::log_error("scan_raf_aircraft_netcdf_file() returned error: unable to determine variable coordinates","nc2xml",user);
     }
-    ientry.data.reset(new metadata::ObML::IDEntry::Data);
-    ientry.data->N_lat=-99.;
-    ientry.data->S_lat=99.;
-    ientry.data->W_lon=999.;
-    ientry.data->E_lon=-999;
-    ientry.data->min_lon_bitmap.reset(new float[360]);
-    ientry.data->max_lon_bitmap.reset(new float[360]);
-    for (n=0; n < 360; ++n) {
-	ientry.data->min_lon_bitmap[n]=ientry.data->max_lon_bitmap[n]=999.;
-    }
-    ientry.data->start.set(3000,12,31,235959);
-    ientry.data->end.set(1000,1,1,0);
-    ID_table[obs_type_index]->insert(ientry);
-    pentry.boxflags.reset(new summarizeMetadata::BoxFlags);
-    pentry.boxflags->initialize(361,180,0,0);
-    platform_table[obs_type_index].insert(pentry);
   }
   else {
     metautils::log_error("scan_raf_aircraft_netcdf_file() returned error: file does not appear to be NCAR-RAF/nimbus compliant netCDF","nc2xml",user);
   }
-  map_name=unixutils::remote_web_file("https://rda.ucar.edu/metadata/ParameterTables/netCDF.ds"+meta_args.dsnum+".xml",tdir->name());
-  if (datatype_map.fill(map_name)) {
-    found_map=true;
+  if (nc_vars.datatype_map.fill(nc_vars.map_name)) {
+    nc_vars.map_filled=true;
   }
-  else {
-    found_map=false;
-  }
+  netCDFStream::VariableData time_data,lat_data,lon_data,alt_data;
   auto vars=istream.variables();
-  for (n=0; n < vars.size(); ++n) {
+  for (size_t n=0; n < vars.size(); ++n) {
     ignore_as_datatype=false;
     long_name="";
     units="";
-    for (m=0; m < vars[n].attrs.size(); ++m) {
+    for (size_t m=0; m < vars[n].attrs.size(); ++m) {
 	if (vars[n].attrs[m].name == "long_name" || vars[n].attrs[m].name == "standard_name") {
-	  sdum=*(reinterpret_cast<std::string *>(vars[n].attrs[m].values));
+	  auto attr_val=*(reinterpret_cast<std::string *>(vars[n].attrs[m].values));
 	  if (vars[n].attrs[m].name == "long_name") {
-	    long_name=sdum;
+	    long_name=attr_val;
 	  }
-	  sdum=strutils::to_lower(sdum);
-	  if (std::regex_search(sdum,std::regex("time"))) {
+	  attr_val=strutils::to_lower(attr_val);
+	  if (std::regex_search(attr_val,std::regex("time"))) {
 	    timevarname=vars[n].name;
-	    istream.variable_data(vars[n].name,var_data);
-	    ientry.data->nsteps=var_data.size();
-	    a=var_data.front();
-	    b=var_data.back();
+	    istream.variable_data(vars[n].name,time_data);
 	  }
-	  else if (std::regex_search(sdum,std::regex("latitude")) || std::regex_search(sdum,std::regex("longitude")) || std::regex_search(sdum,std::regex("altitude"))) {
+	  else if (std::regex_search(attr_val,std::regex("latitude")) || std::regex_search(attr_val,std::regex("longitude")) || std::regex_search(attr_val,std::regex("altitude"))) {
 	    ignore_as_datatype=true;
 	  }
 	}
@@ -3711,168 +3568,117 @@ void scan_raf_aircraft_netcdf_file(InputNetCDFStream& istream,bool& found_map,st
 	  units=*(reinterpret_cast<std::string *>(vars[n].attrs[m].values));
 	}
 	if (vars[n].name == timevarname && vars[n].attrs[m].name == "units") {
-	  sdum=*(reinterpret_cast<std::string *>(vars[n].attrs[m].values));
-	  sp=strutils::split(sdum);
-	  if (sp.size() < 4 || sp[1] != "since") {
-	    metautils::log_error("scan_raf_aircraft_netcdf_file() returned error: bad units '"+sdum+"' on time variable","nc2xml",user);
+	  auto attr_val=*(reinterpret_cast<std::string *>(vars[n].attrs[m].values));
+	  auto val_parts=strutils::split(attr_val);
+	  if (val_parts.size() < 4 || val_parts[1] != "since") {
+	    metautils::log_error("scan_raf_aircraft_netcdf_file() returned error: bad units '"+attr_val+"' on time variable","nc2xml",user);
 	  }
-	  timeunits=sp[0];
-	  sp2=strutils::split(sp[2],"-");
-	  if (sp2.size() != 3) {
+	  timeunits=val_parts[0];
+	  auto date_parts=strutils::split(val_parts[2],"-");
+	  if (date_parts.size() != 3) {
 	    metautils::log_error("scan_raf_aircraft_netcdf_file() returned error: bad units on time variable","nc2xml",user);
 	  }
-	  yr=std::stoi(sp2[0]);
-	  mo=std::stoi(sp2[1]);
-	  dy=std::stoi(sp2[2]);
-	  sp2=strutils::split(sp[3],":");
-	  if (sp2.size() != 3) {
+	  auto yr=std::stoi(date_parts[0]);
+	  auto mo=std::stoi(date_parts[1]);
+	  auto dy=std::stoi(date_parts[2]);
+	  auto time_parts=strutils::split(date_parts[3],":");
+	  if (time_parts.size() != 3) {
 	    metautils::log_error("scan_raf_aircraft_netcdf_file() returned error: bad units on time variable","nc2xml",user);
 	  }
-	  time=std::stoi(sp2[0])*10000+std::stoi(sp2[1])*100+std::stoi(sp2[2]);
+	  auto time=std::stoi(time_parts[0])*10000+std::stoi(time_parts[1])*100+std::stoi(time_parts[2]);
 	  reftime.set(yr,mo,dy,time);
 	}
     }
-    sdum=strutils::to_lower(vars[n].name);
-    if (std::regex_search(sdum,std::regex("lat")) && coords_table.found(vars[n].name,se)) {
-	istream.variable_data(vars[n].name,var_data);
-	lats=new double[var_data.size()];
-	for (m=0; m < static_cast<size_t>(var_data.size()); ++m) {
-	   lats[m]=var_data[m];
-	}
+    auto var_name_l=strutils::to_lower(vars[n].name);
+    if (std::regex_search(var_name_l,std::regex("lat")) && coords_table.found(vars[n].name,se)) {
+	istream.variable_data(vars[n].name,lat_data);
     }
-    else if (std::regex_search(sdum,std::regex("lon")) && coords_table.found(vars[n].name,se)) {
-	istream.variable_data(vars[n].name,var_data);
-	lons=new double[var_data.size()];
-	for (m=0; m < static_cast<size_t>(var_data.size()); ++m) {
-	  lons[m]=var_data[m];
-	}
+    else if (std::regex_search(var_name_l,std::regex("lon")) && coords_table.found(vars[n].name,se)) {
+	istream.variable_data(vars[n].name,lon_data);
     }
-    else if (std::regex_search(sdum,std::regex("alt")) && coords_table.found(vars[n].name,se)) {
-	for (m=0; m < vars[n].attrs.size(); ++m) {
+    else if (std::regex_search(var_name_l,std::regex("alt")) && coords_table.found(vars[n].name,se)) {
+	for (size_t m=0; m < vars[n].attrs.size(); ++m) {
 	  if (vars[n].attrs[m].name == "units") {
 	    vunits=*(reinterpret_cast<std::string *>(vars[n].attrs[m].values));
 	  }
 	}
-	istream.variable_data(vars[n].name,var_data);
-	alts=new double[var_data.size()];
-	for (m=0; m < static_cast<size_t>(var_data.size()); ++m) {
-	  alts[m]=var_data[m];
-	}
+	istream.variable_data(vars[n].name,alt_data);
     }
     else if (!ignore_as_datatype && !coords_table.found(vars[n].name,se)) {
-	sdum=vars[n].name+"<!>"+long_name+"<!>";
+	auto datatype=vars[n].name+"<!>"+long_name+"<!>";
 	if (!units.empty()) {
-	  sdum+="<nobr>"+units+"</nobr>";
+	  datatype+="<nobr>"+units+"</nobr>";
 	}
-	datatypes_list.emplace_back(sdum);
+	datatypes_list.emplace_back(datatype);
     }
   }
-  if (timeunits == "seconds") {
-    dt_start=reftime.seconds_added(a);
-    dt_end=reftime.seconds_added(b);
-  }
-  else if (timeunits == "minutes") {
-    dt_start=reftime.minutes_added(a);
-    dt_end=reftime.minutes_added(b);
+  size_t seconds_mult=1;
+  if (timeunits == "minutes") {
+    seconds_mult=60;
   }
   else if (timeunits == "hours") {
-    dt_start=reftime.hours_added(a);
-    dt_end=reftime.hours_added(b);
+    seconds_mult=3600;
   }
   else {
     metautils::log_error("scan_raf_aircraft_netcdf_file() returned error: bad time units '"+timeunits+"' on time variable","nc2xml",user);
   }
-  if (dt_start < ientry.data->start) {
-    ientry.data->start=dt_start;
-  }
-  if (dt_end > ientry.data->end) {
-    ientry.data->end=dt_end;
-  }
-  for (n=0; n < ientry.data->nsteps; ++n) {
+  double max_altitude=-99999.,min_altitude=999999.;
+  for (size_t n=0; n < time_data.size(); ++n) {
     ++total_num_not_missing;
-    if (lats[n] > ientry.data->N_lat) {
-	ientry.data->N_lat=lats[n];
+    if (!obs_data.added_to_platforms(obs_type,platform_type,lat_data[n],lon_data[n])) {
+	metautils::log_error("scan_cf_point_netcdf_file() returned error: '"+myerror+"' when adding platform "+obs_type+" "+platform_type,"nc2xml",user);
     }
-    if (lats[n] < ientry.data->S_lat) {
-	ientry.data->S_lat=lats[n];
-    }
-    if (lons[n] > ientry.data->E_lon) {
-	ientry.data->E_lon=lons[n];
-    }
-    if (lons[n] < ientry.data->W_lon) {
-	ientry.data->W_lon=lons[n];
-    }
-    geoutils::convert_lat_lon_to_box(1,0.,lons[n],l,k);
-    if (ientry.data->min_lon_bitmap[k] > 900.) {
-	ientry.data->min_lon_bitmap[k]=ientry.data->max_lon_bitmap[k]=lons[n];
-    }
-    else {
-	if (lons[n] < ientry.data->min_lon_bitmap[k]) {
-	  ientry.data->min_lon_bitmap[k]=lons[n];
-	}
-	if (lons[n] > ientry.data->max_lon_bitmap[k]) {
-	  ientry.data->max_lon_bitmap[k]=lons[n];
+    DateTime dt=reftime.seconds_added(time_data[n]*seconds_mult);
+    for (const auto& var : datatypes_list) {
+	auto datatype=var.substr(0,var.find("<!>"));
+	if (!obs_data.added_to_ids(obs_type,ientry,datatype,lat_data[n],lon_data[n],time_data[n],&dt)) {
+	  metautils::log_error("scan_raf_aircraft_netcdf_file() returned error: '"+myerror+"' when adding ID "+ientry.key,"nc2xml",user);
 	}
     }
-    if (lats[n] == -90.) {
-	pentry.boxflags->spole=1;
-    }
-    else if (lats[n] == 90.) {
-	pentry.boxflags->npole=1;
-    }
-    else {
-	geoutils::convert_lat_lon_to_box(1,lats[n],lons[n],l,k);
-	pentry.boxflags->flags[l-1][k]=1;
-	pentry.boxflags->flags[l-1][360]=1;
-    }
-    if (alts != NULL) {
-	if (alts[n] > max_altitude) {
-	  max_altitude=alts[n];
+    if (alt_data.size() > 0) {
+	if (alt_data[n] > max_altitude) {
+	  max_altitude=alt_data[n];
 	}
-	if (alts[n] < min_altitude) {
-	  min_altitude=alts[n];
+	if (alt_data[n] < min_altitude) {
+	  min_altitude=alt_data[n];
 	}
-	delete[] alts;
     }
     else {
 	ignore_altitude=true;
     }
   }
-  delete[] lats;
-  delete[] lons;
   for (const auto& type : datatypes_list) {
-    de.key=type.substr(0,type.find("<!>"));
-    if (!ientry.data->data_types_table.found(de.key,de)) {
-	de.data.reset(new metadata::ObML::DataTypeEntry::Data);
+    metadata::ObML::DataTypeEntry dte;
+    dte.key=type.substr(0,type.find("<!>"));
+    if (!ientry.data->data_types_table.found(dte.key,dte)) {
+	dte.data.reset(new metadata::ObML::DataTypeEntry::Data);
 	if (!ignore_altitude) {
-	  if (de.data->vdata == nullptr) {
-	    de.data->vdata.reset(new metadata::ObML::DataTypeEntry::Data::VerticalData);
+	  if (dte.data->vdata == nullptr) {
+	    dte.data->vdata.reset(new metadata::ObML::DataTypeEntry::Data::VerticalData);
 	  }
-	  de.data->vdata->max_altitude=-99999.;
-	  de.data->vdata->min_altitude=999999.;
-	  de.data->vdata->avg_nlev=0;
-	  de.data->vdata->avg_res=0.;
-	  de.data->vdata->res_cnt=1;
+	  dte.data->vdata->max_altitude=-99999.;
+	  dte.data->vdata->min_altitude=999999.;
+	  dte.data->vdata->avg_nlev=0;
+	  dte.data->vdata->avg_res=0.;
+	  dte.data->vdata->res_cnt=1;
 	}
-	ientry.data->data_types_table.insert(de);
+	ientry.data->data_types_table.insert(dte);
     }
-    de.data->nsteps+=ientry.data->nsteps;
+    dte.data->nsteps+=ientry.data->nsteps;
     if (!ignore_altitude) {
-	if (max_altitude > de.data->vdata->max_altitude) {
-	  de.data->vdata->max_altitude=max_altitude;
+	if (max_altitude > dte.data->vdata->max_altitude) {
+	  dte.data->vdata->max_altitude=max_altitude;
 	}
-	if (min_altitude < de.data->vdata->min_altitude) {
-	  de.data->vdata->min_altitude=min_altitude;
+	if (min_altitude < dte.data->vdata->min_altitude) {
+	  dte.data->vdata->min_altitude=min_altitude;
 	}
-	de.data->vdata->avg_nlev+=ientry.data->nsteps;
-	de.data->vdata->units=vunits;
+	dte.data->vdata->avg_nlev+=ientry.data->nsteps;
+	dte.data->vdata->units=vunits;
     }
-    sdum=datatype_map.description(de.key);
-    if (!found_map || sdum.empty()) {
-	se.key=type;
-	if (!datatype_table.found(se.key,se)) {
-	  datatype_table.insert(se);
-	  var_list.emplace_back(se.key);
+    auto descr=nc_vars.datatype_map.description(dte.key);
+    if (descr.empty()) {
+	if (std::find(nc_vars.netcdf_variables.begin(),nc_vars.netcdf_variables.end(),type) == nc_vars.netcdf_variables.end()) {
+	  nc_vars.netcdf_variables.emplace_back(type);
 	}
     }
   }
@@ -3905,22 +3711,170 @@ void set_time_missing_value(netCDFStream::DataValue& time_miss_val,std::vector<I
   }
 }
 
+void scan_npn_netcdf_file(InputNetCDFStream& istream,metadata::ObML::ObservationData& obs_data,NetCDFVariables& nc_vars)
+{
+  if (verbose_operation) {
+    std::cout << "...beginning function scan_npn_netcdf_file()..." << std::endl;
+  }
+  auto dims=istream.dimensions();
+  auto vars=istream.variables();
+  size_t id_dim=0,id_len=0,low_level_dim=0,high_level_dim=0;
+  for (size_t n=0; n < vars.size(); ++n) {
+    if (vars[n].name == "id") {
+	id_dim=vars[n].dimids.front();
+	id_len=dims[vars[n].dimids.back()].length;
+    }
+    else if (vars[n].name == "low_level") {
+	low_level_dim=vars[n].dimids.front();
+    }
+    else if (vars[n].name == "high_level") {
+	high_level_dim=vars[n].dimids.front();
+    }
+  }
+  netCDFStream::VariableData ids;
+  istream.variable_data("id",ids);
+  if (ids.size() == 0) {
+    std::cerr << "Error: station ID variable could not be identified" << std::endl;
+    exit(1);
+  }
+  std::vector<std::string> station_ids;
+  size_t end=ids.size()/id_len;
+  for (size_t n=0; n < end; ++n) {
+    auto c=reinterpret_cast<char *>(ids.get());
+    if (c[n*id_len] == netCDFStream::CHAR_NOT_SET) {
+	station_ids.emplace_back("");
+    }
+    else {
+	station_ids.emplace_back(&c[n*id_len],id_len);
+	strutils::trim(station_ids.back());
+    }
+  }
+  netCDFStream::VariableData lats;
+  istream.variable_data("lat",lats);
+  if (lats.size() == 0) {
+    std::cerr << "Error: latitude variable could not be identified" << std::endl;
+    exit(1);
+  }
+  netCDFStream::VariableData lons;
+  istream.variable_data("lon",lons);
+  if (lons.size() == 0) {
+    std::cerr << "Error: longitude variable could not be identified" << std::endl;
+    exit(1);
+  }
+  netCDFStream::VariableData low_levels;
+  istream.variable_data("low_level",low_levels);
+  if (low_levels.size() == 0) {
+    std::cerr << "Error: 'low_level' variable could not be identified" << std::endl;
+    exit(1);
+  }
+  netCDFStream::VariableData high_levels;
+  istream.variable_data("high_level",high_levels);
+  if (high_levels.size() == 0) {
+    std::cerr << "Error: 'high_level' variable could not be identified" << std::endl;
+    exit(1);
+  }
+  if (nc_vars.datatype_map.fill(nc_vars.map_name)) {
+    nc_vars.map_filled=true;
+  }
+  short yr,mo,dy;
+  size_t time;
+  netCDFStream::VariableData v;
+  istream.variable_data("year",v);
+  yr=v.front();
+  istream.variable_data("month",v);
+  mo=v.front();
+  istream.variable_data("day",v);
+  dy=v.front();
+  istream.variable_data("hour",v);
+  time=v.front()*10000;
+  istream.variable_data("minute",v);
+  time+=v.front()*100+99;
+  DateTime dt(yr,mo,dy,time,0);
+  auto timestamp=dt.minutes_since(DateTime(1950,1,1,0,0));
+  std::regex azim_re("^azim"),elev_re("^elev");
+  for (const auto& var : vars) {
+    if (var.dimids.size() > 0 && var.dimids.front() == id_dim) {
+	std::string observation_type;
+	if (var.dimids.size() == 1 && var.name != "lat" && var.name != "lon" && !std::regex_search(var.name,azim_re) && !std::regex_search(var.name,elev_re)) {
+	  observation_type="surface";
+	}
+	else if (var.dimids.size() == 2 && (var.dimids.back() == low_level_dim || var.dimids.back() == high_level_dim)) {
+	  observation_type="upper_air";
+	}
+	if (!observation_type.empty()) {
+	  netCDFStream::VariableData var_data;
+	  istream.variable_data(var.name,var_data);
+	  const netCDFStream::VariableData& level_ref= (var.dimids.back() == low_level_dim) ? low_levels : high_levels;
+	  for (size_t n=0; n < station_ids.size(); ++n) {
+	    if (!station_ids[n].empty()) {
+		std::vector<double> levels;
+		auto not_missing=false;
+		if (var_data.size() == station_ids.size()) {
+		  if (var_data[n] > -1.e30 && var_data[n] < 1.e30) {
+		    not_missing=true;
+		  }
+		}
+		else {
+		  size_t num_levels=var_data.size()/station_ids.size();
+		  size_t end=(n+1)*num_levels;
+		  for (size_t m=n*num_levels,l=0; m < end; ++m) {
+		    if (var_data[m] > -1.e30 && var_data[m] < 1.e30) {
+			not_missing=true;
+			levels.emplace_back(level_ref[l]);
+		    }
+		    ++l;
+		  }
+		}
+		if (not_missing) {
+		  if (!obs_data.added_to_platforms(observation_type,"wind_profiler",lats[n],-lons[n])) {
+		    metautils::log_error("scan_cf_point_netcdf_file() returned error: '"+myerror+"' when adding platform "+observation_type,"nc2xml",user);
+		  }
+		  ientry.key="wind_profiler[!]NOAA[!]"+station_ids[n];
+		  if (!obs_data.added_to_ids(observation_type,ientry,var.name,lats[n],-lons[n],timestamp,&dt)) {
+		    metautils::log_error("scan_npn_netcdf_file() returned error: '"+myerror+"' when adding ID "+ientry.key,"nc2xml",user);
+		  }
+		  metadata::ObML::DataTypeEntry dte;
+		  if (observation_type == "upper_air") {
+		    ientry.data->data_types_table.found(var.name,dte);
+		    fill_vertical_resolution_data(levels,"up","m",dte);
+		  }
+		  ++total_num_not_missing;
+		}
+	    }
+	  }
+	  auto descr=nc_vars.datatype_map.description(var.name);
+	  if (descr.empty()) {
+		NetCDFVariableAttributeData nc_va_data;
+		extract_from_variable_attribute(var.attrs,var_data.type(),nc_va_data);
+		if (nc_va_data.units.length() == 1 && nc_va_data.units.front() == 0x1) {
+		  nc_va_data.units="";
+		}
+		auto v=var.name+"<!>"+nc_va_data.long_name+"<!>"+nc_va_data.units;
+		if (std::find(nc_vars.netcdf_variables.begin(),nc_vars.netcdf_variables.end(),v) == nc_vars.netcdf_variables.end()) {
+		  nc_vars.netcdf_variables.emplace_back(v);
+		}
+	  }
+	}
+    }
+  }
+  write_type=ObML_type;
+}
+
 struct Header {
   Header() : type(),ID(),valid_time(),lat(0.),lon(0.),elev(0.) {}
 
   std::string type,ID,valid_time;
   float lat,lon,elev;
 };
-void scan_prepbufr_netcdf_file(InputNetCDFStream& istream,bool& found_map,std::string& map_name,std::list<std::string>& var_list,my::map<metautils::StringEntry>& changed_var_table)
+void scan_prepbufr_netcdf_file(InputNetCDFStream& istream,metadata::ObML::ObservationData& obs_data,NetCDFVariables& nc_vars)
 {
   size_t n,nhdrs=0;
   std::string sdum;
   Header *array=nullptr;
   netCDFStream::VariableData var_data;
-  int obs_type_index=-1,idx;
+  int idx;
   DateTime base_date_time(30000101235959),date_time;
 
-  initialize_for_observations();
   auto attrs=istream.global_attributes();
   sdum="";
   for (n=0; n < attrs.size(); ++n) {
@@ -3990,79 +3944,84 @@ void scan_prepbufr_netcdf_file(InputNetCDFStream& istream,bool& found_map,std::s
   if (istream.variable_data("obs_arr",var_data) == netCDFStream::NcType::_NULL) {
     metautils::log_error("scan_prepbufr_netcdf_file() returned error: could not get 'obs_arr' data","nc2xml",user);
   }
+  std::string obs_type,platform_type;
   for (n=0; n < istream.num_records(); ++n) {
     if (var_data[n*5+4] > -9999.) {
 	++total_num_not_missing;
 	idx=var_data[n*5];
 	if (array[idx].type == "ADPUPA") {
-	  obs_type_index=0;
-	  pentry.key="land_station";
+	  obs_type="upper_air";
+	  platform_type="land_station";
 	}
 	else if (array[idx].type == "AIRCAR" || array[idx].type == "AIRCFT") {
-	  obs_type_index=0;
-	  pentry.key="aircraft";
+	  obs_type="upper_air";
+	  platform_type="aircraft";
 	}
 	else if (array[idx].type == "SATEMP" || array[idx].type == "SATWND") {
-	  obs_type_index=0;
-	  pentry.key="satellite";
+	  obs_type="upper_air";
+	  platform_type="satellite";
 	}
 	else if (array[idx].type == "PROFLR" || array[idx].type == "RASSDA" || array[idx].type == "VADWND") {
-	  obs_type_index=0;
-	  pentry.key="wind_profiler";
+	  obs_type="upper_air";
+	  platform_type="wind_profiler";
 	}
 	else if (array[idx].type == "SPSSMI") {
-	  pentry.key="satellite";
+	  platform_type="satellite";
 	}
 	else if (array[idx].type == "ADPSFC") {
-	  obs_type_index=1;
-	  pentry.key="land_station";
+	  obs_type="surface";
+	  platform_type="land_station";
 	}
 	else if (array[idx].type == "SFCSHP") {
-	  obs_type_index=1;
+	  obs_type="surface";
 	  if (strutils::is_numeric(array[idx].ID) && array[idx].ID.length() == 5 && array[idx].ID >= "99000") {
-	    pentry.key="fixed_ship";
+	    platform_type="fixed_ship";
 	  }
 	  else {
-	    pentry.key="roving_ship";
+	    platform_type="roving_ship";
 	  }
 	}
 	else if (array[idx].type == "ASCATW" || array[idx].type == "ERS1DA" || array[idx].type == "QKSWND" || array[idx].type == "SYNDAT" || array[idx].type == "WDSATR") {
-	  obs_type_index=1;
-	  pentry.key="satellite";
+	  obs_type="surface";
+	  platform_type="satellite";
 	}
 	else if (array[idx].type == "SFCBOG") {
-	  obs_type_index=1;
-	  pentry.key="bogus";
+	  obs_type="surface";
+	  platform_type="bogus";
 	}
 	else {
 	  metautils::log_error("scan_prepbufr_netcdf_file() returned error: unknown observation type '"+array[idx].type+"'","nc2xml",user);
 	}
-	ientry.key=prepbufr_id_key(metautils::clean_id(array[idx].ID),pentry.key,array[idx].type);
+	ientry.key=prepbufr_id_key(metautils::clean_id(array[idx].ID),platform_type,array[idx].type);
 	if (ientry.key.empty()) {
 	  metautils::log_error("scan_prepbufr_netcdf_file() returned error: unable to get ID key for '"+array[idx].type+"', ID: '"+array[idx].ID+"'","nc2xml",user);
 	}
 	if (array[idx].type == "SPSSMI") {
 	  if (strutils::has_ending(ientry.key,"A") || strutils::has_ending(ientry.key,"M") || strutils::has_ending(ientry.key,"S") || strutils::has_ending(ientry.key,"U")) {
-	    obs_type_index=1;
+	    obs_type="surface";
 	  }
 	  else {
-	    obs_type_index=0;
+	    obs_type="upper_air";
 	  }
 	}
-	if (obs_type_index < 0) {
+	if (obs_type.empty()) {
 	  metautils::log_error("scan_prepbufr_netcdf_file() returned error: unable to get observation type for '"+array[idx].type+"', ID: '"+array[idx].ID+"'","nc2xml",user);
 	}
-	de.key=strutils::ftos(var_data[n*5+1]);
+	auto data_type=strutils::ftos(var_data[n*5+1]);
 	sdum=strutils::substitute(array[idx].valid_time,"_","");
 	date_time.set(std::stoll(sdum));
-	update_id_table(obs_type_index,array[idx].lat,array[idx].lon,&date_time,date_time.seconds_since(base_date_time));
-	update_platform_table(obs_type_index,array[idx].lat,array[idx].lon);
+	if (!obs_data.added_to_ids(obs_type,ientry,data_type,array[idx].lat,array[idx].lon,date_time.seconds_since(base_date_time),&date_time)) {
+	    metautils::log_error("scan_prepbufr_netcdf_file() returned error: '"+myerror+"' when adding ID "+ientry.key,"nc2xml",user);
+	}
+	if (!obs_data.added_to_platforms(obs_type,platform_type,array[idx].lat,array[idx].lon)) {
+	  metautils::log_error("scan_cf_point_netcdf_file() returned error: '"+myerror+"' when adding platform "+obs_type+" "+platform_type,"nc2xml",user);
+	}
     }
   }
   write_type=ObML_type;
 }
 
-void scan_idd_metar_netcdf_file(InputNetCDFStream& istream,bool found_map,DataTypeMap& datatype_map,std::list<std::string>& var_list)
+void scan_idd_metar_netcdf_file(InputNetCDFStream& istream,metadata::ObML::ObservationData& obs_data,NetCDFVariables& nc_vars)
 {
   size_t n,m;
   int index;
@@ -4071,12 +4030,10 @@ void scan_idd_metar_netcdf_file(InputNetCDFStream& istream,bool found_map,DataTy
   size_t id_len,num_not_missing;
   int format=-1;
   std::vector<InputNetCDFStream::Attribute> attr;
-  std::string sdum,ID,long_name,units;
   DateTime dt;
   metautils::StringEntry se;
 
-  initialize_for_observations();
-  pentry.key="land_station";
+  std::string platform_type="land_station";
   if (istream.variable_data("latitude",lats) == netCDFStream::NcType::_NULL) {
     if (istream.variable_data("lat",lats) == netCDFStream::NcType::_NULL) {
 	metautils::log_error("scan_idd_metar_netcdf_file() returned error: variable 'latitude' not found","nc2xml",user);
@@ -4136,33 +4093,36 @@ void scan_idd_metar_netcdf_file(InputNetCDFStream& istream,bool found_map,DataTy
 	  metautils::log_error("scan_idd_metar_netcdf_file() returned error: unable to get data for variable '"+vars[n].name+"'","nc2xml",user);
 	}
 	attr=vars[n].attrs;
-	extract_from_variable_attribute(attr,long_name,units,var_data.type(),miss_val);
+	NetCDFVariableAttributeData nc_va_data;
+	extract_from_variable_attribute(attr,var_data.type(),nc_va_data);
 	if (verbose_operation) {
 	  std::cout << "    - attributes extracted" << std::endl;
 	}
 	num_not_missing=0;
 	for (m=0; m < static_cast<size_t>(times.size()); ++m) {
-	  if (!found_missing(times[m],time_miss_val,var_data[m],miss_val)) {
+	  if (!found_missing(times[m],&time_miss_val,var_data[m],nc_va_data.missing_value)) {
 	    ++num_not_missing;
 	    ++total_num_not_missing;
-	    ID.assign(&(reinterpret_cast<char *>(report_ids.get()))[m*id_len],id_len);
-	    strutils::trim(ID);
+	    std::string id(&(reinterpret_cast<char *>(report_ids.get()))[m*id_len],id_len);
+	    strutils::trim(id);
 	    index= (format == 0) ? m : parent_index[m];
 	    if (index < static_cast<int>(times.size())) {
 		dt=compute_nc_time(times,m);
-		ientry.key=pentry.key+"[!]callSign[!]"+metautils::clean_id(ID);
-		de.key=vars[n].name;
-		sdum=datatype_map.description(de.key);
-		if (!found_map || sdum.empty()) {
-		  se.key=vars[n].name+"<!>"+long_name+"<!>"+units;
-		  if (!datatype_table.found(se.key,se)) {
-		    datatype_table.insert(se);
-		    var_list.emplace_back(se.key);
+		ientry.key=platform_type+"[!]callSign[!]"+metautils::clean_id(id);
+		auto descr=nc_vars.datatype_map.description(vars[n].name);
+		if (descr.empty()) {
+		  auto var=vars[n].name+"<!>"+nc_va_data.long_name+"<!>"+nc_va_data.units;
+		  if (std::find(nc_vars.netcdf_variables.begin(),nc_vars.netcdf_variables.end(),var) == nc_vars.netcdf_variables.end()) {
+		    nc_vars.netcdf_variables.emplace_back(var);
 		  }
 		}
 		if (lats[index] >= -90. && lats[index] <= 90. && lons[index] >= -180. && lons[index] <= 180.) {
-		  update_id_table(1,lats[index],lons[index],&dt,times[m]);
-		  update_platform_table(1,lats[index],lons[index]);
+		  if (!obs_data.added_to_ids("surface",ientry,vars[n].name,lats[index],lons[index],times[m],&dt)) {
+		    metautils::log_error("scan_idd_metar_netcdf_file() returned error: '"+myerror+"' when adding ID "+ientry.key,"nc2xml",user);
+		  }
+		  if (!obs_data.added_to_platforms("surface",platform_type,lats[index],lons[index])) {
+		    metautils::log_error("scan_cf_point_netcdf_file() returned error: '"+myerror+"' when adding platform "+platform_type,"nc2xml",user);
+		  }
 		}
 	    }
 	  }
@@ -4175,7 +4135,7 @@ void scan_idd_metar_netcdf_file(InputNetCDFStream& istream,bool found_map,DataTy
   }
 }
 
-void scan_idd_buoy_netcdf_file(InputNetCDFStream& istream,bool found_map,DataTypeMap& datatype_map,std::list<std::string>& var_list)
+void scan_idd_buoy_netcdf_file(InputNetCDFStream& istream,metadata::ObML::ObservationData& obs_data,NetCDFVariables& nc_vars)
 {
   size_t n,m;
   netCDFStream::VariableData lats,lons,times,ship_ids,buoy_ids,stn_types,var_data;
@@ -4183,10 +4143,8 @@ void scan_idd_buoy_netcdf_file(InputNetCDFStream& istream,bool found_map,DataTyp
   size_t id_len,num_not_missing;
   std::vector<InputNetCDFStream::Attribute> attr;
   DateTime dt;
-  std::string sdum,ID,long_name,units;
   metautils::StringEntry se;
 
-  initialize_for_observations();
   if (istream.variable_data("Lat",lats) == netCDFStream::NcType::_NULL) {
     metautils::log_error("scan_idd_buoy_netcdf_file() returned error: variable 'Lat' not found","nc2xml",user);
   }
@@ -4229,40 +4187,44 @@ void scan_idd_buoy_netcdf_file(InputNetCDFStream& istream,bool found_map,DataTyp
 	  metautils::log_error("scan_idd_buoy_netcdf_file() returned error: unable to get data for variable '"+vars[n].name+"'","nc2xml",user);
 	}
 	attr=vars[n].attrs;
-	extract_from_variable_attribute(attr,long_name,units,var_data.type(),miss_val);
+	NetCDFVariableAttributeData nc_va_data;
+	extract_from_variable_attribute(attr,var_data.type(),nc_va_data);
 	num_not_missing=0;
 	for (m=0; m < static_cast<size_t>(times.size()); ++m) {
-	  if (!found_missing(times[m],time_miss_val,var_data[m],miss_val)) {
+	  if (!found_missing(times[m],&time_miss_val,var_data[m],nc_va_data.missing_value)) {
 	    ++num_not_missing;
 	    ++total_num_not_missing;
-	    ID.assign(&(reinterpret_cast<char *>(ship_ids.get()))[m*id_len],id_len);
-	    strutils::trim(ID);
-	    if (!ID.empty()) {
+	    std::string id(&(reinterpret_cast<char *>(ship_ids.get()))[m*id_len],id_len);
+	    strutils::trim(id);
+	    std::string platform_type;
+	    if (!id.empty()) {
 		if (stn_types[m] == 6.) {
-		  pentry.key="drifting_buoy";
+		  platform_type="drifting_buoy";
 		}
 		else {
-		  pentry.key="roving_ship";
+		  platform_type="roving_ship";
 		}
-		ientry.key=pentry.key+"[!]callSign[!]"+metautils::clean_id(ID);
+		ientry.key=platform_type+"[!]callSign[!]"+metautils::clean_id(id);
 	    }
 	    else {
-		pentry.key="drifting_buoy";
-		ientry.key=pentry.key+"[!]other[!]"+strutils::itos(buoy_ids[m]);
+		platform_type="drifting_buoy";
+		ientry.key=platform_type+"[!]other[!]"+strutils::itos(buoy_ids[m]);
 	    }
 	    dt=compute_nc_time(times,m);
-	    de.key=vars[n].name;
-	    sdum=datatype_map.description(de.key);
-	    if (!found_map || sdum.empty()) {
-		se.key=vars[n].name+"<!>"+long_name+"<!>"+units;
-		if (!datatype_table.found(se.key,se)) {
-		  datatype_table.insert(se);
-		  var_list.emplace_back(se.key);
+	    auto descr=nc_vars.datatype_map.description(vars[n].name);
+	    if (descr.empty()) {
+		auto var=vars[n].name+"<!>"+nc_va_data.long_name+"<!>"+nc_va_data.units;
+		if (std::find(nc_vars.netcdf_variables.begin(),nc_vars.netcdf_variables.end(),var) == nc_vars.netcdf_variables.end()) {
+		  nc_vars.netcdf_variables.emplace_back(var);
 		}
 	    }
 	    if (lats[m] >= -90. && lats[m] <= 90. && lons[m] >= -180. && lons[m] <= 180.) {
-		update_id_table(1,lats[m],lons[m],&dt,times[m]);
-		update_platform_table(1,lats[m],lons[m]);
+		if (!obs_data.added_to_ids("surface",ientry,vars[n].name,lats[m],lons[m],times[m],&dt)) {
+		  metautils::log_error("scan_idd_buoy_netcdf_file() returned error: '"+myerror+"' when adding ID "+ientry.key,"nc2xml",user);
+		}
+		if (!obs_data.added_to_platforms("surface",platform_type,lats[m],lons[m])) {
+		  metautils::log_error("scan_cf_point_netcdf_file() returned error: '"+myerror+"' when adding platform "+platform_type,"nc2xml",user);
+		}
 	    }
 	  }
 	}
@@ -4274,7 +4236,7 @@ void scan_idd_buoy_netcdf_file(InputNetCDFStream& istream,bool found_map,DataTyp
   }
 }
 
-void scan_idd_surface_synoptic_netcdf_file(InputNetCDFStream& istream,bool found_map,DataTypeMap& datatype_map,std::list<std::string>& var_list)
+void scan_idd_surface_synoptic_netcdf_file(InputNetCDFStream& istream,metadata::ObML::ObservationData& obs_data,NetCDFVariables& nc_vars)
 {
   size_t n,m;
   netCDFStream::VariableData lats,lons,times,wmo_ids,var_data;
@@ -4282,10 +4244,8 @@ void scan_idd_surface_synoptic_netcdf_file(InputNetCDFStream& istream,bool found
   size_t num_not_missing;
   std::vector<InputNetCDFStream::Attribute> attr;
   DateTime dt;
-  std::string sdum,ID,long_name,units;
   metautils::StringEntry se;
 
-  initialize_for_observations();
   if (istream.variable_data("Lat",lats) == netCDFStream::NcType::_NULL) {
     metautils::log_error("scan_idd_surface_synoptic_netcdf_file() returned error: variable 'Lat' not found","nc2xml",user);
   }
@@ -4315,32 +4275,36 @@ void scan_idd_surface_synoptic_netcdf_file(InputNetCDFStream& istream,bool found
 	  metautils::log_error("scan_idd_surface_synoptic_netcdf_file() returned error: unable to get data for variable '"+vars[n].name+"'","nc2xml",user);
 	}
 	attr=vars[n].attrs;
-	extract_from_variable_attribute(attr,long_name,units,var_data.type(),miss_val);
+	NetCDFVariableAttributeData nc_va_data;
+	extract_from_variable_attribute(attr,var_data.type(),nc_va_data);
 	num_not_missing=0;
 	for (m=0; m < static_cast<size_t>(times.size()); ++m) {
-	  if (!found_missing(times[m],time_miss_val,var_data[m],miss_val)) {
+	  if (!found_missing(times[m],&time_miss_val,var_data[m],nc_va_data.missing_value)) {
 	    ++num_not_missing;
 	    ++total_num_not_missing;
+	    std::string platform_type;
 	    if (wmo_ids[m] < 99000) {
-		pentry.key="land_station";
+		platform_type="land_station";
 	    }
 	    else {
-		pentry.key="fixed_ship";
+		platform_type="fixed_ship";
 	    }
-	    ientry.key=pentry.key+"[!]WMO[!]"+strutils::ftos(wmo_ids[m],5,0,'0');
+	    ientry.key=platform_type+"[!]WMO[!]"+strutils::ftos(wmo_ids[m],5,0,'0');
 	    dt=compute_nc_time(times,m);
-	    de.key=vars[n].name;
-	    sdum=datatype_map.description(de.key);
-	    if (!found_map || sdum.empty()) {
-		se.key=vars[n].name+"<!>"+long_name+"<!>"+units;
-		if (!datatype_table.found(se.key,se)) {
-		  datatype_table.insert(se);
-		  var_list.emplace_back(se.key);
+	    auto descr=nc_vars.datatype_map.description(vars[n].name);
+	    if (descr.empty()) {
+		auto var=vars[n].name+"<!>"+nc_va_data.long_name+"<!>"+nc_va_data.units;
+		if (std::find(nc_vars.netcdf_variables.begin(),nc_vars.netcdf_variables.end(),var) == nc_vars.netcdf_variables.end()) {
+		  nc_vars.netcdf_variables.emplace_back(var);
 		}
 	    }
 	    if (lats[m] >= -90. && lats[m] <= 90. && lons[m] >= -180. && lons[m] <= 180.) {
-		update_id_table(1,lats[m],lons[m],&dt,times[m]);
-		update_platform_table(1,lats[m],lons[m]);
+		if (!obs_data.added_to_ids("surface",ientry,vars[n].name,lats[m],lons[m],times[m],&dt)) {
+		  metautils::log_error("scan_idd_surface_synoptic_netcdf_file() returned error: '"+myerror+"' when adding ID "+ientry.key,"nc2xml",user);
+		}
+		if (!obs_data.added_to_platforms("surface",platform_type,lats[m],lons[m])) {
+		  metautils::log_error("scan_cf_point_netcdf_file() returned error: '"+myerror+"' when adding platform "+platform_type,"nc2xml",user);
+		}
 	    }
 	  }
 	}
@@ -4352,7 +4316,7 @@ void scan_idd_surface_synoptic_netcdf_file(InputNetCDFStream& istream,bool found
   }
 }
 
-void scan_idd_upper_air_netcdf_file(InputNetCDFStream& istream,bool found_map,DataTypeMap& datatype_map,std::list<std::string>& var_list)
+void scan_idd_upper_air_netcdf_file(InputNetCDFStream& istream,metadata::ObML::ObservationData& obs_data,NetCDFVariables& nc_vars)
 {
   size_t n,m;
   netCDFStream::VariableData lats,lons,times,wmo_ids,stn_ids,var_data;
@@ -4360,10 +4324,8 @@ void scan_idd_upper_air_netcdf_file(InputNetCDFStream& istream,bool found_map,Da
   size_t id_len,num_not_missing;
   std::vector<InputNetCDFStream::Attribute> attr;
   DateTime dt;
-  std::string sdum,ID,long_name,units;
   metautils::StringEntry se;
 
-  initialize_for_observations();
   if (istream.variable_data("staLat",lats) == netCDFStream::NcType::_NULL) {
     metautils::log_error("scan_idd_upper_air_netcdf_file() returned error: variable 'staLat' not found","nc2xml",user);
   }
@@ -4388,6 +4350,7 @@ void scan_idd_upper_air_netcdf_file(InputNetCDFStream& istream,bool found_map,Da
     if (verbose_operation) {
 	std::cout << "  netCDF variable: '" << vars[n].name << "'" << std::endl;
     }
+    NetCDFVariableAttributeData nc_wmoid_a_data;
     if (vars[n].name == "synTime") {
 	if (verbose_operation) {
 	  std::cout << "  - time variable is '" << vars[n].name << "'; " << vars[n].attrs.size() << " attributes; type: " << static_cast<int>(times.type()) << std::endl;
@@ -4406,54 +4369,58 @@ void scan_idd_upper_air_netcdf_file(InputNetCDFStream& istream,bool found_map,Da
     }
     else if (vars[n].name == "wmoStaNum") {
 	attr=vars[n].attrs;
-	extract_from_variable_attribute(attr,long_name,units,wmo_ids.type(),wmo_id_miss_val);
+	extract_from_variable_attribute(attr,wmo_ids.type(),nc_wmoid_a_data);
     }
     else if (vars[n].is_rec && (vars[n].name == "numMand" || vars[n].name == "numSigT" || vars[n].name == "numSigW" || vars[n].name == "numMwnd" || vars[n].name == "numTrop")) {
 	if (istream.variable_data(vars[n].name,var_data) == netCDFStream::NcType::_NULL) {
 	  metautils::log_error("scan_idd_upper_air_netcdf_file() returned error: unable to get data for variable '"+vars[n].name+"'","nc2xml",user);
 	}
 	attr=vars[n].attrs;
-	extract_from_variable_attribute(attr,long_name,units,var_data.type(),miss_val);
+	NetCDFVariableAttributeData nc_va_data;
+	extract_from_variable_attribute(attr,var_data.type(),nc_va_data);
 	if (verbose_operation) {
 	  std::cout << "    - attributes extracted" << std::endl;
 	}
 	num_not_missing=0;
 	for (m=0; m < static_cast<size_t>(times.size()); ++m) {
-	  if (!found_missing(times[m],time_miss_val,var_data[m],miss_val)) {
+	  if (!found_missing(times[m],&time_miss_val,var_data[m],nc_va_data.missing_value)) {
 	    ++num_not_missing;
 	    ++total_num_not_missing;
+	    std::string platform_type;
 	    if (wmo_ids[m] < 99000 || wmo_ids[m] > 99900) {
-		pentry.key="land_station";
+		platform_type="land_station";
 	    }
 	    else {
-		pentry.key="fixed_ship";
+		platform_type="fixed_ship";
 	    }
-	    if (wmo_id_miss_val.type() != netCDFStream::NcType::_NULL) {
-		if (wmo_ids[m] == wmo_id_miss_val.get()) {
-		  ID.assign(&(reinterpret_cast<char *>(stn_ids.get()))[m*id_len],id_len);
-		  strutils::trim(ID);
-		  ientry.key=pentry.key+"[!]callSign[!]"+metautils::clean_id(ID);
+	    if (nc_wmoid_a_data.missing_value.type() != netCDFStream::NcType::_NULL) {
+		if (wmo_ids[m] == nc_wmoid_a_data.missing_value.get()) {
+		  std::string id(&(reinterpret_cast<char *>(stn_ids.get()))[m*id_len],id_len);
+		  strutils::trim(id);
+		  ientry.key=platform_type+"[!]callSign[!]"+metautils::clean_id(id);
 		}
 		else {
-		  ientry.key=pentry.key+"[!]WMO[!]"+strutils::ftos(wmo_ids[m],5,0,'0');
+		  ientry.key=platform_type+"[!]WMO[!]"+strutils::ftos(wmo_ids[m],5,0,'0');
 		}
 	    }
 	    else {
-		ientry.key=pentry.key+"[!]WMO[!]"+strutils::ftos(wmo_ids[m],5,0,'0');
+		ientry.key=platform_type+"[!]WMO[!]"+strutils::ftos(wmo_ids[m],5,0,'0');
 	    }
 	    dt=compute_nc_time(times,m);
-	    de.key=vars[n].name;
-	    sdum=datatype_map.description(de.key);
-	    if (!found_map || sdum.empty()) {
-		se.key=vars[n].name+"<!>"+long_name+"<!>"+units;
-		if (!datatype_table.found(se.key,se)) {
-		  datatype_table.insert(se);
-		  var_list.emplace_back(se.key);
+	    auto descr=nc_vars.datatype_map.description(vars[n].name);
+	    if (descr.empty()) {
+		auto var=vars[n].name+"<!>"+nc_va_data.long_name+"<!>"+nc_va_data.units;
+		if (std::find(nc_vars.netcdf_variables.begin(),nc_vars.netcdf_variables.end(),var) == nc_vars.netcdf_variables.end()) {
+		  nc_vars.netcdf_variables.emplace_back(var);
 		}
 	    }
 	    if (lats[m] >= -90. && lats[m] <= 90. && lons[m] >= -180. && lons[m] <= 180.) {
-		update_id_table(0,lats[m],lons[m],&dt,times[m]);
-		update_platform_table(0,lats[m],lons[m]);
+		if (!obs_data.added_to_ids("upper_air",ientry,vars[n].name,lats[m],lons[m],times[m],&dt)) {
+		  metautils::log_error("scan_idd_upper_air_netcdf_file() returned error: '"+myerror+"' when adding ID "+ientry.key,"nc2xml",user);
+		}
+		if (!obs_data.added_to_platforms("upper_air",platform_type,lats[m],lons[m])) {
+		  metautils::log_error("scan_cf_point_netcdf_file() returned error: '"+myerror+"' when adding platform "+platform_type,"nc2xml",user);
+		}
 	    }
 	  }
 	}
@@ -4465,59 +4432,49 @@ void scan_idd_upper_air_netcdf_file(InputNetCDFStream& istream,bool found_map,Da
   }
 }
 
-void scan_idd_observation_netcdf_file(InputNetCDFStream& istream,bool& found_map,std::string& map_name,std::list<std::string>& var_list,my::map<metautils::StringEntry>& changed_var_table)
+void scan_idd_observation_netcdf_file(InputNetCDFStream& istream,metadata::ObML::ObservationData& obs_data,NetCDFVariables& nc_vars)
 {
-  size_t n;
-  std::string sdum,type;
-  std::deque<std::string> sp;
-  DataTypeMap datatype_map;
-
   auto attrs=istream.global_attributes();
-  for (n=0; n < attrs.size(); ++n) {
+  std::string type;
+  for (size_t n=0; n < attrs.size(); ++n) {
     if (attrs[n].name == "title") {
-	sdum=*(reinterpret_cast<std::string *>(attrs[n].values));
-	sp=strutils::split(sdum);
-	type=sp[0];
+	auto title=*(reinterpret_cast<std::string *>(attrs[n].values));
+	auto title_parts=strutils::split(title);
+	type=title_parts.front();
     }
   }
-  map_name=unixutils::remote_web_file("https://rda.ucar.edu/metadata/ParameterTables/netCDF.ds"+meta_args.dsnum+".xml",tdir->name());
-  if (datatype_map.fill(map_name)) {
-    found_map=true;
-  }
-  else {
-    found_map=false;
+  if (nc_vars.datatype_map.fill(nc_vars.map_name)) {
+    nc_vars.map_filled=true;
   }
   if (type == "METAR") {
-    scan_idd_metar_netcdf_file(istream,found_map,datatype_map,var_list);
+    scan_idd_metar_netcdf_file(istream,obs_data,nc_vars);
   }
   else if (type == "BUOY") {
-    scan_idd_buoy_netcdf_file(istream,found_map,datatype_map,var_list);
+    scan_idd_buoy_netcdf_file(istream,obs_data,nc_vars);
   }
   else if (type == "SYNOPTIC") {
-    scan_idd_surface_synoptic_netcdf_file(istream,found_map,datatype_map,var_list);
+    scan_idd_surface_synoptic_netcdf_file(istream,obs_data,nc_vars);
   }
   else {
-    scan_idd_upper_air_netcdf_file(istream,found_map,datatype_map,var_list);
+    scan_idd_upper_air_netcdf_file(istream,obs_data,nc_vars);
   }
   write_type=ObML_type;
 }
 
-void scan_samos_netcdf_file(InputNetCDFStream& istream,DataTypeMap& datatype_map,bool& found_map,std::list<std::string>& var_list,my::map<metautils::StringEntry>& changed_var_table)
+void scan_samos_netcdf_file(InputNetCDFStream& istream,metadata::ObML::ObservationData& obs_data,NetCDFVariables& nc_vars)
 {
   std::string timevarname,latvarname,lonvarname;
   netCDFStream::VariableData times,lats,lons;
-  std::forward_list<std::string> vnames;
-  my::map<metautils::StringEntry> unique_var_table;
+  std::unordered_set<std::string> unique_var_table;
   bool found_time,found_lat,found_lon;
 
   found_time=found_lat=found_lon=false;
-  initialize_for_observations();
-  pentry.key="roving_ship";
+  std::string platform_type="roving_ship";
   ientry.key="";
   auto attrs=istream.global_attributes();
   for (size_t n=0; n < attrs.size(); ++n) {
     if (attrs[n].name == "ID") {
-	ientry.key=pentry.key+"[!]callSign[!]"+*(reinterpret_cast<std::string *>(attrs[n].values));
+	ientry.key=platform_type+"[!]callSign[!]"+*(reinterpret_cast<std::string *>(attrs[n].values));
     }
   }
   auto vars=istream.variables();
@@ -4525,8 +4482,8 @@ void scan_samos_netcdf_file(InputNetCDFStream& istream,DataTypeMap& datatype_map
   for (size_t n=0; n < vars.size(); ++n) {
     for (size_t m=0; m < vars[n].attrs.size(); ++m) {
 	if (vars[n].attrs[m].nc_type == netCDFStream::NcType::CHAR && vars[n].attrs[m].name == "units") {
-	  std::string sdum=strutils::to_lower(*(reinterpret_cast<std::string *>(vars[n].attrs[m].values)));
-	  if (vars[n].is_coord && std::regex_search(sdum,std::regex("since"))) {
+	  std::string units_value=strutils::to_lower(*(reinterpret_cast<std::string *>(vars[n].attrs[m].values)));
+	  if (vars[n].is_coord && std::regex_search(units_value,std::regex("since"))) {
 	    if (found_time) {
 		metautils::log_error("scan_samos_netcdf_file() returned error: time was already identified - don't know what to do with variable: "+vars[n].name,"nc2xml",user);
 	    }
@@ -4541,14 +4498,14 @@ void scan_samos_netcdf_file(InputNetCDFStream& istream,DataTypeMap& datatype_map
 	    }
 	  }
 	  else if (vars[n].dimids.size() == 1 && vars[n].dimids[0] == 0) {
-	    if (sdum == "degrees_north") {
+	    if (units_value == "degrees_north") {
 		if (istream.variable_data(vars[n].name,lats) == netCDFStream::NcType::_NULL) {
 		  metautils::log_error("scan_samos_netcdf_file() returned error: unable to get latitudes","nc2xml",user);
 		}
 		latvarname=vars[n].name;
 		found_lat=true;
 	    }
-	    else if (sdum == "degrees_east") {
+	    else if (units_value == "degrees_east") {
 		if (istream.variable_data(vars[n].name,lons) == netCDFStream::NcType::_NULL) {
 		  metautils::log_error("scan_samos_netcdf_file() returned error: unable to get longitudes","nc2xml",user);
 		}
@@ -4577,8 +4534,8 @@ void scan_samos_netcdf_file(InputNetCDFStream& istream,DataTypeMap& datatype_map
     if (O_map.find("surface") == O_map.end()) {
 	O_map.emplace("surface",std::make_pair(O_map.size(),""));
     }
-    if (P_map.find(pentry.key) == P_map.end()) {
-	P_map.emplace(pentry.key,std::make_pair(P_map.size(),""));
+    if (P_map.find(platform_type) == P_map.end()) {
+	P_map.emplace(platform_type,std::make_pair(P_map.size(),""));
     }
   }
 // find the data variables
@@ -4587,19 +4544,17 @@ void scan_samos_netcdf_file(InputNetCDFStream& istream,DataTypeMap& datatype_map
   float min_lat=99.,max_lat=-99.;
   for (size_t n=0; n < vars.size(); ++n) {
     if (vars[n].name != timevarname && vars[n].name != latvarname && vars[n].name != lonvarname) {
-	std::string long_name,units;
-	netCDFStream::DataValue time_miss_val,miss_val;
+	NetCDFVariableAttributeData nc_va_data;
+	extract_from_variable_attribute(vars[n].attrs,vars[n].nc_type,nc_va_data);
 	netCDFStream::VariableData var_data;
-	extract_from_variable_attribute(vars[n].attrs,long_name,units,vars[n].nc_type,miss_val);
 	if (istream.variable_data(vars[n].name,var_data) == netCDFStream::NcType::_NULL) {
 	  metautils::log_error("scan_samos_netcdf_file() returned error: unable to get data for variable '"+vars[n].name+"'","nc2xml",user);
 	}
-	if (!found_map || datatype_map.description(vars[n].name).empty()) {
-	  metautils::StringEntry se;
-	  se.key=vars[n].name+"<!>"+long_name+"<!>"+units;
-	  if (!unique_var_table.found(se.key,se)) {
-	    var_list.emplace_back(se.key);
-	    unique_var_table.insert(se);
+	if (nc_vars.datatype_map.description(vars[n].name).empty()) {
+	  auto key=vars[n].name+"<!>"+nc_va_data.long_name+"<!>"+nc_va_data.units;
+	  if (unique_var_table.find(key) == unique_var_table.end()) {
+	    nc_vars.netcdf_variables.emplace_back(key);
+	    unique_var_table.emplace(key);
 	  }
 	}
 	if (D_map.find(vars[n].name) == D_map.end()) {
@@ -4629,9 +4584,9 @@ void scan_samos_netcdf_file(InputNetCDFStream& istream,DataTypeMap& datatype_map
 	  }
 	  D_map.emplace(vars[n].name,std::make_pair(D_map.size(),"|"+strutils::lltos(vars[n].offset)+"|"+netCDFStream::nc_type[static_cast<int>(vars[n].nc_type)]+"|"+strutils::itos(bsize)));
 	}
-	std::list<std::string> miss_lines_list;
+	std::vector<std::string> miss_lines_list;
 	for (size_t m=0; m < times.size(); ++m) {
-	  if (!found_missing(times[m],time_miss_val,var_data[m],miss_val)) {
+	  if (!found_missing(times[m],nullptr,var_data[m],nc_va_data.missing_value)) {
 	    ++total_num_not_missing;
 	    float lon=lons[m];
 	    if (lon > 180.) {
@@ -4643,9 +4598,12 @@ void scan_samos_netcdf_file(InputNetCDFStream& istream,DataTypeMap& datatype_map
 		  T_map.emplace(m,dt.to_string("%Y%m%d%H%MM")+"[!]"+strutils::ftos(lats[m],4)+"[!]"+strutils::ftos(lon,4));
 		}
 	    }
-	    de.key=vars[n].name;
-	    update_id_table(1,lats[m],lon,&dt,times[m]);
-	    update_platform_table(1,lats[m],lon);
+	    if (!obs_data.added_to_ids("surface",ientry,vars[n].name,lats[m],lon,times[m],&dt)) {
+		metautils::log_error("scan_samos_netcdf_file() returned error: '"+myerror+"' when adding ID "+ientry.key,"nc2xml",user);
+	    }
+	    if (!obs_data.added_to_platforms("surface",platform_type,lats[m],lon)) {
+		metautils::log_error("scan_cf_point_netcdf_file() returned error: '"+myerror+"' when adding platform "+platform_type,"nc2xml",user);
+	    }
 	    if (lats[m] < min_lat) {
 		min_lat=lats[m];
 	    }
@@ -4655,9 +4613,9 @@ void scan_samos_netcdf_file(InputNetCDFStream& istream,DataTypeMap& datatype_map
 	  }
 	  else {
 	    if (inv_stream.is_open()) {
-		std::string sdum=strutils::itos(m);
-		sdum+="|0|"+strutils::itos(P_map[pentry.key].first)+"|"+strutils::itos(I_map[ientry.key.substr(ientry.key.find("[!]")+3)].first)+"|"+strutils::itos(D_map[vars[n].name].first);
-		miss_lines_list.emplace_back(sdum);
+		std::string miss_line=strutils::itos(m);
+		miss_line+="|0|"+strutils::itos(P_map[platform_type].first)+"|"+strutils::itos(I_map[ientry.key.substr(ientry.key.find("[!]")+3)].first)+"|"+strutils::itos(D_map[vars[n].name].first);
+		miss_lines_list.emplace_back(miss_line);
 	    }
 	  }
 	}
@@ -4701,32 +4659,17 @@ void scan_samos_netcdf_file(InputNetCDFStream& istream,DataTypeMap& datatype_map
   }
 }
 
-void scan_file()
+void scan_file(metadata::ObML::ObservationData& obs_data)
 {
-  InputNetCDFStream istream;
-  std::string file_format,output,error,map_type;
-  std::deque<std::string> sp;
-  std::list<std::string> filelist;
-  std::string temp_dir;
-  metautils::StringEntry se;
-  std::list<std::string> var_list,map_contents;
-  my::map<metautils::StringEntry> changed_var_table;
-  std::vector<netCDFStream::Attribute> gattrs;
-  bool no_write;
-
   tfile=new TempFile;
   tfile->open(meta_args.temp_loc);
   tdir=new TempDir;
   tdir->create(meta_args.temp_loc);
   DataTypeMap datatype_map;
-  bool found_map;
-  std::string map_name=unixutils::remote_web_file("https://rda.ucar.edu/metadata/ParameterTables/netCDF.ds"+meta_args.dsnum+".xml",tdir->name());
-  if (datatype_map.fill(map_name)) {
-    found_map=true;
-  }
-  else {
-    found_map=false;
-  }
+  NetCDFVariables nc_vars;
+  nc_vars.map_name=unixutils::remote_web_file("https://rda.ucar.edu/metadata/ParameterTables/netCDF.ds"+meta_args.dsnum+".xml",tdir->name());
+  std::list<std::string> filelist;
+  std::string file_format,error;
   if (!metautils::primaryMetadata::prepare_file_for_metadata_scanning(*tfile,*tdir,&filelist,file_format,error)) {
     metautils::log_error("prepare_file_for_metadata_scanning() returned '"+error+"'","nc2xml",user);
   }
@@ -4740,30 +4683,25 @@ void scan_file()
     if (verbose_operation) {
 	std::cout << "Beginning scan of " << file << "..." << std::endl;
     }
-    if (temp_dir.empty()) {
-	temp_dir=file;
-	if (strutils::occurs(temp_dir,"/") > strutils::occurs(meta_args.temp_loc,"/")+1) {
-	  temp_dir=temp_dir.substr(0,temp_dir.rfind("/"));
-	}
-	else {
-	  temp_dir="";
-	}
-    }
+    InputNetCDFStream istream;
     istream.open(file.c_str());
     if (std::regex_search(meta_args.data_format,std::regex("^cfnetcdf"))) {
-	scan_cf_netcdf_file(istream,found_map,map_name,var_list,changed_var_table);
-    }
-    else if (std::regex_search(meta_args.data_format,std::regex("^pbnetcdf"))) {
-	scan_prepbufr_netcdf_file(istream,found_map,map_name,var_list,changed_var_table);
-    }
-    else if (std::regex_search(meta_args.data_format,std::regex("^rafnetcdf"))) {
-	scan_raf_aircraft_netcdf_file(istream,found_map,map_name,var_list,changed_var_table);
+	scan_cf_netcdf_file(istream,obs_data,nc_vars);
     }
     else if (std::regex_search(meta_args.data_format,std::regex("^iddnetcdf"))) {
-	scan_idd_observation_netcdf_file(istream,found_map,map_name,var_list,changed_var_table);
+	scan_idd_observation_netcdf_file(istream,obs_data,nc_vars);
+    }
+    else if (std::regex_search(meta_args.data_format,std::regex("^npnnetcdf"))) {
+	scan_npn_netcdf_file(istream,obs_data,nc_vars);
+    }
+    else if (std::regex_search(meta_args.data_format,std::regex("^pbnetcdf"))) {
+	scan_prepbufr_netcdf_file(istream,obs_data,nc_vars);
+    }
+    else if (std::regex_search(meta_args.data_format,std::regex("^rafnetcdf"))) {
+	scan_raf_aircraft_netcdf_file(istream,obs_data,nc_vars);
     }
     else if (std::regex_search(meta_args.data_format,std::regex("^samosnc"))) {
-	scan_samos_netcdf_file(istream,datatype_map,found_map,var_list,changed_var_table);
+	scan_samos_netcdf_file(istream,obs_data,nc_vars);
     }
 /*
     else if (meta_args.data_format.beginsWith("wrfsimnetcdf"))
@@ -4778,10 +4716,11 @@ void scan_file()
     }
   }
   meta_args.data_format="netcdf";
-  if (!meta_args.inventory_only && var_list.size() > 0) {
+  if (!meta_args.inventory_only && nc_vars.netcdf_variables.size() > 0) {
     if (verbose_operation) {
 	std::cout << "Writing parameter map..." << std::endl;
     }
+    std::string map_type;
     if (write_type == GrML_type) {
 	map_type="parameter";
     }
@@ -4791,10 +4730,10 @@ void scan_file()
     else {
 	metautils::log_error("scan_file() returned error: unknown map type","nc2xml",user);
     }
-    if (found_map) {
-	std::ifstream ifs;
+    std::vector<std::string> map_contents;
+    if (nc_vars.map_filled) {
+	std::ifstream ifs(nc_vars.map_name.c_str());
 	char line[32768];
-	ifs.open(map_name.c_str());
 	ifs.getline(line,32768);
 	while (!ifs.eof()) {
 	  map_contents.emplace_back(line);
@@ -4803,24 +4742,27 @@ void scan_file()
 	ifs.close();
 	map_contents.pop_back();
 	std::stringstream oss,ess;
-	unixutils::mysystem2("/bin/rm "+map_name,oss,ess);
+	unixutils::mysystem2("/bin/rm "+nc_vars.map_name,oss,ess);
     }
-    map_name=tdir->name()+"/netCDF.ds"+meta_args.dsnum+".xml";
-    std::ofstream ofs(map_name.c_str());
+    std::stringstream oss,ess;
+    if (unixutils::mysystem2("/bin/mkdir -p "+tdir->name()+"/metadata/ParameterTables",oss,ess) < 0) {
+	metautils::log_error("can't create directory tree for netCDF variables","nc2xml",user);
+    }
+    nc_vars.map_name=tdir->name()+"/metadata/ParameterTables/netCDF.ds"+meta_args.dsnum+".xml";
+    std::ofstream ofs(nc_vars.map_name.c_str());
     if (!ofs.is_open()) {
 	metautils::log_error("scan_file() returned error: can't open parameter map file for output","nc2xml",user);
     }
-    if (!found_map) {
+    if (!nc_vars.map_filled) {
 	ofs << "<?xml version=\"1.0\" ?>" << std::endl;
 	ofs << "<" << map_type << "Map>" << std::endl;
     }
     else {
-	no_write=false;
+	auto no_write=false;
 	for (const auto& line : map_contents) {
 	  if (std::regex_search(line,std::regex(" code=\""))) {
-	    sp=strutils::split(line,"\"");
-	    se.key=sp[1];
-	    if (changed_var_table.found(se.key,se)) {
+	    auto s=strutils::split(line,"\"");
+	    if (nc_vars.changed_variables.find(s[1]) != nc_vars.changed_variables.end()) {
 		no_write=true;
 	    }
 	  }
@@ -4832,24 +4774,24 @@ void scan_file()
 	  }
 	}
     }
-    for (const auto& var : var_list) {
-	sp=strutils::split(var,"<!>");
+    for (const auto& nc_var : nc_vars.netcdf_variables) {
+	auto nc_var_parts=strutils::split(nc_var,"<!>");
 	if (write_type == GrML_type) {
-	  ofs << "  <parameter code=\"" << sp[0] << "\">" << std::endl;
-	  ofs << "    <shortName>" << sp[0] << "</shortName>" << std::endl;
-	  if (!sp[1].empty()) {
-	    ofs << "    <description>" << sp[1] << "</description>" << std::endl;
+	  ofs << "  <parameter code=\"" << nc_var_parts[0] << "\">" << std::endl;
+	  ofs << "    <shortName>" << nc_var_parts[0] << "</shortName>" << std::endl;
+	  if (!nc_var_parts[1].empty()) {
+	    ofs << "    <description>" << nc_var_parts[1] << "</description>" << std::endl;
 	  }
-	  if (!sp[2].empty()) {
-	    ofs << "    <units>" << strutils::substitute(sp[2],"-","^-") << "</units>" << std::endl;
+	  if (!nc_var_parts[2].empty()) {
+	    ofs << "    <units>" << strutils::substitute(nc_var_parts[2],"-","^-") << "</units>" << std::endl;
 	  }
 	  ofs << "  </parameter>" << std::endl;
 	}
 	else if (write_type == ObML_type) {
-	  ofs << "  <dataType code=\"" << sp[0] << "\">" << std::endl;
-	  ofs << "    <description>" << sp[1];
-	  if (!sp[2].empty()) {
-	    ofs << " (" << sp[2] << ")";
+	  ofs << "  <dataType code=\"" << nc_var_parts[0] << "\">" << std::endl;
+	  ofs << "    <description>" << nc_var_parts[1];
+	  if (!nc_var_parts[2].empty()) {
+	    ofs << " (" << nc_var_parts[2] << ")";
 	  }
 	  ofs << "</description>" << std::endl;
 	  ofs << "  </dataType>" << std::endl;
@@ -4862,11 +4804,10 @@ void scan_file()
 	ofs << "</dataTypeMap>" << std::endl;
     }
     ofs.close();
-    if (unixutils::rdadata_sync(tdir->name(),".","/data/web/metadata/ParameterTables",meta_directives.rdadata_home,error) < 0) {
+    if (unixutils::rdadata_sync(tdir->name(),"metadata/ParameterTables/","/data/web",meta_directives.rdadata_home,error) < 0) {
 	metautils::log_warning("parameter map was not synced - error(s): '"+error+"'","nc2xml",user);
     }
-    std::stringstream oss,ess;
-    unixutils::mysystem2("/bin/cp "+map_name+" /glade/u/home/rdadata/share/metadata/ParameterTables/netCDF.ds"+meta_args.dsnum+".xml",oss,ess);
+    unixutils::mysystem2("/bin/cp "+nc_vars.map_name+" /glade/u/home/rdadata/share/metadata/ParameterTables/netCDF.ds"+meta_args.dsnum+".xml",oss,ess);
     if (verbose_operation) {
 	std::cout << "...finished writing parameter map." << std::endl;
     }
@@ -4898,6 +4839,7 @@ int main(int argc,char **argv)
     std::cerr << "required (choose one):" << std::endl;
     std::cerr << "-f cfnetcdf      Climate and Forecast compliant netCDF3 data" << std::endl;
     std::cerr << "-f iddnetcdf     Unidata IDD netCDF3 station data" << std::endl;
+    std::cerr << "-f npnnetcdf     NOAA Profiler Network vertical profile data" << std::endl;
     std::cerr << "-f pbnetcdf      NetCDF3 converted from prepbufr" << std::endl;
     std::cerr << "-f rafnetcdf     NCAR-RAF/nimbus compliant netCDF3 aircraft data" << std::endl;
     std::cerr << "-f samosnc       SAMOS netCDF3 data" << std::endl;
@@ -4930,7 +4872,7 @@ int main(int argc,char **argv)
   signal(SIGSEGV,segv_handler);
   signal(SIGINT,int_handler);
   meta_args.args_string=unixutils::unix_args_string(argc,argv,'%');
-  metautils::read_config("nc2xml",user,meta_args.args_string);
+  metautils::read_config("nc2xml",user);
   parse_args();
   flags="-f";
   if (!meta_args.inventory_only && std::regex_search(meta_args.path,std::regex("^https://rda.ucar.edu"))) {
@@ -4942,7 +4884,8 @@ int main(int argc,char **argv)
     metautils::check_for_existing_cmd("GrML");
     metautils::check_for_existing_cmd("ObML");
   }
-  scan_file();
+  metadata::ObML::ObservationData obs_data;
+  scan_file(obs_data);
   if (verbose_operation && !meta_args.inventory_only) {
     std::cout << "Writing XML..." << std::endl;
   }
@@ -4956,7 +4899,7 @@ int main(int argc,char **argv)
     ext="ObML";
     if (!meta_args.inventory_only) {
 	if (total_num_not_missing > 0) {
-	  metadata::ObML::write_obml(ID_table,platform_table,"nc2xml",user);
+	  metadata::ObML::write_obml(obs_data,"nc2xml",user);
 	}
 	else {
 	  std::cerr << "Terminating - data variables could not be identified or they only contain missing values. No content metadata will be saved for this file" << std::endl;
