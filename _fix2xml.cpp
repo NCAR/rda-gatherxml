@@ -41,11 +41,6 @@ void parse_args()
   std::deque<std::string> sp;
   size_t n;
 
-  meta_args.update_db=true;
-  meta_args.update_summary=true;
-  meta_args.update_graphics=true;
-  meta_args.override_primary_check=false;
-  meta_args.overwrite_only=false;
   meta_args.temp_loc=meta_directives.temp_path;
   sp=strutils::split(meta_args.args_string,"%");
   for (n=0; n < sp.size()-1; n++) {

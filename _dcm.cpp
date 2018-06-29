@@ -44,7 +44,6 @@ bool create_MSS_filelist_cache=false,create_Web_filelist_cache=false,create_inv_
 
 void parse_args()
 {
-  meta_args.update_graphics=true;
   auto arg_list=strutils::split(meta_args.args_string,"%");
   for (auto arg=arg_list.begin(); arg != arg_list.end(); ++arg) {
     if (*arg == "-d") {

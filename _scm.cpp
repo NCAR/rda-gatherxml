@@ -99,7 +99,6 @@ struct StringEntry {
 
 void parse_args()
 {
-  meta_args.regenerate=true;
   auto sp=strutils::split(meta_args.args_string,"`");
   for (size_t n=0; n < sp.size(); n++) {
     if (sp[n] == "-a") {

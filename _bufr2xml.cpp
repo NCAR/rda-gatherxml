@@ -51,11 +51,6 @@ extern "C" void clean_up()
 
 void parse_args()
 {
-  meta_args.update_db=true;
-  meta_args.update_summary=true;
-  meta_args.update_graphics=true;
-  meta_args.override_primary_check=false;
-  meta_args.regenerate=true;
   meta_args.temp_loc=meta_directives.temp_path;
   std::deque<std::string> sp=strutils::split(meta_args.args_string,"%");
   for (size_t n=0; n < sp.size()-1; ++n) {
