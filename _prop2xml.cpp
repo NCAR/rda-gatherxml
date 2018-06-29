@@ -15,6 +15,7 @@ std::string myerror="";
 std::string mywarning="";
 
 std::string user=getenv("USER");
+auto verbose_operation=false;
 
 extern "C" void clean_up()
 {
@@ -38,10 +39,6 @@ extern "C" void int_handler(int)
 
 void parse_args()
 {
-  meta_args.override_primary_check=false;
-  meta_args.update_db=true;
-  meta_args.update_summary=true;
-  meta_args.regenerate=true;
   auto args=strutils::split(meta_args.args_string,"!");
   for (size_t n=0; n < args.size(); ++n) {
     if (args[n] == "-d") {
@@ -55,6 +52,9 @@ void parse_args()
     }
     else if (args[n] == "-i") {
 	meta_args.local_name=args[++n];
+    }
+    else if (args[n] == "-V") {
+	verbose_operation=true;
     }
   }
   if (meta_args.data_format.empty()) {
@@ -219,15 +219,24 @@ void process_observation(const std::string& line,const std::unordered_set<std::s
     std::cerr << "Error: bad data type '" << fields[8] << "' on line:\n" << line << std::endl;
     exit(1);
   }
-  obs_data.add_to_platforms(fields[0],platform_key,lat,lon);
+  if (!obs_data.added_to_platforms(fields[0],platform_key,lat,lon)) {
+    std::cerr << "Error: " << myerror << std::endl;
+    exit(1);
+  }
   auto start_date=fill_date(fields[6],line);
   if (fields[7].empty()) {
-    obs_data.add_to_ids(fields[0],ientry,dtype_parts.front(),lat,lon,std::stod(start_date.to_string("%Y%m%d%H%MM%SS")),&start_date);
+    if (!obs_data.added_to_ids(fields[0],ientry,dtype_parts.front(),"",lat,lon,std::stod(start_date.to_string("%Y%m%d%H%MM%SS")),&start_date)) {
+	std::cerr << "Error: " << myerror << std::endl;
+	exit(1);
+    }
   }
   else {
     auto end_date=fill_date(fields[7],line);
     auto ts=(std::stod(start_date.to_string("%Y%m%d%H%MM%SS"))+std::stod(end_date.to_string("%Y%m%d%H%MM%SS")))/2.;
-    obs_data.add_to_ids(fields[0],ientry,dtype_parts.front(),lat,lon,ts,&start_date,&end_date);
+    if (!obs_data.added_to_ids(fields[0],ientry,dtype_parts.front(),"",lat,lon,ts,&start_date,&end_date)) {
+	std::cerr << "Error: " << myerror << std::endl;
+	exit(1);
+    }
   }
   if (unique_datatypes.find(dtype_parts.front()) == unique_datatypes.end()) {
     unique_datatypes.emplace(dtype_parts.front(),dtype_parts.back());
@@ -240,6 +249,13 @@ void scan_input_file(metadata::ObML::ObservationData& obs_data)
   if (!ifs.is_open()) {
     std::cerr << "Error opening '" << meta_args.local_name << "' for input" << std::endl;
     exit(1);
+  }
+  long long num_input_lines=0;
+  if (verbose_operation) {
+    std::stringstream oss,ess;
+    unixutils::mysystem2("/bin/tcsh -c \"wc -l "+meta_args.local_name+" |awk '{print $1}'\"",oss,ess);
+    num_input_lines=std::stoll(oss.str());
+    std::cout << "Beginning scan of input file '"+meta_args.local_name+"' containing " << num_input_lines << " lines ..." << std::endl;
   }
   std::unordered_set<std::string> platform_types,id_types;
   MySQL::Server server(meta_directives.database_server,meta_directives.metadb_username,meta_directives.metadb_password,"");
@@ -271,6 +287,7 @@ void scan_input_file(metadata::ObML::ObservationData& obs_data)
   const size_t LINE_LENGTH=32768;
   std::unique_ptr<char[]> line(new char[LINE_LENGTH]);
   ifs.getline(line.get(),LINE_LENGTH);
+  auto num_lines=0;
   while (!ifs.eof()) {
     std::string sline=line.get();
     strutils::replace_all(sline,"\\\\","__SLASH__");
@@ -281,9 +298,16 @@ void scan_input_file(metadata::ObML::ObservationData& obs_data)
     else {
 	process_observation(sline,platform_types,id_types,variables,unique_datatypes,obs_data);
     }
+    ++num_lines;
+    if (verbose_operation && (num_lines % 10000) == 0) {
+	std::cout << "Processed " << num_lines << " input lines out of a total of " << num_input_lines << std::endl;
+    }
     ifs.getline(line.get(),LINE_LENGTH);
   }
   ifs.close();
+  if (verbose_operation) {
+    std::cout << "... scanning of input file is completed." << std::endl;
+  }
   server.disconnect();
   TempDir tdir;
   std::stringstream oss,ess;
@@ -302,6 +326,9 @@ void scan_input_file(metadata::ObML::ObservationData& obs_data)
     }
     ifs.close();
     existing_map_contents.pop_back();
+  }
+  if (verbose_operation) {
+    std::cout << "Writing parameter map ..." << std::endl;
   }
   std::string datatype_map=tdir.name()+"/metadata/ParameterTables/"+meta_args.data_format+".ds"+meta_args.dsnum+".xml";
   std::ofstream ofs(datatype_map.c_str());
@@ -360,6 +387,9 @@ void scan_input_file(metadata::ObML::ObservationData& obs_data)
   }
   if (unixutils::mysystem2("/bin/cp "+datatype_map+" "+meta_directives.parameter_map_path+"/",oss,ess) < 0) {
     metautils::log_warning("sync of data type map to share directory failed - error(s): '"+error+"'","prop2xml",user);
+  }
+  if (verbose_operation) {
+    std::cout << "... parameter map written." << std::endl;
   }
 }
 
@@ -430,8 +460,14 @@ int main(int argc,char **argv)
 	flags="-S "+flags;
     }
     std::stringstream oss,ess;
+    if (verbose_operation) {
+	std::cout << "Calling 'scm' ..." << std::endl;
+    }
     if (unixutils::mysystem2(meta_directives.local_root+"/bin/scm -d "+meta_args.dsnum+" "+flags+" "+meta_args.filename+".ObML",oss,ess) < 0) {
 	std::cerr << ess.str() << std::endl;
+    }
+    if (verbose_operation) {
+	std::cout << "... 'scm' completed." << std::endl;
     }
   }
 }

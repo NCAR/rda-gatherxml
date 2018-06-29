@@ -118,10 +118,6 @@ extern "C" void clean_up()
 
 void parse_args()
 {
-  meta_args.override_primary_check=false;
-  meta_args.update_db=true;
-  meta_args.update_summary=true;
-  meta_args.regenerate=true;
   std::deque<std::string> sp=strutils::split(meta_args.args_string,"%");
   for (size_t n=0; n < sp.size(); ++n) {
     if (sp[n] == "-d") {
@@ -818,14 +814,14 @@ void scan_ispd_hdf5_file(InputHDF5Stream& istream,metadata::ObML::ObservationDat
 		    }
 		    if ((v[0] >= 860. && v[0] <= 1090.) || (v[1] >= 400. && v[1] <= 1090.)) {
 			if (v[0] < 9999.9) {
-			  if (!obs_data.added_to_ids("surface",ientry,"SLP",le.data->lat,le.data->lon,std::stoll(timestamp),&dt)) {
+			  if (!obs_data.added_to_ids("surface",ientry,"SLP","",le.data->lat,le.data->lon,std::stoll(timestamp),&dt)) {
 			    metautils::log_error("scan_ispd_hdf5_file() returned error: '"+myerror+" when adding ID "+ientry.key,"hdf2xml",user);
 			  }
 			  le.data->already_counted=true;
 			  ++num_not_missing;
 			}
 			if (v[1] < 9999.9) {
-			  if (!obs_data.added_to_ids("surface",ientry,"STNP",le.data->lat,le.data->lon,std::stoll(timestamp),&dt)) {
+			  if (!obs_data.added_to_ids("surface",ientry,"STNP","",le.data->lat,le.data->lon,std::stoll(timestamp),&dt)) {
 			    metautils::log_error("scan_ispd_hdf5_file() returned error: '"+myerror+" when adding ID "+ientry.key,"hdf2xml",user);
 			  }
 			  le.data->already_counted=true;
@@ -913,7 +909,7 @@ void scan_ispd_hdf5_file(InputHDF5Stream& istream,metadata::ObML::ObservationDat
 			  metautils::log_error("bad precision ("+strutils::itos(dv.precision_)+") for ensemble analysis pressure","hdf2xml",user);
 			}
 			if ((v[0] >= 400. && v[0] <= 1090.) || (v[1] >= 400. && v[1] <= 1090.) || (v[2] >= 400. && v[2] <= 1090.)) {
-			  if (!obs_data.added_to_ids("surface",ientry,"Feedback",le.data->lat,le.data->lon,std::stoll(timestamp),&dt)) {
+			  if (!obs_data.added_to_ids("surface",ientry,"Feedback","",le.data->lat,le.data->lon,std::stoll(timestamp),&dt)) {
 			    metautils::log_error("scan_ispd_hdf5_file() returned error: '"+myerror+" when adding ID "+ientry.key,"hdf2xml",user);
 			  }
 			  ++num_not_missing;
@@ -1027,7 +1023,7 @@ void scan_usarray_transportable_hdf5_file(InputHDF5Stream& istream,ScanData& sca
     }
     if (pres.float_value(n) != pres_miss_val) {
 	DateTime dt=epoch.seconds_added(times.long_long_value(n));
-	if (!obs_data.added_to_ids("surface",ientry,datatype,lat,lon,times.long_long_value(n),&dt)) {
+	if (!obs_data.added_to_ids("surface",ientry,datatype,"",lat,lon,times.long_long_value(n),&dt)) {
 	  metautils::log_error("scan_usarray_transportable_hdf5_file() returned error: '"+myerror+" when adding ID "+ientry.key,"hdf2xml",user);
 	}
 	++num_not_missing;
@@ -1710,7 +1706,7 @@ void scan_cf_point_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data,met
 		metautils::log_error("scan_cf_point_hdf5nc4_file() returned error: '"+myerror+" when adding platform "+platform_type,"hdf2xml",user);
 	    }
 	    ientry.key=platform_type+"[!]unknown[!]"+ids[n];
-	    if (!obs_data.added_to_ids("surface",ientry,ds_entry.key,lats[n],lons[n],time_vals.value(n),&date_times[n])) {
+	    if (!obs_data.added_to_ids("surface",ientry,ds_entry.key,"",lats[n],lons[n],time_vals.value(n),&date_times[n])) {
 		metautils::log_error("scan_cf_point_hdf5nc4_file() returned error: '"+myerror+" when adding ID "+ientry.key,"hdf2xml",user);
 	    }
 	    ++num_not_missing;

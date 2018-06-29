@@ -18,11 +18,7 @@ std::string mywarning="";
 std::string user=getenv("USER");
 TempFile *tfile=nullptr;
 TempDir *tdir=nullptr;
-my::map<metadata::ObML::PlatformEntry> platform_table[metadata::ObML::NUM_OBS_TYPES];
-metadata::ObML::PlatformEntry pentry;
-my::map<metadata::ObML::IDEntry> **id_table=nullptr;
 metadata::ObML::IDEntry ientry;
-size_t total_num_not_missing=0;
 enum {grml_type=1,obml_type};
 int write_type=-1;
 
@@ -59,10 +55,6 @@ void parse_args()
   size_t n;
   int idx;
 
-  meta_args.override_primary_check=false;
-  meta_args.update_db=true;
-  meta_args.update_summary=true;
-  meta_args.regenerate=true;
   sp=strutils::split(meta_args.args_string,"!");
   for (n=0; n < sp.size(); ++n) {
     if (sp[n] == "-d") {
@@ -104,16 +96,6 @@ void parse_args()
   meta_args.path=meta_args.path.substr(0,idx);
 }
 
-void initialize_for_observations()
-{
-  if (id_table == nullptr) {
-    id_table=new my::map<metadata::ObML::IDEntry> *[metadata::ObML::NUM_OBS_TYPES];
-    for (size_t n=0; n < metadata::ObML::NUM_OBS_TYPES; ++n) {
-	id_table[n]=new my::map<metadata::ObML::IDEntry>(9999);
-    }
-  }
-}
-
 struct InvEntry {
   InvEntry() : key(),lat(0.),lon(0.),plat_type(0) {}
 
@@ -122,120 +104,12 @@ struct InvEntry {
   short plat_type;
 };
 
-void update_id_table(size_t obs_type_index,float lat,float lon,DateTime *datetime,DateTime *min_datetime,DateTime *max_datetime)
-{
-  if (!id_table[obs_type_index]->found(ientry.key,ientry)) {
-    ientry.data.reset(new metadata::ObML::IDEntry::Data);
-    ientry.data->S_lat=ientry.data->N_lat=lat;
-    ientry.data->W_lon=ientry.data->E_lon=lon;
-    ientry.data->min_lon_bitmap.reset(new float[360]);
-    ientry.data->max_lon_bitmap.reset(new float[360]);
-    for (size_t n=0; n < 360; ++n) {
-        ientry.data->min_lon_bitmap[n]=ientry.data->max_lon_bitmap[n]=999.;
-    }
-    size_t n,m;
-    geoutils::convert_lat_lon_to_box(1,0.,lon,n,m);
-    ientry.data->min_lon_bitmap[m]=ientry.data->max_lon_bitmap[m]=lon;
-    if (min_datetime == nullptr) {
-	ientry.data->start=*datetime;
-    }
-    else {
-	ientry.data->start=*min_datetime;
-    }
-    if (max_datetime == nullptr) {
-	ientry.data->end=*datetime;
-    }
-    else {
-	ientry.data->end=*max_datetime;
-    }
-    ientry.data->nsteps=1;
-    id_table[obs_type_index]->insert(ientry);
-  }
-  else {
-    if (lat != ientry.data->S_lat || lon != ientry.data->W_lon) {
-	if (lat < ientry.data->S_lat) {
-	  ientry.data->S_lat=lat;
-	}
-	if (lat > ientry.data->N_lat) {
-	  ientry.data->N_lat=lat;
-	}
-	if (lon < ientry.data->W_lon) {
-	  ientry.data->W_lon=lon;
-	}
-	if (lon > ientry.data->E_lon) {
-	  ientry.data->E_lon=lon;
-	}
-	size_t n,m;
-	geoutils::convert_lat_lon_to_box(1,0.,lon,n,m);
-	if (ientry.data->min_lon_bitmap[m] > 900.) {
-	  ientry.data->min_lon_bitmap[m]=ientry.data->max_lon_bitmap[m]=lon;
-	}
-	else { 
-	  if (lon < ientry.data->min_lon_bitmap[m]) {
-	    ientry.data->min_lon_bitmap[m]=lon;
-	  }
-	  if (lon > ientry.data->max_lon_bitmap[m]) {
-	    ientry.data->max_lon_bitmap[m]=lon;
-	  }
-	}
-    }
-    if (min_datetime == nullptr) {
-	if (*datetime < ientry.data->start) {
-	  ientry.data->start=*datetime;
-	}
-    }
-    else {
-	if (*min_datetime < ientry.data->start) {
-	  ientry.data->start=*min_datetime;
-	}
-    }
-    if (max_datetime == nullptr) {
-	if (*datetime > ientry.data->end) {
-	  ientry.data->end=*datetime;
-	}
-    }
-    else {
-	if (*max_datetime > ientry.data->end) {
-	  ientry.data->end=*max_datetime;
-	}
-    }
-    ++(ientry.data->nsteps);
-  }
-}
-
-void update_id_table(size_t obs_type_index,float lat,float lon,DateTime& datetime)
-{
-  update_id_table(obs_type_index,lat,lon,&datetime,nullptr,nullptr);
-}
-
-void update_platform_table(size_t obs_type_index,float lat,float lon)
-{
-  if (!platform_table[obs_type_index].found(pentry.key,pentry)) {
-    pentry.boxflags.reset(new summarizeMetadata::BoxFlags);
-    pentry.boxflags->initialize(361,180,0,0);
-    platform_table[obs_type_index].insert(pentry);
-  }
-  if (lat == -90.) {
-    pentry.boxflags->spole=1;
-  }
-  else if (lat == 90.) {
-    pentry.boxflags->npole=1;
-  }
-  else {
-    size_t n,m;
-    geoutils::convert_lat_lon_to_box(1,lat,lon,n,m);
-    pentry.boxflags->flags[n-1][m]=1;
-    pentry.boxflags->flags[n-1][360]=1;
-  }
-}
-
-void scan_ghcnv3_file(std::list<std::string>& filelist)
+void scan_ghcnv3_file(metadata::ObML::ObservationData& obs_data,std::list<std::string>& filelist)
 {
   TempDir tdir;
   if (!tdir.create(meta_directives.temp_path)) {
     metautils::log_error("scan_ghcnv3_file(): unable to create temporary directory","ascii2xml",user);
   }
-  initialize_for_observations();
 // load the station inventory
   MySQL::Server server(meta_directives.database_server,meta_directives.rdadb_username,meta_directives.rdadb_password,"dssdb");
   if (!server) {
@@ -284,13 +158,14 @@ void scan_ghcnv3_file(std::list<std::string>& filelist)
 	InvEntry ie;
 	ie.key.assign(line,11);
 	inv_table.found(ie.key,ie);
+	std::string platform_type;
 	if (ie.plat_type == 0) {
-	  pentry.key="land_station";
+	  platform_type="land_station";
 	}
 	else {
-	  pentry.key="fixed_ship";
+	  platform_type="fixed_ship";
 	}
-	ientry.key=pentry.key+"[!]GHCNV3[!]"+ie.key;
+	ientry.key=platform_type+"[!]GHCNV3[!]"+ie.key;
 	auto year=std::stoi(std::string(&line[11],4));
 	auto off=19;
 	auto add_platform_entry=false;
@@ -300,24 +175,17 @@ void scan_ghcnv3_file(std::list<std::string>& filelist)
 	    auto month=n+1;
 	    min_datetime.set(year,month,1,0);
 	    max_datetime.set(year,month,dateutils::days_in_month(year,month),235959);
-	    update_id_table(1,ie.lat,ie.lon,nullptr,&min_datetime,&max_datetime);
-	    metadata::ObML::DataTypeEntry de;
-	    de.key.assign(&line[15],4);
-	    if (!ientry.data->data_types_table.found(de.key,de)) {
-		de.data.reset(new metadata::ObML::DataTypeEntry::Data);
-		de.data->nsteps=1;
-		ientry.data->data_types_table.insert(de);
+	    if (!obs_data.added_to_ids("surface",ientry,std::string(&line[15],4),"",ie.lat,ie.lon,-1.,&min_datetime,&max_datetime)) {
+	      metautils::log_error("scan_ghcnv3_file() returned error: '"+myerror+"' while adding ID "+ientry.key,"ascii2xml",user);
 	    }
-	    else {
-		++(de.data->nsteps);
-	    }
-	    ++total_num_not_missing;
 	    add_platform_entry=true;
 	  }
 	  off+=8;
 	}
 	if (add_platform_entry) {
-	  update_platform_table(1,ie.lat,ie.lon);
+	  if (!obs_data.added_to_platforms("surface",platform_type,ie.lat,ie.lon)) {
+	    metautils::log_error("scan_ghcnv3_file() returned error: '"+myerror+"' while adding platform "+platform_type,"ascii2xml",user);
+	  }
 	}
 	ifs.getline(line,32768);
     }
@@ -326,10 +194,9 @@ void scan_ghcnv3_file(std::list<std::string>& filelist)
   }
 }
 
-void scan_little_r_file(std::list<std::string>& filelist)
+void scan_little_r_file(metadata::ObML::ObservationData& obs_data,std::list<std::string>& filelist)
 {
   const char *DATA_TYPES[10]={"Pressure","Height","Temperature","Dew point","Wind speed","Wind direction","East-west wind","North-south wind","Relative humidity","Thickness"};
-  initialize_for_observations();
   std::unique_ptr<unsigned char []> buffer;
   for (const auto& file : filelist) {
     InputLITTLE_RStream istream;
@@ -390,13 +257,14 @@ void scan_little_r_file(std::list<std::string>& filelist)
 	    }
 	  }
 	  if (!all_missing) {
-	    size_t obs_type_index;
+	    std::string obs_type;
 	    if (obs.is_sounding()) {
-		obs_type_index=0;
+		obs_type="upper_air";
 	    }
 	    else {
-		obs_type_index=1;
+		obs_type="surface";
 	    }
+	    std::string platform_type;
 	    switch (obs.platform_code()) {
 		case 12:
 		case 14:
@@ -407,20 +275,20 @@ void scan_little_r_file(std::list<std::string>& filelist)
 		case 35:
 		case 38:
 		{
-		  pentry.key="land_station";
+		  platform_type="land_station";
 		  break;
 		}
 		case 13:
 		case 33:
 		case 36:
 		{
-		  pentry.key="roving_ship";
+		  platform_type="roving_ship";
 		  break;
 		}
 		case 18:
 		case 19:
 		{
-		  pentry.key="drifting_buoy";
+		  platform_type="drifting_buoy";
 		  break;
 		}
 		case 37:
@@ -429,7 +297,7 @@ void scan_little_r_file(std::list<std::string>& filelist)
 		case 97:
 		case 101:
 		{
-		  pentry.key="aircraft";
+		  platform_type="aircraft";
 		  break;
 		}
 		case 86:
@@ -440,23 +308,23 @@ void scan_little_r_file(std::list<std::string>& filelist)
 		case 133:
 		case 281:
 		{
-		  pentry.key="satellite";
+		  platform_type="satellite";
 		  break;
 		}
 		case 111:
 		case 114:
 		{
-		  pentry.key="gps_receiver";
+		  platform_type="gps_receiver";
 		  break;
 		}
 		case 132:
 		{
-		  pentry.key="wind_profiler";
+		  platform_type="wind_profiler";
 		  break;
 		}
 		case 135:
 		{
-		  pentry.key="bogus";
+		  platform_type="bogus";
 		  break;
 		}
 		default:
@@ -464,27 +332,21 @@ void scan_little_r_file(std::list<std::string>& filelist)
 		  metautils::log_error("scan_little_r_file() encountered an undocumented platform code: "+strutils::itos(obs.platform_code()),"ascii2xml",user);
 		}
 	    }
-	    update_platform_table(obs_type_index,obs.location().latitude,obs.location().longitude);
+	    if (!obs_data.added_to_platforms(obs_type,platform_type,obs.location().latitude,obs.location().longitude)) {
+		metautils::log_error("scan_little_r_file() returned error: '"+myerror+"' while adding platform "+obs_type+"-"+platform_type,"ascii2xml",user);
+	    }
 	    size_t j,i;
 	    geoutils::convert_lat_lon_to_box(1,obs.location().latitude,obs.location().longitude,j,i);
-	    ientry.key=pentry.key+"[!]latlonbox1[!]"+strutils::ftos((j-1)*360+1+i,5,0,'0');
+	    ientry.key=platform_type+"[!]latlonbox1[!]"+strutils::ftos((j-1)*360+1+i,5,0,'0');
 	    auto date_time=obs.date_time();
-	    update_id_table(obs_type_index,obs.location().latitude,obs.location().longitude,date_time);
 	    for (size_t n=0; n < data_present.size(); ++n) {
 		if (data_present[n] == 1) {
 		  metadata::ObML::DataTypeEntry de;
-		  de.key=DATA_TYPES[n];
-		  if (!ientry.data->data_types_table.found(de.key,de)) {
-		    de.data.reset(new metadata::ObML::DataTypeEntry::Data);
-		    de.data->nsteps=1;
-		    ientry.data->data_types_table.insert(de);
-		  }
-		  else {
-		    ++(de.data->nsteps);
+		  if (!obs_data.added_to_ids(obs_type,ientry,DATA_TYPES[n],"",obs.location().latitude,obs.location().longitude,-1,&date_time)) {
+		    metautils::log_error("scan_little_r_file() returned error: '"+myerror+"' while adding ID "+ientry.key,"ascii2xml",user);
 		  }
 		}
 	    }
-	    ++total_num_not_missing;
 	  }
 	}
     }
@@ -492,9 +354,8 @@ void scan_little_r_file(std::list<std::string>& filelist)
   }
 }
 
-void scan_nodc_sea_level_file(std::list<std::string>& filelist)
+void scan_nodc_sea_level_file(metadata::ObML::ObservationData& obs_data,std::list<std::string>& filelist)
 {
-  initialize_for_observations();
   std::unique_ptr<unsigned char[]> buffer(nullptr);
   for (const auto& file : filelist) {
     InputNODCSeaLevelObservationStream istream;
@@ -515,39 +376,30 @@ void scan_nodc_sea_level_file(std::list<std::string>& filelist)
 	  else if (meta_args.data_format != obs.data_format()) {
 	    metautils::log_error("scan_nodc_sea_level_file(): data format changed","ascii2xml",user);
 	  }
-	  pentry.key="tide_station";
-	  update_platform_table(1,obs.location().latitude,obs.location().longitude);
-	  ientry.key=pentry.key+"[!]NODC[!]"+obs.location().ID;
+	  if (!obs_data.added_to_platforms("surface","tide_station",obs.location().latitude,obs.location().longitude)) {
+	    metautils::log_error("scan_nodc_sea_level_file() returned error: '"+myerror+"' while adding platform","ascii2xml",user);
+	  }
+	  ientry.key="tide_station[!]NODC[!]"+obs.location().ID;
+	  DateTime start_date_time,*end_date_time=nullptr;
 	  if (obs.data_format() == "F186") {
-	    auto max_date_time=obs.date_time();
-	    max_date_time.set_time(999999);
-	    auto min_date_time=max_date_time;
-	    min_date_time.set_day(1);
-	    update_id_table(1,obs.location().latitude,obs.location().longitude,nullptr,&min_date_time,&max_date_time);
+	    end_date_time=new DateTime(obs.date_time());
+	    end_date_time->set_time(999999);
+	    start_date_time=*end_date_time;
+	    start_date_time.set_day(1);
 	  }
 	  else if (obs.data_format() == "F185") {
-	    auto max_date_time=obs.date_time();
-	    max_date_time.set_time(max_date_time.time()+99);
-	    auto min_date_time=max_date_time;
-	    min_date_time.set_time(99);
-	    update_id_table(1,obs.location().latitude,obs.location().longitude,nullptr,&min_date_time,&max_date_time);
+	    end_date_time=new DateTime(obs.date_time());
+	    end_date_time->set_time(end_date_time->time()+99);
+	    start_date_time=*end_date_time;
+	    start_date_time.set_time(99);
 	  }
 	  else {
-	    auto date_time=obs.date_time();
-	    date_time.set_time(date_time.time()+99);
-	    update_id_table(1,obs.location().latitude,obs.location().longitude,date_time);
+	    start_date_time=obs.date_time();
+	    start_date_time.set_time(start_date_time.time()+99);
 	  }
-	  metadata::ObML::DataTypeEntry de;
-	  de.key="Sea Level Data";
-	  if (!ientry.data->data_types_table.found(de.key,de)) {
-	    de.data.reset(new metadata::ObML::DataTypeEntry::Data);
-	    de.data->nsteps=1;
-	    ientry.data->data_types_table.insert(de);
+	  if (!obs_data.added_to_ids("surface",ientry,"Sea Level Data","",obs.location().latitude,obs.location().longitude,-1.,&start_date_time,end_date_time)) {
+	    metautils::log_error("scan_nodc_sea_level_file() returned error: '"+myerror+"' while adding ID "+ientry.key,"ascii2xml",user);
 	  }
-	  else {
-	    ++(de.data->nsteps);
-	  }
-	  ++total_num_not_missing;
 	}
     }
     istream.close();
@@ -555,15 +407,14 @@ void scan_nodc_sea_level_file(std::list<std::string>& filelist)
   meta_args.data_format.insert(0,"NODC_");
 }
 
-void scan_file()
+void scan_file(metadata::ObML::ObservationData& obs_data)
 {
-  std::string file_format,error;
-  std::list<std::string> filelist;
-
   tfile=new TempFile;
   tfile->open(meta_directives.temp_path);
   tdir=new TempDir;
   tdir->create(meta_directives.temp_path);
+  std::string file_format,error;
+  std::list<std::string> filelist;
   if (!metautils::primaryMetadata::prepare_file_for_metadata_scanning(*tfile,*tdir,&filelist,file_format,error)) {
     metautils::log_error("prepare_file_for_metadata_scanning() returned '"+error+"'","ascii2xml",user);
   }
@@ -571,15 +422,15 @@ void scan_file()
     filelist.emplace_back(tfile->name());
   }
   if (meta_args.data_format == "ghcnmv3") {
-    scan_ghcnv3_file(filelist);
+    scan_ghcnv3_file(obs_data,filelist);
     write_type=obml_type;
   }
   else if (meta_args.data_format == "little_r") {
-    scan_little_r_file(filelist);
+    scan_little_r_file(obs_data,filelist);
     write_type=obml_type;
   }
   else if (meta_args.data_format == "nodcsl") {
-    scan_nodc_sea_level_file(filelist);
+    scan_nodc_sea_level_file(obs_data,filelist);
     write_type=obml_type;
   }
 }
@@ -603,7 +454,7 @@ int main(int argc,char **argv)
   signal(SIGSEGV,segv_handler);
   signal(SIGINT,int_handler);
   meta_args.args_string=unixutils::unix_args_string(argc,argv,'!');
-  metautils::read_config("ascii2xml",user,meta_args.args_string);
+  metautils::read_config("ascii2xml",user);
   parse_args();
   std::string flags="-f";
   if (std::regex_search(meta_args.path,std::regex("^https://rda.ucar.edu"))) {
@@ -611,15 +462,16 @@ int main(int argc,char **argv)
   }
   atexit(clean_up);
   metautils::cmd_register("ascii2xml",user);
-  scan_file();
+  metadata::ObML::ObservationData obs_data;
+  scan_file(obs_data);
   std::string ext;
   if (write_type == grml_type) {
     ext="GrML";
   }
   else if (write_type == obml_type) {
     ext="ObML";
-    if (total_num_not_missing > 0) {
-	metadata::ObML::write_obml(id_table,platform_table,"ascii2xml",user);
+    if (!obs_data.is_empty) {
+	metadata::ObML::write_obml(obs_data,"ascii2xml",user);
     }
     else {
 	std::cerr << "All stations have missing location information - no usable data found; no content metadata will be saved for this file" << std::endl;
