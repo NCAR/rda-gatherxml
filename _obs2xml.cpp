@@ -53,10 +53,6 @@ void parse_args()
 {
   size_t n;
 
-  meta_args.update_db=true;
-  meta_args.update_graphics=true;
-  meta_args.update_summary=true;
-  meta_args.override_primary_check=false;
   meta_args.temp_loc=meta_directives.temp_path;
   std::deque<std::string> sp=strutils::split(meta_args.args_string,"!");
   for (n=0; n < sp.size()-1; n++) {
@@ -1082,33 +1078,35 @@ void scan_file(metadata::ObML::ObservationData& obs_data)
     while ( (num_bytes=istream->read(buffer,BUF_LEN)) != bfstream::eof) {
 	if (num_bytes > 0) {
 	  obs->fill(buffer,Observation::full_report);
-	  std::string obs_type,platform_type;
-	  if (processed_observation(obs,obs_data,obs_type)) {
-	    if (inv_stream.is_open()) {
-		std::stringstream inv_line;
-		inv_line << istream->current_record_offset() << "|" << num_bytes << "|" << obs->date_time().to_string("%Y%m%d%H%MM");
-		InvEntry ie;
-		if (!inv_O_table.found(obs_type,ie)) {
-		  ie.key=obs_type;
-		  ie.num=inv_O_table.size();
-		  inv_O_table.insert(ie);
+	  if (obs->location().latitude > -99. && obs->location().longitude > -199.) {
+	    std::string obs_type,platform_type;
+	    if (processed_observation(obs,obs_data,obs_type)) {
+		if (inv_stream.is_open()) {
+		  std::stringstream inv_line;
+		  inv_line << istream->current_record_offset() << "|" << num_bytes << "|" << obs->date_time().to_string("%Y%m%d%H%MM");
+		  InvEntry ie;
+		  if (!inv_O_table.found(obs_type,ie)) {
+		    ie.key=obs_type;
+		    ie.num=inv_O_table.size();
+		    inv_O_table.insert(ie);
+		  }
+		  inv_line << "|" << ie.num;
+		  auto iparts=strutils::split(ientry.key,"[!]");
+		  if (!inv_P_table.found(iparts[0],ie)) {
+		    ie.key=iparts[0];
+		    ie.num=inv_P_table.size();
+		    inv_P_table.insert(ie);
+		  }
+		  inv_line << "|" << ie.num;
+		  ie.key=iparts[1]+"|"+iparts[2];
+		  if (!inv_I_table.found(ie.key,ie)) {
+		    ie.num=inv_I_table.size();
+		    inv_I_table.insert(ie);
+		  }
+		  inv_line << "|" << ie.num;
+		  inv_line << "|" << strutils::ftos(obs->location().latitude,4) << "|" << strutils::ftos(obs->location().longitude,4);
+		  inv_lines.emplace_back(inv_line.str());
 		}
-		inv_line << "|" << ie.num;
-		auto iparts=strutils::split(ientry.key,"[!]");
-		if (!inv_P_table.found(iparts[0],ie)) {
-		  ie.key=iparts[0];
-		  ie.num=inv_P_table.size();
-		  inv_P_table.insert(ie);
-		}
-		inv_line << "|" << ie.num;
-		ie.key=iparts[1]+"|"+iparts[2];
-		if (!inv_I_table.found(ie.key,ie)) {
-		  ie.num=inv_I_table.size();
-		  inv_I_table.insert(ie);
-		}
-		inv_line << "|" << ie.num;
-		inv_line << "|" << strutils::ftos(obs->location().latitude,4) << "|" << strutils::ftos(obs->location().longitude,4);
-		inv_lines.emplace_back(inv_line.str());
 	    }
 	  }
 	} 
@@ -1226,6 +1224,7 @@ int main(int argc,char **argv)
 	flags="-S "+flags;
     }
     std::stringstream oss,ess;
+std::cerr << meta_directives.local_root+"/bin/scm -d "+meta_args.dsnum+" "+flags+" "+meta_args.filename+".ObML" << std::endl;
     if (unixutils::mysystem2(meta_directives.local_root+"/bin/scm -d "+meta_args.dsnum+" "+flags+" "+meta_args.filename+".ObML",oss,ess) < 0) {
 	std::cerr << ess.str() << std::endl;
     }
