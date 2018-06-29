@@ -516,7 +516,7 @@ int main(int argc,char **argv)
     exit(1);
   }
   meta_args.args_string=unixutils::unix_args_string(argc,argv,'%');
-  metautils::read_config("dcm",user,meta_args.args_string);
+  metautils::read_config("dcm",user);
   server.connect(meta_directives.database_server,meta_directives.metadb_username,meta_directives.metadb_password,"");
   if (!server) {
     metautils::log_error("unable to connect to MySQL:: server on startup","dcm",user);

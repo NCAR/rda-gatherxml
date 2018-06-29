@@ -686,7 +686,7 @@ int main(int argc,char **argv)
   signal(SIGSEGV,segv_handler);
   signal(SIGINT,int_handler);
   meta_args.args_string=unixutils::unix_args_string(argc,argv,'%');
-  metautils::read_config("fix2xml",user,meta_args.args_string);
+  metautils::read_config("fix2xml",user);
   parse_args();
   std::string flags="-f";
   if (strutils::has_beginning(meta_args.path,"https://rda.ucar.edu")) {

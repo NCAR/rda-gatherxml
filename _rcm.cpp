@@ -498,7 +498,7 @@ int main(int argc,char **argv)
     exit(1);
   }
   meta_args.args_string=unixutils::unix_args_string(argc,argv,'%');
-  metautils::read_config("rcm",user,meta_args.args_string);
+  metautils::read_config("rcm",user);
   sp=strutils::split(meta_args.args_string,"%");
   for (n=0; n < sp.size()-2; n++) {
     if (sp[n] == "-C") {
