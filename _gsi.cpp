@@ -131,7 +131,7 @@ extern "C" void *thread_ncl(void *tnc)
   if (unixutils::mysystem2("/bin/mkdir -p "+tdir->name()+"/datasets/ds"+meta_args.dsnum+"/metadata",oss,ess) < 0) {
     metautils::log_error("thread_ncl() can't create directory tree","gsi",user);
   }
-  if (std::regex_search(unixutils::host_name(),std::regex("^(cheyenne|geyser)"))) {
+  if (std::regex_search(unixutils::host_name(),std::regex("^(cheyenne|geyser|caldera|pronghorn|yslogin)"))) {
     unixutils::mysystem2("/bin/tcsh -c \"module delete intel; module load gnu ncl; ncl "+ncl_file->name()+"; ctrans -d sun -res 360x360 "+ncgm_file->name()+" |convert sun:- "+tiff_file->name()+"; mogrify -crop 360x180+0+90! "+tiff_file->name()+"; convert "+tiff_file->name()+" "+tdir->name()+"/datasets/ds"+meta_args.dsnum+"/metadata/spatial_coverage."+t->imagetag+".gif\"",oss,ess);
   }
   else {
@@ -219,7 +219,7 @@ void generate_graphics(MySQL::LocalQuery& query,std::string type,std::string tab
   if (unixutils::mysystem2("/bin/mkdir -p "+tdir->name()+"/datasets/ds"+meta_args.dsnum+"/metadata",oss,ess) < 0) {
     metautils::log_error("generate_graphics() can't create directory tree","gsi",user);
   }
-  if (std::regex_search(unixutils::host_name(),std::regex("^(cheyenne|geyser)"))) {
+  if (std::regex_search(unixutils::host_name(),std::regex("^(cheyenne|geyser|caldera|pronghorn|yslogin)"))) {
     unixutils::mysystem2("/bin/tcsh -c \"module delete intel; module load gnu ncl; ncl "+ncl_file->name()+"; ctrans -d sun -res 360x360 "+ncgm_file->name()+" |convert sun:- "+tiff_file->name()+"; mogrify -crop 360x180+0+90! "+tiff_file->name()+"; convert "+tiff_file->name()+" "+tdir->name()+"/datasets/ds"+meta_args.dsnum+"/metadata/spatial_coverage.gif\"",oss,ess);
   }
   else {
@@ -279,7 +279,7 @@ int main(int argc,char **argv)
   }
   if (table_exists(server,"FixML.ds"+dsnum2+"_locations")) {
     if (gindex.empty()) {
-	query.set("select distinct d.classification_code,c.classification,p.format_code,f.format from FixML.ds"+dsnum2+"_primaries as p left join FixML.ds"+dsnum2+"_locations as d on d.mssID_code = p.code left join FixML.classifications as c on d.classification_code = c.code left join FixML.formats as f on f.format = p.format_code where dsid = '"+meta_args.dsnum+"'");
+	query.set("select distinct d.classification_code,c.classification,p.format_code,f.format from FixML.ds"+dsnum2+"_primaries as p left join FixML.ds"+dsnum2+"_locations as d on d.mssID_code = p.code left join FixML.classifications as c on d.classification_code = c.code left join FixML.formats as f on f.format = p.format_code");
 	table="search.fix_data";
     }
     else {
