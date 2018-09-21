@@ -18,8 +18,8 @@
 #include <MySQL.hpp>
 #include <myerror.hpp>
 
-metautils::Directives meta_directives;
-metautils::Args meta_args;
+metautils::Directives metautils::directives;
+metautils::Args metautils::args;
 my::map<metadata::GrML::GridEntry> grid_table;
 const std::string user=getenv("USER");
 TempFile *tfile=nullptr;
@@ -40,76 +40,76 @@ void parse_args()
   std::deque<std::string> sp;
   size_t n;
 
-  meta_args.temp_loc=meta_directives.temp_path;
-  sp=strutils::split(meta_args.args_string,"!");
+  metautils::args.temp_loc=metautils::directives.temp_path;
+  sp=strutils::split(metautils::args.args_string,"!");
   for (n=0; n < sp.size()-1; n++) {
     if (sp[n] == "-f") {
-	meta_args.data_format=sp[++n];
+	metautils::args.data_format=sp[++n];
     }
     else if (sp[n] == "-d") {
-	meta_args.dsnum=sp[++n];
-	if (strutils::has_beginning(meta_args.dsnum,"ds")) {
-	  meta_args.dsnum=meta_args.dsnum.substr(2);
+	metautils::args.dsnum=sp[++n];
+	if (strutils::has_beginning(metautils::args.dsnum,"ds")) {
+	  metautils::args.dsnum=metautils::args.dsnum.substr(2);
 	}
     }
     else if (sp[n] == "-l") {
-	meta_args.local_name=sp[++n];
+	metautils::args.local_name=sp[++n];
     }
     else if (sp[n] == "-m") {
-        meta_args.member_name=sp[++n];
+        metautils::args.member_name=sp[++n];
     }
     else if (sp[n] == "-I") {
-	meta_args.inventory_only=true;
-	meta_args.update_db=false;
+	metautils::args.inventory_only=true;
+	metautils::args.update_db=false;
     }
     else if (sp[n] == "-S") {
-	meta_args.update_summary=false;
+	metautils::args.update_summary=false;
     }
     else if (sp[n] == "-U") {
 	if (user == "dattore") {
-	  meta_args.update_db=false;
+	  metautils::args.update_db=false;
 	}
     }
     else if (sp[n] == "-NC") {
 	if (user == "dattore") {
-	  meta_args.override_primary_check=true;
+	  metautils::args.override_primary_check=true;
 	}
     }
     else if (sp[n] == "-OO") {
 	if (user == "dattore") {
-	  meta_args.overwrite_only=true;
+	  metautils::args.overwrite_only=true;
 	}
     }
     else if (sp[n] == "-R") {
-	meta_args.regenerate=false;
+	metautils::args.regenerate=false;
     }
     else if (sp[n] == "-t") {
-	meta_args.temp_loc=sp[++n];
+	metautils::args.temp_loc=sp[++n];
     }
   }
-  if (meta_args.data_format.empty()) {
+  if (metautils::args.data_format.empty()) {
     std::cerr << "no format specified" << std::endl;
     exit(1);
   }
   else {
-    meta_args.data_format=strutils::to_lower(meta_args.data_format);
+    metautils::args.data_format=strutils::to_lower(metautils::args.data_format);
   }
-  if (meta_args.data_format == "grib1") {
-    meta_args.data_format="grib";
+  if (metautils::args.data_format == "grib1") {
+    metautils::args.data_format="grib";
   }
-  if (meta_args.dsnum.empty()) {
+  if (metautils::args.dsnum.empty()) {
     std::cerr << "no dataset number specified" << std::endl;
     exit(1);
   }
-  if (meta_args.dsnum == "999.9") {
-    meta_args.override_primary_check=true;
-    meta_args.update_db=false;
-    meta_args.update_summary=false;
-    meta_args.regenerate=false;
+  if (metautils::args.dsnum == "999.9") {
+    metautils::args.override_primary_check=true;
+    metautils::args.update_db=false;
+    metautils::args.update_summary=false;
+    metautils::args.regenerate=false;
   }
   n=sp[sp.size()-1].rfind("/");
-  meta_args.path=sp[sp.size()-1].substr(0,n);
-  meta_args.filename=sp[sp.size()-1].substr(n+1);
+  metautils::args.path=sp[sp.size()-1].substr(0,n);
+  metautils::args.filename=sp[sp.size()-1].substr(n+1);
 }
 
 extern "C" void clean_up()
@@ -121,7 +121,7 @@ extern "C" void clean_up()
   }
 // remove temporary file that was sym-linked because the data file name contains
 //  metadata
-  if (meta_args.data_format == "cmorph025" || meta_args.data_format == "cmorph8km") {
+  if (metautils::args.data_format == "cmorph025" || metautils::args.data_format == "cmorph8km") {
     unixutils::mysystem2("/bin/rm "+tfile_name,oss,ess);
   }
   if (tdir != nullptr) {
@@ -155,82 +155,82 @@ void scan_file()
   std::unique_ptr<idstream> istream;
   Grid *grid=nullptr;
   GRIBMessage *message=nullptr;
-  if (meta_args.data_format == "grib" || meta_args.data_format == "grib0") {
+  if (metautils::args.data_format == "grib" || metautils::args.data_format == "grib0") {
     istream.reset(new InputGRIBStream);
     message=new GRIBMessage;
     grid=new GRIBGrid;
   }
-  else if (meta_args.data_format == "grib2") {
+  else if (metautils::args.data_format == "grib2") {
     istream.reset(new InputGRIBStream);
     message=new GRIB2Message;
     grid=new GRIB2Grid;
   }
-  else if (meta_args.data_format == "jraieeemm") {
+  else if (metautils::args.data_format == "jraieeemm") {
     istream.reset(new InputJRAIEEEMMGridStream);
     grid=new JRAIEEEMMGrid;
   }
-  else if (meta_args.data_format == "oct") {
+  else if (metautils::args.data_format == "oct") {
     istream.reset(new InputOctagonalGridStream);
     grid=new OctagonalGrid;
   }
-  else if (meta_args.data_format == "tropical") {
+  else if (metautils::args.data_format == "tropical") {
     istream.reset(new InputTropicalGridStream);
     grid=new TropicalGrid;
   }
-  else if (meta_args.data_format == "ll") {
+  else if (metautils::args.data_format == "ll") {
     istream.reset(new InputLatLonGridStream);
     grid=new LatLonGrid;
   }
-  else if (meta_args.data_format == "slp") {
+  else if (metautils::args.data_format == "slp") {
     istream.reset(new InputSLPGridStream);
     grid=new SLPGrid;
   }
-  else if (meta_args.data_format == "navy") {
+  else if (metautils::args.data_format == "navy") {
     istream.reset(new InputNavyGridStream);
     grid=new NavyGrid;
   }
-  else if (meta_args.data_format == "ussrslp") {
+  else if (metautils::args.data_format == "ussrslp") {
     istream.reset(new InputUSSRSLPGridStream);
     grid=new USSRSLPGrid;
   }
-  else if (meta_args.data_format == "on84") {
+  else if (metautils::args.data_format == "on84") {
     istream.reset(new InputON84GridStream);
     grid=new ON84Grid;
   }
-  else if (meta_args.data_format == "noaaoi2") {
+  else if (metautils::args.data_format == "noaaoi2") {
     istream.reset(new InputNOAAOI2SSTGridStream);
     grid=new NOAAOI2SSTGrid;
   }
-  else if (meta_args.data_format == "cgcm1") {
+  else if (metautils::args.data_format == "cgcm1") {
     istream.reset(new InputCGCM1GridStream);
     grid=new CGCM1Grid;
   }
-  else if (meta_args.data_format == "cmorph025") {
+  else if (metautils::args.data_format == "cmorph025") {
     istream.reset(new InputCMORPH025GridStream);
     grid=new CMORPH025Grid;
   }
-  else if (meta_args.data_format == "cmorph8km") {
+  else if (metautils::args.data_format == "cmorph8km") {
     istream.reset(new InputCMORPH8kmGridStream);
     grid=new CMORPH8kmGrid;
   }
-  else if (meta_args.data_format == "gpcp") {
+  else if (metautils::args.data_format == "gpcp") {
     istream.reset(new InputGPCPGridStream);
     grid=new GPCPGrid;
   }
   else {
-    metautils::log_error(meta_args.data_format+"-formatted files not recognized","grid2xml",user);
+    metautils::log_error(metautils::args.data_format+"-formatted files not recognized","grid2xml",user);
   }
   tfile=new TempFile;
   tdir=new TempDir;
-  if (meta_args.data_format == "jraieeemm") {
-    tfile->open(meta_args.temp_loc,"."+meta_args.filename);
+  if (metautils::args.data_format == "jraieeemm") {
+    tfile->open(metautils::args.temp_loc,"."+metautils::args.filename);
     tfile_name=tfile->name();
   }
   else {
-    tfile->open(meta_args.temp_loc);
+    tfile->open(metautils::args.temp_loc);
 // symlink the temporary file when the data file name contains metadata
-    if (meta_args.data_format == "cmorph025" || meta_args.data_format == "cmorph8km") {
-	tfile_name= (!meta_args.local_name.empty()) ? meta_args.local_name : meta_args.filename;
+    if (metautils::args.data_format == "cmorph025" || metautils::args.data_format == "cmorph8km") {
+	tfile_name= (!metautils::args.local_name.empty()) ? metautils::args.local_name : metautils::args.filename;
 	auto idx=tfile_name.rfind("/");
 	if (idx != std::string::npos) {
 	  tfile_name=tfile_name.substr(idx+1);
@@ -246,7 +246,7 @@ void scan_file()
 	tfile_name=tfile->name();
     }
   }
-  tdir->create(meta_args.temp_loc);
+  tdir->create(metautils::args.temp_loc);
   std::string file_format,error;
   if (!metautils::primaryMetadata::prepare_file_for_metadata_scanning(*tfile,*tdir,NULL,file_format,error)) {
     metautils::log_error("prepare_file_for_metadata_scanning() returned '"+error+"'","grid2xml",user);
@@ -259,11 +259,11 @@ void scan_file()
 	metautils::log_error("open_file_for_metadata_scanning(): unable to open file","grid2xml",user);
     }
   }
-  if ((file_format.empty() || file_format == "TAR") && (meta_args.data_format == "grib" || meta_args.data_format == "grib0" || meta_args.data_format == "grib2")) {
+  if ((file_format.empty() || file_format == "TAR") && (metautils::args.data_format == "grib" || metautils::args.data_format == "grib0" || metautils::args.data_format == "grib2")) {
     metadata::open_inventory(inv_file,&inv_dir,inv_stream,"GrML","grid2xml",user);
   }
-  else if (meta_args.inventory_only) {
-    metautils::log_error("scan_file() returned error: unable to inventory "+meta_args.path+"/"+meta_args.filename+" because archive format is '"+file_format+"'","grid2xml",user);
+  else if (metautils::args.inventory_only) {
+    metautils::log_error("scan_file() returned error: unable to inventory "+metautils::args.path+"/"+metautils::args.filename+" because archive format is '"+file_format+"'","grid2xml",user);
   }
   xmlutils::LevelMapper level_mapper("/glade/u/home/rdadata/share/metadata/LevelTables");
   std::list<std::string> inv_lines;
@@ -271,7 +271,7 @@ void scan_file()
   size_t ngrids=0;
   int buffer_length=0;
   while (1) {
-    if ((meta_args.data_format != "grib" && meta_args.data_format != "grib2") || ngrids == message->number_of_grids()) {
+    if ((metautils::args.data_format != "grib" && metautils::args.data_format != "grib2") || ngrids == message->number_of_grids()) {
 	auto bytes_read=istream->peek();
 	if (bytes_read < 0) {
 	  if (bytes_read == bfstream::error) {
@@ -289,7 +289,7 @@ void scan_file()
 	istream->read(buffer.get(),buffer_length);
 	ngrids=0;
     }
-    if (meta_args.data_format == "grib" || meta_args.data_format == "grib2") {
+    if (metautils::args.data_format == "grib" || metautils::args.data_format == "grib2") {
 	if (ngrids == 0) {
 	  message->fill(buffer.get(),true);
 	  while (message->number_of_grids() == 0) {
@@ -318,11 +318,11 @@ void scan_file()
 	++ngrids;
     }
     else {
-	if (meta_args.data_format == "cmorph025") {
+	if (metautils::args.data_format == "cmorph025") {
 	  reinterpret_cast<CMORPH025Grid *>(grid)->set_date_time(reinterpret_cast<InputCMORPH025GridStream *>(istream.get())->date_time());
 	  reinterpret_cast<CMORPH025Grid *>(grid)->set_latitudes(reinterpret_cast<InputCMORPH025GridStream *>(istream.get())->start_latitude(),reinterpret_cast<InputCMORPH025GridStream *>(istream.get())->end_latitude());
 	}
-	else if (meta_args.data_format == "gpcp") {
+	else if (metautils::args.data_format == "gpcp") {
 	  grid->fill(buffer.get(),Grid::full_grid);
 	}
 	else {
@@ -330,7 +330,7 @@ void scan_file()
 	}
     }
     griddef=grid->definition();
-    if (meta_args.data_format == "gpcp" && reinterpret_cast<GPCPGrid *>(grid)->is_empty_grid()) {
+    if (metautils::args.data_format == "gpcp" && reinterpret_cast<GPCPGrid *>(grid)->is_empty_grid()) {
 	griddef.type=0;
     }
     if (griddef.type > 0) {
@@ -361,14 +361,14 @@ void scan_file()
 	ee.key="";
 	units="";
 	auto fcst_hr=grid->forecast_time()/10000;
-	if (meta_args.data_format == "grib" || meta_args.data_format == "grib0") {
+	if (metautils::args.data_format == "grib" || metautils::args.data_format == "grib0") {
 	  if (message->edition() == 0) {
-	    meta_args.data_format="grib0";
+	    metautils::args.data_format="grib0";
 	  }
 	  last_valid_date_time=first_valid_date_time;
 	  lentry.key=strutils::ftos(grid->source())+"-"+strutils::ftos((reinterpret_cast<GRIBGrid *>(grid))->sub_center_id());
 	  pentry.key=lentry.key;
-	  if (meta_args.data_format == "grib") {
+	  if (metautils::args.data_format == "grib") {
 	    pentry.key+="."+strutils::ftos((reinterpret_cast<GRIBGrid *>(grid))->parameter_table_code());
 	  }
 	  pentry.key+=":"+strutils::ftos(grid->parameter());
@@ -386,7 +386,7 @@ void scan_file()
 	  }
 	  auto level_type=strutils::itos((reinterpret_cast<GRIBGrid *>(grid))->first_level_type());
 	  std::string data_format;
-	  if (meta_args.data_format == "grib" || meta_args.data_format == "grib1") {
+	  if (metautils::args.data_format == "grib" || metautils::args.data_format == "grib1") {
 	    data_format="WMO_GRIB1";
 	  }
 	  else {
@@ -457,7 +457,7 @@ void scan_file()
 	    inv_lines.emplace_back(inv_line);
 	  }
 	}
-	else if (meta_args.data_format == "grib2") {
+	else if (metautils::args.data_format == "grib2") {
 /*
 	  last_valid_date_time=first_valid_date_time;
 first_valid_date_time=grid->reference_date_time().hours_added(grid->forecast_time()/10000);
@@ -590,7 +590,7 @@ first_valid_date_time=grid->reference_date_time().hours_added(grid->forecast_tim
 	    inv_lines.emplace_back(inv_line);
 	  }
 	}
-	else if (meta_args.data_format == "oct" || meta_args.data_format == "tropical" || meta_args.data_format == "ll" || meta_args.data_format == "slp" || meta_args.data_format == "navy") {
+	else if (metautils::args.data_format == "oct" || metautils::args.data_format == "tropical" || metautils::args.data_format == "ll" || metautils::args.data_format == "slp" || metautils::args.data_format == "navy") {
 	  last_valid_date_time=first_valid_date_time;
 	  pentry.key=strutils::itos(grid->parameter());
 	  if (fcst_hr == 0) {
@@ -621,7 +621,7 @@ first_valid_date_time=grid->reference_date_time().hours_added(grid->forecast_tim
 	    lentry.key="1:"+strutils::itos(grid->first_level_value())+":"+strutils::itos(grid->second_level_value());
 	  }
 	}
-	else if (meta_args.data_format == "jraieeemm") {
+	else if (metautils::args.data_format == "jraieeemm") {
 	  last_valid_date_time=first_valid_date_time;
 	  last_valid_date_time.set_day(dateutils::days_in_month(first_valid_date_time.year(),first_valid_date_time.month()));
 	  last_valid_date_time.add_hours(18);
@@ -648,7 +648,7 @@ first_valid_date_time=grid->reference_date_time().hours_added(grid->forecast_tim
 	  }
 	  lentry.key=strutils::itos(grid->first_level_type())+":"+strutils::ftos(grid->first_level_value(),5);
 	}
-	else if (meta_args.data_format == "ussrslp") {
+	else if (metautils::args.data_format == "ussrslp") {
 	  pentry.key=strutils::itos(grid->parameter());
 	  if (fcst_hr == 0) {
 	    gentry.key+="<!>Analysis";
@@ -657,7 +657,7 @@ first_valid_date_time=grid->reference_date_time().hours_added(grid->forecast_tim
 	    gentry.key+="<!>"+strutils::itos(fcst_hr)+"-hour Forecast";
 	  }
 	}
-	else if (meta_args.data_format == "on84") {
+	else if (metautils::args.data_format == "on84") {
 	  last_valid_date_time=first_valid_date_time;
 	  pentry.key=strutils::itos(grid->parameter());
 	  switch ((reinterpret_cast<ON84Grid *>(grid))->time_marker()) {
@@ -703,7 +703,7 @@ first_valid_date_time=grid->reference_date_time().hours_added(grid->forecast_tim
 	    lentry.key=strutils::itos((reinterpret_cast<ON84Grid *>(grid))->first_level_type())+":"+strutils::ftos(grid->first_level_value(),5)+":"+strutils::ftos(grid->second_level_value(),5);
 	  }
 	}
-	else if (meta_args.data_format == "cgcm1") {
+	else if (metautils::args.data_format == "cgcm1") {
 	  pentry.key=(reinterpret_cast<CGCM1Grid *>(grid))->parameter_name();
 	  strutils::trim(pentry.key);
 	  strutils::replace_all(pentry.key,"\"","&quot;");
@@ -723,21 +723,21 @@ first_valid_date_time=grid->reference_date_time().hours_added(grid->forecast_tim
 	  }
 	  lentry.key=strutils::itos(grid->first_level_value());
 	}
-	else if (meta_args.data_format == "cmorph025") {
+	else if (metautils::args.data_format == "cmorph025") {
 	  pentry.key=(reinterpret_cast<InputCMORPH025GridStream *>(istream.get()))->parameter_code();
 	  strutils::trim(pentry.key);
 	  last_valid_date_time=first_valid_date_time;
 	  gentry.key+="<!>Analysis";
 	  lentry.key="surface";
 	}
-	else if (meta_args.data_format == "cmorph8km") {
+	else if (metautils::args.data_format == "cmorph8km") {
 	  pentry.key="CMORPH";
 	  last_valid_date_time=first_valid_date_time;
 	  first_valid_date_time=grid->reference_date_time();
 	  gentry.key+="<!>30-minute Average (initial+0 to initial+30)";
 	  lentry.key="surface";
 	}
-	else if (meta_args.data_format == "gpcp") {
+	else if (metautils::args.data_format == "gpcp") {
 	  pentry.key=reinterpret_cast<GPCPGrid *>(grid)->parameter_name();
 	  last_valid_date_time=first_valid_date_time;
 	  first_valid_date_time=grid->reference_date_time();
@@ -914,35 +914,35 @@ int main(int argc,char **argv)
   }
   signal(SIGSEGV,segv_handler);
   signal(SIGINT,int_handler);
-  meta_args.args_string=unixutils::unix_args_string(argc,argv,'!');
+  metautils::args.args_string=unixutils::unix_args_string(argc,argv,'!');
   metautils::read_config("grid2xml",user);
   parse_args();
   flags="-f";
-  if (!meta_args.inventory_only && strutils::has_beginning(meta_args.path,"https://rda.ucar.edu")) {
+  if (!metautils::args.inventory_only && strutils::has_beginning(metautils::args.path,"https://rda.ucar.edu")) {
     flags="-wf";
   }
   atexit(clean_up);
   metautils::cmd_register("grid2xml",user);
-  if (!meta_args.overwrite_only && !meta_args.inventory_only) {
+  if (!metautils::args.overwrite_only && !metautils::args.inventory_only) {
     metautils::check_for_existing_cmd("GrML");
   }
   scan_file();
-  if (!meta_args.inventory_only) {
+  if (!metautils::args.inventory_only) {
     metadata::GrML::write_grml(grid_table,"grid2xml",user);
   }
-  if (meta_args.update_db) {
-    if (!meta_args.update_summary) {
+  if (metautils::args.update_db) {
+    if (!metautils::args.update_summary) {
 	flags="-S "+flags;
     }
-    if (!meta_args.regenerate) {
+    if (!metautils::args.regenerate) {
 	flags="-R "+flags;
     }
-    if (unixutils::mysystem2(meta_directives.local_root+"/bin/scm -d "+meta_args.dsnum+" "+flags+" "+meta_args.filename+".GrML",oss,ess) < 0) {
+    if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" "+flags+" "+metautils::args.filename+".GrML",oss,ess) < 0) {
 	std::cerr << ess.str() << std::endl;
     }
   }
   if (inv_stream.is_open()) {
-    metadata::close_inventory(inv_file,inv_dir,inv_stream,"GrML",true,meta_args.update_summary,"grid2xml",user);
+    metadata::close_inventory(inv_file,inv_dir,inv_stream,"GrML",true,metautils::args.update_summary,"grid2xml",user);
   }
   return 0;
 }
