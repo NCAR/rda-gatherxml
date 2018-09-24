@@ -15,8 +15,8 @@
 #include <utils.hpp>
 #include <myerror.hpp>
 
-metautils::Directives meta_directives;
-metautils::Args meta_args;
+metautils::Directives metautils::directives;
+metautils::Args metautils::args;
 std::string myerror="";
 std::string mywarning="";
 
@@ -118,61 +118,61 @@ extern "C" void clean_up()
 
 void parse_args()
 {
-  std::deque<std::string> sp=strutils::split(meta_args.args_string,"%");
+  std::deque<std::string> sp=strutils::split(metautils::args.args_string,"%");
   for (size_t n=0; n < sp.size(); ++n) {
     if (sp[n] == "-d") {
-	meta_args.dsnum=sp[++n];
-	if (std::regex_search(meta_args.dsnum,std::regex("^ds"))) {
-	  meta_args.dsnum=meta_args.dsnum.substr(2);
+	metautils::args.dsnum=sp[++n];
+	if (std::regex_search(metautils::args.dsnum,std::regex("^ds"))) {
+	  metautils::args.dsnum=metautils::args.dsnum.substr(2);
 	}
     }
     else if (sp[n] == "-f") {
-	meta_args.data_format=sp[++n];
+	metautils::args.data_format=sp[++n];
     }
     else if (sp[n] == "-l") {
-	meta_args.local_name=sp[++n];
+	metautils::args.local_name=sp[++n];
     }
     else if (sp[n] == "-m") {
-	meta_args.member_name=sp[++n];
+	metautils::args.member_name=sp[++n];
     }
     else if (sp[n] == "-I") {
-	meta_args.inventory_only=true;
-	meta_args.update_db=false;
+	metautils::args.inventory_only=true;
+	metautils::args.update_db=false;
     }
     else if (sp[n] == "-R") {
-	meta_args.regenerate=false;
+	metautils::args.regenerate=false;
     }
     else if (sp[n] == "-S") {
-	meta_args.update_summary=false;
+	metautils::args.update_summary=false;
     }
     else if (sp[n] == "-V") {
 	verbose_operation=true;
     }
   }
-  if (meta_args.data_format.empty()) {
+  if (metautils::args.data_format.empty()) {
     std::cerr << "Error: no format specified" << std::endl;
     exit(1);
   }
   else {
-    meta_args.data_format=strutils::to_lower(meta_args.data_format);
+    metautils::args.data_format=strutils::to_lower(metautils::args.data_format);
   }
-  if (meta_args.dsnum.empty()) {
+  if (metautils::args.dsnum.empty()) {
     std::cerr << "Error: no dataset number specified" << std::endl;
     exit(1);
   }
-  if (meta_args.dsnum == "999.9") {
-    meta_args.override_primary_check=true;
-    meta_args.update_db=false;
-    meta_args.update_summary=false;
-    meta_args.regenerate=false;
+  if (metautils::args.dsnum == "999.9") {
+    metautils::args.override_primary_check=true;
+    metautils::args.update_db=false;
+    metautils::args.update_summary=false;
+    metautils::args.regenerate=false;
   }
-  meta_args.path=sp[sp.size()-1];
-  auto idx=meta_args.path.length()-1;
-  while (idx > 0 && meta_args.path[idx] != '/') {
+  metautils::args.path=sp[sp.size()-1];
+  auto idx=metautils::args.path.length()-1;
+  while (idx > 0 && metautils::args.path[idx] != '/') {
     idx--;
   }
-  meta_args.filename=meta_args.path.substr(idx+1);
-  meta_args.path=meta_args.path.substr(0,idx);
+  metautils::args.filename=metautils::args.path.substr(idx+1);
+  metautils::args.path=metautils::args.path.substr(0,idx);
 }
 
 extern "C" void segv_handler(int)
@@ -220,7 +220,7 @@ void scan_hdf4_file(std::list<std::string>& filelist,ScanData& scan_data)
 	myerror+=" - file: '"+file+"'";
 	exit(1);
     }
-    if (meta_args.data_format == "quikscathdf4") {
+    if (metautils::args.data_format == "quikscathdf4") {
 	scan_quikscat_hdf4_file(istream);
     }
     istream.close();
@@ -1032,7 +1032,7 @@ void scan_usarray_transportable_hdf5_file(InputHDF5Stream& istream,ScanData& sca
   metadata::ObML::DataTypeEntry dte;
   ientry.data->data_types_table.found(datatype,dte);
   ientry.data->nsteps=dte.data->nsteps=num_not_missing;
-  scan_data.map_name=unixutils::remote_web_file("https://rda.ucar.edu/metadata/ParameterTables/HDF5.ds"+meta_args.dsnum+".xml",scan_data.tdir->name());
+  scan_data.map_name=unixutils::remote_web_file("https://rda.ucar.edu/metadata/ParameterTables/HDF5.ds"+metautils::args.dsnum+".xml",scan_data.tdir->name());
   scan_data.found_map=(!scan_data.map_name.empty());
   se.key=datatype+"<!>"+se.key+"<!>Hz";
   scan_data.varlist.emplace_back(se.key);
@@ -1386,7 +1386,7 @@ void add_gridded_parameters_to_netcdf_level_entry(InputHDF5Stream& istream,std::
 	tr_description=strutils::capitalize(tr_description);
 	if (std::regex_search(gentry_key,std::regex(tr_description+"$"))) {
 	  if (attr.value.dim_sizes[0] == 4 || attr.value.dim_sizes[0] == 3 || (attr.value.dim_sizes[0] == 2 && gcoords.valid_time.data_array.num_values == 1)) {
-	    param_entry->key="ds"+meta_args.dsnum+":"+var.key;
+	    param_entry->key="ds"+metautils::args.dsnum+":"+var.key;
 	    add_gridded_netcdf_parameter(var,scan_data,time_range,parameter_data,tre.data->num_steps);
 	    InvEntry ie;
 	    if (!inv_P_table.found(param_entry->key,ie)) {
@@ -1411,7 +1411,7 @@ void update_level_entry(InputHDF5Stream& istream,const metautils::NcTime::TimeRa
   for (const auto& var : vars) {
     var.dataset->attributes.found("DIMENSION_LIST",attr);
     if (attr.value._class_ == 9 && attr.value.dim_sizes.size() == 1 && attr.value.dim_sizes[0] > 2 && attr.value.vlen.class_ == 7 && parameter_matches_dimensions(istream,attr,gcoords,level_id)) {
-	param_entry->key="ds"+meta_args.dsnum+":"+var.key;
+	param_entry->key="ds"+metautils::args.dsnum+":"+var.key;
 	time_method=gridded_time_method(var.dataset,gcoords);
 	time_method=strutils::capitalize(time_method);
 	if (!lentry->parameter_code_table.found(param_entry->key,*param_entry)) {
@@ -1629,7 +1629,7 @@ void scan_cf_point_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data,met
     }
     id_vals.fill(istream,*ds);
   }
-  scan_data.map_name=unixutils::remote_web_file("https://rda.ucar.edu/metadata/ParameterTables/HDF5.ds"+meta_args.dsnum+".xml",scan_data.tdir->name());
+  scan_data.map_name=unixutils::remote_web_file("https://rda.ucar.edu/metadata/ParameterTables/HDF5.ds"+metautils::args.dsnum+".xml",scan_data.tdir->name());
   scan_data.found_map=!scan_data.map_name.empty();
   std::vector<DateTime> date_times;
   date_times.reserve(time_vals.num_values);
@@ -1748,7 +1748,7 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
   auto found_time=false;
   grid_initialize();
   metadata::open_inventory(inv_file,&inv_dir,inv_stream,"GrML","hdf2xml",user);
-  scan_data.map_name=unixutils::remote_web_file("https://rda.ucar.edu/metadata/ParameterTables/netCDF4.ds"+meta_args.dsnum+".xml",scan_data.tdir->name());
+  scan_data.map_name=unixutils::remote_web_file("https://rda.ucar.edu/metadata/ParameterTables/netCDF4.ds"+metautils::args.dsnum+".xml",scan_data.tdir->name());
 // rename the parameter map so that it is not overwritten by the level map,
 //   which has the same name
   if (!scan_data.map_name.empty()) {
@@ -2365,7 +2365,7 @@ std::cerr << floatutils::myequalf(data_array_value(gcoords.latitude.data_array,c
 		  add_gridded_parameters_to_netcdf_level_entry(istream,gentry->key,gcoords,level_id,scan_data,tre,parameter_data);
 		  if (!lentry->parameter_code_table.empty()) {
 		    for (l=0; l < num_levels; ++l) {
-			lentry->key="ds"+meta_args.dsnum+","+level_id+":";
+			lentry->key="ds"+metautils::args.dsnum+","+level_id+":";
 			if (gcoords.time_bounds.ds == nullptr) {
 			  if (ds == nullptr) {
 			    ddum=0;
@@ -2411,7 +2411,7 @@ std::cerr << floatutils::myequalf(data_array_value(gcoords.latitude.data_array,c
 		else {
 // existing grid - needs update
 		  for (l=0; l < num_levels; ++l) {
-		    lentry->key="ds"+meta_args.dsnum+","+level_id+":";
+		    lentry->key="ds"+metautils::args.dsnum+","+level_id+":";
 		    if (ds == nullptr) {
 			ddum=0;
 		    }
@@ -2510,13 +2510,13 @@ void scan_hdf5_file(std::list<std::string>& filelist,ScanData& scan_data)
 	myerror+=" - file: '"+file+"'";
 	exit(1);
     }
-    if (meta_args.data_format == "ispdhdf5") {
+    if (metautils::args.data_format == "ispdhdf5") {
 	scan_ispd_hdf5_file(istream,obs_data);
     }
-    else if (meta_args.data_format == "hdf5nc4") {
+    else if (metautils::args.data_format == "hdf5nc4") {
 	scan_hdf5nc4_file(istream,scan_data,obs_data);
     }
-    else if (meta_args.data_format == "usarrthdf5") {
+    else if (metautils::args.data_format == "usarrthdf5") {
 	scan_usarray_transportable_hdf5_file(istream,scan_data,obs_data);
     }
     else {
@@ -2527,14 +2527,14 @@ void scan_hdf5_file(std::list<std::string>& filelist,ScanData& scan_data)
   }
   if (write_type == GrML_type) {
     cmd_type="GrML";
-    if (!meta_args.inventory_only) {
+    if (!metautils::args.inventory_only) {
 	metadata::GrML::write_grml(*grid_table,"hdf2xml",user);
     }
     grid_finalize();
   }
   else if (write_type == ObML_type) {
     if (num_not_missing > 0) {
-	meta_args.data_format="hdf5";
+	metautils::args.data_format="hdf5";
 	cmd_type="ObML";
 	metadata::ObML::write_obml(obs_data,"hdf2xml",user);
     }
@@ -2562,12 +2562,12 @@ void scan_hdf5_file(std::list<std::string>& filelist,ScanData& scan_data)
 void scan_file()
 {
   tfile=new TempFile;
-  if (!tfile->open(meta_directives.temp_path)) {
-    metautils::log_error("scan_file() was not able to create a temporary file in "+meta_directives.temp_path,"hdf2xml",user);
+  if (!tfile->open(metautils::directives.temp_path)) {
+    metautils::log_error("scan_file() was not able to create a temporary file in "+metautils::directives.temp_path,"hdf2xml",user);
   }
   auto tdir=new TempDir;
-  if (!tdir->create(meta_directives.temp_path)) {
-    metautils::log_error("scan_file() was not able to create a temporary directory in "+meta_directives.temp_path,"hdf2xml",user);
+  if (!tdir->create(metautils::directives.temp_path)) {
+    metautils::log_error("scan_file() was not able to create a temporary directory in "+metautils::directives.temp_path,"hdf2xml",user);
   }
   std::string file_format,error;
   std::list<std::string> filelist;
@@ -2579,13 +2579,13 @@ void scan_file()
   }
   ScanData scan_data;
   scan_data.tdir.reset(new TempDir);
-  if (!scan_data.tdir->create(meta_directives.temp_path)) {
-    metautils::log_error("scan_file() was not able to create a temporary directory in "+meta_directives.temp_path,"hdf2xml",user);
+  if (!scan_data.tdir->create(metautils::directives.temp_path)) {
+    metautils::log_error("scan_file() was not able to create a temporary directory in "+metautils::directives.temp_path,"hdf2xml",user);
   }
-  if (std::regex_search(meta_args.data_format,std::regex("hdf4"))) {
+  if (std::regex_search(metautils::args.data_format,std::regex("hdf4"))) {
     scan_hdf4_file(filelist,scan_data);
   }
-  else if (std::regex_search(meta_args.data_format,std::regex("hdf5"))) {
+  else if (std::regex_search(metautils::args.data_format,std::regex("hdf5"))) {
     scan_hdf5_file(filelist,scan_data);
   }
   else {
@@ -2622,32 +2622,32 @@ int main(int argc,char **argv)
   }
   signal(SIGSEGV,segv_handler);
   signal(SIGINT,int_handler);
-  meta_args.args_string=unixutils::unix_args_string(argc,argv,'%');
+  metautils::args.args_string=unixutils::unix_args_string(argc,argv,'%');
   metautils::read_config("hdf2xml",user);
   parse_args();
   atexit(clean_up);
   metautils::cmd_register("hdf2xml",user);
-  if (!meta_args.overwrite_only) {
+  if (!metautils::args.overwrite_only) {
     metautils::check_for_existing_cmd("GrML");
     metautils::check_for_existing_cmd("ObML");
   }
   scan_file();
   flags="-f";
-  if (!meta_args.inventory_only && std::regex_search(meta_args.path,std::regex("^https://rda.ucar.edu"))) {
+  if (!metautils::args.inventory_only && std::regex_search(metautils::args.path,std::regex("^https://rda.ucar.edu"))) {
     flags="-wf";
   }
-  if (meta_args.update_db) {
-    if (!meta_args.update_summary) {
+  if (metautils::args.update_db) {
+    if (!metautils::args.update_summary) {
 	flags="-S "+flags;
     }
-    if (!meta_args.regenerate) {
+    if (!metautils::args.regenerate) {
 	flags="-R "+flags;
     }
     if (cmd_type.empty()) {
 	metautils::log_error("content metadata type was not specified","hdf2xml",user);
     }
     std::stringstream oss,ess;
-    if (unixutils::mysystem2(meta_directives.local_root+"/bin/scm -d "+meta_args.dsnum+" "+flags+" "+meta_args.filename+"."+cmd_type,oss,ess) < 0) {
+    if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" "+flags+" "+metautils::args.filename+"."+cmd_type,oss,ess) < 0) {
 	std::cerr << ess.str() << std::endl;
     }
   }
