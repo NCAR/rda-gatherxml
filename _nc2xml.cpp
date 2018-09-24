@@ -18,8 +18,8 @@
 #include <myerror.hpp>
 #include <bufr.hpp>
 
-metautils::Directives meta_directives;
-metautils::Args meta_args;
+metautils::Directives metautils::directives;
+metautils::Args metautils::args;
 std::string myerror="";
 std::string mywarning="";
 
@@ -105,79 +105,79 @@ void parse_args()
   std::deque<std::string> sp;
   size_t n;
 
-  meta_args.temp_loc=meta_directives.temp_path;
-  sp=strutils::split(meta_args.args_string,"%");
+  metautils::args.temp_loc=metautils::directives.temp_path;
+  sp=strutils::split(metautils::args.args_string,"%");
   for (n=0; n < sp.size()-1; ++n) {
     if (sp[n] == "-f") {
-	meta_args.data_format=sp[++n];
+	metautils::args.data_format=sp[++n];
     }
     else if (sp[n] == "-d") {
-	meta_args.dsnum=sp[++n];
-	if (std::regex_search(meta_args.dsnum,std::regex("^ds"))) {
-	  meta_args.dsnum=meta_args.dsnum.substr(2);
+	metautils::args.dsnum=sp[++n];
+	if (std::regex_search(metautils::args.dsnum,std::regex("^ds"))) {
+	  metautils::args.dsnum=metautils::args.dsnum.substr(2);
 	}
     }
     else if (sp[n] == "-l") {
-	meta_args.local_name=sp[++n];
+	metautils::args.local_name=sp[++n];
     }
     else if (sp[n] == "-m") {
-	meta_args.member_name=sp[++n];
+	metautils::args.member_name=sp[++n];
     }
     else if (sp[n] == "-I") {
-	meta_args.inventory_only=true;
-	meta_args.update_db=false;
+	metautils::args.inventory_only=true;
+	metautils::args.update_db=false;
     }
     else if (sp[n] == "-S") {
-	meta_args.update_summary=false;
+	metautils::args.update_summary=false;
     }
     else if (sp[n] == "-U") {
 	if (user == "dattore") {
-	  meta_args.update_db=false;
+	  metautils::args.update_db=false;
 	}
     }
     else if (sp[n] == "-NC") {
 	if (user == "dattore") {
-	  meta_args.override_primary_check=true;
+	  metautils::args.override_primary_check=true;
 	}
     }
     else if (sp[n] == "-OO") {
 	if (user == "dattore") {
-	  meta_args.overwrite_only=true;
+	  metautils::args.overwrite_only=true;
 	}
     }
     else if (sp[n] == "-R") {
 	if (user == "dattore") {
-	  meta_args.regenerate=false;
+	  metautils::args.regenerate=false;
 	}
     }
     else if (sp[n] == "-t") {
-	meta_args.temp_loc=sp[++n];
+	metautils::args.temp_loc=sp[++n];
     }
     else if (sp[n] == "-V") {
 	verbose_operation=true;
     }
   }
-  if (meta_args.data_format.empty()) {
+  if (metautils::args.data_format.empty()) {
     std::cerr << "Error: no format specified" << std::endl;
     exit(1);
   }
-  if (meta_args.dsnum.empty()) {
+  if (metautils::args.dsnum.empty()) {
     std::cerr << "Error: no dataset specified" << std::endl;
     exit(1);
   }
-  if (meta_args.dsnum == "999.9") {
-    meta_args.override_primary_check=true;
-    meta_args.update_db=false;
-    meta_args.update_summary=false;
-    meta_args.regenerate=false;
+  if (metautils::args.dsnum == "999.9") {
+    metautils::args.override_primary_check=true;
+    metautils::args.update_db=false;
+    metautils::args.update_summary=false;
+    metautils::args.regenerate=false;
   }
   n=sp.back().rfind("/");
-  meta_args.path=sp.back().substr(0,n);
-  if (!std::regex_search(meta_args.path,std::regex("^/FS/DSS")) && !std::regex_search(meta_args.path,std::regex("^/DSS")) && !std::regex_search(meta_args.path,std::regex("^https://rda.ucar.edu"))) {
+  metautils::args.path=sp.back().substr(0,n);
+  if (!std::regex_search(metautils::args.path,std::regex("^/FS/DSS")) && !std::regex_search(metautils::args.path,std::regex("^/DSS")) && !std::regex_search(metautils::args.path,std::regex("^https://rda.ucar.edu"))) {
     std::cerr << "Error: bad path" << std::endl;
     exit(1);
   }
-  meta_args.filename=sp.back().substr(n+1);
+  metautils::args.filename=sp.back().substr(n+1);
 }
 
 void fill_nc_time_data(const InputNetCDFStream::Attribute& attr)
@@ -500,7 +500,7 @@ void add_level_to_inventory(std::string lentry_key,std::string gentry_key,size_t
   auto dims=istream.dimensions();
   auto vars=istream.variables();
   for (size_t n=0; n < vars.size(); ++n) {
-    auto key="ds"+meta_args.dsnum+":"+vars[n].name;
+    auto key="ds"+metautils::args.dsnum+":"+vars[n].name;
     if (vars[n].dimids.size() > 0 && !vars[n].is_coord && vars[n].dimids[0] == timedimid && P_map.find(key) != P_map.end() && ((vars[n].dimids.size() == 4 && levdimid >= 0 && static_cast<int>(vars[n].dimids[1]) == levdimid && vars[n].dimids[2] == latdimid && vars[n].dimids[3] == londimid) || (vars[n].dimids.size() == 3 && levdimid < 0 && vars[n].dimids[1] == latdimid && vars[n].dimids[2] == londimid))) {
 	auto R_key=strutils::itos(static_cast<int>(vars[n].nc_type));
 	if (R_map.find(R_key) == R_map.end()) {
@@ -555,7 +555,7 @@ void add_gridded_parameters_to_netcdf_level_entry(const std::vector<netCDFStream
 // check as a zonal mean grid variable
 	  if (std::regex_search(gentry_key,std::regex("^[12]<!>1<!>"))) {
 	    if (is_zonal_mean_grid_variable(vars[n],timedimid,levdimid,latdimid)) {
-		param_entry.key="ds"+meta_args.dsnum+":"+vars[n].name;
+		param_entry.key="ds"+metautils::args.dsnum+":"+vars[n].name;
 		add_gridded_netcdf_parameter(vars[n],first_valid_date_time,last_valid_date_time,tre.data->num_steps,parameter_table,nc_vars);
 		if (inv_stream.is_open()) {
 		  add_grid_to_inventory(gentry_key);
@@ -565,7 +565,7 @@ void add_gridded_parameters_to_netcdf_level_entry(const std::vector<netCDFStream
 	  else if (vars[n].dimids.size() == 3 || vars[n].dimids.size() == 4) {
 	    if (is_regular_lat_lon_grid_variable(vars[n],timedimid,levdimid,latdimid,londimid)) {
 // check as a regular lat/lon grid variable
-		param_entry.key="ds"+meta_args.dsnum+":"+vars[n].name;
+		param_entry.key="ds"+metautils::args.dsnum+":"+vars[n].name;
 		add_gridded_netcdf_parameter(vars[n],first_valid_date_time,last_valid_date_time,tre.data->num_steps,parameter_table,nc_vars);
 		if (inv_stream.is_open()) {
 		  add_grid_to_inventory(gentry_key);
@@ -573,7 +573,7 @@ void add_gridded_parameters_to_netcdf_level_entry(const std::vector<netCDFStream
 	    }
 	    else if (is_polar_stereographic_grid_variable(vars[n],timedimid,levdimid,latdimid)) {
 // check as a polar-stereographic grid variable
-		param_entry.key="ds"+meta_args.dsnum+":"+vars[n].name;
+		param_entry.key="ds"+metautils::args.dsnum+":"+vars[n].name;
 		add_gridded_netcdf_parameter(vars[n],first_valid_date_time,last_valid_date_time,tre.data->num_steps,parameter_table,nc_vars);
 		if (inv_stream.is_open()) {
 		  add_grid_to_inventory(gentry_key);
@@ -2873,7 +2873,7 @@ else {
 		  param_entry.num_time_steps=0;
 		  add_gridded_parameters_to_netcdf_level_entry(vars,gentry.key,timeid,timedimid,levdimids[m],latdimids[k],londimids[k],tre,parameter_table,nc_vars);
 		  for (size_t n=0; n < num_levels; ++n) {
-		    lentry.key="ds"+meta_args.dsnum+","+levids[m]+":";
+		    lentry.key="ds"+metautils::args.dsnum+","+levids[m]+":";
 		    switch (levtypes[m]) {
 			case netCDFStream::NcType::INT:
 			{
@@ -2908,7 +2908,7 @@ else {
 		else {
 // existing grid - needs update
 		  for (size_t n=0; n < num_levels; ++n) {
-		    lentry.key="ds"+meta_args.dsnum+","+levids[m]+":";
+		    lentry.key="ds"+metautils::args.dsnum+","+levids[m]+":";
 		    switch (levtypes[m]) {
 			case netCDFStream::NcType::INT:
 			{
@@ -2943,7 +2943,7 @@ else {
 // run through all of the parameters
 			for (size_t l=0; l < vars.size(); ++l) {
 			  if (!vars[l].is_coord && vars[l].dimids[0] == timedimid && ((vars[l].dimids.size() == 4 && levdimids[m] >= 0 && vars[l].dimids[1] == levdimids[m] && vars[l].dimids[2] == latdimids[k] && vars[l].dimids[3] == londimids[k]) || (vars[l].dimids.size() == 3 && levdimids[m] < 0 && vars[l].dimids[1] == latdimids[k] && vars[l].dimids[2] == londimids[k]))) {
-			    param_entry.key="ds"+meta_args.dsnum+":"+vars[l].name;
+			    param_entry.key="ds"+metautils::args.dsnum+":"+vars[l].name;
 			    auto time_method=gridded_time_method(vars[l],timeid);
 			    time_method=strutils::capitalize(time_method);
 			    if (!lentry.parameter_code_table.found(param_entry.key,param_entry)) {
@@ -3005,7 +3005,7 @@ else {
 	}
     }
     std::vector<std::string> map_contents;
-    auto level_map_file=unixutils::remote_web_file("https://rda.ucar.edu/metadata/LevelTables/netCDF.ds"+meta_args.dsnum+".xml",tdir->name());
+    auto level_map_file=unixutils::remote_web_file("https://rda.ucar.edu/metadata/LevelTables/netCDF.ds"+metautils::args.dsnum+".xml",tdir->name());
     if (level_map.fill(level_map_file)) {
 	std::ifstream ifs(level_map_file.c_str());
 	char line[32768];
@@ -3021,14 +3021,14 @@ else {
 	map_contents.clear();
     }
     auto tdir=new TempDir;
-    if (!tdir->create(meta_directives.temp_path)) {
+    if (!tdir->create(metautils::directives.temp_path)) {
 	metautils::log_error("can't create temporary directory for netCDF levels","nc2xml",user);
     }
     std::stringstream oss,ess;
     if (unixutils::mysystem2("/bin/mkdir -p "+tdir->name()+"/metadata/LevelTables",oss,ess) < 0) {
 	metautils::log_error("can't create directory tree for netCDF levels","nc2xml",user);
     }
-    std::ofstream ofs((tdir->name()+"/metadata/LevelTables/netCDF.ds"+meta_args.dsnum+".xml").c_str());
+    std::ofstream ofs((tdir->name()+"/metadata/LevelTables/netCDF.ds"+metautils::args.dsnum+".xml").c_str());
     if (!ofs.is_open()) {
 	metautils::log_error("can't open output for writing netCDF levels","nc2xml",user);
     }
@@ -3052,10 +3052,10 @@ else {
     ofs << "</levelMap>" << std::endl;
     ofs.close();
     std::string error;
-    if (unixutils::rdadata_sync(tdir->name(),"metadata/LevelTables/","/data/web",meta_directives.rdadata_home,error) < 0) {
+    if (unixutils::rdadata_sync(tdir->name(),"metadata/LevelTables/","/data/web",metautils::directives.rdadata_home,error) < 0) {
 	metautils::log_warning("level map was not synced - error(s): '"+error+"'","nc2xml",user);
     }
-    unixutils::mysystem2("/bin/cp "+tdir->name()+"/metadata/LevelTables/netCDF.ds"+meta_args.dsnum+".xml /glade/u/home/rdadata/share/metadata/LevelTables/",oss,ess);
+    unixutils::mysystem2("/bin/cp "+tdir->name()+"/metadata/LevelTables/netCDF.ds"+metautils::args.dsnum+".xml /glade/u/home/rdadata/share/metadata/LevelTables/",oss,ess);
     if (verbose_operation) {
 	std::cout << "... done scanning netCDF variables" << std::endl;
     }
@@ -3110,7 +3110,7 @@ void scan_wrf_simulation_netcdf_file(InputNetCDFStream& istream,bool& found_map,
   if (verbose_operation) {
     std::cout << "...beginning function scan_wrf_simulation_netcdf_file()..." << std::endl;
   }
-  sdum=unixutils::remote_web_file("https://rda.ucar.edu/metadata/LevelTables/netCDF.ds"+meta_args.dsnum+".xml",tdir->name());
+  sdum=unixutils::remote_web_file("https://rda.ucar.edu/metadata/LevelTables/netCDF.ds"+metautils::args.dsnum+".xml",tdir->name());
   if (level_map.fill(sdum)) {
     ifs.open(sdum.c_str());
     ifs.getline(line,32768);
@@ -3122,7 +3122,7 @@ void scan_wrf_simulation_netcdf_file(InputNetCDFStream& istream,bool& found_map,
     ifs.clear();
     map_contents.pop_back();
   }
-  map_name=unixutils::remote_web_file("https://rda.ucar.edu/metadata/ParameterTables/netCDF.ds"+meta_args.dsnum+".xml",tdir->name());
+  map_name=unixutils::remote_web_file("https://rda.ucar.edu/metadata/ParameterTables/netCDF.ds"+metautils::args.dsnum+".xml",tdir->name());
   if (!parameter_map.fill(map_name)) {
     found_map=false;
   }
@@ -3257,9 +3257,9 @@ void scan_wrf_simulation_netcdf_file(InputNetCDFStream& istream,bool& found_map,
     }
   }
   tmpfile=new TempFile("/tmp","");
-  std::ofstream ofs((tmpfile->name()+"/netCDF.ds"+meta_args.dsnum+".xml").c_str());
+  std::ofstream ofs((tmpfile->name()+"/netCDF.ds"+metautils::args.dsnum+".xml").c_str());
   if (!ofs.is_open()) {
-    metautils::log_error("scan_wrf_simulation_netcdf_file() can't open "+tmpfile->name()+"/netCDF.ds"+meta_args.dsnum+".xml for writing netCDF levels","nc2xml",user);
+    metautils::log_error("scan_wrf_simulation_netcdf_file() can't open "+tmpfile->name()+"/netCDF.ds"+metautils::args.dsnum+".xml for writing netCDF levels","nc2xml",user);
   }
   if (map_contents.size() > 0) {
     for (const auto& line : map_contents) {
@@ -3301,11 +3301,11 @@ void scan_wrf_simulation_netcdf_file(InputNetCDFStream& istream,bool& found_map,
   ofs << "</levelMap>" << std::endl;
   ofs.close();
   std::string error;
-  if (unixutils::rdadata_sync(tmpfile->name(),".","/data/web/metadata/LevelTables",meta_directives.rdadata_home,error) < 0) {
+  if (unixutils::rdadata_sync(tmpfile->name(),".","/data/web/metadata/LevelTables",metautils::directives.rdadata_home,error) < 0) {
     metautils::log_warning("scan_wrf_simulation_netcdf_file() - level map was not synced - error(s): '"+error+"'","nc2xml",user);
   }
   std::stringstream oss,ess;
-  unixutils::mysystem2("/bin/cp "+tmpfile->name()+"/netCDF.ds"+meta_args.dsnum+".xml /glade/u/home/rdadata/share/metadata/LevelTables/",oss,ess);
+  unixutils::mysystem2("/bin/cp "+tmpfile->name()+"/netCDF.ds"+metautils::args.dsnum+".xml /glade/u/home/rdadata/share/metadata/LevelTables/",oss,ess);
   delete tmpfile;
   for (const auto& key : gentry_keys) {
     gentry.key=key;
@@ -3323,7 +3323,7 @@ void scan_wrf_simulation_netcdf_file(InputNetCDFStream& istream,bool& found_map,
 	  add_gridded_parameters_to_netcdf_level_entry(vars,gentry.key,timeid,timedimid,levdimid,latdimid,londimid,found_map,tre,parameter_table,var_list,changed_var_table,parameter_map);
 	  if (lentry.parameter_code_table.size() > 0) {
 	    if (levdimid < 0) {
-		lentry.key="ds"+meta_args.dsnum+",sfc:0";
+		lentry.key="ds"+metautils::args.dsnum+",sfc:0";
 		gentry.level_table.insert(lentry);
 	    }
 	    else {
@@ -3331,7 +3331,7 @@ void scan_wrf_simulation_netcdf_file(InputNetCDFStream& istream,bool& found_map,
 		  if (!vars[n].is_coord && vars[n].dimids.size() == 1 && static_cast<int>(vars[n].dimids[0]) == levdimid) {
 		    istream.variable_data(vars[n].name,var_data);
 		    for (m=0; m < static_cast<size_t>(var_data.size()); ++m) {
-			lentry.key="ds"+meta_args.dsnum+","+vars[n].name+":";
+			lentry.key="ds"+metautils::args.dsnum+","+vars[n].name+":";
 			switch (vars[n].nc_type) {
 			  case netCDFStream::NcType::SHORT:
 			  case netCDFStream::NcType::INT:
@@ -3368,7 +3368,7 @@ void scan_wrf_simulation_netcdf_file(InputNetCDFStream& istream,bool& found_map,
 // existing grid - needs update
 	for (const auto& levdimid : levdimids) {
 	  if (levdimid < 0) {
-	    lentry.key="ds"+meta_args.dsnum+",sfc:0";
+	    lentry.key="ds"+metautils::args.dsnum+",sfc:0";
 	    if (!gentry.level_table.found(lentry.key,lentry)) {
 		lentry.parameter_code_table.clear();
 		add_gridded_parameters_to_netcdf_level_entry(vars,gentry.key,timeid,timedimid,levdimid,latdimid,londimid,found_map,tre,parameter_table,var_list,changed_var_table,parameter_map);
@@ -3387,7 +3387,7 @@ void scan_wrf_simulation_netcdf_file(InputNetCDFStream& istream,bool& found_map,
 		    istream.variable_data(vars[n].name,var_data);
 		  }
 		  for (m=0; m < static_cast<size_t>(var_data.size()); ++m) {
-		    lentry.key="ds"+meta_args.dsnum+","+vars[n].name+":";
+		    lentry.key="ds"+metautils::args.dsnum+","+vars[n].name+":";
 		    switch (vars[n].nc_type) {
 			case netCDFStream::NcType::SHORT:
 			case netCDFStream::NcType::INT:
@@ -3463,7 +3463,7 @@ void scan_cf_netcdf_file(InputNetCDFStream& istream,metadata::ObML::ObservationD
     }
     std::string platform_type="unknown";
     if (!platform.empty()) {
-	MySQL::Server server(meta_directives.database_server,meta_directives.metadb_username,meta_directives.metadb_password,"");
+	MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
 	if (server) {
 	  MySQL::LocalQuery query("ObML_platformType","search.GCMD_platforms","path = '"+platform+"'");
 	  if (query.submit(server) == 0) {
@@ -4657,12 +4657,12 @@ void scan_samos_netcdf_file(InputNetCDFStream& istream,metadata::ObML::Observati
 void scan_file(metadata::ObML::ObservationData& obs_data)
 {
   tfile=new TempFile;
-  tfile->open(meta_args.temp_loc);
+  tfile->open(metautils::args.temp_loc);
   tdir=new TempDir;
-  tdir->create(meta_args.temp_loc);
+  tdir->create(metautils::args.temp_loc);
   DataTypeMap datatype_map;
   NetCDFVariables nc_vars;
-  nc_vars.map_name=unixutils::remote_web_file("https://rda.ucar.edu/metadata/ParameterTables/netCDF.ds"+meta_args.dsnum+".xml",tdir->name());
+  nc_vars.map_name=unixutils::remote_web_file("https://rda.ucar.edu/metadata/ParameterTables/netCDF.ds"+metautils::args.dsnum+".xml",tdir->name());
   std::list<std::string> filelist;
   std::string file_format,error;
   if (!metautils::primaryMetadata::prepare_file_for_metadata_scanning(*tfile,*tdir,&filelist,file_format,error)) {
@@ -4680,38 +4680,38 @@ void scan_file(metadata::ObML::ObservationData& obs_data)
     }
     InputNetCDFStream istream;
     istream.open(file.c_str());
-    if (std::regex_search(meta_args.data_format,std::regex("^cfnetcdf"))) {
+    if (std::regex_search(metautils::args.data_format,std::regex("^cfnetcdf"))) {
 	scan_cf_netcdf_file(istream,obs_data,nc_vars);
     }
-    else if (std::regex_search(meta_args.data_format,std::regex("^iddnetcdf"))) {
+    else if (std::regex_search(metautils::args.data_format,std::regex("^iddnetcdf"))) {
 	scan_idd_observation_netcdf_file(istream,obs_data,nc_vars);
     }
-    else if (std::regex_search(meta_args.data_format,std::regex("^npnnetcdf"))) {
+    else if (std::regex_search(metautils::args.data_format,std::regex("^npnnetcdf"))) {
 	scan_npn_netcdf_file(istream,obs_data,nc_vars);
     }
-    else if (std::regex_search(meta_args.data_format,std::regex("^pbnetcdf"))) {
+    else if (std::regex_search(metautils::args.data_format,std::regex("^pbnetcdf"))) {
 	scan_prepbufr_netcdf_file(istream,obs_data,nc_vars);
     }
-    else if (std::regex_search(meta_args.data_format,std::regex("^rafnetcdf"))) {
+    else if (std::regex_search(metautils::args.data_format,std::regex("^rafnetcdf"))) {
 	scan_raf_aircraft_netcdf_file(istream,obs_data,nc_vars);
     }
-    else if (std::regex_search(meta_args.data_format,std::regex("^samosnc"))) {
+    else if (std::regex_search(metautils::args.data_format,std::regex("^samosnc"))) {
 	scan_samos_netcdf_file(istream,obs_data,nc_vars);
     }
 /*
-    else if (meta_args.data_format.beginsWith("wrfsimnetcdf"))
+    else if (metautils::args.data_format.beginsWith("wrfsimnetcdf"))
 	scan_wrf_simulation_netcdf_file(istream,found_map,map_name,var_list,changed_var_table);
 */
     else {
-	metautils::log_error(meta_args.data_format+"-formatted files not recognized","nc2xml",user);
+	metautils::log_error(metautils::args.data_format+"-formatted files not recognized","nc2xml",user);
     }
     istream.close();
     if (verbose_operation) {
 	std::cout << "  ...scan of " << file << " completed." << std::endl;
     }
   }
-  meta_args.data_format="netcdf";
-  if (!meta_args.inventory_only && nc_vars.netcdf_variables.size() > 0) {
+  metautils::args.data_format="netcdf";
+  if (!metautils::args.inventory_only && nc_vars.netcdf_variables.size() > 0) {
     if (verbose_operation) {
 	std::cout << "Writing parameter map..." << std::endl;
     }
@@ -4743,7 +4743,7 @@ void scan_file(metadata::ObML::ObservationData& obs_data)
     if (unixutils::mysystem2("/bin/mkdir -p "+tdir->name()+"/metadata/ParameterTables",oss,ess) < 0) {
 	metautils::log_error("can't create directory tree for netCDF variables","nc2xml",user);
     }
-    nc_vars.map_name=tdir->name()+"/metadata/ParameterTables/netCDF.ds"+meta_args.dsnum+".xml";
+    nc_vars.map_name=tdir->name()+"/metadata/ParameterTables/netCDF.ds"+metautils::args.dsnum+".xml";
     std::ofstream ofs(nc_vars.map_name.c_str());
     if (!ofs.is_open()) {
 	metautils::log_error("scan_file() returned error: can't open parameter map file for output","nc2xml",user);
@@ -4799,10 +4799,10 @@ void scan_file(metadata::ObML::ObservationData& obs_data)
 	ofs << "</dataTypeMap>" << std::endl;
     }
     ofs.close();
-    if (unixutils::rdadata_sync(tdir->name(),"metadata/ParameterTables/","/data/web",meta_directives.rdadata_home,error) < 0) {
+    if (unixutils::rdadata_sync(tdir->name(),"metadata/ParameterTables/","/data/web",metautils::directives.rdadata_home,error) < 0) {
 	metautils::log_warning("parameter map was not synced - error(s): '"+error+"'","nc2xml",user);
     }
-    unixutils::mysystem2("/bin/cp "+nc_vars.map_name+" /glade/u/home/rdadata/share/metadata/ParameterTables/netCDF.ds"+meta_args.dsnum+".xml",oss,ess);
+    unixutils::mysystem2("/bin/cp "+nc_vars.map_name+" /glade/u/home/rdadata/share/metadata/ParameterTables/netCDF.ds"+metautils::args.dsnum+".xml",oss,ess);
     if (verbose_operation) {
 	std::cout << "...finished writing parameter map." << std::endl;
     }
@@ -4866,33 +4866,33 @@ int main(int argc,char **argv)
   }
   signal(SIGSEGV,segv_handler);
   signal(SIGINT,int_handler);
-  meta_args.args_string=unixutils::unix_args_string(argc,argv,'%');
+  metautils::args.args_string=unixutils::unix_args_string(argc,argv,'%');
   metautils::read_config("nc2xml",user);
   parse_args();
   flags="-f";
-  if (!meta_args.inventory_only && std::regex_search(meta_args.path,std::regex("^https://rda.ucar.edu"))) {
+  if (!metautils::args.inventory_only && std::regex_search(metautils::args.path,std::regex("^https://rda.ucar.edu"))) {
     flags="-wf";
   }
   atexit(clean_up);
   metautils::cmd_register("nc2xml",user);
-  if (!meta_args.overwrite_only && !meta_args.inventory_only) {
+  if (!metautils::args.overwrite_only && !metautils::args.inventory_only) {
     metautils::check_for_existing_cmd("GrML");
     metautils::check_for_existing_cmd("ObML");
   }
   metadata::ObML::ObservationData obs_data;
   scan_file(obs_data);
-  if (verbose_operation && !meta_args.inventory_only) {
+  if (verbose_operation && !metautils::args.inventory_only) {
     std::cout << "Writing XML..." << std::endl;
   }
   if (write_type == GrML_type) {
     ext="GrML";
-    if (!meta_args.inventory_only) {
+    if (!metautils::args.inventory_only) {
 	metadata::GrML::write_grml(grid_table,"nc2xml",user);
     }
   }
   else if (write_type == ObML_type) {
     ext="ObML";
-    if (!meta_args.inventory_only) {
+    if (!metautils::args.inventory_only) {
 	if (total_num_not_missing > 0) {
 	  metadata::ObML::write_obml(obs_data,"nc2xml",user);
 	}
@@ -4902,21 +4902,21 @@ int main(int argc,char **argv)
 	}
     }
   }
-  if (verbose_operation && !meta_args.inventory_only) {
+  if (verbose_operation && !metautils::args.inventory_only) {
     std::cout << "...finished writing XML." << std::endl;
   }
-  if (meta_args.update_db) {
-    if (!meta_args.update_summary) {
+  if (metautils::args.update_db) {
+    if (!metautils::args.update_summary) {
 	flags="-S "+flags;
     }
-    if (!meta_args.regenerate) {
+    if (!metautils::args.regenerate) {
 	flags="-R "+flags;
     }
     if (verbose_operation) {
 	std::cout << "Calling 'scm' to update the database..." << std::endl;
     }
     std::stringstream oss,ess;
-    if (unixutils::mysystem2(meta_directives.local_root+"/bin/scm -d "+meta_args.dsnum+" "+flags+" "+meta_args.filename+"."+ext,oss,ess) < 0) {
+    if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" "+flags+" "+metautils::args.filename+"."+ext,oss,ess) < 0) {
 	std::cerr << ess.str() << std::endl;
     }
     if (verbose_operation) {
@@ -4987,7 +4987,7 @@ int main(int argc,char **argv)
 	  ifs.close();
 	}
     }
-    metadata::close_inventory(inv_file,inv_dir,inv_stream,ext,true,meta_args.update_summary,"nc2xml",user);
+    metadata::close_inventory(inv_file,inv_dir,inv_stream,ext,true,metautils::args.update_summary,"nc2xml",user);
   }
   if (unknown_IDs.size() > 0) {
     std::stringstream ss;
