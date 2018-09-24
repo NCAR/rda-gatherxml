@@ -944,5 +944,8 @@ int main(int argc,char **argv)
   if (inv_stream.is_open()) {
     metadata::close_inventory(inv_file,inv_dir,inv_stream,"GrML",true,metautils::args.update_summary,"grid2xml",user);
   }
+  if (inv_dir != nullptr) {
+    delete inv_dir;
+  }
   return 0;
 }

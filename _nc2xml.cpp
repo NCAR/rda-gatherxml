@@ -4996,5 +4996,8 @@ int main(int argc,char **argv)
     }
     metautils::log_warning("unknown ID(s):\n"+ss.str(),"nc2xml",user);
   }
+  if (inv_dir != nullptr) {
+    delete inv_dir;
+  }
   return 0;
 }

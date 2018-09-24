@@ -2679,4 +2679,7 @@ int main(int argc,char **argv)
     }
     metadata::close_inventory(inv_file,inv_dir,inv_stream,"GrML",true,true,"hdf2xml",user);
   }
+  if (inv_dir != nullptr) {
+    delete inv_dir;
+  }
 }
