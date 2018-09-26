@@ -51,8 +51,7 @@ std::string user=getenv("USER");
 enum {GrML_type=1,ObML_type};
 int write_type=-1;
 std::string inv_file;
-TempFile *tfile=NULL;
-TempDir *tdir=nullptr,*inv_dir=nullptr;
+TempDir *inv_dir=nullptr;
 std::ofstream inv_stream;
 bool verbose_operation=false;
 size_t total_num_not_missing=0;
@@ -88,12 +87,6 @@ void sort_inventory_map(std::unordered_map<std::string,std::pair<int,std::string
 
 extern "C" void clean_up()
 {
-  if (tfile != NULL) {
-    delete tfile;
-  }
-  if (tdir != NULL) {
-    delete tdir;
-  }
   if (!myerror.empty()) {
     std::cerr << "Error: " << myerror << std::endl;
     metautils::log_error(myerror,"nc2xml",user);
@@ -3004,8 +2997,12 @@ else {
 	  }
 	}
     }
-    std::vector<std::string> map_contents;
+    std::unique_ptr<TempDir> tdir(new TempDir);
+    if (!tdir->create(metautils::directives.temp_path)) {
+	metautils::log_error("can't create temporary directory for netCDF levels","nc2xml",user);
+    }
     auto level_map_file=unixutils::remote_web_file("https://rda.ucar.edu/metadata/LevelTables/netCDF.ds"+metautils::args.dsnum+".xml",tdir->name());
+    std::vector<std::string> map_contents;
     if (level_map.fill(level_map_file)) {
 	std::ifstream ifs(level_map_file.c_str());
 	char line[32768];
@@ -3019,10 +3016,6 @@ else {
     }
     else {
 	map_contents.clear();
-    }
-    auto tdir=new TempDir;
-    if (!tdir->create(metautils::directives.temp_path)) {
-	metautils::log_error("can't create temporary directory for netCDF levels","nc2xml",user);
     }
     std::stringstream oss,ess;
     if (unixutils::mysystem2("/bin/mkdir -p "+tdir->name()+"/metadata/LevelTables",oss,ess) < 0) {
@@ -4656,9 +4649,9 @@ void scan_samos_netcdf_file(InputNetCDFStream& istream,metadata::ObML::Observati
 
 void scan_file(metadata::ObML::ObservationData& obs_data)
 {
-  tfile=new TempFile;
+  std::unique_ptr<TempFile> tfile(new TempFile);
   tfile->open(metautils::args.temp_loc);
-  tdir=new TempDir;
+  std::unique_ptr<TempDir> tdir(new TempDir);
   tdir->create(metautils::args.temp_loc);
   DataTypeMap datatype_map;
   NetCDFVariables nc_vars;
@@ -4826,7 +4819,7 @@ int main(int argc,char **argv)
 {
   std::ifstream ifs;
   char line[32768];
-  std::string metadata_file,wfile,flags,ext;
+  std::string metadata_file,wfile,ext;
 
   if (argc < 4) {
     std::cerr << "usage: nc2xml -f format -d [ds]nnn.n [options...] path" << std::endl;
@@ -4869,10 +4862,6 @@ int main(int argc,char **argv)
   metautils::args.args_string=unixutils::unix_args_string(argc,argv,'%');
   metautils::read_config("nc2xml",user);
   parse_args();
-  flags="-f";
-  if (!metautils::args.inventory_only && std::regex_search(metautils::args.path,std::regex("^https://rda.ucar.edu"))) {
-    flags="-wf";
-  }
   atexit(clean_up);
   metautils::cmd_register("nc2xml",user);
   if (!metautils::args.overwrite_only && !metautils::args.inventory_only) {
@@ -4884,10 +4873,11 @@ int main(int argc,char **argv)
   if (verbose_operation && !metautils::args.inventory_only) {
     std::cout << "Writing XML..." << std::endl;
   }
+  std::string tdir;
   if (write_type == GrML_type) {
     ext="GrML";
     if (!metautils::args.inventory_only) {
-	metadata::GrML::write_grml(grid_table,"nc2xml",user);
+	tdir=metadata::GrML::write_grml(grid_table,"nc2xml",user);
     }
   }
   else if (write_type == ObML_type) {
@@ -4906,11 +4896,21 @@ int main(int argc,char **argv)
     std::cout << "...finished writing XML." << std::endl;
   }
   if (metautils::args.update_db) {
+    std::string flags;
     if (!metautils::args.update_summary) {
-	flags="-S "+flags;
+	flags+=" -S ";
     }
     if (!metautils::args.regenerate) {
-	flags="-R "+flags;
+	flags+=" -R ";
+    }
+    if (!tdir.empty()) {
+	flags+=" -t "+tdir;
+    }
+    if (!metautils::args.inventory_only && std::regex_search(metautils::args.path,std::regex("^https://rda.ucar.edu"))) {
+	flags+=" -wf";
+    }
+    else {
+	flags+=" -f";
     }
     if (verbose_operation) {
 	std::cout << "Calling 'scm' to update the database..." << std::endl;
@@ -4987,7 +4987,7 @@ int main(int argc,char **argv)
 	  ifs.close();
 	}
     }
-    metadata::close_inventory(inv_file,inv_dir,inv_stream,ext,true,metautils::args.update_summary,"nc2xml",user);
+    metadata::close_inventory(inv_file,&inv_dir,inv_stream,ext,true,metautils::args.update_summary,"nc2xml",user);
   }
   if (unknown_IDs.size() > 0) {
     std::stringstream ss;
@@ -4996,8 +4996,4 @@ int main(int argc,char **argv)
     }
     metautils::log_warning("unknown ID(s):\n"+ss.str(),"nc2xml",user);
   }
-  if (inv_dir != nullptr) {
-    delete inv_dir;
-  }
-  return 0;
 }

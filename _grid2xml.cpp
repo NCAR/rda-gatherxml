@@ -8,6 +8,7 @@
 #include <list>
 #include <deque>
 #include <vector>
+#include <regex>
 #include <grid.hpp>
 #include <mymap.hpp>
 #include <strutils.hpp>
@@ -15,7 +16,6 @@
 #include <xmlutils.hpp>
 #include <metadata.hpp>
 #include <netcdf.hpp>
-#include <MySQL.hpp>
 #include <myerror.hpp>
 
 metautils::Directives metautils::directives;
@@ -37,54 +37,51 @@ const int grib2_unit_mult[]={1,1,1,1,1,10,30,100,1,1,3,6,12,1};
 
 void parse_args()
 {
-  std::deque<std::string> sp;
-  size_t n;
-
   metautils::args.temp_loc=metautils::directives.temp_path;
-  sp=strutils::split(metautils::args.args_string,"!");
-  for (n=0; n < sp.size()-1; n++) {
-    if (sp[n] == "-f") {
-	metautils::args.data_format=sp[++n];
+  auto args=strutils::split(metautils::args.args_string,"!");
+  for (size_t n=0; n < args.size()-1; n++) {
+    if (args[n] == "-f") {
+	metautils::args.data_format=args[++n];
     }
-    else if (sp[n] == "-d") {
-	metautils::args.dsnum=sp[++n];
-	if (strutils::has_beginning(metautils::args.dsnum,"ds")) {
+    else if (args[n] == "-d") {
+	metautils::args.dsnum=args[++n];
+	if (metautils::args.dsnum.substr(0,2) == "ds") {
 	  metautils::args.dsnum=metautils::args.dsnum.substr(2);
 	}
     }
-    else if (sp[n] == "-l") {
-	metautils::args.local_name=sp[++n];
+    else if (args[n] == "-l") {
+	metautils::args.local_name=args[++n];
     }
-    else if (sp[n] == "-m") {
-        metautils::args.member_name=sp[++n];
+    else if (args[n] == "-m") {
+        metautils::args.member_name=args[++n];
     }
-    else if (sp[n] == "-I") {
+    else if (args[n] == "-I") {
 	metautils::args.inventory_only=true;
 	metautils::args.update_db=false;
     }
-    else if (sp[n] == "-S") {
+    else if (args[n] == "-S") {
 	metautils::args.update_summary=false;
     }
-    else if (sp[n] == "-U") {
+    else if (args[n] == "-U") {
 	if (user == "dattore") {
 	  metautils::args.update_db=false;
 	}
     }
-    else if (sp[n] == "-NC") {
+    else if (args[n] == "-NC") {
 	if (user == "dattore") {
 	  metautils::args.override_primary_check=true;
 	}
     }
-    else if (sp[n] == "-OO") {
+    else if (args[n] == "-OO") {
 	if (user == "dattore") {
 	  metautils::args.overwrite_only=true;
 	}
     }
-    else if (sp[n] == "-R") {
+    else if (args[n] == "-R") {
 	metautils::args.regenerate=false;
     }
-    else if (sp[n] == "-t") {
-	metautils::args.temp_loc=sp[++n];
+    else if (args[n] == "-t") {
+	metautils::args.temp_loc=args[++n];
     }
   }
   if (metautils::args.data_format.empty()) {
@@ -107,21 +104,20 @@ void parse_args()
     metautils::args.update_summary=false;
     metautils::args.regenerate=false;
   }
-  n=sp[sp.size()-1].rfind("/");
-  metautils::args.path=sp[sp.size()-1].substr(0,n);
-  metautils::args.filename=sp[sp.size()-1].substr(n+1);
+  auto idx=args.back().rfind("/");
+  metautils::args.path=args.back().substr(0,idx);
+  metautils::args.filename=args.back().substr(idx+1);
 }
 
 extern "C" void clean_up()
 {
-  std::stringstream oss,ess;
-
   if (tfile != nullptr) {
     delete tfile;
   }
 // remove temporary file that was sym-linked because the data file name contains
 //  metadata
   if (metautils::args.data_format == "cmorph025" || metautils::args.data_format == "cmorph8km") {
+    std::stringstream oss,ess;
     unixutils::mysystem2("/bin/rm "+tfile_name,oss,ess);
   }
   if (tdir != nullptr) {
@@ -863,7 +859,7 @@ extern "C" void int_handler(int)
 
 int main(int argc,char **argv)
 {
-  std::string web_home,flags;
+  std::string web_home;
   std::stringstream oss,ess;
 
   if (argc < 4) {
@@ -917,10 +913,6 @@ int main(int argc,char **argv)
   metautils::args.args_string=unixutils::unix_args_string(argc,argv,'!');
   metautils::read_config("grid2xml",user);
   parse_args();
-  flags="-f";
-  if (!metautils::args.inventory_only && strutils::has_beginning(metautils::args.path,"https://rda.ucar.edu")) {
-    flags="-wf";
-  }
   atexit(clean_up);
   metautils::cmd_register("grid2xml",user);
   if (!metautils::args.overwrite_only && !metautils::args.inventory_only) {
@@ -928,24 +920,36 @@ int main(int argc,char **argv)
   }
   scan_file();
   if (!metautils::args.inventory_only) {
-    metadata::GrML::write_grml(grid_table,"grid2xml",user);
-  }
-  if (metautils::args.update_db) {
-    if (!metautils::args.update_summary) {
-	flags="-S "+flags;
+    auto tdir=metadata::GrML::write_grml(grid_table,"grid2xml",user);
+    if (metautils::args.update_db) {
+	std::string flags;
+	if (!metautils::args.update_summary) {
+	  flags+=" -S";
+	}
+	if (!metautils::args.regenerate) {
+	  flags+=" -R";
+	}
+	if (!tdir.empty()) {
+	  flags+=" -t "+tdir;
+	}
+	if (std::regex_search(metautils::args.path,std::regex("^https://rda.ucar.edu"))) {
+	  flags+=" -wf";
+	}
+	else {
+	  flags+=" -f";
+	}
+std::cerr << "scm -d "+metautils::args.dsnum+" "+flags+" "+metautils::args.filename+".GrML" << std::endl;
+	if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" "+flags+" "+metautils::args.filename+".GrML",oss,ess) < 0) {
+	  std::cerr << ess.str() << std::endl;
+	}
     }
-    if (!metautils::args.regenerate) {
-	flags="-R "+flags;
-    }
-    if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" "+flags+" "+metautils::args.filename+".GrML",oss,ess) < 0) {
-	std::cerr << ess.str() << std::endl;
+    else if (metautils::args.dsnum == "999.9") {
+	std::cout << "Output is in:" << std::endl;
+	std::cout << "  " << tdir << "/" << metautils::args.filename << ".GrML" << std::endl;
     }
   }
   if (inv_stream.is_open()) {
-    metadata::close_inventory(inv_file,inv_dir,inv_stream,"GrML",true,metautils::args.update_summary,"grid2xml",user);
-  }
-  if (inv_dir != nullptr) {
-    delete inv_dir;
+    metadata::close_inventory(inv_file,&inv_dir,inv_stream,"GrML",true,metautils::args.update_summary,"grid2xml",user);
   }
   return 0;
 }
