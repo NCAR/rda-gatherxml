@@ -938,7 +938,6 @@ int main(int argc,char **argv)
 	else {
 	  flags+=" -f";
 	}
-std::cerr << "scm -d "+metautils::args.dsnum+" "+flags+" "+metautils::args.filename+".GrML" << std::endl;
 	if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" "+flags+" "+metautils::args.filename+".GrML",oss,ess) < 0) {
 	  std::cerr << ess.str() << std::endl;
 	}
