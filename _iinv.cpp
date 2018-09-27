@@ -21,9 +21,10 @@ std::string myerror="";
 std::string mywarning="";
 
 struct LocalArgs {
-  LocalArgs() : dsnum2(),create_cache(true),notify(false),verbose(false),wms_only(false) {}
+  LocalArgs() : dsnum2(),temp_directory(),create_cache(true),notify(false),verbose(false),wms_only(false) {}
 
   std::string dsnum2;
+  std::string temp_directory;
   bool create_cache,notify,verbose;
   bool wms_only;
 } local_args;
@@ -69,6 +70,9 @@ void parse_args(int argc,char **argv)
     }
     else if (sp[n] == "-N") {
 	local_args.notify=true;
+    }
+    else if (sp[n] == "-t") {
+	local_args.temp_directory=sp[++n];
     }
     else if (sp[n] == "-V") {
 	local_args.verbose=true;
@@ -346,27 +350,18 @@ void build_wms_capabilities()
 void insert_grml_inventory()
 {
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
-  auto grml_filename=unixutils::remote_web_file("https://rda.ucar.edu/datasets/ds"+metautils::args.dsnum+"/metadata/inv/"+metautils::args.filename+".gz",temp_dir.name());
-  struct stat buf;
-  if (stat(grml_filename.c_str(),&buf) == 0) {
-    system(("gunzip "+grml_filename).c_str());
-    strutils::chop(grml_filename,3);
-  }
-  else {
-    grml_filename=unixutils::remote_web_file("https://rda.ucar.edu/datasets/ds"+metautils::args.dsnum+"/metadata/inv/"+metautils::args.filename,temp_dir.name());
-  }
-  std::ifstream ifs(grml_filename.c_str());
+  std::ifstream ifs(local_args.temp_directory+"/"+metautils::args.filename.c_str());
   if (!ifs.is_open()) {
     metautils::log_error("insert_grml_inventory() was not able to open "+metautils::args.filename,"iinv",user);
   }
-  grml_filename=strutils::substitute(metautils::args.filename,".GrML_inv","");
-  strutils::replace_all(grml_filename,"%","/");
-  MySQL::LocalQuery query("select code,format_code,tindex from WGrML.ds"+local_args.dsnum2+"_webfiles as w left join dssdb.wfile as x on (x.dsid = 'ds"+metautils::args.dsnum+"' and x.type = 'D' and x.wfile = w.webID) where webID = '"+grml_filename+"'");
+  auto web_id=strutils::substitute(metautils::args.filename,".GrML_inv","");
+  strutils::replace_all(web_id,"%","/");
+  MySQL::LocalQuery query("select code,format_code,tindex from WGrML.ds"+local_args.dsnum2+"_webfiles as w left join dssdb.wfile as x on (x.dsid = 'ds"+metautils::args.dsnum+"' and x.type = 'D' and x.wfile = w.webID) where webID = '"+web_id+"'");
   if (query.submit(server) < 0) {
     metautils::log_error("insert_grml_inventory() returned error: "+query.error()+" while looking for code from webfiles","iinv",user);
   }
   if (query.num_rows() == 0) {
-    metautils::log_error("insert_grml_inventory() did not find "+grml_filename+" in WGrML.ds"+local_args.dsnum2+"_webfiles","iinv",user);
+    metautils::log_error("insert_grml_inventory() did not find "+web_id+" in WGrML.ds"+local_args.dsnum2+"_webfiles","iinv",user);
   }
   MySQL::Row row;
   query.fetch_row(row);
