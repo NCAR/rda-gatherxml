@@ -2596,8 +2596,6 @@ void scan_file()
 
 int main(int argc,char **argv)
 {
-  std::string flags;
-
   if (argc < 6) {
     std::cerr << "usage: hdf2xml -f format -d [ds]nnn.n [options...] <path>" << std::endl;
     std::cerr << "\nrequired (choose one):" << std::endl;
@@ -2632,16 +2630,19 @@ int main(int argc,char **argv)
     metautils::check_for_existing_cmd("ObML");
   }
   scan_file();
-  flags="-f";
-  if (!metautils::args.inventory_only && std::regex_search(metautils::args.path,std::regex("^https://rda.ucar.edu"))) {
-    flags="-wf";
-  }
   if (metautils::args.update_db) {
+    std::string flags;
     if (!metautils::args.update_summary) {
-	flags="-S "+flags;
+	flags+=" -S ";
     }
     if (!metautils::args.regenerate) {
-	flags="-R "+flags;
+	flags+=" -R ";
+    }
+    if (!metautils::args.inventory_only && std::regex_search(metautils::args.path,std::regex("^https://rda.ucar.edu"))) {
+	flags+=" -wf";
+    }
+    else {
+	flags+=" -f";
     }
     if (cmd_type.empty()) {
 	metautils::log_error("content metadata type was not specified","hdf2xml",user);
@@ -2677,9 +2678,6 @@ int main(int argc,char **argv)
     for (const auto& line : inv_lines) {
 	inv_stream << line << std::endl;
     }
-    metadata::close_inventory(inv_file,inv_dir,inv_stream,"GrML",true,true,"hdf2xml",user);
-  }
-  if (inv_dir != nullptr) {
-    delete inv_dir;
+    metadata::close_inventory(inv_file,&inv_dir,inv_stream,"GrML",true,true,"hdf2xml",user);
   }
 }
