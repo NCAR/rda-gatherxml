@@ -101,6 +101,7 @@ metautils::NcTime::TimeData time_data,fcst_ref_time_data;
 my::map<InvEntry> inv_U_table,inv_G_table,inv_L_table,inv_P_table,inv_R_table;
 std::list<std::string> inv_lines;
 std::stringstream wss;
+std::string xml_directory;
 auto verbose_operation=false;
 
 extern "C" void clean_up()
@@ -2528,7 +2529,7 @@ void scan_hdf5_file(std::list<std::string>& filelist,ScanData& scan_data)
   if (write_type == GrML_type) {
     cmd_type="GrML";
     if (!metautils::args.inventory_only) {
-	metadata::GrML::write_grml(*grid_table,"hdf2xml",user);
+	xml_directory=metadata::GrML::write_grml(*grid_table,"hdf2xml",user);
     }
     grid_finalize();
   }
@@ -2637,6 +2638,9 @@ int main(int argc,char **argv)
     }
     if (!metautils::args.regenerate) {
 	flags+=" -R ";
+    }
+    if (!xml_directory.empty()) {
+	flags+=" -t "+xml_directory;
     }
     if (!metautils::args.inventory_only && std::regex_search(metautils::args.path,std::regex("^https://rda.ucar.edu"))) {
 	flags+=" -wf";
