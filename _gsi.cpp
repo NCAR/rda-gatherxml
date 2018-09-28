@@ -12,8 +12,8 @@
 #include <metadata.hpp>
 #include <myerror.hpp>
 
-metautils::Directives meta_directives;
-metautils::Args meta_args;
+metautils::Directives metautils::directives;
+metautils::Args metautils::args;
 struct ThreadStruct {
   ThreadStruct() : query(),imagetag(),tid(-1) {}
 
@@ -78,7 +78,7 @@ ncl_file->writeln("  cmap=(/ (/1.,1.,1./), (/0.,0.,0./), (/0.3294,0.4588,0.3529/
 extern "C" void *thread_ncl(void *tnc)
 {
   ThreadStruct *t=(ThreadStruct *)tnc;
-  MySQL::Server srv(meta_directives.database_server,meta_directives.metadb_username,meta_directives.metadb_password,"");
+  MySQL::Server srv(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   if (t->query.submit(srv) < 0) {
     metautils::log_error("thread_ncl() returned error: "+t->query.error(),"gsi",user);
   }
@@ -88,9 +88,9 @@ extern "C" void *thread_ncl(void *tnc)
 	wrotemap[n][m]=0;
     }
   }
-  auto ncl_file=new TempFile(meta_directives.temp_path,".ncl");
-  auto ncgm_file=new TempFile(meta_directives.temp_path,".ncgm");
-  auto tiff_file=new TempFile(meta_directives.temp_path,".tiff");
+  auto ncl_file=new TempFile(metautils::directives.temp_path,".ncl");
+  auto ncgm_file=new TempFile(metautils::directives.temp_path,".ncgm");
+  auto tiff_file=new TempFile(metautils::directives.temp_path,".tiff");
   write_ncl_head(ncl_file,ncgm_file);
   ncl_file->writeln("  p=new((/500000,2/),\"float\",-999)");
   auto cnt=0;
@@ -124,26 +124,27 @@ extern "C" void *thread_ncl(void *tnc)
   ncl_file->writeln("end");
   ncl_file->close();
   auto tdir=new TempDir;
-  if (!tdir->create(meta_directives.temp_path)) {
+  if (!tdir->create(metautils::directives.temp_path)) {
     metautils::log_error("thread_ncl() can't create temporary directory","gsi",user);
   }
   std::stringstream oss,ess;
-  if (unixutils::mysystem2("/bin/mkdir -p "+tdir->name()+"/datasets/ds"+meta_args.dsnum+"/metadata",oss,ess) < 0) {
+  if (unixutils::mysystem2("/bin/mkdir -p "+tdir->name()+"/datasets/ds"+metautils::args.dsnum+"/metadata",oss,ess) < 0) {
     metautils::log_error("thread_ncl() can't create directory tree","gsi",user);
   }
   if (std::regex_search(unixutils::host_name(),std::regex("^(cheyenne|geyser|caldera|pronghorn|yslogin)"))) {
-    unixutils::mysystem2("/bin/tcsh -c \"module delete intel; module load gnu ncl; ncl "+ncl_file->name()+"; ctrans -d sun -res 360x360 "+ncgm_file->name()+" |convert sun:- "+tiff_file->name()+"; mogrify -crop 360x180+0+90! "+tiff_file->name()+"; convert "+tiff_file->name()+" "+tdir->name()+"/datasets/ds"+meta_args.dsnum+"/metadata/spatial_coverage."+t->imagetag+".gif\"",oss,ess);
+    unixutils::mysystem2("/bin/tcsh -c \"module delete intel; module load gnu ncl; ncl "+ncl_file->name()+"; ctrans -d sun -res 360x360 "+ncgm_file->name()+" |convert sun:- "+tiff_file->name()+"; mogrify -crop 360x180+0+90! "+tiff_file->name()+"; convert "+tiff_file->name()+" "+tdir->name()+"/datasets/ds"+metautils::args.dsnum+"/metadata/spatial_coverage."+t->imagetag+".gif\"",oss,ess);
   }
   else {
-    unixutils::mysystem2("/bin/tcsh -c \"setenv NCARG_NCARG /usr/share/ncarg; /usr/bin/ncl "+ncl_file->name()+"; /usr/bin/ctrans -d sun -res 360x360 "+ncgm_file->name()+" |convert sun:- "+tiff_file->name()+"; mogrify -crop 360x180+0+90! "+tiff_file->name()+"; convert "+tiff_file->name()+" "+tdir->name()+"/datasets/ds"+meta_args.dsnum+"/metadata/spatial_coverage."+t->imagetag+".gif\"",oss,ess);
+    unixutils::mysystem2("/bin/tcsh -c \"setenv NCARG_NCARG /usr/share/ncarg; /usr/bin/ncl "+ncl_file->name()+"; /usr/bin/ctrans -d sun -res 360x360 "+ncgm_file->name()+" |convert sun:- "+tiff_file->name()+"; mogrify -crop 360x180+0+90! "+tiff_file->name()+"; convert "+tiff_file->name()+" "+tdir->name()+"/datasets/ds"+metautils::args.dsnum+"/metadata/spatial_coverage."+t->imagetag+".gif\"",oss,ess);
   }
   delete ncl_file;
   delete ncgm_file;
   delete tiff_file;
   std::string error;
-  if (unixutils::rdadata_sync(tdir->name(),"datasets/ds"+meta_args.dsnum+"/metadata/","/data/web",meta_directives.rdadata_home,error) < 0) {
+  if (unixutils::rdadata_sync(tdir->name(),"datasets/ds"+metautils::args.dsnum+"/metadata/","/data/web",metautils::directives.rdadata_home,error) < 0) {
     metautils::log_warning("rdadata_sync errors: '"+error+"'","gsi",user);
   }
+  delete tdir;
   return NULL;
 }
 
@@ -164,17 +165,17 @@ void generate_graphics(MySQL::LocalQuery& query,std::string type,std::string tab
   while (query.fetch_row(row)) {
     if (gindex.empty()) {
 	if (type == "obs") {
-	  tnc[nn].query.set("select distinct box1d_row,box1d_bitmap from "+table+" where dsid = '"+meta_args.dsnum+"' and observationType_code = "+row[0]+" and platformType_code = "+row[1]+" and format_code = "+row[4]+" order by box1d_row");
+	  tnc[nn].query.set("select distinct box1d_row,box1d_bitmap from "+table+" where dsid = '"+metautils::args.dsnum+"' and observationType_code = "+row[0]+" and platformType_code = "+row[1]+" and format_code = "+row[4]+" order by box1d_row");
 	  tnc[nn].imagetag=strutils::substitute(row[5]," ","_")+"_mss_"+row[2]+"."+row[3];
 	}
 	else if (type == "fix") {
-	  tnc[nn].query.set("select box1d_row,box1d_bitmap from "+table+" where dsid = '"+meta_args.dsnum+"' and classification_code = "+row[0]+" and format_code = "+row[2]+" order by box1d_row");
+	  tnc[nn].query.set("select box1d_row,box1d_bitmap from "+table+" where dsid = '"+metautils::args.dsnum+"' and classification_code = "+row[0]+" and format_code = "+row[2]+" order by box1d_row");
 	  tnc[nn].imagetag=strutils::substitute(row[3]," ","_")+"_mss_"+row[1];
 	}
     }
     else {
 	if (type == "obs") {
-	  tnc[nn].query.set("select distinct box1d_row,box1d_bitmap from ObML.ds"+dsnum2+"_primaries as p left join dssdb.mssfile as x on (x.dsid = 'ds"+meta_args.dsnum+"' and x.mssfile = p.mssID) left join "+table+" as t on t.mssID_code = p.code where x.gindex = "+gindex+" and observationType_code = "+row[0]+" and platformType_code = "+row[1]+" and p.format_code = "+row[4]+" order by box1d_row");
+	  tnc[nn].query.set("select distinct box1d_row,box1d_bitmap from ObML.ds"+dsnum2+"_primaries as p left join dssdb.mssfile as x on (x.dsid = 'ds"+metautils::args.dsnum+"' and x.mssfile = p.mssID) left join "+table+" as t on t.mssID_code = p.code where x.gindex = "+gindex+" and observationType_code = "+row[0]+" and platformType_code = "+row[1]+" and p.format_code = "+row[4]+" order by box1d_row");
 	  tnc[nn].imagetag=strutils::substitute(row[5]," ","_")+"_mss_gindex_"+gindex+"_"+row[2]+"."+row[3];
 	}
 	else if (type == "fix") {
@@ -189,9 +190,9 @@ void generate_graphics(MySQL::LocalQuery& query,std::string type,std::string tab
     pthread_join(tnc[m].tid,NULL);
   }
   delete[] tnc;
-  auto ncl_file=new TempFile(meta_directives.temp_path,".ncl");
-  auto ncgm_file=new TempFile(meta_directives.temp_path,".ncgm");
-  auto tiff_file=new TempFile(meta_directives.temp_path,".tiff");
+  auto ncl_file=new TempFile(metautils::directives.temp_path,".ncl");
+  auto ncgm_file=new TempFile(metautils::directives.temp_path,".ncgm");
+  auto tiff_file=new TempFile(metautils::directives.temp_path,".tiff");
   write_ncl_head(ncl_file,ncgm_file);
   ncl_file->writeln("  p=new((/500000,2/),\"float\",-999)");
   auto cnt=0;
@@ -212,26 +213,27 @@ void generate_graphics(MySQL::LocalQuery& query,std::string type,std::string tab
   ncl_file->writeln("end");
   ncl_file->close();
   auto tdir=new TempDir;
-  if (!tdir->create(meta_directives.temp_path)) {
+  if (!tdir->create(metautils::directives.temp_path)) {
     metautils::log_error("generate_graphics() can't create temporary directory","gsi",user);
   }
   std::stringstream oss,ess;
-  if (unixutils::mysystem2("/bin/mkdir -p "+tdir->name()+"/datasets/ds"+meta_args.dsnum+"/metadata",oss,ess) < 0) {
+  if (unixutils::mysystem2("/bin/mkdir -p "+tdir->name()+"/datasets/ds"+metautils::args.dsnum+"/metadata",oss,ess) < 0) {
     metautils::log_error("generate_graphics() can't create directory tree","gsi",user);
   }
   if (std::regex_search(unixutils::host_name(),std::regex("^(cheyenne|geyser|caldera|pronghorn|yslogin)"))) {
-    unixutils::mysystem2("/bin/tcsh -c \"module delete intel; module load gnu ncl; ncl "+ncl_file->name()+"; ctrans -d sun -res 360x360 "+ncgm_file->name()+" |convert sun:- "+tiff_file->name()+"; mogrify -crop 360x180+0+90! "+tiff_file->name()+"; convert "+tiff_file->name()+" "+tdir->name()+"/datasets/ds"+meta_args.dsnum+"/metadata/spatial_coverage.gif\"",oss,ess);
+    unixutils::mysystem2("/bin/tcsh -c \"module delete intel; module load gnu ncl; ncl "+ncl_file->name()+"; ctrans -d sun -res 360x360 "+ncgm_file->name()+" |convert sun:- "+tiff_file->name()+"; mogrify -crop 360x180+0+90! "+tiff_file->name()+"; convert "+tiff_file->name()+" "+tdir->name()+"/datasets/ds"+metautils::args.dsnum+"/metadata/spatial_coverage.gif\"",oss,ess);
   }
   else {
-    unixutils::mysystem2("/bin/tcsh -c \"setenv NCARG_NCARG /usr/share/ncarg; /usr/bin/ncl "+ncl_file->name()+"; /usr/bin/ctrans -d sun -res 360x360 "+ncgm_file->name()+" |convert sun:- "+tiff_file->name()+"; mogrify -crop 360x180+0+90! "+tiff_file->name()+"; convert "+tiff_file->name()+" "+tdir->name()+"/datasets/ds"+meta_args.dsnum+"/metadata/spatial_coverage.gif\"",oss,ess);
+    unixutils::mysystem2("/bin/tcsh -c \"setenv NCARG_NCARG /usr/share/ncarg; /usr/bin/ncl "+ncl_file->name()+"; /usr/bin/ctrans -d sun -res 360x360 "+ncgm_file->name()+" |convert sun:- "+tiff_file->name()+"; mogrify -crop 360x180+0+90! "+tiff_file->name()+"; convert "+tiff_file->name()+" "+tdir->name()+"/datasets/ds"+metautils::args.dsnum+"/metadata/spatial_coverage.gif\"",oss,ess);
   }
   delete ncl_file;
   delete ncgm_file;
   delete tiff_file;
   std::string error;
-  if (unixutils::rdadata_sync(tdir->name(),"datasets/ds"+meta_args.dsnum+"/metadata/","/data/web",meta_directives.rdadata_home,error) < 0) {
+  if (unixutils::rdadata_sync(tdir->name(),"datasets/ds"+metautils::args.dsnum+"/metadata/","/data/web",metautils::directives.rdadata_home,error) < 0) {
     metautils::log_warning("rdadata_sync errors: '"+error+"'","gsi",user);
   }
+  delete tdir;
 }
 
 int main(int argc,char **argv)
@@ -249,9 +251,9 @@ int main(int argc,char **argv)
     std::cerr << "-N            notify with a message when gsi completes" << std::endl;
     exit(1);
   }
-  meta_args.args_string=unixutils::unix_args_string(argc,argv,'!');
+  metautils::args.args_string=unixutils::unix_args_string(argc,argv,'!');
   metautils::read_config("gsi",user);
-  sp=strutils::split(meta_args.args_string,"!");
+  sp=strutils::split(metautils::args.args_string,"!");
   for (n=0; n < sp.size()-1; n++) {
     if (sp[n] == "-N") {
 	notify=true;
@@ -260,9 +262,9 @@ int main(int argc,char **argv)
 	gindex=sp[++n];
     }
   }
-  meta_args.dsnum=sp[n];
-  dsnum2=strutils::substitute(meta_args.dsnum,".","");
-  server.connect(meta_directives.database_server,meta_directives.metadb_username,meta_directives.metadb_password,"");
+  metautils::args.dsnum=sp[n];
+  dsnum2=strutils::substitute(metautils::args.dsnum,".","");
+  server.connect(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   if (!server) {
     metautils::log_error("unable to connect to MySQL server on startup","gsi",user);
   }

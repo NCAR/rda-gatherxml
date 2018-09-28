@@ -19,8 +19,8 @@
 #include <search.hpp>
 #include <myerror.hpp>
 
-metautils::Directives meta_directives;
-metautils::Args meta_args;
+metautils::Directives metautils::directives;
+metautils::Args metautils::args;
 std::string myerror="";
 std::string mywarning="";
 
@@ -46,27 +46,27 @@ void generate_index(std::string type,std::string tdir_name)
   ofs << "<!DOCTYPE html>" << std::endl;
   ofs << "<head>" << std::endl;
   if (dataset_type == "I") {
-    ofs << "<meta http-equiv=\"Refresh\" content=\"0; url=/index.html?hash=error&code=404&url=/datasets/ds" << meta_args.dsnum << "\" />" << std::endl;
+    ofs << "<meta http-equiv=\"Refresh\" content=\"0; url=/index.html?hash=error&code=404&url=/datasets/ds" << metautils::args.dsnum << "\" />" << std::endl;
     ofs << "</head>" << std::endl;
   }
   else {
     struct stat buf;
     std::string ds_overview;
-    if (stat(("/data/web/datasets/ds"+meta_args.dsnum+"/metadata/dsOverview.xml").c_str(),&buf) == 0) {
-	ds_overview="/data/web/datasets/ds"+meta_args.dsnum+"/metadata/dsOverview.xml";
+    if (stat(("/data/web/datasets/ds"+metautils::args.dsnum+"/metadata/dsOverview.xml").c_str(),&buf) == 0) {
+	ds_overview="/data/web/datasets/ds"+metautils::args.dsnum+"/metadata/dsOverview.xml";
     }
     else {
-	ds_overview=unixutils::remote_web_file("https://rda.ucar.edu/datasets/ds"+meta_args.dsnum+"/metadata/dsOverview.xml",temp_dir.name());
+	ds_overview=unixutils::remote_web_file("https://rda.ucar.edu/datasets/ds"+metautils::args.dsnum+"/metadata/dsOverview.xml",temp_dir.name());
 	if (ds_overview.empty()) {
-	  metautils::log_error("dsOverview.xml does not exist for "+meta_args.dsnum,"dsgen",user);
+	  metautils::log_error("dsOverview.xml does not exist for "+metautils::args.dsnum,"dsgen",user);
 	}
     }
     if (!xdoc.open(ds_overview)) {
-	metautils::log_error("unable to open dsOverview.xml for "+meta_args.dsnum+"; parse error: '"+xdoc.parse_error()+"'","dsgen",user);
+	metautils::log_error("unable to open dsOverview.xml for "+metautils::args.dsnum+"; parse error: '"+xdoc.parse_error()+"'","dsgen",user);
     }
     ofs << "<meta http-equiv=\"Content-type\" content=\"application/xml+xhtml;charset=UTF-8\" />" << std::endl;
     ofs << "<meta name=\"fragment\" content=\"!\" />" << std::endl;
-    if (!metadataExport::export_to_dc_meta_tags(ofs,meta_args.dsnum,xdoc,0)) {
+    if (!metadataExport::export_to_dc_meta_tags(ofs,metautils::args.dsnum,xdoc,0)) {
 	metautils::log_error("unable to export DC meta tags","dsgen",user);
     }
     auto e=xdoc.element("dsOverview/title");
@@ -75,7 +75,7 @@ void generate_index(std::string type,std::string tdir_name)
     ofs << "<?php include (\"main/styles.inc\"); ?>" << std::endl;
     ofs << "<?php include (\"main/scripts.inc\"); ?>" << std::endl;
     ofs << "<?php include (\"main/ds_scripts.inc\"); ?>" << std::endl;
-    if (!metadataExport::export_to_json_ld(ofs,meta_args.dsnum,xdoc,0)) {
+    if (!metadataExport::export_to_json_ld(ofs,metautils::args.dsnum,xdoc,0)) {
 	metautils::log_error("unable to export JSON-LD metadata","dsgen",user);
     }
     ofs << "</head>" << std::endl;
@@ -93,7 +93,7 @@ void generate_index(std::string type,std::string tdir_name)
     ofs << "    if ($conn) {" << std::endl;
     ofs << "      $db=mysql_select_db(\"dssdb\",$conn);" << std::endl;
     ofs << "      if ($db) {" << std::endl;
-    ofs << "        $query=\"select dsid from dsbookmarks where email = '\" . $duser . \"' and dsid = '" << meta_args.dsnum << "'\";" << std::endl;
+    ofs << "        $query=\"select dsid from dsbookmarks where email = '\" . $duser . \"' and dsid = '" << metautils::args.dsnum << "'\";" << std::endl;
     ofs << "        $res=mysql_query($query,$conn);" << std::endl;
     ofs << "        if ($res && mysql_num_rows($res) > 0) {" << std::endl;
     ofs << "          $is_bookmarked=true;" << std::endl;
@@ -115,13 +115,13 @@ void generate_index(std::string type,std::string tdir_name)
     else {
 	ofs << "default_200_200.png\" width=\"70\"";
     }
-    ofs << " height=\"70\" /></td><td><span class=\"fs24px bold\">" << title << "</span><br /><span class=\"fs16px bold\"><span class=\"blue\">ds" << meta_args.dsnum << "</span>";
-    MySQL::Query query("doi","dssdb.dsvrsn","dsid = 'ds"+meta_args.dsnum+"' and status = 'A'");
+    ofs << " height=\"70\" /></td><td><span class=\"fs24px bold\">" << title << "</span><br /><span class=\"fs16px bold\"><span class=\"blue\">ds" << metautils::args.dsnum << "</span>";
+    MySQL::Query query("doi","dssdb.dsvrsn","dsid = 'ds"+metautils::args.dsnum+"' and status = 'A'");
     MySQL::Row row;
     if (query.submit(server) == 0 && query.fetch_row(row) && !row[0].empty()) {
 	ofs << "&nbsp;|&nbsp;<span class=\"blue\">DOI: " << row[0] << "</span>";
     }
-    ofs << "</span><div id=\"ds_bookmark\" style=\"display: inline; margin-left: 2px\"><?php if ($can_bookmark) { $dsid=\"" << meta_args.dsnum << "\"; if ($is_bookmarked) { include(\"dsbookmarks/showunset.inc\"); } else { include(\"dsbookmarks/showset.inc\"); } } ?></div></td></tr>" << std::endl;
+    ofs << "</span><div id=\"ds_bookmark\" style=\"display: inline; margin-left: 2px\"><?php if ($can_bookmark) { $dsid=\"" << metautils::args.dsnum << "\"; if ($is_bookmarked) { include(\"dsbookmarks/showunset.inc\"); } else { include(\"dsbookmarks/showset.inc\"); } } ?></div></td></tr>" << std::endl;
     e=xdoc.element("dsOverview/contact");
     auto contact_parts=strutils::split(e.content());
     query.set("select logname,phoneno from dssdb.dssgrp where fstname = '"+contact_parts[0]+"' and lstname = '"+contact_parts[1]+"'");
@@ -409,7 +409,7 @@ void insert_text_field(std::ofstream& ofs,const XMLElement& e,std::string sectio
 
 void generate_description(std::string type,std::string tdir_name)
 {
-  std::string dsnum2=strutils::substitute(meta_args.dsnum,".","");
+  std::string dsnum2=strutils::substitute(metautils::args.dsnum,".","");
   std::ofstream ofs;
   ofs.open((tdir_name+"/description.html").c_str());
   if (!ofs.is_open()) {
@@ -465,11 +465,11 @@ void generate_description(std::string type,std::string tdir_name)
   ofs << "  $cdg_guidance_path=\"\";" << std::endl;
   ofs << "  $conn=mysql_connect(\"rda-db.ucar.edu\",\"metadata\",\"metadata\");" << std::endl;
   ofs << "  if ($conn) {" << std::endl;
-  ofs << "    $res=mysql_query(\"select dsid from metautil.rda_blog where dsid = '" << meta_args.dsnum << "'\");" << std::endl;
+  ofs << "    $res=mysql_query(\"select dsid from metautil.rda_blog where dsid = '" << metautils::args.dsnum << "'\");" << std::endl;
   ofs << "    if (mysql_numrows($res) > 0) {" << std::endl;
   ofs << "      $rda_blog=true;" << std::endl;
   ofs << "    }" << std::endl;
-  ofs << "    $res=mysql_query(\"select cdg_page_path,cdg_guidance_path from metautil.climate_data_guide where dsid = '" << meta_args.dsnum << "'\");" << std::endl;
+  ofs << "    $res=mysql_query(\"select cdg_page_path,cdg_guidance_path from metautil.climate_data_guide where dsid = '" << metautils::args.dsnum << "'\");" << std::endl;
   ofs << "    if (mysql_numrows($res) > 0) {" << std::endl;
   ofs << "      @ $row=mysql_fetch_array($res,MYSQL_ASSOC);" << std::endl;
   ofs << "      $cdg_page_path=$row['cdg_page_path'];" << std::endl;
@@ -499,21 +499,21 @@ void generate_description(std::string type,std::string tdir_name)
 // acknowledgments
   insert_text_field(ofs,xdoc.element("dsOverview/acknowledgement"),"Acknowledgments");
 // temporal range(s)
-  MySQL::LocalQuery query("select dsid from dssdb.dsgroup where dsid = 'ds"+meta_args.dsnum+"'");
+  MySQL::LocalQuery query("select dsid from dssdb.dsgroup where dsid = 'ds"+metautils::args.dsnum+"'");
   if (query.submit(server) < 0) {
     metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",user);
   }
   if (query.num_rows() > 0) {
-    query.set("select p.date_start,p.time_start,p.start_flag,p.date_end,p.time_end,p.end_flag,p.time_zone,g.title,g.grpid from dssdb.dsperiod as p left join dssdb.dsgroup as g on (p.dsid = g.dsid and p.gindex = g.gindex) where p.dsid = 'ds"+meta_args.dsnum+"' and g.pindex = 0 and date_start > '0000-00-00' and date_start < '3000-01-01' and date_end > '0000-00-00' and date_end < '3000-01-01' union select p.date_start,p.time_start,p.start_flag,p.date_end,p.time_end,p.end_flag,p.time_zone,g2.title,g.grpid from dssdb.dsperiod as p left join dssdb.dsgroup as g on (p.dsid = g.dsid and p.gindex = g.gindex) left join dssdb.dsgroup as g2 on (p.dsid = g2.dsid and g.pindex = g2.gindex) where p.dsid = 'ds"+meta_args.dsnum+"' and date_start > '0000-00-00' and date_start < '3000-01-01' and date_end > '0000-00-00' and date_end < '3000-01-01' and !isnull(g2.title) order by title");
+    query.set("select p.date_start,p.time_start,p.start_flag,p.date_end,p.time_end,p.end_flag,p.time_zone,g.title,g.grpid from dssdb.dsperiod as p left join dssdb.dsgroup as g on (p.dsid = g.dsid and p.gindex = g.gindex) where p.dsid = 'ds"+metautils::args.dsnum+"' and g.pindex = 0 and date_start > '0000-00-00' and date_start < '3000-01-01' and date_end > '0000-00-00' and date_end < '3000-01-01' union select p.date_start,p.time_start,p.start_flag,p.date_end,p.time_end,p.end_flag,p.time_zone,g2.title,g.grpid from dssdb.dsperiod as p left join dssdb.dsgroup as g on (p.dsid = g.dsid and p.gindex = g.gindex) left join dssdb.dsgroup as g2 on (p.dsid = g2.dsid and g.pindex = g2.gindex) where p.dsid = 'ds"+metautils::args.dsnum+"' and date_start > '0000-00-00' and date_start < '3000-01-01' and date_end > '0000-00-00' and date_end < '3000-01-01' and !isnull(g2.title) order by title");
   }
   else {
-    query.set("select date_start,time_start,start_flag,date_end,time_end,end_flag,time_zone,NULL,NULL from dssdb.dsperiod where dsid = 'ds"+meta_args.dsnum+"' and date_start > '0000-00-00' and date_start < '3000-01-01' and date_end > '0000-00-00' and date_end < '3000-01-01'");
+    query.set("select date_start,time_start,start_flag,date_end,time_end,end_flag,time_zone,NULL,NULL from dssdb.dsperiod where dsid = 'ds"+metautils::args.dsnum+"' and date_start > '0000-00-00' and date_start < '3000-01-01' and date_end > '0000-00-00' and date_end < '3000-01-01'");
   }
   if (query.submit(server) < 0) {
     metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",user);
   }
   if (query.num_rows() == 0) {
-    query.set("select date_start,time_start,start_flag,date_end,time_end,end_flag,time_zone,NULL,NULL from dssdb.dsperiod where dsid = 'ds"+meta_args.dsnum+"' and date_start > '0000-00-00' and date_start < '3000-01-01' and date_end > '0000-00-00' and date_end < '3000-01-01'");
+    query.set("select date_start,time_start,start_flag,date_end,time_end,end_flag,time_zone,NULL,NULL from dssdb.dsperiod where dsid = 'ds"+metautils::args.dsnum+"' and date_start > '0000-00-00' and date_start < '3000-01-01' and date_end > '0000-00-00' and date_end < '3000-01-01'");
     if (query.submit(server) < 0) {
 	metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",user);
     }
@@ -524,13 +524,13 @@ void generate_description(std::string type,std::string tdir_name)
   if (query.num_rows() > 0) {
     ofs << "<tr style=\"vertical-align: top\"><td class=\"bold nowrap\">Temporal Range:</td><td>";
     if (query.num_rows() > 1) {
-	MySQL::LocalQuery query2("distinct gindex","dssdb.dsperiod","dsid = 'ds"+meta_args.dsnum+"'");
+	MySQL::LocalQuery query2("distinct gindex","dssdb.dsperiod","dsid = 'ds"+metautils::args.dsnum+"'");
 	if (query2.submit(server) < 0) {
 	  metautils::log_error("query: "+query2.show()+" returned error: "+query2.error(),"dsgen",user);
 	}
 	if (query2.num_rows() > 1) {
 	  grouped_periods=true;
-	  query2.set("select gindex,title from dssdb.dsgroup where dsid = 'ds"+meta_args.dsnum+"'");
+	  query2.set("select gindex,title from dssdb.dsgroup where dsid = 'ds"+metautils::args.dsnum+"'");
 	  if (query2.submit(server) < 0) {
 	    metautils::log_error("error: "+query2.error()+" while getting groups data","dsgen",user);
 	  }
@@ -538,7 +538,7 @@ void generate_description(std::string type,std::string tdir_name)
 	  while (query2.fetch_row(row2)) {
 	    groups_table.emplace(row2[0],row2[1]);
 	  }
-	  query2.set("select mssfile,tindex from dssdb.mssfile where dsid = 'ds"+meta_args.dsnum+"' and type = 'P' and status = 'P'");
+	  query2.set("select mssfile,tindex from dssdb.mssfile where dsid = 'ds"+metautils::args.dsnum+"' and type = 'P' and status = 'P'");
 	  if (query2.submit(server) < 0) {
 	    metautils::log_error("error: "+query2.error()+" while getting RDA files data","dsgen",user);
 	  }
@@ -551,7 +551,7 @@ void generate_description(std::string type,std::string tdir_name)
 		metadata_files_table.emplace(row2[0],row2[1]);
 	    }
 	  }
-	  query2.set("select min(concat(date_start,' ',time_start)),min(start_flag),max(concat(date_end,' ',time_end)),min(end_flag),any_value(time_zone) from dssdb.dsperiod where dsid = 'ds"+meta_args.dsnum+"' and date_start > '0000-00-00' and date_start < '3000-01-01' and date_end > '0000-00-00' and date_end < '3000-01-01' group by dsid");
+	  query2.set("select min(concat(date_start,' ',time_start)),min(start_flag),max(concat(date_end,' ',time_end)),min(end_flag),any_value(time_zone) from dssdb.dsperiod where dsid = 'ds"+metautils::args.dsnum+"' and date_start > '0000-00-00' and date_start < '3000-01-01' and date_end > '0000-00-00' and date_end < '3000-01-01' group by dsid");
 	  if (query2.submit(server) < 0) {
 	    metautils::log_error("query: "+query2.show()+" returned error: "+query2.error(),"dsgen",user);
 	  }
@@ -650,7 +650,7 @@ void generate_description(std::string type,std::string tdir_name)
   }
 // variables
   ofs << "<tr style=\"vertical-align: top\"><td class=\"bold\">Variables:</td><td>" << std::endl;
-  query.set("select substring_index(path,' > ',-1) as var from search.variables_new as v left join search.GCMD_sciencekeywords as g on g.uuid = v.keyword where v.vocabulary = 'GCMD' and v.dsid = '"+meta_args.dsnum+"' order by var");
+  query.set("select substring_index(path,' > ',-1) as var from search.variables_new as v left join search.GCMD_sciencekeywords as g on g.uuid = v.keyword where v.vocabulary = 'GCMD' and v.dsid = '"+metautils::args.dsnum+"' order by var");
   if (query.submit(server) < 0) {
     metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",user);
   }
@@ -669,33 +669,33 @@ void generate_description(std::string type,std::string tdir_name)
 	}
     }
   }
-  if (unixutils::exists_on_server(meta_directives.web_server,"/data/web/datasets/ds"+meta_args.dsnum+"/metadata/grib.html",meta_directives.rdadata_home)) {
-    ofs << "<div>GRIB parameter table:  <a href=\"/datasets/ds" << meta_args.dsnum << "/#metadata/grib.html?_do=y\">HTML</a>";
-    if (unixutils::exists_on_server(meta_directives.web_server,"/data/web/datasets/ds"+meta_args.dsnum+"/metadata/grib.xml",meta_directives.rdadata_home)) {
-	ofs << " | <a href=\"/datasets/ds" << meta_args.dsnum << "/metadata/grib.xml\">XML</a></div>";
+  if (unixutils::exists_on_server(metautils::directives.web_server,"/data/web/datasets/ds"+metautils::args.dsnum+"/metadata/grib.html",metautils::directives.rdadata_home)) {
+    ofs << "<div>GRIB parameter table:  <a href=\"/datasets/ds" << metautils::args.dsnum << "/#metadata/grib.html?_do=y\">HTML</a>";
+    if (unixutils::exists_on_server(metautils::directives.web_server,"/data/web/datasets/ds"+metautils::args.dsnum+"/metadata/grib.xml",metautils::directives.rdadata_home)) {
+	ofs << " | <a href=\"/datasets/ds" << metautils::args.dsnum << "/metadata/grib.xml\">XML</a></div>";
     }
     ofs << std::endl;
   }
-  if (unixutils::exists_on_server(meta_directives.web_server,"/data/web/datasets/ds"+meta_args.dsnum+"/metadata/grib2.html",meta_directives.rdadata_home)) {
-    ofs << "<div>GRIB2 parameter table:  <a href=\"/datasets/ds" << meta_args.dsnum << "/#metadata/grib2.html?_do=y\">HTML</a>";
-    if (unixutils::exists_on_server(meta_directives.web_server,"/data/web/datasets/ds"+meta_args.dsnum+"/metadata/grib2.xml",meta_directives.rdadata_home)) {
-	ofs << " | <a href=\"/datasets/ds" << meta_args.dsnum << "/metadata/grib2.xml\">XML</a></div>"; 
+  if (unixutils::exists_on_server(metautils::directives.web_server,"/data/web/datasets/ds"+metautils::args.dsnum+"/metadata/grib2.html",metautils::directives.rdadata_home)) {
+    ofs << "<div>GRIB2 parameter table:  <a href=\"/datasets/ds" << metautils::args.dsnum << "/#metadata/grib2.html?_do=y\">HTML</a>";
+    if (unixutils::exists_on_server(metautils::directives.web_server,"/data/web/datasets/ds"+metautils::args.dsnum+"/metadata/grib2.xml",metautils::directives.rdadata_home)) {
+	ofs << " | <a href=\"/datasets/ds" << metautils::args.dsnum << "/metadata/grib2.xml\">XML</a></div>"; 
     }
     ofs << std::endl;
   }
-  if (unixutils::exists_on_server(meta_directives.web_server,"/data/web/datasets/ds"+meta_args.dsnum+"/metadata/on84.html",meta_directives.rdadata_home)) {
-    ofs << "<div>ON84 parameter table:  <a href=\"/datasets/ds" << meta_args.dsnum << "/metadata/on84.html\">HTML</a>";
-    if (unixutils::exists_on_server(meta_directives.web_server,"/data/web/datasets/ds"+meta_args.dsnum+"/metadata/on84.html",meta_directives.rdadata_home)) {
-	ofs << " | <a href=\"/datasets/ds" << meta_args.dsnum << "/metadata/on84.xml\">XML</a></div>";
+  if (unixutils::exists_on_server(metautils::directives.web_server,"/data/web/datasets/ds"+metautils::args.dsnum+"/metadata/on84.html",metautils::directives.rdadata_home)) {
+    ofs << "<div>ON84 parameter table:  <a href=\"/datasets/ds" << metautils::args.dsnum << "/metadata/on84.html\">HTML</a>";
+    if (unixutils::exists_on_server(metautils::directives.web_server,"/data/web/datasets/ds"+metautils::args.dsnum+"/metadata/on84.html",metautils::directives.rdadata_home)) {
+	ofs << " | <a href=\"/datasets/ds" << metautils::args.dsnum << "/metadata/on84.xml\">XML</a></div>";
     }
     ofs << std::endl;
   }
-  query.set("gindex,title","dssdb.dsgroup","dsid = 'ds"+meta_args.dsnum+"' and pindex = 0 and pmsscnt > 0");
+  query.set("gindex,title","dssdb.dsgroup","dsid = 'ds"+metautils::args.dsnum+"' and pindex = 0 and pmsscnt > 0");
   if (query.submit(server) == 0) {
     std::stringstream vars_by_product;
     while (query.fetch_row(row)) {
-	if (unixutils::exists_on_server(meta_directives.web_server,"/data/web/datasets/ds"+meta_args.dsnum+"/metadata/customize.GrML."+row[0],meta_directives.rdadata_home)) {
-	  auto c_file=unixutils::remote_web_file("https://rda.ucar.edu/datasets/ds"+meta_args.dsnum+"/metadata/customize.GrML."+row[0],temp_dir.name());
+	if (unixutils::exists_on_server(metautils::directives.web_server,"/data/web/datasets/ds"+metautils::args.dsnum+"/metadata/customize.GrML."+row[0],metautils::directives.rdadata_home)) {
+	  auto c_file=unixutils::remote_web_file("https://rda.ucar.edu/datasets/ds"+metautils::args.dsnum+"/metadata/customize.GrML."+row[0],temp_dir.name());
 	  if (!c_file.empty()) {
 	    std::ifstream ifs;
 	    char line[32768];
@@ -737,8 +737,8 @@ void generate_description(std::string type,std::string tdir_name)
     for (const auto& type : types) {
 	if (type == "grid") {
 	  ofs << "<tr style=\"vertical-align: top\"><td class=\"bold nowrap\">Vertical Levels:</td><td>See the <a href=\"#metadata/detailed.html?_do=y&view=level\">detailed metadata</a> for level information";
-	  if (unixutils::exists_on_server(meta_directives.web_server,"/data/web/datasets/ds"+meta_args.dsnum+"/metadata/grib2_levels.html",meta_directives.rdadata_home)) {
-	    ofs << "<br /><a href=\"/datasets/ds" << meta_args.dsnum << "/#metadata/grib2_levels.html?_do=y\">GRIB2 level table</a>"; 
+	  if (unixutils::exists_on_server(metautils::directives.web_server,"/data/web/datasets/ds"+metautils::args.dsnum+"/metadata/grib2_levels.html",metautils::directives.rdadata_home)) {
+	    ofs << "<br /><a href=\"/datasets/ds" << metautils::args.dsnum << "/#metadata/grib2_levels.html?_do=y\">GRIB2 level table</a>"; 
 	  }
 	  ofs << "</td></tr>" << std::endl;
 	  break;
@@ -1080,7 +1080,7 @@ void generate_description(std::string type,std::string tdir_name)
     ofs << "</span></span></td></tr>" << std::endl;
   }
 // data contributors
-  query.set("select g.path from search.contributors_new as c left join search.GCMD_providers as g on g.uuid = c.keyword where c.dsid = '"+meta_args.dsnum+"' and c.vocabulary = 'GCMD'");
+  query.set("select g.path from search.contributors_new as c left join search.GCMD_providers as g on g.uuid = c.keyword where c.dsid = '"+metautils::args.dsnum+"' and c.vocabulary = 'GCMD'");
   if (query.submit(server) < 0) {
     metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",user);
   }
@@ -1151,8 +1151,8 @@ void generate_description(std::string type,std::string tdir_name)
   }
 // WRF Preprocessing System
   ofs << "<?php" << std::endl;
-  ofs << "  if (file_exists(\"/usr/local/www/server_root/web/datasets/ds" << meta_args.dsnum << "/metadata/Vtable.RDA_ds" << meta_args.dsnum << "\")) {" << std::endl;
-  ofs << "    print \"<tr style=\\\"vertical-align: bottom\\\"><td class=\\\"bold\\\">WRF Preprocessing System (WPS):</td><td>The GRIB-formatted data in this dataset can be used to initialize the Weather Research and Forecasting (WRF) Model.<br /><!--<a target=\\\"_vtable\\\" href=\\\"/datasets/ds" << meta_args.dsnum << "/metadata/Vtable.RDA_ds" << meta_args.dsnum << "\\\">Vtable</a>&nbsp;|&nbsp;--><a target=\\\"_wrf\\\" href=\\\"http://www2.mmm.ucar.edu/wrf/users/download/free_data.html\\\"><em>WRF Vtables</em></a></td></tr>\";" << std::endl;
+  ofs << "  if (file_exists(\"/usr/local/www/server_root/web/datasets/ds" << metautils::args.dsnum << "/metadata/Vtable.RDA_ds" << metautils::args.dsnum << "\")) {" << std::endl;
+  ofs << "    print \"<tr style=\\\"vertical-align: bottom\\\"><td class=\\\"bold\\\">WRF Preprocessing System (WPS):</td><td>The GRIB-formatted data in this dataset can be used to initialize the Weather Research and Forecasting (WRF) Model.<br /><!--<a target=\\\"_vtable\\\" href=\\\"/datasets/ds" << metautils::args.dsnum << "/metadata/Vtable.RDA_ds" << metautils::args.dsnum << "\\\">Vtable</a>&nbsp;|&nbsp;--><a target=\\\"_wrf\\\" href=\\\"http://www2.mmm.ucar.edu/wrf/users/download/free_data.html\\\"><em>WRF Vtables</em></a></td></tr>\";" << std::endl;
   ofs << "  }" << std::endl;
   ofs << "?>" << std::endl;
 // publications
@@ -1301,7 +1301,7 @@ void generate_description(std::string type,std::string tdir_name)
   if (started_pubs)
     ofs << "</td></tr>" << std::endl;
 // citation
-  ofs << "<tr style=\"vertical-align: top\"><td class=\"bold\">How to Cite This Dataset:<div style=\"background-color: #2a70ae; color: white; width: 40px; padding: 1px; margin-top: 3px; font-size: 16px; font-weight: bold; border-radius: 5px 5px 5px 5px; text-align: center; cursor: pointer\" onClick=\"javascript:location='/cgi-bin/datasets/citation?dsnum=" << meta_args.dsnum << "&style=ris'\" title=\"download citation in RIS format\">RIS</div><div style=\"background-color: #2a70ae; color: white; width: 60px; padding: 2px 8px 2px 8px; font-size: 16px; font-weight: bold; font-family: serif; border-radius: 5px 5px 5px 5px; text-align: center; cursor: pointer; margin-top: 5px\" onClick=\"location='/cgi-bin/datasets/citation?dsnum=" << meta_args.dsnum << "&style=bibtex'\" title=\"download citation in BibTeX format\">BibTeX</div></td><td><div id=\"citation\" style=\"border: thin solid black; padding: 5px\"><img src=\"/images/transpace.gif\" width=\"1\" height=\"1\" onLoad=\"getAjaxContent('GET',null,'/cgi-bin/datasets/citation?dsnum=" << meta_args.dsnum << "&style=esip','citation')\" /></div>" << std::endl;
+  ofs << "<tr style=\"vertical-align: top\"><td class=\"bold\">How to Cite This Dataset:<div style=\"background-color: #2a70ae; color: white; width: 40px; padding: 1px; margin-top: 3px; font-size: 16px; font-weight: bold; border-radius: 5px 5px 5px 5px; text-align: center; cursor: pointer\" onClick=\"javascript:location='/cgi-bin/datasets/citation?dsnum=" << metautils::args.dsnum << "&style=ris'\" title=\"download citation in RIS format\">RIS</div><div style=\"background-color: #2a70ae; color: white; width: 60px; padding: 2px 8px 2px 8px; font-size: 16px; font-weight: bold; font-family: serif; border-radius: 5px 5px 5px 5px; text-align: center; cursor: pointer; margin-top: 5px\" onClick=\"location='/cgi-bin/datasets/citation?dsnum=" << metautils::args.dsnum << "&style=bibtex'\" title=\"download citation in BibTeX format\">BibTeX</div></td><td><div id=\"citation\" style=\"border: thin solid black; padding: 5px\"><img src=\"/images/transpace.gif\" width=\"1\" height=\"1\" onLoad=\"getAjaxContent('GET',null,'/cgi-bin/datasets/citation?dsnum=" << metautils::args.dsnum << "&style=esip','citation')\" /></div>" << std::endl;
   ofs << "<?php" << std::endl;
   ofs << "  $signedin=false;" << std::endl;
   ofs << "  if (isSet($_SERVER[\"HTTP_COOKIE\"])) {" << std::endl;
@@ -1315,7 +1315,7 @@ void generate_description(std::string type,std::string tdir_name)
   ofs << "    }" << std::endl;
   ofs << "  }" << std::endl;
   ofs << "  if ($signedin)" << std::endl;
-  ofs << "    print \"<a href=\\\"javascript:void(0)\\\" onClick=\\\"getAjaxContent('GET',null,'/php/ajax/mydatacitation.php?tab=ds_history&dsid=ds" << meta_args.dsnum << "&b=no','content_container')\\\">\";" << std::endl;
+  ofs << "    print \"<a href=\\\"javascript:void(0)\\\" onClick=\\\"getAjaxContent('GET',null,'/php/ajax/mydatacitation.php?tab=ds_history&dsid=ds" << metautils::args.dsnum << "&b=no','content_container')\\\">\";" << std::endl;
   ofs << "  else" << std::endl;
   ofs << "    print \"<span style=\\\"color: #a0a0a0\\\">\";" << std::endl;
   ofs << "  print \"Get a customized data citation\";" << std::endl;
@@ -1327,11 +1327,11 @@ void generate_description(std::string type,std::string tdir_name)
   ofs << "</td></tr>" << std::endl;
 // volume
   ofs << "<tr style=\"vertical-align: top\"><td class=\"bold nowrap\">Total Volume:</td><td>";
-  query.set("primary_size","dssdb.dataset","dsid = 'ds"+meta_args.dsnum+"'");
+  query.set("primary_size","dssdb.dataset","dsid = 'ds"+metautils::args.dsnum+"'");
   if (query.submit(server) < 0) {
     metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",user);
   }
-  MySQL::LocalQuery query2("select primary_size,title,grpid from dssdb.dsgroup where dsid = 'ds"+meta_args.dsnum+"' and pindex = 0 and primary_size > 0");
+  MySQL::LocalQuery query2("select primary_size,title,grpid from dssdb.dsgroup where dsid = 'ds"+metautils::args.dsnum+"' and pindex = 0 and primary_size > 0");
   if (query2.submit(server) < 0) {
     metautils::log_error("query: "+query2.show()+" returned error: "+query2.error(),"dsgen",user);
   }
@@ -1459,19 +1459,19 @@ void generate_description(std::string type,std::string tdir_name)
     ofs << "</table></td></tr>" << std::endl;
   }
 // more details
-  if (unixutils::exists_on_server(meta_directives.web_server,"/data/web/datasets/ds"+meta_args.dsnum+"/metadata/detailed.html",meta_directives.rdadata_home)) {
+  if (unixutils::exists_on_server(metautils::directives.web_server,"/data/web/datasets/ds"+metautils::args.dsnum+"/metadata/detailed.html",metautils::directives.rdadata_home)) {
     ofs << "<tr style=\"vertical-align: top\"><td class=\"bold nowrap\">More Details:</td><td>View <a href=\"#metadata/detailed.html?_do=y\">more details</a> for this dataset, including dataset citation, data contributors, and other detailed metadata</td></tr>" << std::endl;
   }
 // RDA blog
   ofs << "<?php" << std::endl;
   ofs << "  if ($rda_blog) {" << std::endl;
-  ofs << "    print \"<tr style=\\\"vertical-align: top\\\"><td class=\\\"bold nowrap\\\">RDA Blog:</td><td>Read <a href=\\\"http://ncarrda.blogspot.com/search/label/ds" << meta_args.dsnum << "\\\" target=\\\"_rdablog\\\">posts</a> on the RDA blog that are related to this dataset</td></tr>\n\";" << std::endl;
+  ofs << "    print \"<tr style=\\\"vertical-align: top\\\"><td class=\\\"bold nowrap\\\">RDA Blog:</td><td>Read <a href=\\\"http://ncarrda.blogspot.com/search/label/ds" << metautils::args.dsnum << "\\\" target=\\\"_rdablog\\\">posts</a> on the RDA blog that are related to this dataset</td></tr>\n\";" << std::endl;
   ofs << "  }" << std::endl;
   ofs << "?>" << std::endl;
 // data access
   ofs << "<tr style=\"vertical-align: top\"><td class=\"bold nowrap\">Data Access:</td><td><div style=\"display: inline; float: left\">Click the </div><a class=\"clean\" href=\"#access\"><div class=\"dstab dstab-off\" style=\"width: 100px; margin: 0px 5px 0px 5px; text-align: center\">Data Access</div></a><div style=\"display: inline; float: left\"> tab here or in the navigation bar near the top of the page</div></td></tr>" << std::endl;
 // metadata record
-  ofs << "<tr style=\"vertical-align: top\"><td class=\"bold nowrap\">Metadata Record:</td><td><div id=\"meta_record\" style=\"display: inline; float: left\"></div><img src=\"/images/transpace.gif\" width=\"1\" height=\"1\" onload=\"getAjaxContent('GET',null,'/cgi-bin/datasets/showMetadata?dsnum=" << meta_args.dsnum << "','meta_record')\" /></td></tr>" << std::endl;
+  ofs << "<tr style=\"vertical-align: top\"><td class=\"bold nowrap\">Metadata Record:</td><td><div id=\"meta_record\" style=\"display: inline; float: left\"></div><img src=\"/images/transpace.gif\" width=\"1\" height=\"1\" onload=\"getAjaxContent('GET',null,'/cgi-bin/datasets/showMetadata?dsnum=" << metautils::args.dsnum << "','meta_record')\" /></td></tr>" << std::endl;
   ofs << "</table>" << std::endl;
   ofs.close();
 }
@@ -1489,24 +1489,24 @@ int main(int argc,char **argv)
     no_dset_waf=true;
     ++next;
   }
-  meta_args.dsnum=argv[next];
-  if (std::regex_search(meta_args.dsnum,std::regex("^ds"))) {
-    meta_args.dsnum=meta_args.dsnum.substr(2);
+  metautils::args.dsnum=argv[next];
+  if (std::regex_search(metautils::args.dsnum,std::regex("^ds"))) {
+    metautils::args.dsnum=metautils::args.dsnum.substr(2);
   }
-  meta_args.args_string=unixutils::unix_args_string(argc,argv);
-  metautils::read_config("dsgen",user,meta_args.args_string);
-  if (!temp_dir.create(meta_directives.temp_path)) {
+  metautils::args.args_string=unixutils::unix_args_string(argc,argv);
+  metautils::read_config("dsgen",user);
+  if (!temp_dir.create(metautils::directives.temp_path)) {
     metautils::log_error("unable to create temporary directory","dsgen",user);
   }
-  server.connect(meta_directives.database_server,meta_directives.metadb_username,meta_directives.metadb_password,"");
-  MySQL::LocalQuery query("select type from search.datasets where dsid = '"+meta_args.dsnum+"'");
+  server.connect(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
+  MySQL::LocalQuery query("select type from search.datasets where dsid = '"+metautils::args.dsnum+"'");
   MySQL::Row row;
   if (query.submit(server) < 0 || !query.fetch_row(row)) {
     metautils::log_error("unable to determine dataset type","dsgen",user);
   }
   dataset_type=row[0];
   TempDir dataset_doc_dir;
-  if (!dataset_doc_dir.create(meta_directives.temp_path)) {
+  if (!dataset_doc_dir.create(metautils::directives.temp_path)) {
     metautils::log_error("unable to create temporary document directory","dsgen",user);
   }
   generate_index(dataset_type,dataset_doc_dir.name());
@@ -1515,7 +1515,7 @@ int main(int argc,char **argv)
     xdoc.close();
   }
   if (!no_dset_waf) {
-    if (server.insert("metautil.dset_waf","'"+meta_args.dsnum+"',''","update dsid = values(dsid)") < 0) {
+    if (server.insert("metautil.dset_waf","'"+metautils::args.dsnum+"',''","update dsid = values(dsid)") < 0) {
 	metautils::log_warning("not marked for DSET WAF update","dsgen",user);
     }
   }
@@ -1524,9 +1524,9 @@ int main(int argc,char **argv)
   if (dataset_type == "W") {
     remote_path+="/internal";
   }
-  remote_path+="/datasets/ds"+meta_args.dsnum;
+  remote_path+="/datasets/ds"+metautils::args.dsnum;
   std::string error;
-  if (unixutils::rdadata_sync(dataset_doc_dir.name(),".",remote_path,meta_directives.rdadata_home,error) < 0) {
+  if (unixutils::rdadata_sync(dataset_doc_dir.name(),".",remote_path,metautils::directives.rdadata_home,error) < 0) {
     metautils::log_warning("couldn't sync dataset files - rdadata_sync error(s): '"+error+"'","dsgen",user);
   }
 }

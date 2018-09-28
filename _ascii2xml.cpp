@@ -10,8 +10,8 @@
 #include <utils.hpp>
 #include <myerror.hpp>
 
-metautils::Directives meta_directives;
-metautils::Args meta_args;
+metautils::Directives metautils::directives;
+metautils::Args metautils::args;
 std::string myerror="";
 std::string mywarning="";
 
@@ -55,45 +55,45 @@ void parse_args()
   size_t n;
   int idx;
 
-  sp=strutils::split(meta_args.args_string,"!");
+  sp=strutils::split(metautils::args.args_string,"!");
   for (n=0; n < sp.size(); ++n) {
     if (sp[n] == "-d") {
-	meta_args.dsnum=sp[++n];
-	if (std::regex_search(meta_args.dsnum,std::regex("^ds"))) {
-	  meta_args.dsnum=meta_args.dsnum.substr(2);
+	metautils::args.dsnum=sp[++n];
+	if (std::regex_search(metautils::args.dsnum,std::regex("^ds"))) {
+	  metautils::args.dsnum=metautils::args.dsnum.substr(2);
 	}
     }
     else if (sp[n] == "-f") {
-	meta_args.data_format=sp[++n];
+	metautils::args.data_format=sp[++n];
     }
     else if (sp[n] == "-l") {
-	meta_args.local_name=sp[++n];
+	metautils::args.local_name=sp[++n];
     }
     else if (sp[n] == "-m") {
-	meta_args.member_name=sp[++n];
+	metautils::args.member_name=sp[++n];
     }
   }
-  if (meta_args.data_format.empty()) {
+  if (metautils::args.data_format.empty()) {
     std::cerr << "Error: no format specified" << std::endl;
     exit(1);
   }
   else {
-    meta_args.data_format=strutils::to_lower(meta_args.data_format);
+    metautils::args.data_format=strutils::to_lower(metautils::args.data_format);
   }
-  if (meta_args.dsnum.empty()) {
+  if (metautils::args.dsnum.empty()) {
     std::cerr << "Error: no dataset number specified" << std::endl;
     exit(1);
   }
-  if (meta_args.dsnum == "999.9") {
-    meta_args.override_primary_check=true;
-    meta_args.update_db=false;
-    meta_args.update_summary=false;
-    meta_args.regenerate=false;
+  if (metautils::args.dsnum == "999.9") {
+    metautils::args.override_primary_check=true;
+    metautils::args.update_db=false;
+    metautils::args.update_summary=false;
+    metautils::args.regenerate=false;
   }
-  meta_args.path=sp.back();
-  idx=meta_args.path.rfind("/");
-  meta_args.filename=meta_args.path.substr(idx+1);
-  meta_args.path=meta_args.path.substr(0,idx);
+  metautils::args.path=sp.back();
+  idx=metautils::args.path.rfind("/");
+  metautils::args.filename=metautils::args.path.substr(idx+1);
+  metautils::args.path=metautils::args.path.substr(0,idx);
 }
 
 struct InvEntry {
@@ -107,11 +107,11 @@ struct InvEntry {
 void scan_ghcnv3_file(metadata::ObML::ObservationData& obs_data,std::list<std::string>& filelist)
 {
   TempDir tdir;
-  if (!tdir.create(meta_directives.temp_path)) {
+  if (!tdir.create(metautils::directives.temp_path)) {
     metautils::log_error("scan_ghcnv3_file(): unable to create temporary directory","ascii2xml",user);
   }
 // load the station inventory
-  MySQL::Server server(meta_directives.database_server,meta_directives.rdadb_username,meta_directives.rdadb_password,"dssdb");
+  MySQL::Server server(metautils::directives.database_server,metautils::directives.rdadb_username,metautils::directives.rdadb_password,"dssdb");
   if (!server) {
     metautils::log_error("scan_ghcnv3_file(): '"+server.error()+"' while trying to connect to RDADB","ascii2xml",user);
   }
@@ -370,10 +370,10 @@ void scan_nodc_sea_level_file(metadata::ObML::ObservationData& obs_data,std::lis
 	NODCSeaLevelObservation obs;
 	obs.fill(buffer.get(),false);
 	if (obs.sea_level_height() < 99999 && obs.sea_level_height() > -9999) {
-	  if (meta_args.data_format == "nodcsl") {
-	    meta_args.data_format=obs.data_format();
+	  if (metautils::args.data_format == "nodcsl") {
+	    metautils::args.data_format=obs.data_format();
 	  }
-	  else if (meta_args.data_format != obs.data_format()) {
+	  else if (metautils::args.data_format != obs.data_format()) {
 	    metautils::log_error("scan_nodc_sea_level_file(): data format changed","ascii2xml",user);
 	  }
 	  if (!obs_data.added_to_platforms("surface","tide_station",obs.location().latitude,obs.location().longitude)) {
@@ -404,15 +404,15 @@ void scan_nodc_sea_level_file(metadata::ObML::ObservationData& obs_data,std::lis
     }
     istream.close();
   }
-  meta_args.data_format.insert(0,"NODC_");
+  metautils::args.data_format.insert(0,"NODC_");
 }
 
 void scan_file(metadata::ObML::ObservationData& obs_data)
 {
   tfile=new TempFile;
-  tfile->open(meta_directives.temp_path);
+  tfile->open(metautils::directives.temp_path);
   tdir=new TempDir;
-  tdir->create(meta_directives.temp_path);
+  tdir->create(metautils::directives.temp_path);
   std::string file_format,error;
   std::list<std::string> filelist;
   if (!metautils::primaryMetadata::prepare_file_for_metadata_scanning(*tfile,*tdir,&filelist,file_format,error)) {
@@ -421,15 +421,15 @@ void scan_file(metadata::ObML::ObservationData& obs_data)
   if (filelist.size() == 0) {
     filelist.emplace_back(tfile->name());
   }
-  if (meta_args.data_format == "ghcnmv3") {
+  if (metautils::args.data_format == "ghcnmv3") {
     scan_ghcnv3_file(obs_data,filelist);
     write_type=obml_type;
   }
-  else if (meta_args.data_format == "little_r") {
+  else if (metautils::args.data_format == "little_r") {
     scan_little_r_file(obs_data,filelist);
     write_type=obml_type;
   }
-  else if (meta_args.data_format == "nodcsl") {
+  else if (metautils::args.data_format == "nodcsl") {
     scan_nodc_sea_level_file(obs_data,filelist);
     write_type=obml_type;
   }
@@ -453,11 +453,11 @@ int main(int argc,char **argv)
   }
   signal(SIGSEGV,segv_handler);
   signal(SIGINT,int_handler);
-  meta_args.args_string=unixutils::unix_args_string(argc,argv,'!');
+  metautils::args.args_string=unixutils::unix_args_string(argc,argv,'!');
   metautils::read_config("ascii2xml",user);
   parse_args();
   std::string flags="-f";
-  if (std::regex_search(meta_args.path,std::regex("^https://rda.ucar.edu"))) {
+  if (std::regex_search(metautils::args.path,std::regex("^https://rda.ucar.edu"))) {
     flags="-wf";
   }
   atexit(clean_up);
@@ -478,15 +478,15 @@ int main(int argc,char **argv)
 	exit(1);
     }
   }
-  if (meta_args.update_db) {
-    if (!meta_args.regenerate) {
+  if (metautils::args.update_db) {
+    if (!metautils::args.regenerate) {
 	flags="-R "+flags;
     }
-    if (!meta_args.update_summary) {
+    if (!metautils::args.update_summary) {
 	flags="-S "+flags;
     }
     std::stringstream oss,ess;
-    if (unixutils::mysystem2(meta_directives.local_root+"/bin/scm -d "+meta_args.dsnum+" "+flags+" "+meta_args.filename+"."+ext,oss,ess) < 0) {
+    if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" "+flags+" "+metautils::args.filename+"."+ext,oss,ess) < 0) {
 	std::cerr << ess.str() << std::endl;
     }
   }

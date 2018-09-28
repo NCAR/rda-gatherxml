@@ -9,8 +9,8 @@
 #include <strutils.hpp>
 #include <myerror.hpp>
 
-metautils::Directives meta_directives;
-metautils::Args meta_args;
+metautils::Directives metautils::directives;
+metautils::Args metautils::args;
 std::string myerror="";
 std::string mywarning="";
 
@@ -39,59 +39,59 @@ extern "C" void int_handler(int)
 
 void parse_args()
 {
-  auto args=strutils::split(meta_args.args_string,"!");
+  auto args=strutils::split(metautils::args.args_string,"!");
   for (size_t n=0; n < args.size(); ++n) {
     if (args[n] == "-d") {
-	meta_args.dsnum=args[++n];
-	if (meta_args.dsnum.substr(0,2) == "ds") {
-	  meta_args.dsnum.erase(0,2);
+	metautils::args.dsnum=args[++n];
+	if (metautils::args.dsnum.substr(0,2) == "ds") {
+	  metautils::args.dsnum.erase(0,2);
 	}
     }
     else if (args[n] == "-f") {
-	meta_args.data_format=args[++n];
+	metautils::args.data_format=args[++n];
     }
     else if (args[n] == "-i") {
-	meta_args.local_name=args[++n];
+	metautils::args.local_name=args[++n];
     }
     else if (args[n] == "-V") {
 	verbose_operation=true;
     }
   }
-  if (meta_args.data_format.empty()) {
+  if (metautils::args.data_format.empty()) {
     std::cerr << "Error: no format specified" << std::endl;
     exit(1);
   }
   else {
-    meta_args.data_format=strutils::to_lower(meta_args.data_format);
-    if (meta_args.data_format != "ascii" && meta_args.data_format != "binary") {
+    metautils::args.data_format=strutils::to_lower(metautils::args.data_format);
+    if (metautils::args.data_format != "ascii" && metautils::args.data_format != "binary") {
 	std::cerr << "Error: invalid data format" << std::endl;
 	exit(1);
     }
     else {
-	if (meta_args.data_format == "ascii") {
-	  meta_args.data_format="ASCII";
+	if (metautils::args.data_format == "ascii") {
+	  metautils::args.data_format="ASCII";
 	}
-	else if (meta_args.data_format == "binary") {
-	  meta_args.data_format="Binary";
+	else if (metautils::args.data_format == "binary") {
+	  metautils::args.data_format="Binary";
 	}
-	meta_args.data_format.insert(0,"proprietary_");
+	metautils::args.data_format.insert(0,"proprietary_");
     }
   }
-  if (meta_args.dsnum.empty()) {
+  if (metautils::args.dsnum.empty()) {
     std::cerr << "Error: no dataset number specified" << std::endl;
     exit(1);
   }
-  if (meta_args.dsnum == "999.9") {
-    meta_args.override_primary_check=true;
-    meta_args.update_db=false;
-    meta_args.update_summary=false;
-    meta_args.regenerate=false;
+  if (metautils::args.dsnum == "999.9") {
+    metautils::args.override_primary_check=true;
+    metautils::args.update_db=false;
+    metautils::args.update_summary=false;
+    metautils::args.regenerate=false;
   }
-  meta_args.filename=args.back();
-  auto idx=meta_args.filename.rfind("/");
+  metautils::args.filename=args.back();
+  auto idx=metautils::args.filename.rfind("/");
   if (idx != std::string::npos) {
-    meta_args.path=meta_args.filename.substr(0,idx);
-    meta_args.filename=meta_args.filename.substr(idx+1);
+    metautils::args.path=metautils::args.filename.substr(0,idx);
+    metautils::args.filename=metautils::args.filename.substr(idx+1);
   }
 }
 
@@ -245,20 +245,20 @@ void process_observation(const std::string& line,const std::unordered_set<std::s
 
 void scan_input_file(metadata::ObML::ObservationData& obs_data)
 {
-  std::ifstream ifs(meta_args.local_name);
+  std::ifstream ifs(metautils::args.local_name);
   if (!ifs.is_open()) {
-    std::cerr << "Error opening '" << meta_args.local_name << "' for input" << std::endl;
+    std::cerr << "Error opening '" << metautils::args.local_name << "' for input" << std::endl;
     exit(1);
   }
   long long num_input_lines=0;
   if (verbose_operation) {
     std::stringstream oss,ess;
-    unixutils::mysystem2("/bin/tcsh -c \"wc -l "+meta_args.local_name+" |awk '{print $1}'\"",oss,ess);
+    unixutils::mysystem2("/bin/tcsh -c \"wc -l "+metautils::args.local_name+" |awk '{print $1}'\"",oss,ess);
     num_input_lines=std::stoll(oss.str());
-    std::cout << "Beginning scan of input file '"+meta_args.local_name+"' containing " << num_input_lines << " lines ..." << std::endl;
+    std::cout << "Beginning scan of input file '"+metautils::args.local_name+"' containing " << num_input_lines << " lines ..." << std::endl;
   }
   std::unordered_set<std::string> platform_types,id_types;
-  MySQL::Server server(meta_directives.database_server,meta_directives.metadb_username,meta_directives.metadb_password,"");
+  MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   if (!server) {
     metautils::log_error("scan_input_file(): unable to connect to the metadata database","prop2xml",user);
   }
@@ -311,10 +311,10 @@ void scan_input_file(metadata::ObML::ObservationData& obs_data)
   server.disconnect();
   TempDir tdir;
   std::stringstream oss,ess;
-  if (!tdir.create(meta_directives.temp_path) || unixutils::mysystem2("/bin/mkdir -p "+tdir.name()+"/metadata/ParameterTables",oss,ess) < 0) {
+  if (!tdir.create(metautils::directives.temp_path) || unixutils::mysystem2("/bin/mkdir -p "+tdir.name()+"/metadata/ParameterTables",oss,ess) < 0) {
     metautils::log_error("can't create temporary directory for data type map","prop2xml",user);
   }
-  auto existing_datatype_map=unixutils::remote_web_file("https://rda.ucar.edu/metadata/ParameterTables/"+meta_args.data_format+".ds"+meta_args.dsnum+".xml",tdir.name());
+  auto existing_datatype_map=unixutils::remote_web_file("https://rda.ucar.edu/metadata/ParameterTables/"+metautils::args.data_format+".ds"+metautils::args.dsnum+".xml",tdir.name());
   std::vector<std::string> existing_map_contents;
   if (!existing_datatype_map.empty()) {
     std::ifstream ifs(existing_datatype_map.c_str());
@@ -330,7 +330,7 @@ void scan_input_file(metadata::ObML::ObservationData& obs_data)
   if (verbose_operation) {
     std::cout << "Writing parameter map ..." << std::endl;
   }
-  std::string datatype_map=tdir.name()+"/metadata/ParameterTables/"+meta_args.data_format+".ds"+meta_args.dsnum+".xml";
+  std::string datatype_map=tdir.name()+"/metadata/ParameterTables/"+metautils::args.data_format+".ds"+metautils::args.dsnum+".xml";
   std::ofstream ofs(datatype_map.c_str());
   if (!ofs.is_open()) {
     metautils::log_error("unable to write data type map to temporary directory","prop2xml",user);
@@ -382,10 +382,10 @@ void scan_input_file(metadata::ObML::ObservationData& obs_data)
   ofs << "</dataTypeMap>" << std::endl;
   ofs.close();
   std::string error;
-  if (unixutils::rdadata_sync(tdir.name(),"metadata/ParameterTables/","/data/web",meta_directives.rdadata_home,error) < 0) {
+  if (unixutils::rdadata_sync(tdir.name(),"metadata/ParameterTables/","/data/web",metautils::directives.rdadata_home,error) < 0) {
     metautils::log_error("unable to sync data type map - error(s): '"+error+"'","prop2xml",user);
   }
-  if (unixutils::mysystem2("/bin/cp "+datatype_map+" "+meta_directives.parameter_map_path+"/",oss,ess) < 0) {
+  if (unixutils::mysystem2("/bin/cp "+datatype_map+" "+metautils::directives.parameter_map_path+"/",oss,ess) < 0) {
     metautils::log_warning("sync of data type map to share directory failed - error(s): '"+error+"'","prop2xml",user);
   }
   if (verbose_operation) {
@@ -411,24 +411,24 @@ int main(int argc,char **argv)
   }
   signal(SIGSEGV,segv_handler);
   signal(SIGINT,int_handler);
-  meta_args.args_string=unixutils::unix_args_string(argc,argv,'!');
+  metautils::args.args_string=unixutils::unix_args_string(argc,argv,'!');
   metautils::read_config("prop2xml",user);
   parse_args();
   std::string flags="-f";
-  if (!std::regex_search(meta_args.path,std::regex("^/FS/DSS"))) {
+  if (!std::regex_search(metautils::args.path,std::regex("^/FS/DSS"))) {
     flags="-wf";
   }
   atexit(clean_up);
   metautils::cmd_register("prop2xml",user);
-  if (meta_args.dsnum != "999.9") {
+  if (metautils::args.dsnum != "999.9") {
     auto verified_hpss_file=false;
-    MySQL::Server server(meta_directives.database_server,meta_directives.rdadb_username,meta_directives.rdadb_password,"dssdb");
-    MySQL::LocalQuery query("dsid","mssfile","mssfile = '"+meta_args.path+"/"+meta_args.filename+"'");
+    MySQL::Server server(metautils::directives.database_server,metautils::directives.rdadb_username,metautils::directives.rdadb_password,"dssdb");
+    MySQL::LocalQuery query("dsid","mssfile","mssfile = '"+metautils::args.path+"/"+metautils::args.filename+"'");
     if (query.submit(server) == 0) {
 	if (query.num_rows() > 0) {
 	  MySQL::Row row;
 	  if (query.fetch_row(row)) {
-	    if (row[0] == "ds"+meta_args.dsnum) {
+	    if (row[0] == "ds"+metautils::args.dsnum) {
 		verified_hpss_file=true;
 	    }
 	  }
@@ -452,18 +452,18 @@ int main(int argc,char **argv)
   }
   scan_input_file(obs_data);
   metadata::ObML::write_obml(obs_data,"prop2xml",user);
-  if (meta_args.update_db) {
-    if (!meta_args.regenerate) {
+  if (metautils::args.update_db) {
+    if (!metautils::args.regenerate) {
 	flags="-R "+flags;
     }
-    if (!meta_args.update_summary) {
+    if (!metautils::args.update_summary) {
 	flags="-S "+flags;
     }
     std::stringstream oss,ess;
     if (verbose_operation) {
 	std::cout << "Calling 'scm' ..." << std::endl;
     }
-    if (unixutils::mysystem2(meta_directives.local_root+"/bin/scm -d "+meta_args.dsnum+" "+flags+" "+meta_args.filename+".ObML",oss,ess) < 0) {
+    if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" "+flags+" "+metautils::args.filename+".ObML",oss,ess) < 0) {
 	std::cerr << ess.str() << std::endl;
     }
     if (verbose_operation) {

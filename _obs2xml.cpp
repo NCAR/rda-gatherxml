@@ -20,8 +20,8 @@
 #include <raob.hpp>
 #include <myerror.hpp>
 
-metautils::Directives meta_directives;
-metautils::Args meta_args;
+metautils::Directives metautils::directives;
+metautils::Args metautils::args;
 std::string myerror="";
 std::string mywarning="";
 
@@ -53,46 +53,46 @@ void parse_args()
 {
   size_t n;
 
-  meta_args.temp_loc=meta_directives.temp_path;
-  std::deque<std::string> sp=strutils::split(meta_args.args_string,"!");
+  metautils::args.temp_loc=metautils::directives.temp_path;
+  std::deque<std::string> sp=strutils::split(metautils::args.args_string,"!");
   for (n=0; n < sp.size()-1; n++) {
     if (sp[n] == "-f") {
-	meta_args.data_format=sp[++n];
+	metautils::args.data_format=sp[++n];
     }
     else if (sp[n] == "-d") {
-	meta_args.dsnum=sp[++n];
-	if (std::regex_search(meta_args.dsnum,std::regex("^ds"))) {
-	  meta_args.dsnum=meta_args.dsnum.substr(2);
+	metautils::args.dsnum=sp[++n];
+	if (std::regex_search(metautils::args.dsnum,std::regex("^ds"))) {
+	  metautils::args.dsnum=metautils::args.dsnum.substr(2);
 	}
     }
     else if (sp[n] == "-G") {
-	meta_args.update_graphics=false;
+	metautils::args.update_graphics=false;
     }
     else if (sp[n] == "-I") {
-	meta_args.inventory_only=true;
-	meta_args.update_db=false;
+	metautils::args.inventory_only=true;
+	metautils::args.update_db=false;
     }
     else if (sp[n] == "-l") {
-	meta_args.local_name=sp[++n];
+	metautils::args.local_name=sp[++n];
     }
     else if (sp[n] == "-m") {
-	meta_args.member_name=sp[++n];
+	metautils::args.member_name=sp[++n];
     }
     else if (sp[n] == "-R") {
-	meta_args.regenerate=false;
+	metautils::args.regenerate=false;
     }
     else if (sp[n] == "-S") {
-	meta_args.update_summary=false;
+	metautils::args.update_summary=false;
     }
     else if (sp[n] == "-U") {
-	meta_args.update_db=false;
+	metautils::args.update_db=false;
     }
     else if (sp[n] == "-V") {
 	verbose_operation=true;
     }
     else if (sp[n] == "-NC") {
 	if (user == "dattore") {
-	  meta_args.override_primary_check=true;
+	  metautils::args.override_primary_check=true;
 	}
     }
     else {
@@ -100,26 +100,26 @@ void parse_args()
 	exit(1);
     }
   }
-  if (meta_args.data_format.length() == 0) {
+  if (metautils::args.data_format.length() == 0) {
     std::cerr << "Error: no format specified" << std::endl;
     exit(1);
   }
   else {
-    meta_args.data_format=strutils::to_lower(meta_args.data_format);
+    metautils::args.data_format=strutils::to_lower(metautils::args.data_format);
   }
-  if (meta_args.dsnum.length() == 0) {
+  if (metautils::args.dsnum.length() == 0) {
     std::cerr << "Error: no dataset specified" << std::endl;
     exit(1);
   }
-  if (meta_args.dsnum == "999.9") {
-    meta_args.override_primary_check=true;
-    meta_args.update_db=false;
-    meta_args.update_summary=false;
-    meta_args.regenerate=false;
+  if (metautils::args.dsnum == "999.9") {
+    metautils::args.override_primary_check=true;
+    metautils::args.update_db=false;
+    metautils::args.update_summary=false;
+    metautils::args.regenerate=false;
   }
   n=sp.back().rfind("/");
-  meta_args.path=sp.back().substr(0,n);
-  meta_args.filename=sp.back().substr(n+1);
+  metautils::args.path=sp.back().substr(0,n);
+  metautils::args.filename=sp.back().substr(n+1);
 }
 
 std::string clean_imma_id(std::string id)
@@ -306,7 +306,7 @@ bool processed_adp_observation(Observation *obs,metadata::ObML::ObservationData&
 //	std::cerr << "Warning: unknown platform type 999 for ID '" << obs->location().ID << "'" << std::endl;
     platform_type="";
   }
-  if (meta_args.data_format == "on29") {
+  if (metautils::args.data_format == "on29") {
     obs_type="upper_air";
   }
   else {
@@ -646,7 +646,7 @@ bool processed_td32_observation(Observation *obs,metadata::ObML::ObservationData
   auto *o=reinterpret_cast<TD32Data *>(obs);
   auto id=obs->location().ID;
   auto header=o->header();
-  if (meta_args.data_format == "td3210" || meta_args.data_format == "td3280") {
+  if (metautils::args.data_format == "td3210" || metautils::args.data_format == "td3280") {
     id=id.substr(3);
     ientry.key="land_station[!]WBAN[!]"+id;
   }
@@ -946,35 +946,35 @@ bool processed_wmssc_observation(Observation *obs,metadata::ObML::ObservationDat
 
 bool processed_observation(Observation *obs,metadata::ObML::ObservationData& obs_data,std::string& obs_type)
 {
-  if (meta_args.data_format == "isd") {
+  if (metautils::args.data_format == "isd") {
     return processed_isd_observation(obs,obs_data,obs_type);
   }
-  else if (meta_args.data_format == "on29" || meta_args.data_format == "on124") {
+  else if (metautils::args.data_format == "on29" || metautils::args.data_format == "on124") {
     return processed_adp_observation(obs,obs_data,obs_type);
   }
-  else if (meta_args.data_format == "cpcsumm") {
+  else if (metautils::args.data_format == "cpcsumm") {
     return processed_cpc_summary_observation(obs,obs_data,obs_type);
   }
-  else if (meta_args.data_format == "imma") {
+  else if (metautils::args.data_format == "imma") {
     return processed_imma_observation(obs,obs_data,obs_type);
   }
-  else if (meta_args.data_format == "nodcbt") {
+  else if (metautils::args.data_format == "nodcbt") {
     return processed_nodc_bt_observation(obs,obs_data,obs_type);
   }
-  else if (std::regex_search(meta_args.data_format,std::regex("^td32"))) {
+  else if (std::regex_search(metautils::args.data_format,std::regex("^td32"))) {
     return processed_td32_observation(obs,obs_data,obs_type);
   }
-  else if (meta_args.data_format == "tsr") {
+  else if (metautils::args.data_format == "tsr") {
     return processed_dss_tsr_observation(obs,obs_data,obs_type);
   }
-  else if (meta_args.data_format == "uadb") {
+  else if (metautils::args.data_format == "uadb") {
     return processed_uadb_observation(obs,obs_data,obs_type);
   }
-  else if (meta_args.data_format == "wmssc") {
+  else if (metautils::args.data_format == "wmssc") {
     return processed_wmssc_observation(obs,obs_data,obs_type);
   }
   else {
-    std::cerr << "Error: unable to scan format " << meta_args.data_format << std::endl;
+    std::cerr << "Error: unable to scan format " << metautils::args.data_format << std::endl;
     exit(1);
   }
 }
@@ -990,56 +990,56 @@ void scan_file(metadata::ObML::ObservationData& obs_data)
 {
   idstream *istream;
   Observation *obs;
-  if (meta_args.data_format == "on29" || meta_args.data_format == "on124") {
+  if (metautils::args.data_format == "on29" || metautils::args.data_format == "on124") {
     istream=new InputADPStream;
     obs=new ADPObservation;
   }
-  else if (meta_args.data_format == "cpcsumm") {
+  else if (metautils::args.data_format == "cpcsumm") {
     istream=new InputCPCSummaryObservationStream;
     obs=new CPCSummaryObservation;
   }
-  else if (meta_args.data_format == "imma") {
+  else if (metautils::args.data_format == "imma") {
     istream=new InputIMMAObservationStream;
     obs=new IMMAObservation;
   }
-  else if (meta_args.data_format == "isd") {
+  else if (metautils::args.data_format == "isd") {
     istream=new InputISDObservationStream;
     obs=new ISDObservation;
   }
-  else if (std::regex_search(meta_args.data_format,std::regex("^td32"))) {
-    if (meta_args.data_format == "td3200" || meta_args.data_format == "td3210" || meta_args.data_format == "td3220" || meta_args.data_format == "td3240" || meta_args.data_format == "td3260" || meta_args.data_format == "td3280") {
+  else if (std::regex_search(metautils::args.data_format,std::regex("^td32"))) {
+    if (metautils::args.data_format == "td3200" || metautils::args.data_format == "td3210" || metautils::args.data_format == "td3220" || metautils::args.data_format == "td3240" || metautils::args.data_format == "td3260" || metautils::args.data_format == "td3280") {
 	istream=new InputTD32Stream;
     }
     else {
-	std::cerr << "Error: format " << meta_args.data_format << " not recognized" << std::endl;
+	std::cerr << "Error: format " << metautils::args.data_format << " not recognized" << std::endl;
 	exit(1);
     }
     obs=new TD32Data;
   }
-  else if (meta_args.data_format == "nodcbt") {
+  else if (metautils::args.data_format == "nodcbt") {
     istream=new InputNODCBTObservationStream;
     obs=new NODCBTObservation;
   }
-  else if (meta_args.data_format == "tsr") {
+  else if (metautils::args.data_format == "tsr") {
     istream=new InputTsraobStream;
     obs=new Tsraob;
   }
-  else if (meta_args.data_format == "uadb") {
+  else if (metautils::args.data_format == "uadb") {
     istream=new InputUADBRaobStream;
     obs=new UADBRaob;
   }
-  else if (meta_args.data_format == "wmssc") {
+  else if (metautils::args.data_format == "wmssc") {
     istream=new InputWMSSCObservationStream;
     obs=new WMSSCObservation;
   }
   else {
-    std::cerr << "Error: format " << meta_args.data_format << " not recognized" << std::endl;
+    std::cerr << "Error: format " << metautils::args.data_format << " not recognized" << std::endl;
     exit(1);
   }
   tfile=new TempFile;
-  tfile->open(meta_args.temp_loc);
+  tfile->open(metautils::args.temp_loc);
   tdir=new TempDir;
-  tdir->create(meta_args.temp_loc);
+  tdir->create(metautils::args.temp_loc);
   std::list<std::string> filelist;
   if (verbose_operation) {
     std::cout << "Preparing file for metadata scanning ..." << std::endl;
@@ -1066,11 +1066,11 @@ void scan_file(metadata::ObML::ObservationData& obs_data)
     if (!metautils::primaryMetadata::open_file_for_metadata_scanning(istream,file,error)) {
 	metautils::log_error("open_file_for_metadata_scanning(): '"+error+"'","obs2xml",user);
     }
-    if (file_format.empty() && meta_args.data_format == "isd") {
+    if (file_format.empty() && metautils::args.data_format == "isd") {
 	metadata::open_inventory(inv_file,&inv_dir,inv_stream,"ObML","obs2xml",user);
     }
-    else if (meta_args.inventory_only) {
-	metautils::log_error("scan_file(): unable to inventory "+meta_args.path+"/"+meta_args.filename+" because archive format is '"+file_format+"' and data format is '"+meta_args.data_format+"'","obs2xml",user);
+    else if (metautils::args.inventory_only) {
+	metautils::log_error("scan_file(): unable to inventory "+metautils::args.path+"/"+metautils::args.filename+" because archive format is '"+file_format+"' and data format is '"+metautils::args.data_format+"'","obs2xml",user);
     }
     const size_t BUF_LEN=80000;
     unsigned char buffer[BUF_LEN];
@@ -1191,21 +1191,21 @@ int main(int argc,char **argv)
   }
   signal(SIGSEGV,segv_handler);
   signal(SIGINT,int_handler);
-  meta_args.args_string=unixutils::unix_args_string(argc,argv,'!');
+  metautils::args.args_string=unixutils::unix_args_string(argc,argv,'!');
   metautils::read_config("obs2xml",user);
   parse_args();
   flags="-f";
-  if (!meta_args.inventory_only && std::regex_search(meta_args.path,std::regex("^https://rda.ucar.edu"))) {
+  if (!metautils::args.inventory_only && std::regex_search(metautils::args.path,std::regex("^https://rda.ucar.edu"))) {
     flags="-wf";
   }
   atexit(clean_up);
   metautils::cmd_register("obs2xml",user);
-  if (!meta_args.inventory_only) {
+  if (!metautils::args.inventory_only) {
     metautils::check_for_existing_cmd("ObML");
   }
   metadata::ObML::ObservationData obs_data;
   scan_file(obs_data);
-  if (!meta_args.inventory_only) {
+  if (!metautils::args.inventory_only) {
     if (!obs_data.is_empty) {
 	metadata::ObML::write_obml(obs_data,"obs2xml",user);
     }
@@ -1213,24 +1213,23 @@ int main(int argc,char **argv)
 	metautils::log_error("all stations have missing location information - no usable data found; no content metadata will be saved for this file","obs2xml",user);
     }
   }
-  if (meta_args.update_db) {
-    if (!meta_args.update_graphics) {
+  if (metautils::args.update_db) {
+    if (!metautils::args.update_graphics) {
 	flags="-G "+flags;
     }
-    if (!meta_args.regenerate) {
+    if (!metautils::args.regenerate) {
 	flags="-R "+flags;
     }
-    if (!meta_args.update_summary) {
+    if (!metautils::args.update_summary) {
 	flags="-S "+flags;
     }
     std::stringstream oss,ess;
-std::cerr << meta_directives.local_root+"/bin/scm -d "+meta_args.dsnum+" "+flags+" "+meta_args.filename+".ObML" << std::endl;
-    if (unixutils::mysystem2(meta_directives.local_root+"/bin/scm -d "+meta_args.dsnum+" "+flags+" "+meta_args.filename+".ObML",oss,ess) < 0) {
+    if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" "+flags+" "+metautils::args.filename+".ObML",oss,ess) < 0) {
 	std::cerr << ess.str() << std::endl;
     }
   }
   if (inv_stream.is_open()) {
-    metadata::close_inventory(inv_file,inv_dir,inv_stream,"ObML",meta_args.update_summary,true,"obs2xml",user);
+    metadata::close_inventory(inv_file,inv_dir,inv_stream,"ObML",metautils::args.update_summary,true,"obs2xml",user);
   }
   return 0;
 }

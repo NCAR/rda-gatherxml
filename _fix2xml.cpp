@@ -14,8 +14,8 @@
 #include <datetime.hpp>
 #include <myerror.hpp>
 
-metautils::Directives meta_directives;
-metautils::Args meta_args;
+metautils::Directives metautils::directives;
+metautils::Args metautils::args;
 std::string myerror="";
 std::string mywarning="";
 
@@ -41,61 +41,61 @@ void parse_args()
   std::deque<std::string> sp;
   size_t n;
 
-  meta_args.temp_loc=meta_directives.temp_path;
-  sp=strutils::split(meta_args.args_string,"%");
+  metautils::args.temp_loc=metautils::directives.temp_path;
+  sp=strutils::split(metautils::args.args_string,"%");
   for (n=0; n < sp.size()-1; n++) {
     if (sp[n] == "-f") {
-	meta_args.data_format=sp[++n];
+	metautils::args.data_format=sp[++n];
     }
     else if (sp[n] == "-l") {
-	meta_args.local_name=sp[++n];
+	metautils::args.local_name=sp[++n];
     }
     else if (sp[n] == "-m") {
-        meta_args.member_name=sp[++n];
+        metautils::args.member_name=sp[++n];
     }
     else if (sp[n] == "-d") {
-	meta_args.dsnum=sp[++n];
-	if (strutils::has_beginning(meta_args.dsnum,"ds")) {
-	  meta_args.dsnum=meta_args.dsnum.substr(2);
+	metautils::args.dsnum=sp[++n];
+	if (strutils::has_beginning(metautils::args.dsnum,"ds")) {
+	  metautils::args.dsnum=metautils::args.dsnum.substr(2);
 	}
     }
     else if (sp[n] == "-m") {
-	meta_args.member_name=sp[++n];
+	metautils::args.member_name=sp[++n];
     }
     else if (sp[n] == "-G") {
-	meta_args.update_graphics=false;
+	metautils::args.update_graphics=false;
     }
     else if (sp[n] == "-S") {
-	meta_args.update_summary=false;
+	metautils::args.update_summary=false;
     }
     else if (sp[n] == "-OO") {
-        meta_args.overwrite_only=true;
+        metautils::args.overwrite_only=true;
     }
   }
-  if (meta_args.data_format.empty()) {
+  if (metautils::args.data_format.empty()) {
     std::cerr << "Error: no format specified" << std::endl;
     exit(1);
   }
   else {
-    strutils::to_lower(meta_args.data_format);
+    strutils::to_lower(metautils::args.data_format);
   }
-  if (meta_args.dsnum.empty()) {
+  if (metautils::args.dsnum.empty()) {
     std::cerr << "Error: no dataset number specified" << std::endl;
     exit(1);
   }
-  if (meta_args.dsnum == "999.9") {
-    meta_args.override_primary_check=true;
-    meta_args.update_db=false;
-    meta_args.update_summary=false;
-    meta_args.regenerate=false;
+  if (metautils::args.dsnum == "999.9") {
+    metautils::args.override_primary_check=true;
+    metautils::args.update_db=false;
+    metautils::args.update_summary=false;
+    metautils::args.regenerate=false;
   }
-  meta_args.path=sp[sp.size()-1];
-  n=meta_args.path.length()-1;
-  while (n > 0 && meta_args.path[n] != '/') {
+  metautils::args.path=sp[sp.size()-1];
+  n=metautils::args.path.length()-1;
+  while (n > 0 && metautils::args.path[n] != '/') {
     --n;
   }
-  meta_args.filename=meta_args.path.substr(n+1);
-  meta_args.path=meta_args.path.substr(0,n);
+  metautils::args.filename=metautils::args.path.substr(n+1);
+  metautils::args.path=metautils::args.path.substr(0,n);
 }
 
 void process_HURDAT(Cyclone *c)
@@ -564,9 +564,9 @@ void scan_file()
 
   tfile=new TempFile;
   tdir=new TempDir;
-  tfile->open(meta_args.temp_loc);
-  tdir->create(meta_args.temp_loc);
-  if (meta_args.data_format == "cxml") {
+  tfile->open(metautils::args.temp_loc);
+  tdir->create(metautils::args.temp_loc);
+  if (metautils::args.data_format == "cxml") {
     if (!metautils::primaryMetadata::prepare_file_for_metadata_scanning(*tfile,*tdir,&filelist,file_format,error)) {
 	metautils::log_error("prepare_file_for_metadata_scanning() returned '"+error+"'","fix2xml",user);
     }
@@ -575,7 +575,7 @@ void scan_file()
     }
     for (const auto& file : filelist) {
 	if (!xdoc.open(file)) {
-	  if (meta_args.dsnum != "330.3")
+	  if (metautils::args.dsnum != "330.3")
 	    std::cerr << "Error: scan_file() was unable to parse " << file << std::endl;
 	  exit(1);
 	}
@@ -583,7 +583,7 @@ void scan_file()
 	xdoc.close();
     }
   }
-  else if (meta_args.data_format == "tcvitals") {
+  else if (metautils::args.data_format == "tcvitals") {
     if (!metautils::primaryMetadata::prepare_file_for_metadata_scanning(*tfile,*tdir,&filelist,file_format,error)) {
 	metautils::log_error("prepare_file_for_metadata_scanning() returned '"+error+"'","fix2xml",user);
     }
@@ -607,12 +607,12 @@ void scan_file()
     }
   }
   else {
-    if (meta_args.data_format == "hurdat") {
+    if (metautils::args.data_format == "hurdat") {
 	istream=new InputHURDATCycloneStream;
 	c=new HURDATCyclone;
     }
     else {
-	metautils::log_error("format "+meta_args.data_format+" not recognized","fix2xml",user);
+	metautils::log_error("format "+metautils::args.data_format+" not recognized","fix2xml",user);
     }
     if (!metautils::primaryMetadata::prepare_file_for_metadata_scanning(*tfile,*tdir,nullptr,file_format,error)) {
 	metautils::log_error("prepare_file_for_metadata_scanning() returned '"+error+"'","fix2xml",user);
@@ -623,7 +623,7 @@ void scan_file()
     if (istream != nullptr) {
 	while ( (status=istream->read(buffer,BUF_LEN)) > 0) {
 	  c->fill(buffer,Cyclone::full_report);
-	  if (meta_args.data_format == "hurdat") {
+	  if (metautils::args.data_format == "hurdat") {
 	    process_HURDAT(c);
 	  }
 	}
@@ -634,7 +634,7 @@ void scan_file()
     }
   }
   if (feature_table.size() == 0) {
-    if (meta_args.dsnum != "330.3") {
+    if (metautils::args.dsnum != "330.3") {
 	std::cerr << "Terminating - no fix data found in file" << std::endl;
     }
     exit(1);
@@ -680,29 +680,29 @@ int main(int argc,char **argv)
   }
   signal(SIGSEGV,segv_handler);
   signal(SIGINT,int_handler);
-  meta_args.args_string=unixutils::unix_args_string(argc,argv,'%');
+  metautils::args.args_string=unixutils::unix_args_string(argc,argv,'%');
   metautils::read_config("fix2xml",user);
   parse_args();
   std::string flags="-f";
-  if (strutils::has_beginning(meta_args.path,"https://rda.ucar.edu")) {
+  if (strutils::has_beginning(metautils::args.path,"https://rda.ucar.edu")) {
     flags="-wf";
   }
   atexit(clean_up);
   metautils::cmd_register("fix2xml",user);
-  if (!meta_args.overwrite_only) {
+  if (!metautils::args.overwrite_only) {
     metautils::check_for_existing_cmd("FixML");
   }
   scan_file();
   metadata::FixML::write_fixml(feature_table,stage_table,"fix2xml",user);
-  if (meta_args.update_db) {
-    if (!meta_args.update_graphics) {
+  if (metautils::args.update_db) {
+    if (!metautils::args.update_graphics) {
 	flags="-G "+flags;
     }
-    if (!meta_args.update_summary) {
+    if (!metautils::args.update_summary) {
 	flags="-S "+flags;
     }
     std::stringstream oss,ess;
-    if (unixutils::mysystem2(meta_directives.local_root+"/bin/scm -d "+meta_args.dsnum+" "+flags+" "+meta_args.filename+".FixML",oss,ess) < 0) {
+    if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" "+flags+" "+metautils::args.filename+".FixML",oss,ess) < 0) {
 	std::cerr << ess.str() << std::endl;
     }
   }

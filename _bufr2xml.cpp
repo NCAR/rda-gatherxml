@@ -11,8 +11,8 @@
 #include <metadata.hpp>
 #include <myerror.hpp>
 
-metautils::Directives meta_directives;
-metautils::Args meta_args;
+metautils::Directives metautils::directives;
+metautils::Args metautils::args;
 std::string myerror="";
 std::string mywarning="";
 
@@ -51,85 +51,85 @@ extern "C" void clean_up()
 
 void parse_args()
 {
-  meta_args.temp_loc=meta_directives.temp_path;
-  std::deque<std::string> sp=strutils::split(meta_args.args_string,"%");
+  metautils::args.temp_loc=metautils::directives.temp_path;
+  std::deque<std::string> sp=strutils::split(metautils::args.args_string,"%");
   for (size_t n=0; n < sp.size()-1; ++n) {
     if (sp[n] == "-f") {
-	meta_args.data_format=sp[++n];
+	metautils::args.data_format=sp[++n];
     }
     else if (sp[n] == "-d") {
-	meta_args.dsnum=sp[++n];
-	if (strutils::has_beginning(meta_args.dsnum,"ds")) {
-	  meta_args.dsnum=meta_args.dsnum.substr(2);
+	metautils::args.dsnum=sp[++n];
+	if (strutils::has_beginning(metautils::args.dsnum,"ds")) {
+	  metautils::args.dsnum=metautils::args.dsnum.substr(2);
 	}
     }
     else if (sp[n] == "-l") {
-	meta_args.local_name=sp[++n];
+	metautils::args.local_name=sp[++n];
     }
     else if (sp[n] == "-m") {
-	meta_args.member_name=sp[++n];
+	metautils::args.member_name=sp[++n];
     }
     else if (sp[n] == "-U") {
 	if (user == "dattore") {
-	  meta_args.update_db=false;
+	  metautils::args.update_db=false;
 	}
     }
     else if (sp[n] == "-NC") {
 	if (user == "dattore") {
-	  meta_args.override_primary_check=true;
+	  metautils::args.override_primary_check=true;
 	}
     }
     else if (sp[n] == "-G") {
 	if (user == "dattore") {
-	  meta_args.update_graphics=false;
+	  metautils::args.update_graphics=false;
 	}
     }
     else if (sp[n] == "-R") {
-        meta_args.regenerate=false;
+        metautils::args.regenerate=false;
     }
     else if (sp[n] == "-S") {
-        meta_args.update_summary=false;
+        metautils::args.update_summary=false;
     }
     else {
 	std::cerr << "Error: bad argument " << sp[n] << std::endl;
 	exit(1);
     }
   }
-  if (meta_args.data_format.length() == 0) {
+  if (metautils::args.data_format.length() == 0) {
     std::cerr << "Error: no format specified" << std::endl;
     exit(1);
   }
   else {
-    meta_args.data_format=strutils::to_lower(meta_args.data_format);
+    metautils::args.data_format=strutils::to_lower(metautils::args.data_format);
   }
-  if (meta_args.data_format == "prepbufr") {
+  if (metautils::args.data_format == "prepbufr") {
     rpt.set_data_handler(handle_ncep_prepbufr);
   }
-  else if (meta_args.data_format == "adpbufr") {
+  else if (metautils::args.data_format == "adpbufr") {
     rpt.set_data_handler(handle_ncep_adpbufr);
   }
-  else if (meta_args.data_format == "radbufr") {
+  else if (metautils::args.data_format == "radbufr") {
     rpt.set_data_handler(handle_ncep_radiance_bufr);
   }
-  else if (meta_args.data_format == "ecmwfbufr") {
+  else if (metautils::args.data_format == "ecmwfbufr") {
     rpt.set_data_handler(handle_ecmwf_bufr);
   }
   else {
-    metautils::log_error("Error: format "+meta_args.data_format+" not recognized","bufr2xml",user);
+    metautils::log_error("Error: format "+metautils::args.data_format+" not recognized","bufr2xml",user);
   }
-  if (meta_args.dsnum.length() == 0) {
+  if (metautils::args.dsnum.length() == 0) {
     std::cerr << "Error: no dataset number specified" << std::endl;
     exit(1);
   }
-  if (meta_args.dsnum == "999.9") {
-    meta_args.override_primary_check=true;
-    meta_args.update_db=false;
-    meta_args.update_summary=false;
-    meta_args.regenerate=false;
+  if (metautils::args.dsnum == "999.9") {
+    metautils::args.override_primary_check=true;
+    metautils::args.update_db=false;
+    metautils::args.update_summary=false;
+    metautils::args.regenerate=false;
   }
   size_t idx=sp.back().rfind("/");
-  meta_args.path=sp.back().substr(0,idx);
-  meta_args.filename=sp.back().substr(idx+1);
+  metautils::args.path=sp.back().substr(0,idx);
+  metautils::args.filename=sp.back().substr(idx+1);
 }
 
 bool is_valid_date(DateTime& datetime)
@@ -1012,9 +1012,9 @@ void process_ecmwf_bufr_observation(metadata::ObML::ObservationData& obs_data,si
 void scan_file(metadata::ObML::ObservationData& obs_data)
 {
   tfile=new TempFile;
-  tfile->open(meta_args.temp_loc);
+  tfile->open(metautils::args.temp_loc);
   tdir=new TempDir;
-  tdir->create(meta_args.temp_loc);
+  tdir->create(metautils::args.temp_loc);
   std::string file_format,error;
   if (!metautils::primaryMetadata::prepare_file_for_metadata_scanning(*tfile,*tdir,NULL,file_format,error)) {
     metautils::log_error("prepare_file_for_metadata_scanning() returned '"+error+"'","bufr2xml",user);
@@ -1026,24 +1026,24 @@ void scan_file(metadata::ObML::ObservationData& obs_data)
     metautils::log_error("open_file_for_metadata_scanning() returned '"+error+"'","bufr2xml",user);
   }
   while (istream.read(buffer,BUF_LEN) > 0) {
-    rpt.fill(istream,buffer,BUFRReport::header_only,meta_directives.rdadata_home+"/share/BUFR");
+    rpt.fill(istream,buffer,BUFRReport::header_only,metautils::directives.rdadata_home+"/share/BUFR");
     if (rpt.data_type() != 11) {
 	std::string message_type;
-	if (meta_args.data_format == "prepbufr") {
+	if (metautils::args.data_format == "prepbufr") {
 	  message_type=istream.data_category_description(rpt.data_type());
 	}
 	data=rpt.data();
 	for (int n=0; n < rpt.number_of_subsets(); ++n) {
-	  if (meta_args.data_format == "prepbufr") {
+	  if (metautils::args.data_format == "prepbufr") {
 	    process_ncep_prepbufr_observation(obs_data,message_type,n);
 	  }
-	  else if (meta_args.data_format == "adpbufr") {
+	  else if (metautils::args.data_format == "adpbufr") {
 	    process_ncep_adp_bufr_observation(obs_data,n);
 	  }
-	  else if (meta_args.data_format == "radbufr") {
+	  else if (metautils::args.data_format == "radbufr") {
 	    process_ncep_radiance_bufr_observation(obs_data,n);
 	  }
-	  else if (meta_args.data_format == "ecmwfbufr") {
+	  else if (metautils::args.data_format == "ecmwfbufr") {
 	    process_ecmwf_bufr_observation(obs_data,n);
 	  }
 	}
@@ -1091,11 +1091,11 @@ int main(int argc,char **argv)
   }
   signal(SIGSEGV,segv_handler);
   signal(SIGINT,int_handler);
-  meta_args.args_string=unixutils::unix_args_string(argc,argv,'%');
+  metautils::args.args_string=unixutils::unix_args_string(argc,argv,'%');
   metautils::read_config("bufr2xml",user);
   parse_args();
   flags="-f";
-  if (std::regex_search(meta_args.path,std::regex("^https://rda.ucar.edu"))) {
+  if (std::regex_search(metautils::args.path,std::regex("^https://rda.ucar.edu"))) {
     flags="-wf";
   }
   atexit(clean_up);
@@ -1110,17 +1110,17 @@ int main(int argc,char **argv)
     std::cerr << "No data found - no content metadata will be generated" << std::endl;
     exit(1);
   }
-  if (meta_args.update_db) {
-    if (!meta_args.update_graphics) {
+  if (metautils::args.update_db) {
+    if (!metautils::args.update_graphics) {
 	flags="-G "+flags;
     }
-    if (!meta_args.regenerate) {
+    if (!metautils::args.regenerate) {
 	flags="-R "+flags;
     }
-    if (!meta_args.update_summary) {
+    if (!metautils::args.update_summary) {
 	flags="-S "+flags;
     }
-    if (unixutils::mysystem2(meta_directives.local_root+"/bin/scm -d "+meta_args.dsnum+" "+flags+" "+meta_args.filename+".ObML",oss,ess) < 0) {
+    if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" "+flags+" "+metautils::args.filename+".ObML",oss,ess) < 0) {
 	std::cerr << ess.str() << std::endl;
     }
   }
