@@ -21,7 +21,8 @@ std::string myerror="";
 std::string mywarning="";
 
 std::string user=getenv("USER");
-TempFile *tfile=NULL;
+TempDir *work_dir=nullptr;
+TempFile *work_file=nullptr;
 std::string inv_file;
 TempDir *inv_dir=nullptr;
 std::ofstream inv_stream;
@@ -106,8 +107,11 @@ auto verbose_operation=false;
 
 extern "C" void clean_up()
 {
-  if (tfile != NULL) {
-    delete tfile;
+  if (work_dir != nullptr) {
+    delete work_dir;
+  }
+  if (work_file != nullptr) {
+    delete work_file;
   }
   if (!wss.str().empty()) {
     metautils::log_warning(wss.str(),"hdf2xml",user);
@@ -2562,21 +2566,21 @@ void scan_hdf5_file(std::list<std::string>& filelist,ScanData& scan_data)
 
 void scan_file()
 {
-  tfile=new TempFile;
-  if (!tfile->open(metautils::directives.temp_path)) {
+  work_file=new TempFile;
+  if (!work_file->open(metautils::directives.temp_path)) {
     metautils::log_error("scan_file() was not able to create a temporary file in "+metautils::directives.temp_path,"hdf2xml",user);
   }
-  auto tdir=new TempDir;
-  if (!tdir->create(metautils::directives.temp_path)) {
+  work_dir=new TempDir;
+  if (!work_dir->create(metautils::directives.temp_path)) {
     metautils::log_error("scan_file() was not able to create a temporary directory in "+metautils::directives.temp_path,"hdf2xml",user);
   }
   std::string file_format,error;
   std::list<std::string> filelist;
-  if (!metautils::primaryMetadata::prepare_file_for_metadata_scanning(*tfile,*tdir,&filelist,file_format,error)) {
+  if (!metautils::primaryMetadata::prepare_file_for_metadata_scanning(*work_file,*work_dir,&filelist,file_format,error)) {
     metautils::log_error("prepare_file_for_metadata_scanning() returned '"+error+"'","hdf2xml",user);
   }
   if (filelist.empty()) {
-    filelist.emplace_back(tfile->name());
+    filelist.emplace_back(work_file->name());
   }
   ScanData scan_data;
   scan_data.tdir.reset(new TempDir);
