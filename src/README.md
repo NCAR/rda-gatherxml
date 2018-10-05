@@ -25,11 +25,11 @@ This directory contains the source code for ``gatherxml`` and it's modules, as w
       - ``_prop2xml.cpp`` - scans data files in proprietary ASCII or Binary formats
       
 - ``_dcm.cpp``
-   - deletes data file content metadata from the database
+   - deletes data file content metadata from the database when data files are deleted
 - ``_rcm.cpp``
-   - renames content metadata when the data file is renamed
+   - renames data file content metadata when data files are renamed
 - ``_scm.cpp``
-   - summarizes content metadata for a file and/or a dataset
+   - summarizes content metadata and populates the metadata database at both the data file and dataset levels
 - ``_dsgen.cpp``
    - regenerates a dataset description page
 - ``_gsi.cpp``
