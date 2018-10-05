@@ -20,6 +20,10 @@ ifneq ($(findstring yslogin,$(HOST)),)
 	DAVMACH = 1
 	EXT = dav-ys
 endif
+ifneq ($(findstring casper,$(HOST)),)
+	DAVMACH = 1
+	EXT = dav-cp
+endif
 ifeq ($(DAVMACH),1)
 	COMPILER = /glade/u/apps/dav/opt/ncarcompilers/0.4.1/g++
 	GCCVERSION = $(shell g++ --version |grep "^g++" |awk '{print $$3}')
