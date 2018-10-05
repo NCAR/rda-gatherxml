@@ -12,7 +12,7 @@ This directory contains the source code for ``gatherxml`` and it's modules, as w
       - ``rcm``
       - ``scm``
 
-- ``-gatherxml.cpp``
+- ``_gatherxml.cpp``
    - scans a data file and extracts content metadata by calling the appropriate module, which depends on the data format (-f flag) that is passed to ``gatherxml``
    - needs ``gatherxml.con`` to run
    - the following are the possible modules called by ``gatherxml`` (these should not be executed explicitly; users should only execute ``gatherxml``):
