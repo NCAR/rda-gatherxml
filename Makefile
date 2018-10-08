@@ -1,5 +1,6 @@
 ifeq ($(findstring rda-web-dev,$(HOST)),)
 OPTIONS = -Wall -Wold-style-cast -O3 -std=c++11 -Weffc++
+C_OPTIONS = -c $(OPTIONS)
 GLOBALINCLUDEDIR = /glade/u/home/dattore/cpp/lib/include
 INCLUDEDIR = ./include
 SRCDIR = ./src
@@ -88,9 +89,27 @@ JASPERRUNPATH = -Wl,-rpath,$(JASPERLIBDIR)
 ZRUNPATH = -Wl,-rpath,$(ZLIBDIR)
 SYNC =
 #
+GATHERXMLSUBS = $(SRCDIR)/libgatherxml/detailed_metadata.cpp $(SRCDIR)/libgatherxml/fix_metadata.cpp $(SRCDIR)/libgatherxml/grid_metadata.cpp $(SRCDIR)/libgatherxml/obs_metadata.cpp $(SRCDIR)/libgatherxml/summarize_metadata.cpp $(SRCDIR)/libgatherxml/write_metadata.cpp
+GATHERXMLOBJS = detailed_metadata.o fix_metadata.o grid_metadata.o obs_metadata.o summarize_metadata.o write_metadata.o
+#
 .PHONY: finalize
 #
 all: _ascii2xml _bufr2xml _dcm _dsgen _fix2xml _gatherxml _grid2xml _gsi _hdf2xml _iinv _nc2xml _obs2xml _prop2xml _rcm _scm _sdp _sml
+#
+obj_gatherxml: $(GATHERXMLSUBS)
+ifeq ($(OKAYTOMAKE),1)
+	$(COMPILER) $(C_OPTIONS) $(GATHERXMLSUBS) -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR)
+endif
+libgatherxml.so: $(GATHERXMLOBJS)
+ifeq ($(OKAYTOMAKE),1)
+ifeq ($(strip $(LIBVERSION)),)
+	$(error libgatherxml.so: no version number given)
+else
+	sudo -u rdadata $(COMPILER) -shared -o $(LIBDIR)/libgatherxml.so.$(LIBVERSION) -Wl,-soname,libgatherxml.so.$(LIBVERSION) $(OBJS)
+	sudo -u rdadata rm $(LIBDIR)/libgatherxml.so
+	sudo -u rdadata ln -s $(LIBDIR)/libxml.so.$(LIBVERSION) $(LIBDIR)/libgatherxml.so
+endif
+endif
 #
 _ascii2xml: $(SRCDIR)/_ascii2xml.cpp
 ifeq ($(strip $(VERSION)),)
