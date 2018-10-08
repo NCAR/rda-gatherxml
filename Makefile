@@ -91,7 +91,7 @@ SYNC =
 #
 all: _ascii2xml _bufr2xml _dcm _dsgen _fix2xml _gatherxml _grid2xml _gsi _hdf2xml _iinv _nc2xml _obs2xml _prop2xml _rcm _scm _sdp _sml
 #
-_ascii2xml: _ascii2xml.cpp
+_ascii2xml: $(SRCDIR)/_ascii2xml.cpp
 ifeq ($(strip $(VERSION)),)
 	-@ echo "no version number given"
 else
@@ -103,7 +103,7 @@ ifeq ($(OKAYTOMAKE),1)
 endif
 endif
 #
-_bufr2xml: _bufr2xml.cpp
+_bufr2xml: $(SRCDIR)/_bufr2xml.cpp
 ifeq ($(strip $(VERSION)),)
 	-@ echo "no version number given"
 else
@@ -115,7 +115,7 @@ ifeq ($(OKAYTOMAKE),1)
 endif
 endif
 #
-cmd_util: cmd_util.cpp
+cmd_util: $(SRCDIR)/cmd_util.cpp
 ifeq ($(strip $(VERSION)),)
 	-@ echo "no version number given"
 else
@@ -127,7 +127,7 @@ else
 	ln -s $(LOCALBINDIR)/cmd_util.$(VERSION) $(LOCALBINDIR)/cmd_util
 endif
 #
-_dcm: _dcm.cpp
+_dcm: $(SRCDIR)/_dcm.cpp
 ifeq ($(strip $(VERSION)),)
 	-@ echo "no version number given"
 else
@@ -139,7 +139,7 @@ ifeq ($(OKAYTOMAKE),1)
 endif
 endif
 #
-_dsgen: _dsgen.cpp
+_dsgen: $(SRCDIR)/_dsgen.cpp
 ifeq ($(strip $(VERSION)),)
 	-@ echo "no version number given"
 else
@@ -151,7 +151,7 @@ ifeq ($(OKAYTOMAKE),1)
 endif
 endif
 #
-_fix2xml: _fix2xml.cpp
+_fix2xml: $(SRCDIR)/_fix2xml.cpp
 ifeq ($(strip $(VERSION)),)
 	-@ echo "no version number given"
 else
@@ -163,7 +163,7 @@ ifeq ($(OKAYTOMAKE),1)
 endif
 endif
 #
-_gatherxml: _gatherxml.cpp
+_gatherxml: $(SRCDIR)/_gatherxml.cpp
 ifeq ($(strip $(VERSION)),)
 	-@ echo "no version number given"
 else
@@ -175,7 +175,7 @@ ifeq ($(OKAYTOMAKE),1)
 endif
 endif
 #
-_grid2xml: _grid2xml.cpp
+_grid2xml: $(SRCDIR)/_grid2xml.cpp
 ifeq ($(strip $(VERSION)),)
 	-@ echo "no version number given"
 else
@@ -187,7 +187,7 @@ ifeq ($(OKAYTOMAKE),1)
 endif
 endif
 #
-_gsi: _gsi.cpp
+_gsi: $(SRCDIR)/_gsi.cpp
 ifeq ($(strip $(VERSION)),)
 	-@ echo "no version number given"
 else
@@ -199,7 +199,7 @@ ifeq ($(OKAYTOMAKE),1)
 endif
 endif
 #
-_hdf2xml: _hdf2xml.cpp
+_hdf2xml: $(SRCDIR)/_hdf2xml.cpp
 ifeq ($(strip $(VERSION)),)
 	-@ echo "no version number given"
 else
@@ -211,7 +211,7 @@ ifeq ($(OKAYTOMAKE),1)
 endif
 endif
 #
-_iinv: _iinv.cpp
+_iinv: $(SRCDIR)/_iinv.cpp
 ifeq ($(strip $(VERSION)),)
 	-@ echo "no version number given"
 else
@@ -223,7 +223,7 @@ ifeq ($(OKAYTOMAKE),1)
 endif
 endif
 #
-_nc2xml: _nc2xml.cpp
+_nc2xml: $(SRCDIR)/_nc2xml.cpp
 ifeq ($(strip $(VERSION)),)
 	-@ echo "no version number given"
 else
@@ -235,7 +235,7 @@ ifeq ($(OKAYTOMAKE),1)
 endif
 endif
 #
-_obs2xml: _obs2xml.cpp
+_obs2xml: $(SRCDIR)/_obs2xml.cpp
 ifeq ($(strip $(VERSION)),)
 	-@ echo "no version number given"
 else
@@ -247,7 +247,7 @@ ifeq ($(OKAYTOMAKE),1)
 endif
 endif
 #
-_prop2xml: _prop2xml.cpp
+_prop2xml: $(SRCDIR)/_prop2xml.cpp
 ifeq ($(strip $(VERSION)),)
 	-@ echo "no version number given"
 else
@@ -259,7 +259,7 @@ ifeq ($(OKAYTOMAKE),1)
 endif
 endif
 #
-_rcm: _rcm.cpp
+_rcm: $(SRCDIR)/_rcm.cpp
 ifeq ($(strip $(VERSION)),)
 	-@ echo "no version number given"
 else
@@ -271,7 +271,7 @@ ifeq ($(OKAYTOMAKE),1)
 endif
 endif
 #
-_scm: _scm.cpp
+_scm: $(SRCDIR)/_scm.cpp
 ifeq ($(strip $(VERSION)),)
 	-@ echo "no version number given"
 else
@@ -283,14 +283,14 @@ ifeq ($(OKAYTOMAKE),1)
 endif
 endif
 #
-_sdp: _sdp.cpp
+_sdp: $(SRCDIR)/_sdp.cpp
 ifeq ($(OKAYTOMAKE),1)
 	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(SRCDIR)/_sdp.cpp -I$(INCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -lmysqlclient -lmysql -lutils -lutilsthread -lgridutils -lbitmap -lmetadata -lmetahelpers -lsearch -lxml -lz -lpthread -o ./_sdp
 	sudo -u rdadata cp ./_sdp $(BINDIR)
 	rm ./_sdp
 endif
 #
-_sml: _sml.cpp
+_sml: $(SRCDIR)/_sml.cpp
 ifeq ($(OKAYTOMAKE),1)
 	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(SRCDIR)/_sml.cpp -I$(INCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -lmysqlclient -lmysql -lutils -lutilsthread -lgridutils -lbitmap -lmetadata -lmetahelpers -lsearch -lxml -lz -lpthread -o ./_sml
 	sudo -u rdadata cp ./_sml $(BINDIR)/
