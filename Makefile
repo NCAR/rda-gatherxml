@@ -1,6 +1,7 @@
 ifeq ($(findstring rda-web-dev,$(HOST)),)
 OPTIONS = -Wall -Wold-style-cast -O3 -std=c++11 -Weffc++
-INCLUDEDIR = /glade/u/home/dattore/cpp/lib/include
+GLOBALINCLUDEDIR = /glade/u/home/dattore/cpp/lib/include
+INCLUDEDIR = ./include
 SRCDIR = ./src
 OKAYTOMAKE = 0
 DAVMACH = 0
@@ -96,7 +97,7 @@ ifeq ($(strip $(VERSION)),)
 	-@ echo "no version number given"
 else
 ifeq ($(OKAYTOMAKE),1)
-	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(ZRUNPATH) $(SRCDIR)/_ascii2xml.cpp -I$(INCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(ZLIBDIR) -lmysqlclient -lmysql -lobs -lutils -lutilsthread -lbitmap -lio -liometadata -lmetadata -lmetahelpers -lgridutils -lsearch -lxml -lz -lpthread -o _ascii2xml.$(EXT).$(VERSION)
+	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(ZRUNPATH) $(SRCDIR)/_ascii2xml.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(ZLIBDIR) -lmysqlclient -lmysql -lobs -lutils -lutilsthread -lbitmap -lio -liometadata -lmetadata -lmetahelpers -lgridutils -lsearch -lxml -lz -lpthread -o _ascii2xml.$(EXT).$(VERSION)
 	sudo -u rdadata cp ./_ascii2xml.$(EXT).$(VERSION) $(BINDIR)/_ascii2xml.$(VERSION)
 	rm _ascii2xml.$(EXT).$(VERSION)
 	make SYNC=$@ finalize
@@ -108,7 +109,7 @@ ifeq ($(strip $(VERSION)),)
 	-@ echo "no version number given"
 else
 ifeq ($(OKAYTOMAKE),1)
-	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(ZRUNPATH) $(SRCDIR)/_bufr2xml.cpp -I$(INCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(ZLIBDIR) -lmysqlclient -lmysql -lio -lutils -lutilsthread -lmetadata -lmetahelpers -lbufr -lobs -lbitmap -liometadata -lgridutils -lsearch -lxml -lz -lpthread -o _bufr2xml.$(EXT).$(VERSION)
+	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(ZRUNPATH) $(SRCDIR)/_bufr2xml.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(ZLIBDIR) -lmysqlclient -lmysql -lio -lutils -lutilsthread -lmetadata -lmetahelpers -lbufr -lobs -lbitmap -liometadata -lgridutils -lsearch -lxml -lz -lpthread -o _bufr2xml.$(EXT).$(VERSION)
 	sudo -u rdadata cp ./_bufr2xml.$(EXT).$(VERSION) $(BINDIR)/_bufr2xml.$(VERSION)
 	rm ./_bufr2xml.$(EXT).$(VERSION)
 	make SYNC=$@ finalize
@@ -119,7 +120,7 @@ cmd_util: $(SRCDIR)/cmd_util.cpp
 ifeq ($(strip $(VERSION)),)
 	-@ echo "no version number given"
 else
-	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(SRCDIR)/cmd_util.cpp -I$(INCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -lmysql -lmysqlclient -lutils -lutilsthread -lmetadata -lmetahelpers -lgridutils -lbitmap -lsearch -lxml -lz -o cmd_util.$(VERSION)
+	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(SRCDIR)/cmd_util.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -lmysql -lmysqlclient -lutils -lutilsthread -lmetadata -lmetahelpers -lgridutils -lbitmap -lsearch -lxml -lz -o cmd_util.$(VERSION)
 	sudo -u rdadata cp ./cmd_util.$(VERSION) $(LOCALBINDIR)/
 	rm cmd_util.$(VERSION)
 	sudo -u rdadata chmod 4710 $(LOCALBINDIR)/cmd_util.$(VERSION)
@@ -132,7 +133,7 @@ ifeq ($(strip $(VERSION)),)
 	-@ echo "no version number given"
 else
 ifeq ($(OKAYTOMAKE),1)
-	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(ZRUNPATH) $(SRCDIR)/_dcm.cpp -I$(INCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lutils -lutilsthread -lmetadata -lmetahelpers -lgridutils -lsearch -lxml -lbitmap -lz -lpthread -o ./_dcm.$(EXT).$(VERSION)
+	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(ZRUNPATH) $(SRCDIR)/_dcm.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lutils -lutilsthread -lmetadata -lmetahelpers -lgridutils -lsearch -lxml -lbitmap -lz -lpthread -o ./_dcm.$(EXT).$(VERSION)
 	sudo -u rdadata cp ./_dcm.$(EXT).$(VERSION) $(BINDIR)/_dcm.$(VERSION)
 	rm _dcm.$(EXT).$(VERSION)
 	make SYNC=$@ finalize
@@ -144,7 +145,7 @@ ifeq ($(strip $(VERSION)),)
 	-@ echo "no version number given"
 else
 ifeq ($(OKAYTOMAKE),1)
-	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(ZRUNPATH) $(SRCDIR)/_dsgen.cpp -I$(INCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lutils -lutilsthread -lmetadata -lmetahelpers -lmetaexport -lmetaexporthelpers -lgridutils -lsearch -lxml -lbitmap -lcitation -lz -lpthread -o ./_dsgen.$(EXT).$(VERSION)
+	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(ZRUNPATH) $(SRCDIR)/_dsgen.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lutils -lutilsthread -lmetadata -lmetahelpers -lmetaexport -lmetaexporthelpers -lgridutils -lsearch -lxml -lbitmap -lcitation -lz -lpthread -o ./_dsgen.$(EXT).$(VERSION)
 	sudo -u rdadata cp ./_dsgen.$(EXT).$(VERSION) $(BINDIR)/_dsgen.$(VERSION)
 	rm ./_dsgen.$(EXT).$(VERSION)
 	make SYNC=$@ finalize
@@ -156,7 +157,7 @@ ifeq ($(strip $(VERSION)),)
 	-@ echo "no version number given"
 else
 ifeq ($(OKAYTOMAKE),1)
-	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(JASPERRUNPATH) $(ZRUNPATH) $(SRCDIR)/_fix2xml.cpp -I$(INCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(JASPERLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lcyclone -lutils -lutilsthread -lio -liometadata -lmetadata -lmetahelpers -lgridutils -lbitmap -lsearch -lxml -lz -lpthread -o ./_fix2xml.$(EXT).$(VERSION)
+	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(JASPERRUNPATH) $(ZRUNPATH) $(SRCDIR)/_fix2xml.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(JASPERLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lcyclone -lutils -lutilsthread -lio -liometadata -lmetadata -lmetahelpers -lgridutils -lbitmap -lsearch -lxml -lz -lpthread -o ./_fix2xml.$(EXT).$(VERSION)
 	sudo -u rdadata cp ./_fix2xml.$(EXT).$(VERSION) $(BINDIR)/_fix2xml.$(VERSION)
 	rm ./_fix2xml.$(EXT).$(VERSION)
 	make SYNC=$@ finalize
@@ -168,7 +169,7 @@ ifeq ($(strip $(VERSION)),)
 	-@ echo "no version number given"
 else
 ifeq ($(OKAYTOMAKE),1)
-	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(ZRUNPATH) $(SRCDIR)/_gatherxml.cpp -I$(INCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(ZLIBDIR) -lmysqlclient -lmysql -lutils -lutilsthread -lmetadata -lmetahelpers -lgridutils -lbitmap -lsearch -lxml -lz -lpthread -o ./_gatherxml.$(EXT).$(VERSION)
+	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(ZRUNPATH) $(SRCDIR)/_gatherxml.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(ZLIBDIR) -lmysqlclient -lmysql -lutils -lutilsthread -lmetadata -lmetahelpers -lgridutils -lbitmap -lsearch -lxml -lz -lpthread -o ./_gatherxml.$(EXT).$(VERSION)
 	sudo -u rdadata cp ./_gatherxml.$(EXT).$(VERSION) $(BINDIR)/_gatherxml.$(VERSION)
 	rm ./_gatherxml.$(EXT).$(VERSION)
 	make SYNC=$@ finalize
@@ -180,7 +181,7 @@ ifeq ($(strip $(VERSION)),)
 	-@ echo "no version number given"
 else
 ifeq ($(OKAYTOMAKE),1)
-	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(JASPERRUNPATH) $(ZRUNPATH) $(SRCDIR)/_grid2xml.cpp -I$(INCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(JASPERLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lgrids -ljasper -lutils -lutilsthread -lbitmap -lio -liometadata -lmetadata -lmetahelpers -lgridutils -lsearch -lxml -lerror -lpthread -lz -o ./_grid2xml.$(EXT).$(VERSION)
+	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(JASPERRUNPATH) $(ZRUNPATH) $(SRCDIR)/_grid2xml.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(JASPERLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lgrids -ljasper -lutils -lutilsthread -lbitmap -lio -liometadata -lmetadata -lmetahelpers -lgridutils -lsearch -lxml -lerror -lpthread -lz -o ./_grid2xml.$(EXT).$(VERSION)
 	sudo -u rdadata cp ./_grid2xml.$(EXT).$(VERSION) $(BINDIR)/_grid2xml.$(VERSION)
 	rm ./_grid2xml.$(EXT).$(VERSION)
 	make SYNC=$@ finalize
@@ -192,7 +193,7 @@ ifeq ($(strip $(VERSION)),)
 	-@ echo "no version number given"
 else
 ifeq ($(OKAYTOMAKE),1)
-	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(ZRUNPATH) $(SRCDIR)/_gsi.cpp -I$(INCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(ZLIBDIR) -lmysqlclient -lmysql -lutils -lutilsthread -lmetadata -lmetahelpers -lgridutils -lbitmap -lxml -lsearch -lpthread -lz -o ./_gsi.$(EXT).$(VERSION)
+	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(ZRUNPATH) $(SRCDIR)/_gsi.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(ZLIBDIR) -lmysqlclient -lmysql -lutils -lutilsthread -lmetadata -lmetahelpers -lgridutils -lbitmap -lxml -lsearch -lpthread -lz -o ./_gsi.$(EXT).$(VERSION)
 	sudo -u rdadata cp ./_gsi.$(EXT).$(VERSION) $(BINDIR)/_gsi.$(VERSION)
 	rm ./_gsi.$(EXT).$(VERSION)
 	make SYNC=$@ finalize
@@ -204,7 +205,7 @@ ifeq ($(strip $(VERSION)),)
 	-@ echo "no version number given"
 else
 ifeq ($(OKAYTOMAKE),1)
-	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(ZRUNPATH) $(SRCDIR)/_hdf2xml.cpp -I$(INCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(ZLIBDIR) -lmysqlclient -lmysql -lio -lutils -lutilsthread -lbitmap -lhdf -liometadata -lmetadata -lmetahelpers -lgridutils -lxml -lsearch -lpthread -lz -o ./_hdf2xml.$(EXT).$(VERSION)
+	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(ZRUNPATH) $(SRCDIR)/_hdf2xml.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(ZLIBDIR) -lmysqlclient -lmysql -lio -lutils -lutilsthread -lbitmap -lhdf -liometadata -lmetadata -lmetahelpers -lgridutils -lxml -lsearch -lpthread -lz -o ./_hdf2xml.$(EXT).$(VERSION)
 	sudo -u rdadata cp ./_hdf2xml.$(EXT).$(VERSION) $(BINDIR)/_hdf2xml.$(VERSION)
 	rm ./_hdf2xml.$(EXT).$(VERSION)
 	make SYNC=$@ finalize
@@ -216,7 +217,7 @@ ifeq ($(strip $(VERSION)),)
 	-@ echo "no version number given"
 else
 ifeq ($(OKAYTOMAKE),1)
-	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(SRCDIR)/_iinv.cpp -I$(INCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -lmysql -lmysqlclient -lutils -lutilsthread -lbitmap -lmetadata -lmetahelpers -lsearch -lxml -lgridutils -lpthread -lz -o _iinv.$(EXT).$(VERSION)
+	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(SRCDIR)/_iinv.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -lmysql -lmysqlclient -lutils -lutilsthread -lbitmap -lmetadata -lmetahelpers -lsearch -lxml -lgridutils -lpthread -lz -o _iinv.$(EXT).$(VERSION)
 	sudo -u rdadata cp ./_iinv.$(EXT).$(VERSION) $(BINDIR)/_iinv.$(VERSION)
 	rm _iinv.$(EXT).$(VERSION)
 	make SYNC=$@ finalize
@@ -228,7 +229,7 @@ ifeq ($(strip $(VERSION)),)
 	-@ echo "no version number given"
 else
 ifeq ($(OKAYTOMAKE),1)
-	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(JASPERRUNPATH) $(ZRUNPATH) $(SRCDIR)/_nc2xml.cpp -I$(INCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(JASPERLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lio -lutils -lutilsthread -liometadata -lmetadata -lmetahelpers -lgridutils -lsearch -lxml -lbufr -lbitmap -lerror -lpthread -lz -o ./_nc2xml.$(EXT).$(VERSION)
+	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(JASPERRUNPATH) $(ZRUNPATH) $(SRCDIR)/_nc2xml.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(JASPERLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lio -lutils -lutilsthread -liometadata -lmetadata -lmetahelpers -lgridutils -lsearch -lxml -lbufr -lbitmap -lerror -lpthread -lz -o ./_nc2xml.$(EXT).$(VERSION)
 	sudo -u rdadata cp ./_nc2xml.$(EXT).$(VERSION) $(BINDIR)/_nc2xml.$(VERSION)
 	rm ./_nc2xml.$(EXT).$(VERSION)
 	make SYNC=$@ finalize
@@ -240,7 +241,7 @@ ifeq ($(strip $(VERSION)),)
 	-@ echo "no version number given"
 else
 ifeq ($(OKAYTOMAKE),1)
-	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(JASPERRUNPATH) $(ZRUNPATH) $(SRCDIR)/_obs2xml.cpp -I$(INCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(JASPERLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lio -lobs -lutils -lutilsthread -lbitmap -liometadata -lmetadata -lmetahelpers -lsearch -lxml -lgridutils -lz -lpthread -o ./_obs2xml.$(EXT).$(VERSION)
+	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(JASPERRUNPATH) $(ZRUNPATH) $(SRCDIR)/_obs2xml.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(JASPERLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lio -lobs -lutils -lutilsthread -lbitmap -liometadata -lmetadata -lmetahelpers -lsearch -lxml -lgridutils -lz -lpthread -o ./_obs2xml.$(EXT).$(VERSION)
 	sudo -u rdadata cp ./_obs2xml.$(EXT).$(VERSION) $(BINDIR)/_obs2xml.$(VERSION)
 	rm ./_obs2xml.$(EXT).$(VERSION)
 	make SYNC=$@ finalize
@@ -252,7 +253,7 @@ ifeq ($(strip $(VERSION)),)
 	-@ echo "no version number given"
 else
 ifeq ($(OKAYTOMAKE),1)
-	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(ZRUNPATH) $(SRCDIR)/_prop2xml.cpp -I$(INCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lutils -lutilsthread -lmetadata -lmetahelpers -lbitmap -lgridutils -lsearch -lxml -lz -lpthread -o ./_prop2xml.$(EXT).$(VERSION)
+	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(ZRUNPATH) $(SRCDIR)/_prop2xml.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lutils -lutilsthread -lmetadata -lmetahelpers -lbitmap -lgridutils -lsearch -lxml -lz -lpthread -o ./_prop2xml.$(EXT).$(VERSION)
 	sudo -u rdadata cp ./_prop2xml.$(EXT).$(VERSION) $(BINDIR)/_prop2xml.$(VERSION)
 	rm ./_prop2xml.$(EXT).$(VERSION)
 	make SYNC=$@ finalize
@@ -264,7 +265,7 @@ ifeq ($(strip $(VERSION)),)
 	-@ echo "no version number given"
 else
 ifeq ($(OKAYTOMAKE),1)
-	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(ZRUNPATH) $(SRCDIR)/_rcm.cpp -I$(INCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lutils -lutilsthread -lmetadata -lmetahelpers -lgridutils -lsearch -lxml -lbitmap -lz -lpthread -o ./_rcm.$(EXT).$(VERSION)
+	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(ZRUNPATH) $(SRCDIR)/_rcm.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lutils -lutilsthread -lmetadata -lmetahelpers -lgridutils -lsearch -lxml -lbitmap -lz -lpthread -o ./_rcm.$(EXT).$(VERSION)
 	sudo -u rdadata cp ./_rcm.$(EXT).$(VERSION) $(BINDIR)/_rcm.$(VERSION)
 	rm ./_rcm.$(EXT).$(VERSION)
 	make SYNC=$@ finalize
@@ -276,7 +277,7 @@ ifeq ($(strip $(VERSION)),)
 	-@ echo "no version number given"
 else
 ifeq ($(OKAYTOMAKE),1)
-	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(ZRUNPATH) $(SRCDIR)/_scm.cpp -I$(INCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lutils -lutilsthread -lgridutils -lmetadata -lmetahelpers -lsearch -lxml -lbitmap -lz -lpthread -o _scm.$(EXT).$(VERSION)
+	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(ZRUNPATH) $(SRCDIR)/_scm.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lutils -lutilsthread -lgridutils -lmetadata -lmetahelpers -lsearch -lxml -lbitmap -lz -lpthread -o _scm.$(EXT).$(VERSION)
 	sudo -u rdadata cp ./_scm.$(EXT).$(VERSION) $(BINDIR)/_scm.$(VERSION)
 	rm _scm.$(EXT).$(VERSION)
 	make SYNC=$@ finalize
@@ -285,14 +286,14 @@ endif
 #
 _sdp: $(SRCDIR)/_sdp.cpp
 ifeq ($(OKAYTOMAKE),1)
-	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(SRCDIR)/_sdp.cpp -I$(INCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -lmysqlclient -lmysql -lutils -lutilsthread -lgridutils -lbitmap -lmetadata -lmetahelpers -lsearch -lxml -lz -lpthread -o ./_sdp
+	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(SRCDIR)/_sdp.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -lmysqlclient -lmysql -lutils -lutilsthread -lgridutils -lbitmap -lmetadata -lmetahelpers -lsearch -lxml -lz -lpthread -o ./_sdp
 	sudo -u rdadata cp ./_sdp $(BINDIR)
 	rm ./_sdp
 endif
 #
 _sml: $(SRCDIR)/_sml.cpp
 ifeq ($(OKAYTOMAKE),1)
-	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(SRCDIR)/_sml.cpp -I$(INCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -lmysqlclient -lmysql -lutils -lutilsthread -lgridutils -lbitmap -lmetadata -lmetahelpers -lsearch -lxml -lz -lpthread -o ./_sml
+	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(SRCDIR)/_sml.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -lmysqlclient -lmysql -lutils -lutilsthread -lgridutils -lbitmap -lmetadata -lmetahelpers -lsearch -lxml -lz -lpthread -o ./_sml
 	sudo -u rdadata cp ./_sml $(BINDIR)/
 	rm ./_sml
 endif
