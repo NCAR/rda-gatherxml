@@ -4,7 +4,7 @@
 #include <set>
 #include <regex>
 #include <signal.h>
-#include <metadata.hpp>
+#include <gatherxml.hpp>
 #include <utils.hpp>
 #include <strutils.hpp>
 #include <myerror.hpp>
@@ -162,7 +162,7 @@ void process_variable_list(const std::string& line,std::unordered_map<std::strin
   }
 }
 
-void process_observation(const std::string& line,const std::unordered_set<std::string>& platform_types,const std::unordered_set<std::string>& id_types,std::unordered_map<std::string,std::tuple<std::string,std::set<std::string>>>& variables,std::unordered_map<std::string,std::string>& unique_datatypes,metadata::ObML::ObservationData& obs_data)
+void process_observation(const std::string& line,const std::unordered_set<std::string>& platform_types,const std::unordered_set<std::string>& id_types,std::unordered_map<std::string,std::tuple<std::string,std::set<std::string>>>& variables,std::unordered_map<std::string,std::string>& unique_datatypes,gatherxml::markup::ObML::ObservationData& obs_data)
 {
   auto fields=strutils::split(line,",");
   if (fields.size() != 9) {
@@ -186,7 +186,7 @@ void process_observation(const std::string& line,const std::unordered_set<std::s
   else {
     platform_key=fields[1];
   }
-  metadata::ObML::IDEntry ientry;
+  gatherxml::markup::ObML::IDEntry ientry;
   if (id_types.find(fields[2]) == id_types.end()) {
     std::cerr << "Error: invalid station ID type '" << fields[2] << "' on line:\n" << line << std::endl;
     exit(1);
@@ -243,7 +243,7 @@ void process_observation(const std::string& line,const std::unordered_set<std::s
   }
 }
 
-void scan_input_file(metadata::ObML::ObservationData& obs_data)
+void scan_input_file(gatherxml::markup::ObML::ObservationData& obs_data)
 {
   std::ifstream ifs(metautils::args.local_name);
   if (!ifs.is_open()) {
@@ -446,12 +446,12 @@ int main(int argc,char **argv)
 	exit(1);
     }
   }
-  metadata::ObML::ObservationData obs_data;
+  gatherxml::markup::ObML::ObservationData obs_data;
   if (obs_data.num_types == 0) {
     metautils::log_error("scan_input_file(): unable to initialize for observations","prop2xml",user);
   }
   scan_input_file(obs_data);
-  metadata::ObML::write_obml(obs_data,"prop2xml",user);
+  gatherxml::markup::ObML::write(obs_data,"prop2xml",user);
   if (metautils::args.update_db) {
     if (!metautils::args.regenerate) {
 	flags="-R "+flags;
