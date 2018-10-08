@@ -3,14 +3,18 @@
 #include <stdio.h>
 #include <sys/stat.h>
 #include <regex>
+#include <gatherxml.hpp>
 #include <strutils.hpp>
 #include <utils.hpp>
 #include <MySQL.hpp>
 #include <tempfile.hpp>
-#include <metadata.hpp>
+#include <myerror.hpp>
 
-metautils::Directives directives;
-metautils::Args args;
+metautils::Directives metautils::directives;
+metautils::Args metautils::args;
+std::string myerror="";
+std::string mywarning="";
+
 struct LocalArgs {
   LocalArgs() : gindex(),start_date(),start_time(),end_date(),end_time(),tz(),start_date_flag(),start_time_flag(),end_date_flag(),end_time_flag() {}
 
@@ -19,7 +23,7 @@ struct LocalArgs {
   int start_date_flag,start_time_flag,end_date_flag,end_time_flag;
 } local_args;
 const std::string user=getenv("USER");
-const std::string server_root="/"+strutils::token(host_name(),".",0);
+const std::string server_root="/"+strutils::token(unixutils::host_name(),".",0);
 
 int check_date(std::string date,std::string& db_date,std::string type)
 {
@@ -53,7 +57,7 @@ int check_date(std::string date,std::string& db_date,std::string type)
   }
   if (sp.size() > 2) {
 // check the day
-    sdum=strutils::itos(days_in_month(std::stoi(sp[0]),std::stoi(sp[1])));
+    sdum=strutils::itos(dateutils::days_in_month(std::stoi(sp[0]),std::stoi(sp[1])));
     if (sp[2].length() != 2 || sp[2] < "01" || sp[2] > sdum) {
 	std::cerr << "Error: bad month in " << type << " date" << std::endl;
 	exit(1);
@@ -64,7 +68,7 @@ int check_date(std::string date,std::string& db_date,std::string type)
     if (type == "start")
 	db_date+="-01";
     else
-	db_date+="-"+strutils::itos(days_in_month(std::stoi(sp[0]),std::stoi(sp[1])));
+	db_date+="-"+strutils::itos(dateutils::days_in_month(std::stoi(sp[0]),std::stoi(sp[1])));
   }
   return flag;
 }
@@ -140,18 +144,18 @@ int main(int argc,char **argv)
     exit(1);
   }
   local_args.start_date_flag=local_args.start_time_flag=local_args.end_date_flag=local_args.end_time_flag=0;
-  metautils::read_config("sdp",user,args.args_string);
+  metautils::read_config("sdp",user);
   std::string dsnum2;
   std::string db_start_date,db_start_time,db_end_date,db_end_time;
-  args.args_string=unix_args_string(argc,argv,'%');
-  auto unix_args=strutils::split(args.args_string,"%");
+  metautils::args.args_string=unixutils::unix_args_string(argc,argv,'%');
+  auto unix_args=strutils::split(metautils::args.args_string,"%");
   for (size_t n=0; n < unix_args.size(); ++n) {
     if (unix_args[n] == "-d") {
-	args.dsnum=unix_args[++n];
-	if (std::regex_search(args.dsnum,std::regex("^ds"))) {
-	  args.dsnum=args.dsnum.substr(2);
+	metautils::args.dsnum=unix_args[++n];
+	if (std::regex_search(metautils::args.dsnum,std::regex("^ds"))) {
+	  metautils::args.dsnum=metautils::args.dsnum.substr(2);
 	}
-	dsnum2=strutils::substitute(args.dsnum,".","");
+	dsnum2=strutils::substitute(metautils::args.dsnum,".","");
     }
     else if (unix_args[n] == "-g") {
 	local_args.gindex=unix_args[++n];
@@ -183,7 +187,7 @@ int main(int argc,char **argv)
 	std::cerr << "Warning: flag " << unix_args[n] << " is not a valid flag" << std::endl;
     }
   }
-  if (args.dsnum.empty()) {
+  if (metautils::args.dsnum.empty()) {
     std::cerr << "Error: no dataset specified" << std::endl;
     exit(1);
   }
@@ -203,25 +207,23 @@ int main(int argc,char **argv)
     std::cerr << "Error: you must specify a full end date to be able to specify a end time" << std::endl;
     exit(1);
   }
-  MySQL::Server server;
-  metautils::connect_to_metadata_server(server);
-  MySQL::Server server_d;
-  metautils::connect_to_rdadb_server(server_d);
+  MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
+  MySQL::Server server_d(metautils::directives.database_server,metautils::directives.rdadb_username,metautils::directives.rdadb_password,"dssdb");
   if (!server || !server_d) {
     std::cerr << "Error connecting to MySQL:: database" << std::endl;
     exit(1);
   }
-  MySQL::LocalQuery query("type","search.datasets","dsid = '"+args.dsnum+"'");
+  MySQL::LocalQuery query("type","search.datasets","dsid = '"+metautils::args.dsnum+"'");
   if (query.submit(server) < 0) {
-    metautils::log_error("error '"+query.error()+"' while checking dataset type","sdp",user,args.args_string);
+    metautils::log_error("error '"+query.error()+"' while checking dataset type","sdp",user);
   }
   MySQL::Row row;
   if (!query.fetch_row(row)) {
-    std::cerr << "Error: ds" << args.dsnum << " does not exist" << std::endl;
+    std::cerr << "Error: ds" << metautils::args.dsnum << " does not exist" << std::endl;
     exit(1);
   }
   if (row[0] == "I") {
-    std::cerr << "Abort: ds" << args.dsnum << " is an internal dataset" << std::endl;
+    std::cerr << "Abort: ds" << metautils::args.dsnum << " is an internal dataset" << std::endl;
     exit(1);
   }
   auto db_names=server.db_names();
@@ -236,7 +238,7 @@ int main(int argc,char **argv)
     std::cerr << "Error: the dataset period has been set from content metadata and can't be modified with " << argv[0] << std::endl;
     exit(1);
   }
-  query.set("gindex","dssdb.dsperiod","dsid = 'ds"+args.dsnum+"' and gindex = "+local_args.gindex);
+  query.set("gindex","dssdb.dsperiod","dsid = 'ds"+metautils::args.dsnum+"' and gindex = "+local_args.gindex);
   if (query.submit(server_d) < 0) {
     std::cerr << "Error: " << query.error() << std::endl;
     exit(1);
@@ -245,8 +247,8 @@ int main(int argc,char **argv)
     std::cerr << "Error: the specified group index does not have an associated period - you must first create this association with the Metadata Manager" << std::endl;
     exit(1);
   }
-  metautils::log_warning("You should consider generating file content metadata for this dataset","sdp",user,args.args_string);
-  query.set("grpid","dssdb.dsgroup","dsid = 'ds"+args.dsnum+"' and gindex = "+local_args.gindex);
+  metautils::log_warning("You should consider generating file content metadata for this dataset","sdp",user);
+  query.set("grpid","dssdb.dsgroup","dsid = 'ds"+metautils::args.dsnum+"' and gindex = "+local_args.gindex);
   if (query.submit(server_d) < 0) {
     std::cerr << "Error: " << query.error() << std::endl;
     exit(1);
@@ -259,28 +261,28 @@ int main(int argc,char **argv)
     group_ID="Entire Dataset";
   }
   auto *tdir=new TempDir();
-  if (!tdir->create(directives.temp_path)) {
-    metautils::log_error("unable to create temporary directory (1)","sdp",user,args.args_string);
+  if (!tdir->create(metautils::directives.temp_path)) {
+    metautils::log_error("unable to create temporary directory (1)","sdp",user);
   }
-  auto old_ds_overview=remote_web_file("http://rda.ucar.edu/datasets/ds"+args.dsnum+"/metadata/dsOverview.xml",tdir->name());
+  auto old_ds_overview=unixutils::remote_web_file("http://rda.ucar.edu/datasets/ds"+metautils::args.dsnum+"/metadata/dsOverview.xml",tdir->name());
   std::ifstream ifs(old_ds_overview.c_str());
   if (!ifs.is_open()) {
-    metautils::log_error("unable to open overview XML file for ds"+args.dsnum,"sdp",user,args.args_string);
+    metautils::log_error("unable to open overview XML file for ds"+metautils::args.dsnum,"sdp",user);
   }
   auto *sync_dir=new TempDir();
-  if (!sync_dir->create(directives.temp_path)) {
-    metautils::log_error("unable to create temporary directory (2)","sdp",user,args.args_string);
+  if (!sync_dir->create(metautils::directives.temp_path)) {
+    metautils::log_error("unable to create temporary directory (2)","sdp",user);
   }
   std::ofstream ofs((sync_dir->name()+"/dsOverview.xml").c_str());
   if (!ofs.is_open()) {
-    metautils::log_error("unable to open output file for updated XML","sdp",user,args.args_string);
+    metautils::log_error("unable to open output file for updated XML","sdp",user);
   }
   char line[32768];
   ifs.getline(line,32768);
   while (!ifs.eof()) {
     std::string sline=line;
     if (std::regex_search(sline,std::regex("^  <timeStamp"))) {
-	ofs << "  <timeStamp value=\"" << current_date_time().to_string("%Y-%m-%d %HH:%MM:%SS %Z") << "\" />" << std::endl;
+	ofs << "  <timeStamp value=\"" << dateutils::current_date_time().to_string("%Y-%m-%d %HH:%MM:%SS %Z") << "\" />" << std::endl;
     }
     else if (std::regex_search(sline,std::regex("^    <temporal")) && (std::regex_search(sline,std::regex("groupID=\""+group_ID+"\"")) || (group_ID == "Entire Dataset" && !std::regex_search(sline,std::regex("groupID"))))) {
 	std::string new_line="    <temporal";
@@ -340,19 +342,19 @@ int main(int argc,char **argv)
   ofs.close();
   auto cvs_key=strutils::strand(15);
   std::stringstream oss,ess;
-  if (mysystem2("/bin/sh -c \"curl -s --data 'authKey=qGNlKijgo9DJ7MN&cmd=identify' http://rda.ucar.edu/cgi-bin/dss/remoteRDAServerUtils\"",oss,ess) < 0) {
-    metautils::log_error("unable to identify web server - error: '"+ess.str()+"'","sdp",user,args.args_string);
+  if (unixutils::mysystem2("/bin/sh -c \"curl -s --data 'authKey=qGNlKijgo9DJ7MN&cmd=identify' http://rda.ucar.edu/cgi-bin/dss/remoteRDAServerUtils\"",oss,ess) < 0) {
+    metautils::log_error("unable to identify web server - error: '"+ess.str()+"'","sdp",user);
   }
-  if (mysystem2("/bin/sh -c \""+strutils::token(oss.str(),".",0)+"-sync "+sync_dir->name()+"/dsOverview.xml /"+strutils::token(oss.str(),".",0)+"/web/ds"+args.dsnum+".xml."+cvs_key+"\"",oss,ess) < 0) {
-    metautils::log_error("unable to web-sync file for CVS - error: '"+ess.str()+"'","sdp",user,args.args_string);
+  if (unixutils::mysystem2("/bin/sh -c \""+strutils::token(oss.str(),".",0)+"-sync "+sync_dir->name()+"/dsOverview.xml /"+strutils::token(oss.str(),".",0)+"/web/ds"+metautils::args.dsnum+".xml."+cvs_key+"\"",oss,ess) < 0) {
+    metautils::log_error("unable to web-sync file for CVS - error: '"+ess.str()+"'","sdp",user);
   }
-  mysystem2("/usr/bin/wget -q -O - --post-data=\"authKey=qGNlKijgo9DJ7MN&cmd=cvssdp&dsnum="+args.dsnum+"&key="+cvs_key+"\" http://rda.ucar.edu/cgi-bin/dss/remoteRDAServerUtils",oss,ess);
+  unixutils::mysystem2("/usr/bin/wget -q -O - --post-data=\"authKey=qGNlKijgo9DJ7MN&cmd=cvssdp&dsnum="+metautils::args.dsnum+"&key="+cvs_key+"\" http://rda.ucar.edu/cgi-bin/dss/remoteRDAServerUtils",oss,ess);
   if (!oss.str().empty()) {
-    metautils::log_error("cvs error(s): "+oss.str(),"sdp",user,args.args_string);
+    metautils::log_error("cvs error(s): "+oss.str(),"sdp",user);
   }
   std::string error;
-  if (host_sync(sync_dir->name(),".","/data/web/datasets/ds"+args.dsnum+"/metadata",error) < 0) {
-    metautils::log_error("unable to host_sync updated XML file - error(s): '"+error+"'","sdp",user,args.args_string);
+  if (unixutils::rdadata_sync(sync_dir->name(),".","/data/web/datasets/ds"+metautils::args.dsnum+"/metadata",metautils::directives.rdadata_home,error) < 0) {
+    metautils::log_error("unable to rdadata_sync updated XML file - error(s): '"+error+"'","sdp",user);
   }
   delete sync_dir;
   std::string update_string;
@@ -398,8 +400,8 @@ int main(int argc,char **argv)
     }
     update_string+="time_zone = '"+local_args.tz+"'";
   }
-  if (server_d.update("dssdb.dsperiod",update_string,"dsid = 'ds"+args.dsnum+"' and gindex = "+local_args.gindex) < 0) {
-    metautils::log_error("while updating dssdb.dsperiod: '"+server_d.error()+"'","sdp",user,args.args_string);
+  if (server_d.update("dssdb.dsperiod",update_string,"dsid = 'ds"+metautils::args.dsnum+"' and gindex = "+local_args.gindex) < 0) {
+    metautils::log_error("while updating dssdb.dsperiod: '"+server_d.error()+"'","sdp",user);
   }
-  mysystem2(directives.local_root+"/bin/dsgen "+args.dsnum,oss,ess);
+  unixutils::mysystem2(metautils::directives.local_root+"/bin/dsgen "+metautils::args.dsnum,oss,ess);
 }
