@@ -36,3 +36,8 @@ This directory contains the source code for ``gatherxml`` and it's modules, as w
    - generates the geospatial-representation images on the detailed metadata pages for observations datasets
 - ``_iinv.cpp``
    - inserts detailed information (byte offsets, byte lengths, product, level, parameter, valid date, etc.) into the inventory database
+   
+   - - - -
+- ``libgatherxml``
+   - library of routines that are specific to ``gatherxml``
+   
