@@ -106,7 +106,7 @@ ifeq ($(strip $(LIBVERSION)),)
 	$(error libgatherxml.so: no version number given)
 else
 	sudo -u rdadata $(COMPILER) -shared -o $(LIBDIR)/libgatherxml.so.$(LIBVERSION) -Wl,-soname,libgatherxml.so.$(LIBVERSION) $(OBJS)
-	sudo -u rdadata rm $(LIBDIR)/libgatherxml.so
+	sudo -u rdadata rm -f $(LIBDIR)/libgatherxml.so
 	sudo -u rdadata ln -s $(LIBDIR)/libxml.so.$(LIBVERSION) $(LIBDIR)/libgatherxml.so
 endif
 endif
