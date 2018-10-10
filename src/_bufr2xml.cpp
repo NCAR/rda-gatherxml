@@ -5,10 +5,10 @@
 #include <string>
 #include <sstream>
 #include <regex>
+#include <gatherxml.hpp>
 #include <bufr.hpp>
 #include <strutils.hpp>
 #include <utils.hpp>
-#include <metadata.hpp>
 #include <myerror.hpp>
 
 metautils::Directives metautils::directives;
@@ -16,7 +16,7 @@ metautils::Args metautils::args;
 std::string myerror="";
 std::string mywarning="";
 
-metadata::ObML::IDEntry ientry;
+gatherxml::markup::ObML::IDEntry ientry;
 struct UniqueObservationEntry {
   struct Data {
     Data() : nobs(0),dtype_list() {}
@@ -29,7 +29,7 @@ struct UniqueObservationEntry {
   std::string key;
   std::shared_ptr<Data> data;
 } uoe;
-metadata::ObML::DataTypeEntry de;
+gatherxml::markup::ObML::DataTypeEntry de;
 BUFRReport rpt;
 BUFRData **data;
 std::string user=getenv("USER");
@@ -146,7 +146,7 @@ bool is_valid_date(DateTime& datetime)
   return true;
 }
 
-void process_ncep_prepbufr_observation(metadata::ObML::ObservationData& obs_data,std::string& message_type,size_t subset_number)
+void process_ncep_prepbufr_observation(gatherxml::markup::ObML::ObservationData& obs_data,std::string& message_type,size_t subset_number)
 {
   auto **pdata=reinterpret_cast<NCEPPREPBUFRData **>(data);
   auto dhr=pdata[subset_number]->dhr;
@@ -408,7 +408,7 @@ void process_ncep_prepbufr_observation(metadata::ObML::ObservationData& obs_data
   }
 }
 
-void process_ncep_adp_bufr_observation(metadata::ObML::ObservationData& obs_data,size_t subset_number)
+void process_ncep_adp_bufr_observation(gatherxml::markup::ObML::ObservationData& obs_data,size_t subset_number)
 {
   auto **adata=reinterpret_cast<NCEPADPBUFRData **>(data);
   if (adata[subset_number]->datetime.year() == 31073) {
@@ -767,7 +767,7 @@ void process_ncep_adp_bufr_observation(metadata::ObML::ObservationData& obs_data
   }
 }
 
-void process_ncep_radiance_bufr_observation(metadata::ObML::ObservationData& obs_data,size_t subset_number)
+void process_ncep_radiance_bufr_observation(gatherxml::markup::ObML::ObservationData& obs_data,size_t subset_number)
 {
   auto **rdata=reinterpret_cast<NCEPRadianceBUFRData **>(data);
   std::string obs_type,platform_type;
@@ -842,7 +842,7 @@ void process_ncep_radiance_bufr_observation(metadata::ObML::ObservationData& obs
   }
 }
 
-void process_ecmwf_bufr_observation(metadata::ObML::ObservationData& obs_data,size_t subset_number)
+void process_ecmwf_bufr_observation(gatherxml::markup::ObML::ObservationData& obs_data,size_t subset_number)
 {
   auto **edata=reinterpret_cast<ECMWFBUFRData **>(data);
   if (edata[subset_number]->datetime.year() > 3000) {
@@ -1009,7 +1009,7 @@ void process_ecmwf_bufr_observation(metadata::ObML::ObservationData& obs_data,si
   }
 }
 
-void scan_file(metadata::ObML::ObservationData& obs_data)
+void scan_file(gatherxml::markup::ObML::ObservationData& obs_data)
 {
   tfile=new TempFile;
   tfile->open(metautils::args.temp_loc);
@@ -1101,10 +1101,10 @@ int main(int argc,char **argv)
   atexit(clean_up);
   metautils::cmd_register("bufr2xml",user);
   metautils::check_for_existing_cmd("ObML");
-  metadata::ObML::ObservationData obs_data;
+  gatherxml::markup::ObML::ObservationData obs_data;
   scan_file(obs_data);
   if (!obs_data.is_empty) {
-    metadata::ObML::write_obml(obs_data,"bufr2xml",user);
+    gatherxml::markup::ObML::write(obs_data,"bufr2xml",user);
   }
   else {
     std::cerr << "No data found - no content metadata will be generated" << std::endl;
