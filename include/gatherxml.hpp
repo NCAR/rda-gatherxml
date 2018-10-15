@@ -6,6 +6,13 @@
 
 namespace gatherxml {
 
+namespace detailedMetadata {
+
+extern void generate_detailed_metadata_view(std::string caller,std::string user);
+extern void generate_group_detailed_metadata_view(std::string group_index,std::string file_type,std::string caller,std::string user);
+
+} // end namespace gatherxml::detailedMetadata
+
 namespace summarizeMetadata {
 
 struct BoxFlags {
