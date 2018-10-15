@@ -8,9 +8,13 @@
 #include <mymap.hpp>
 #include <strutils.hpp>
 #include <utils.hpp>
+#include <myerror.hpp>
 
-metautils::Directives directives;
-metautils::Args args;
+metautils::Directives metautils::directives;
+metautils::Args metautils::args;
+std::string myerror="";
+std::string mywarning="";
+
 MySQL::Server server_m,server_d;
 std::string user=getenv("USER");
 std::string dsnum2;
@@ -45,14 +49,14 @@ void fill_files_with_metadata(std::string filename = "")
 	meta_link.assign(&dbs[n][0],2);
     }
     if (table_exists(server_m,std::string(dbs[n])+".ds"+dsnum2+listType)) {
-	if (filename.length() > 0) {
+	if (!filename.empty()) {
 	  query.set("select "+IDType+"ID from "+dbs[n]+".ds"+dsnum2+listType+" where "+IDType+"ID = '"+filename+"'");
 	}
 	else {
 	  query.set("select "+IDType+"ID from "+dbs[n]+".ds"+dsnum2+listType);
 	}
 	if (query.submit(server_m) < 0) {
-	  metautils::log_error("error '"+query.error()+"' while trying to get "+dbs[n]+" filelist","sml",user,args.args_string);
+	  metautils::log_error("error '"+query.error()+"' while trying to get "+dbs[n]+" filelist","sml",user);
 	}
 	while (query.fetch_row(row)) {
 	  e.key=row[0];
@@ -65,15 +69,15 @@ void fill_files_with_metadata(std::string filename = "")
 
 void nullify_meta_link(std::string table,std::string file,std::string old_meta_link)
 {
-  if (server_d.update("dssdb."+table,"meta_link = NULL","dsid = 'ds"+args.dsnum+"' and "+table+" = '"+file+"'") < 0)
-    metautils::log_error("error '"+server_d.error()+"' while trying to nullify meta_link for '"+file+"'","sml",user,args.args_string);
+  if (server_d.update("dssdb."+table,"meta_link = NULL","dsid = 'ds"+metautils::args.dsnum+"' and "+table+" = '"+file+"'") < 0)
+    metautils::log_error("error '"+server_d.error()+"' while trying to nullify meta_link for '"+file+"'","sml",user);
   std::cout << "Info: changed 'meta_link' from '" << old_meta_link << "' to NULL for file: '" << file << "'" << std::endl;
 }
 
 void update_meta_link(std::string table,std::string file,std::string new_meta_link,std::string old_meta_link)
 {
-  if (server_d.update("dssdb."+table,"meta_link = '"+new_meta_link+"'","dsid = 'ds"+args.dsnum+"' and "+table+" = '"+file+"'") < 0)
-    metautils::log_error("error '"+server_d.error()+"' while trying to set meta_link for '"+file+"' to '"+new_meta_link+"'","sml",user,args.args_string);
+  if (server_d.update("dssdb."+table,"meta_link = '"+new_meta_link+"'","dsid = 'ds"+metautils::args.dsnum+"' and "+table+" = '"+file+"'") < 0)
+    metautils::log_error("error '"+server_d.error()+"' while trying to set meta_link for '"+file+"' to '"+new_meta_link+"'","sml",user);
   std::cout << "Info: changed 'meta_link' from '" << old_meta_link << "' to '" << new_meta_link << "' for file: '" << file << "'" << std::endl;
 }
 
@@ -83,13 +87,13 @@ void set_file_meta_links()
   MySQL::Row row;
   Entry e;
 
-//  query.set("select mssfile,meta_link,'mssfile' from mssfile where dsid = 'ds"+args.dsnum+"' and property = 'P' and retention_days > 0 union select wfile,meta_link,'wfile' from wfile where dsid = 'ds"+args.dsnum+"' and type = 'D' and property = 'A'");
-query.set("select mssfile,meta_link,'mssfile' from mssfile where dsid = 'ds"+args.dsnum+"' and type = 'P' and status = 'P' union select wfile,meta_link,'wfile' from wfile where dsid = 'ds"+args.dsnum+"' and type = 'D' and status = 'P'");
+//  query.set("select mssfile,meta_link,'mssfile' from mssfile where dsid = 'ds"+metautils::args.dsnum+"' and property = 'P' and retention_days > 0 union select wfile,meta_link,'wfile' from wfile where dsid = 'ds"+metautils::args.dsnum+"' and type = 'D' and property = 'A'");
+query.set("select mssfile,meta_link,'mssfile' from mssfile where dsid = 'ds"+metautils::args.dsnum+"' and type = 'P' and status = 'P' union select wfile,meta_link,'wfile' from wfile where dsid = 'ds"+metautils::args.dsnum+"' and type = 'D' and status = 'P'");
   if (query.submit(server_d) < 0)
-    metautils::log_error("error '"+query.error()+"' while trying to get dssdb filelist","sml",user,args.args_string);
+    metautils::log_error("error '"+query.error()+"' while trying to get dssdb filelist","sml",user);
   while (query.fetch_row(row)) {
     if (!files_with_metadata.found(row[0],e)) {
-	if (row[1].length() > 0 && row[1] != "N")
+	if (!row[1].empty() && row[1] != "N")
 	  nullify_meta_link(row[2],row[0],row[1]);
     }
     else {
@@ -103,23 +107,23 @@ void set_file_meta_link(std::string filename)
 {
   MySQL::LocalQuery query;
   if (strutils::has_beginning(filename,"/FS/DSS/") || strutils::has_beginning(filename,"/DSS/")) {
-    query.set("select meta_link,'mssfile' from mssfile where dsid = 'ds"+args.dsnum+"' and mssfile = '"+filename+"'");
+    query.set("select meta_link,'mssfile' from mssfile where dsid = 'ds"+metautils::args.dsnum+"' and mssfile = '"+filename+"'");
   }
   else {
-    query.set("select meta_link,'wfile' from wfile where dsid = 'ds"+args.dsnum+"' and wfile = '"+filename+"'");
+    query.set("select meta_link,'wfile' from wfile where dsid = 'ds"+metautils::args.dsnum+"' and wfile = '"+filename+"'");
   }
   if (query.submit(server_d) < 0) {
-    metautils::log_error("error '"+query.error()+"' while trying to get entry for '"+filename+"' from dssdb","sml",user,args.args_string);
+    metautils::log_error("error '"+query.error()+"' while trying to get entry for '"+filename+"' from dssdb","sml",user);
   }
   if (query.num_rows() == 0) {
-    metautils::log_error("'"+filename+"' is not in dssdb","sml",user,args.args_string);
+    metautils::log_error("'"+filename+"' is not in dssdb","sml",user);
   }
   else {
     MySQL::Row row;
     query.fetch_row(row);
     Entry e;
     if (!files_with_metadata.found(filename,e)) {
-	if (row[0].length() > 0 && row[0] != "N") {
+	if (!row[0].empty() && row[0] != "N") {
 	  nullify_meta_link(row[1],filename,row[0]);
 	}
     }
@@ -137,27 +141,27 @@ int main(int argc,char **argv)
     std::cerr << "usage: sml -d nnn.n [files...]" << std::endl;
     exit(1);
   }
-  args.args_string=unix_args_string(argc,argv,'%');
-  auto unix_args=strutils::split(args.args_string,"%");
+  metautils::args.args_string=unixutils::unix_args_string(argc,argv,'%');
+  auto unix_args=strutils::split(metautils::args.args_string,"%");
   for (size_t n=0; n < unix_args.size(); ++n) {
     if (unix_args[n] == "-d") {
-	args.dsnum=unix_args[++n];
-	if (strutils::has_beginning(args.dsnum,"ds")) {
-	  args.dsnum=args.dsnum.substr(2);
+	metautils::args.dsnum=unix_args[++n];
+	if (strutils::has_beginning(metautils::args.dsnum,"ds")) {
+	  metautils::args.dsnum=metautils::args.dsnum.substr(2);
 	}
     }
     else if (n > 1) {
 	file_list.push_back(unix_args[n]);
     }
   }
-  if (args.dsnum.length() == 0) {
+  if (metautils::args.dsnum.empty()) {
     std::cerr << "Error: no dataset number specified" << std::endl;
     exit(1);
   }
-  dsnum2=strutils::substitute(args.dsnum,".","");
-  metautils::read_config("sml",user,args.args_string,false);
-  metautils::connect_to_metadata_server(server_m);
-  metautils::connect_to_RDADB_server(server_d);
+  dsnum2=strutils::substitute(metautils::args.dsnum,".","");
+  metautils::read_config("sml",user,false);
+  server_m.connect(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
+  server_d.connect(metautils::directives.database_server,metautils::directives.rdadb_username,metautils::directives.rdadb_password,"dssdb");
   if (file_list.size() == 0) {
     fill_files_with_metadata();
     set_file_meta_links();
@@ -171,8 +175,8 @@ int main(int argc,char **argv)
   if (files_with_metadata.size() > 0) {
     ds_meta_link="Y";
   }
-  if (server_d.update("dssdb.dataset","meta_link = '"+ds_meta_link+"', version = version + 1","dsid = 'ds"+args.dsnum+"'") < 0) {
-    metautils::log_error("error '"+server_d.error()+"' while updating meta_link field for dataset","sml",user,args.args_string);
+  if (server_d.update("dssdb.dataset","meta_link = '"+ds_meta_link+"', version = version + 1","dsid = 'ds"+metautils::args.dsnum+"'") < 0) {
+    metautils::log_error("error '"+server_d.error()+"' while updating meta_link field for dataset","sml",user);
   }
   server_d.disconnect();
   server_m.disconnect();
