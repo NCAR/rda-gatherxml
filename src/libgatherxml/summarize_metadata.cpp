@@ -873,13 +873,13 @@ void fill_data_formats_table(std::string file_type,std::string db,MySQL::Server&
 }
 
 struct FileEntry {
-  FileEntry() : key(),backup_name(),data_format(),units(),metafile_ID(),mod_time(),start(),end(),file_format(),data_size(),group_ID(),annotation(),inv() {}
+  FileEntry() : key(),data_format(),units(),metafile_id(),start(),end(),file_format(),data_size(),group_id() {}
 
   std::string key;
-  std::string backup_name,data_format,units,metafile_ID,mod_time;
+  std::string data_format,units,metafile_id;
   std::string start,end;
   std::string file_format,data_size;
-  std::string group_ID,annotation,inv;
+  std::string group_id;
 };
 void get_file_data(MySQL::Server& server,MySQL::Query& query,std::string unit,std::string unit_plural,my::map<XEntry>& gindex_table,my::map<XEntry>& rda_files_table,my::map<XEntry>& data_formats,my::map<FileEntry>& table)
 {
@@ -900,15 +900,15 @@ void get_file_data(MySQL::Server& server,MySQL::Query& query,std::string unit,st
 	fe.end=dateutils::string_ll_to_date_string(row[4]);
 	if (gindex_table.found(xe.strings->at(0),xe2)) {
 	  if (!xe2.strings->at(0).empty()) {
-	    fe.group_ID=xe2.strings->at(0);
+	    fe.group_id=xe2.strings->at(0);
 	  }
 	  else {
-	    fe.group_ID=xe.strings->at(0);
+	    fe.group_id=xe.strings->at(0);
 	  }
-	  fe.group_ID+="[!]"+xe.strings->at(0);
+	  fe.group_id+="[!]"+xe.strings->at(0);
 	}
 	else {
-	  fe.group_ID="";
+	  fe.group_id="";
 	}
 	fe.file_format=xe.strings->at(1);
 	fe.data_size=xe.strings->at(2);
@@ -1533,51 +1533,51 @@ void create_file_list_cache(std::string file_type,std::string caller,std::string
     for (const auto& key : grml_file_data_table.keys()) {
 	grml_file_data_table.found(key,fe);
 	array[n]=fe;
-	array[n].metafile_ID=fe.key;
+	array[n].metafile_id=fe.key;
 	if (file_type == "MSS") {
-	  strutils::replace_all(array[n].metafile_ID,"/FS/DSS/","");
-	  strutils::replace_all(array[n].metafile_ID,"/DSS/","");
+	  strutils::replace_all(array[n].metafile_id,"/FS/DSS/","");
+	  strutils::replace_all(array[n].metafile_id,"/DSS/","");
 	}
 	ee.key=fe.key;
 	files_with_CMD_table.insert(ee);
-	strutils::replace_all(array[n].metafile_ID,"/","%25");
-	strutils::replace_all(array[n].metafile_ID,"+","%2B");
-	array[n].metafile_ID+=".GrML";
+	strutils::replace_all(array[n].metafile_id,"/","%25");
+	strutils::replace_all(array[n].metafile_id,"+","%2B");
+	array[n].metafile_id+=".GrML";
 	strutils::replace_all(array[n].data_format,"proprietary_","");
 	++n;
     }
     for (const auto& key : obml_file_data_table.keys()) {
 	obml_file_data_table.found(key,fe);
 	array[n]=fe;
-	array[n].metafile_ID=fe.key;
+	array[n].metafile_id=fe.key;
 	if (file_type == "MSS") {
-	  strutils::replace_all(array[n].metafile_ID,"/FS/DSS/","");
-	  strutils::replace_all(array[n].metafile_ID,"/DSS/","");
+	  strutils::replace_all(array[n].metafile_id,"/FS/DSS/","");
+	  strutils::replace_all(array[n].metafile_id,"/DSS/","");
 	}
 	ee.key=fe.key;
 	files_with_CMD_table.insert(ee);
-	strutils::replace_all(array[n].metafile_ID,"/","%25");
-	strutils::replace_all(array[n].metafile_ID,"+","%2B");
-	array[n].metafile_ID+=".ObML";
+	strutils::replace_all(array[n].metafile_id,"/","%25");
+	strutils::replace_all(array[n].metafile_id,"+","%2B");
+	array[n].metafile_id+=".ObML";
 	strutils::replace_all(array[n].data_format,"proprietary_","");
 	++n;
     }
     while (satellite_query.fetch_row(row)) {
 	if (file_type == "MSS") {
 	  array[n].key=row[0];
-	  array[n].metafile_ID=row[0];
-	  strutils::replace_all(array[n].metafile_ID,"/FS/DSS/","");
-	  strutils::replace_all(array[n].metafile_ID,"/DSS/","");
+	  array[n].metafile_id=row[0];
+	  strutils::replace_all(array[n].metafile_id,"/FS/DSS/","");
+	  strutils::replace_all(array[n].metafile_id,"/DSS/","");
 	}
 	else if (file_type == "Web") {
 	  array[n].key=row[0];
-	  array[n].metafile_ID=row[0];
+	  array[n].metafile_id=row[0];
 	}
 	ee.key=row[0];
 	files_with_CMD_table.insert(ee);
-	strutils::replace_all(array[n].metafile_ID,"/","%25");
-	strutils::replace_all(array[n].metafile_ID,"+","%2B");
-	array[n].metafile_ID+=".SatML";
+	strutils::replace_all(array[n].metafile_id,"/","%25");
+	strutils::replace_all(array[n].metafile_id,"+","%2B");
+	array[n].metafile_id+=".SatML";
 	array[n].data_format=row[1];
 	strutils::replace_all(array[n].data_format,"proprietary_","");
 	array[n].units=row[2];
@@ -1595,29 +1595,29 @@ void create_file_list_cache(std::string file_type,std::string caller,std::string
 	array[n].file_format=row[5];
 	array[n].data_size=row[6];
 	if (!row[7].empty()) {
-	  array[n].group_ID=row[7];
+	  array[n].group_id=row[7];
 	}
 	else {
-	  array[n].group_ID=row[8];
+	  array[n].group_id=row[8];
 	}
-	if (!array[n].group_ID.empty()) {
-	  array[n].group_ID+="[!]"+row[8];
+	if (!array[n].group_id.empty()) {
+	  array[n].group_id+="[!]"+row[8];
 	}
 	++n;
     }
     for (const auto& key : fixml_file_data_table.keys()) {
 	fixml_file_data_table.found(key,fe);
 	array[n]=fe;
-	array[n].metafile_ID=fe.key;
+	array[n].metafile_id=fe.key;
 	if (file_type == "MSS") {
-	  strutils::replace_all(array[n].metafile_ID,"/FS/DSS/","");
-	  strutils::replace_all(array[n].metafile_ID,"/DSS/","");
+	  strutils::replace_all(array[n].metafile_id,"/FS/DSS/","");
+	  strutils::replace_all(array[n].metafile_id,"/DSS/","");
 	}
 	ee.key=fe.key;
 	files_with_CMD_table.insert(ee);
-	strutils::replace_all(array[n].metafile_ID,"/","%25");
-	strutils::replace_all(array[n].metafile_ID,"+","%2B");
-	array[n].metafile_ID+=".FixML";
+	strutils::replace_all(array[n].metafile_id,"/","%25");
+	strutils::replace_all(array[n].metafile_id,"+","%2B");
+	array[n].metafile_id+=".FixML";
 	strutils::replace_all(array[n].data_format,"proprietary_","");
 	++n;
     }
@@ -1679,7 +1679,7 @@ metautils::log_warning("create_file_list_cache() returned warning: empty data si
 	  data_size="";
 	}
 	strutils::trim(data_size);
-	ofs << array[n].key << "<!>" << array[n].data_format << "<!>" << array[n].units << "<!>" << array[n].start << "<!>" << array[n].end << "<!>" << array[n].file_format << "<!>" << data_size << "<!>" << array[n].group_ID << "<!>" << array[n].metafile_ID;
+	ofs << array[n].key << "<!>" << array[n].data_format << "<!>" << array[n].units << "<!>" << array[n].start << "<!>" << array[n].end << "<!>" << array[n].file_format << "<!>" << data_size << "<!>" << array[n].group_id << "<!>" << array[n].metafile_id;
 	ofs << std::endl;
     }
     if (num_missing_data_size > 0) {
