@@ -58,19 +58,20 @@ MYSQLRUNPATH = -Wl,-rpath,$(MYSQLLIBDIR)
 JASPERRUNPATH = -Wl,-rpath,$(JASPERLIBDIR)
 ZRUNPATH = -Wl,-rpath,$(ZLIBDIR)
 SYNC =
+BUILDDIR = ./build-$(EXT)
 #
 GATHERXMLSUBS = $(SRCDIR)/libgatherxml/detailed_metadata.cpp $(SRCDIR)/libgatherxml/fix_metadata.cpp $(SRCDIR)/libgatherxml/grid_metadata.cpp $(SRCDIR)/libgatherxml/obs_metadata.cpp $(SRCDIR)/libgatherxml/summarize_metadata.cpp $(SRCDIR)/libgatherxml/write_metadata.cpp
-GATHERXMLOBJS = detailed_metadata.o fix_metadata.o grid_metadata.o obs_metadata.o summarize_metadata.o write_metadata.o
+GATHERXMLOBJS = $(BUILDDIR)/libgatherxml/detailed_metadata.o $(BUILDDIR)/libgatherxml/fix_metadata.o $(BUILDDIR)/libgatherxml/grid_metadata.o $(BUILDDIR)/libgatherxml/obs_metadata.o $(BUILDDIR)/libgatherxml/summarize_metadata.o $(BUILDDIR)/libgatherxml/write_metadata.o
 #
-.PHONY: finalize
+.PHONY: builddir clean finalize
 #
 all: _ascii2xml _bufr2xml _dcm _dsgen _fix2xml _gatherxml _grid2xml _gsi _hdf2xml _iinv _nc2xml _obs2xml _prop2xml _rcm _scm _sdp _sml
 #
-obj_gatherxml: $(GATHERXMLSUBS)
-ifeq ($(OKAYTOMAKE),1)
-	$(COMPILER) $(C_OPTIONS) $(GATHERXMLSUBS) -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR)
-endif
-libgatherxml.so: $(GATHERXMLOBJS) obj_gatherxml
+# libgatherxml.so
+#
+$(BUILDDIR)/libgatherxml/%.o: $(SRCDIR)/libgatherxml/%.cpp
+	$(COMPILER) $(C_OPTIONS) $< -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -o $@
+libgatherxml.so: builddir $(GATHERXMLOBJS)
 ifeq ($(OKAYTOMAKE),1)
 ifeq ($(strip $(LIBVERSION)),)
 	$(error libgatherxml.so: no version number given)
@@ -78,6 +79,7 @@ else
 	sudo -u rdadata $(COMPILER) -shared -o $(LIBDIR)/libgatherxml.so.$(LIBVERSION) -Wl,-soname,libgatherxml.so.$(LIBVERSION) $(GATHERXMLOBJS)
 	sudo -u rdadata rm -f $(LIBDIR)/libgatherxml.so
 	sudo -u rdadata ln -s $(LIBDIR)/libgatherxml.so.$(LIBVERSION) $(LIBDIR)/libgatherxml.so
+	make clean
 endif
 endif
 #
@@ -286,6 +288,12 @@ ifeq ($(OKAYTOMAKE),1)
 	sudo -u rdadata cp ./_sml $(BINDIR)/
 	rm ./_sml
 endif
+#
+builddir:
+	mkdir -p $(BUILDDIR)/libgatherxml
+#
+clean:
+	rm -rf $(BUILDDIR)
 #
 finalize:
 ifeq ($(strip $(VERSION)),)
