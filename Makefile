@@ -100,7 +100,7 @@ obj_gatherxml: $(GATHERXMLSUBS)
 ifeq ($(OKAYTOMAKE),1)
 	$(COMPILER) $(C_OPTIONS) $(GATHERXMLSUBS) -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR)
 endif
-libgatherxml.so: $(GATHERXMLOBJS)
+libgatherxml.so: $(GATHERXMLOBJS) obj_gatherxml
 ifeq ($(OKAYTOMAKE),1)
 ifeq ($(strip $(LIBVERSION)),)
 	$(error libgatherxml.so: no version number given)
