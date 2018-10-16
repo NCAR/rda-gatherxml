@@ -1534,13 +1534,15 @@ void create_file_list_cache(std::string file_type,std::string caller,std::string
 	grml_file_data_table.found(key,fe);
 	array[n]=fe;
 	array[n].metafile_id=fe.key;
+/*
 	if (file_type == "MSS") {
 	  strutils::replace_all(array[n].metafile_id,"/FS/DSS/","");
 	  strutils::replace_all(array[n].metafile_id,"/DSS/","");
 	}
+*/
 	ee.key=fe.key;
 	files_with_CMD_table.insert(ee);
-	strutils::replace_all(array[n].metafile_id,"/","%25");
+//	strutils::replace_all(array[n].metafile_id,"/","%25");
 	strutils::replace_all(array[n].metafile_id,"+","%2B");
 	array[n].metafile_id+=".GrML";
 	strutils::replace_all(array[n].data_format,"proprietary_","");
@@ -1550,32 +1552,32 @@ void create_file_list_cache(std::string file_type,std::string caller,std::string
 	obml_file_data_table.found(key,fe);
 	array[n]=fe;
 	array[n].metafile_id=fe.key;
+/*
 	if (file_type == "MSS") {
 	  strutils::replace_all(array[n].metafile_id,"/FS/DSS/","");
 	  strutils::replace_all(array[n].metafile_id,"/DSS/","");
 	}
+*/
 	ee.key=fe.key;
 	files_with_CMD_table.insert(ee);
-	strutils::replace_all(array[n].metafile_id,"/","%25");
+//	strutils::replace_all(array[n].metafile_id,"/","%25");
 	strutils::replace_all(array[n].metafile_id,"+","%2B");
 	array[n].metafile_id+=".ObML";
 	strutils::replace_all(array[n].data_format,"proprietary_","");
 	++n;
     }
     while (satellite_query.fetch_row(row)) {
+	array[n].key=row[0];
+	array[n].metafile_id=row[0];
+/*
 	if (file_type == "MSS") {
-	  array[n].key=row[0];
-	  array[n].metafile_id=row[0];
 	  strutils::replace_all(array[n].metafile_id,"/FS/DSS/","");
 	  strutils::replace_all(array[n].metafile_id,"/DSS/","");
 	}
-	else if (file_type == "Web") {
-	  array[n].key=row[0];
-	  array[n].metafile_id=row[0];
-	}
+*/
 	ee.key=row[0];
 	files_with_CMD_table.insert(ee);
-	strutils::replace_all(array[n].metafile_id,"/","%25");
+//	strutils::replace_all(array[n].metafile_id,"/","%25");
 	strutils::replace_all(array[n].metafile_id,"+","%2B");
 	array[n].metafile_id+=".SatML";
 	array[n].data_format=row[1];
@@ -1609,13 +1611,15 @@ void create_file_list_cache(std::string file_type,std::string caller,std::string
 	fixml_file_data_table.found(key,fe);
 	array[n]=fe;
 	array[n].metafile_id=fe.key;
+/*
 	if (file_type == "MSS") {
 	  strutils::replace_all(array[n].metafile_id,"/FS/DSS/","");
 	  strutils::replace_all(array[n].metafile_id,"/DSS/","");
 	}
+*/
 	ee.key=fe.key;
 	files_with_CMD_table.insert(ee);
-	strutils::replace_all(array[n].metafile_id,"/","%25");
+//	strutils::replace_all(array[n].metafile_id,"/","%25");
 	strutils::replace_all(array[n].metafile_id,"+","%2B");
 	array[n].metafile_id+=".FixML";
 	strutils::replace_all(array[n].data_format,"proprietary_","");
