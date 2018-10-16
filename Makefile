@@ -6,27 +6,9 @@ INCLUDEDIR = ./include
 SRCDIR = ./src
 OKAYTOMAKE = 0
 DAVMACH = 0
-ifneq ($(findstring geyser,$(HOST)),)
+ifneq ($(or $(findstring geyser,$(HOST)),$(findstring caldera,$(HOST)),$(findstring pronghorn,$(HOST)),$(findstring yslogin,$(HOST)),$(findstring casper,$(HOST))),)
 	DAVMACH = 1
-	EXT = dav-g
-endif
-ifneq ($(findstring caldera,$(HOST)),)
-	DAVMACH = 1
-	EXT = dav-c
-endif
-ifneq ($(findstring pronghorn,$(HOST)),)
-	DAVMACH = 1
-	EXT = dav-p
-endif
-ifneq ($(findstring yslogin,$(HOST)),)
-	DAVMACH = 1
-	EXT = dav-ys
-endif
-ifneq ($(findstring casper,$(HOST)),)
-	DAVMACH = 1
-	EXT = dav-cp
-endif
-ifeq ($(DAVMACH),1)
+	EXT = dav
 	COMPILER = /glade/u/apps/dav/opt/ncarcompilers/0.4.1/g++
 	GCCVERSION = $(shell g++ --version |grep "^g++" |awk '{print $$3}')
 	EXPECTEDGCCVERSION = 7.3.0
@@ -44,8 +26,6 @@ CHEYENNE = 0
 ifneq ($(findstring cheyenne,$(HOST)),)
 	CHEYENNE = 1
 	EXT = ch
-endif
-ifeq ($(CHEYENNE),1)
 	COMPILER = /glade/u/apps/ch/opt/gnu/7.1.0/bin/g++
 	GCCVERSION = $(shell g++ --version |grep "^g++" |awk '{print $$3}')
 	EXPECTEDGCCVERSION = 7.1.0
@@ -60,19 +40,9 @@ ifeq ($(CHEYENNE),1)
 	OKAYTOMAKE = 1
 endif
 VMMACH = 0
-ifneq ($(findstring rda-data,$(HOST)),)
+ifneq ($(or $(findstring rda-data,$(HOST)),$(findstring rda-web-dev,$(HOST))),)
 	VMMACH = 1
-	EXT = vm-data
-endif
-ifneq ($(findstring rda-web-prod,$(HOST)),)
-	VMMACH = 1
-	EXT = vm-prod
-endif
-ifneq ($(findstring rda-web-dev,$(HOST)),)
-	VMMACH = 1
-	EXT = vm-dev
-endif
-ifeq ($(VMMACH),1)
+	EXT = vm
 	COMPILER = g++49
         MYSQLINCLUDEDIR = /usr/include/mysql
         LIBDIR = /usr/local/dss/lib
