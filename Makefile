@@ -79,7 +79,6 @@ else
 	sudo -u rdadata $(COMPILER) -shared -o $(LIBDIR)/libgatherxml.so.$(LIBVERSION) -Wl,-soname,libgatherxml.so.$(LIBVERSION) $(GATHERXMLOBJS)
 	sudo -u rdadata rm -f $(LIBDIR)/libgatherxml.so
 	sudo -u rdadata ln -s $(LIBDIR)/libgatherxml.so.$(LIBVERSION) $(LIBDIR)/libgatherxml.so
-	make clean
 endif
 endif
 #
@@ -113,7 +112,6 @@ else
 	sudo -u rdadata chmod 4710 $(LOCALBINDIR)/$@.$(VERSION)
 	rm -f $(LOCALBINDIR)/$@
 	ln -s $(LOCALBINDIR)/$@.$(VERSION) $(LOCALBINDIR)/$@
-	make clean
 endif
 endif
 #
@@ -291,7 +289,6 @@ ifneq ($(strip $(VERSION)),)
 	ln -s $(BINDIR)/$(EXECUTABLE).$(VERSION) $(BINDIR)/$(EXECUTABLE)
 endif
 endif
-	make clean
 else
 %::
 	-@ echo "operational software must be built on operational machines"
