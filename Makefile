@@ -131,7 +131,6 @@ ifeq ($(strip $(VERSION)),)
 	$(error no version number given)
 else
 	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(ZRUNPATH) $(SRCDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lgatherxml -lutils -lutilsthread -lmetadata -lmetahelpers -lmetaexport -lmetaexporthelpers -lgridutils -lsearch -lxml -lbitmap -lcitation -lz -lpthread -o $(BUILDDIR)/$@.$(EXT).$(VERSION)
-	make install EXECUTABLE=$@
 endif
 endif
 #
@@ -264,6 +263,7 @@ clean:
 	rm -rf $(BUILDDIR)
 #
 install:
+ifneq ($(strip $(EXECUTABLE)),)
 ifeq ($(strip $(VERSION)),)
 	sudo -u rdadata cp ./$(BUILDDIR)/$(EXECUTABLE).$(EXT) $(BINDIR)/$(EXECUTABLE)
 	sudo -u rdadata chmod 740 $(BINDIR)/$(EXECUTABLE)
@@ -288,6 +288,14 @@ ifneq ($(strip $(VERSION)),)
 	rm -f $(BINDIR)/$(EXECUTABLE)
 	ln -s $(BINDIR)/$(EXECUTABLE).$(VERSION) $(BINDIR)/$(EXECUTABLE)
 endif
+endif
+else ifneq ($(strip $(TEMPLATE)),)
+	sudo -u rdadata cp ./templates/$(TEMPLATE) /glade/u/home/rdadata/share/templates/
+ifeq ($(VMMACH),1)
+	sudo -u rdadata cp ./templates/$(TEMPLATE) /usr/local/dss/share/templates/
+endif
+else
+	$(error Nothing was specified to install. Use EXECUTABLE= or TEMPLATE=)
 endif
 else
 %::
