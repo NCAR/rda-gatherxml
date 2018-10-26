@@ -126,6 +126,7 @@ void generate_index(std::string type,std::string tdir_name)
   }
   ofs << tdoc;
   ofs.close();
+  delete t;
 }
 
 bool compare_strings(const std::string& left,const std::string& right)
@@ -1512,6 +1513,7 @@ void generate_description(std::string type,std::string tdir_name)
   }
   ofs << tdoc;
   ofs.close();
+  delete t;
 }
 
 int main(int argc,char **argv)
