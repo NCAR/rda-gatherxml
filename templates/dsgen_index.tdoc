@@ -1,0 +1,76 @@
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@
+@ Template for dataset indexes
+@
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+<!DOCTYPE html>
+<head>
+#IF __IS_INTERNAL_DATASET__
+<meta http-equiv="Refresh" content="0; url=/index.html?hash=error&code=404&url=/datasets/ds__DSNUM__" />
+</head>
+#ENDIF __IS_INTERNAL_DATASET__
+#ELSE __IS_INTERNAL_DATASET__
+<meta http-equiv="Content-type" content="application/xml+xhtml;charset=UTF-8" />
+<meta name="fragment" content="!" />
+__DC_META_TAGS__
+<title>CISL RDA: __TITLE__</title>
+<?php include ("main/styles.inc"); ?>
+<?php include ("main/scripts.inc"); ?>
+<?php include ("main/ds_scripts.inc"); ?>
+__JSON_LD__
+</head>
+<body>
+<div id="window_container_inner" style="background-color: rgba(255,255,255,0.4); width: 1000px; height: auto; padding: 0px 20px 20px 20px; border-radius: 0px 0px 20px 20px; margin: 0px auto 40px auto">
+<?php include("main/banner.inc"); ?>
+<div id="dstitle" style="width: 980px; height: auto; padding: 10px 10px 0px 10px; background-color: #fffff5">
+<table width="980" style="padding-bottom: 10px">
+<?php
+  $can_bookmark=false;
+  if (strlen($duser) > 0) {
+    $can_bookmark=true;
+    $is_bookmarked=false;
+    $conn = mysql_connect("rda-db.ucar.edu","dssdb","dssdb");
+    if ($conn) {
+      $db=mysql_select_db("dssdb",$conn);
+      if ($db) {
+        $query="select dsid from dsbookmarks where email = '" . $duser . "' and dsid = '__DSNUM__'";
+        $res=mysql_query($query,$conn);
+        if ($res && mysql_num_rows($res) > 0) {
+          $is_bookmarked=true;
+        }
+      }
+    }
+    mysql_close($conn);
+  }
+?>
+<tr valign="top"><td rowspan="2" width="1"><img style="float: left; margin-right: 5px" src="/images/ds_logos/__LOGO_IMAGE__" width="__LOGO_WIDTH__" height="70" /></td><td><span class="fs24px bold">__TITLE__</span><br /><span class="fs16px bold"><span class="blue">ds__DSNUM__</span>__DOI_SPAN__</span><div id="ds_bookmark" style="display: inline; margin-left: 2px"><?php if ($can_bookmark) { $dsid="__DSNUM__"; if ($is_bookmarked) { include("dsbookmarks/showunset.inc"); } else { include("dsbookmarks/showset.inc"); } } ?></div></td></tr>
+<tr valign="bottom"><td align="right"><span class="fs16px">For assistance, contact <a class="blue" href="mailto:__CONTACT_LOGIN__@ucar.edu">__CONTACT_NAME__</a> <span class="mediumGrayText">(__CONTACT_PHONE__).</span></span></td></tr>
+</table>
+#IF __IS_DEAD_DATASET__
+<?php include("main/dstabs-dead.inc"); ?>
+#ENDIF __IS_DEAD_DATASET__
+#ELSE __IS_DEAD_DATASET__
+<?php include("main/dstabs.inc"); ?>
+#ENDELSE __IS_DEAD_DATASET__
+</div>
+<div id="content_container" style="width: 980px; height: auto; overflow: visible; padding: 10px; background-color: #fffff5">
+<?php
+  if ($_POST["globus"] == "Y") {
+    print "<img src=\"/images/transpace.gif\" onLoad=\"getAjaxContent('POST','" . file_get_contents("php://input") . "','/php/dsrqst.php','content_container')\" />";
+  }
+  else {
+?>
+<noscript>
+<span class="bold red">WARNING:</span> This website uses Javascript extensively, but it appears that your browser has disabled it.  Your accessibility to information and data will be severely limited unless you enable Javascript.
+</noscript>
+<?php
+  }
+?>
+</div>
+<?php include("main/footer.inc"); ?>
+<?php include("main/accessories.inc"); ?>
+</div>
+<?php include("main/orgnav.inc"); ?>
+</body>
+#ENDELSE __IS_INTERNAL_DATASET__
+</html>

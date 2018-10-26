@@ -1,0 +1,308 @@
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@
+@ Template for dataset description pages
+@
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+#IF __IS_DEAD_DATASET__
+<table class="fs16px" width="100%" cellspacing="10" cellpadding="0" border="0">
+</table>
+#ENDIF __IS_DEAD_DATASET__
+#ELSE __IS_DEAD_DATASET__
+<?php
+  $rda_blog=false;
+  $cdg_page_path="";
+  $cdg_guidance_path="";
+  $conn=mysql_connect("rda-db.ucar.edu","metadata","metadata");
+  if ($conn) {
+    $res=mysql_query("select dsid from metautil.rda_blog where dsid = '__DSNUM__'");
+    if (mysql_numrows($res) > 0) {
+      $rda_blog=true;
+    }
+    $res=mysql_query("select cdg_page_path,cdg_guidance_path from metautil.climate_data_guide where dsid = '__DSNUM__'");
+    if (mysql_numrows($res) > 0) {
+      @ $row=mysql_fetch_array($res,MYSQL_ASSOC);
+      $cdg_page_path=$row['cdg_page_path'];
+      $cdg_guidance_path=$row['cdg_guidance_path'];
+    }
+  }
+?>
+<style id="border_style">
+.border-top {
+  border-top: 1px solid #fffff5;
+}
+.border-right {
+  border-right: 1px solid #fffff5;
+}
+.border-bottom {
+  border-bottom: 1px solid #fffff5;
+}
+.border-left {
+  border-left: 1px solid #fffff5;
+}
+</style>
+<table class="fs16px" width="100%" cellspacing="10" cellpadding="0" border="0">
+@
+@ YouTube tutorial
+<tr style="vertical-align: bottom">
+<td class="bold nowrap">Help with this page:</td>
+<td><a href="http://ncarrda.blogspot.com/search/label/Tutorial+YouTube+Description" target="_tutorial">RDA dataset description page video tour</a></td>
+</tr>
+@
+@ Abstract
+<tr style="vertical-align: top">
+<td class="bold">Abstract:</td>
+<td>__ABSTRACT__</td>
+</tr>
+@
+@ Acknowledgements
+#IF __HAS_ACKNOWLEDGEMENTS__
+<tr style="vertical-align: top">
+<td class="bold">Acknowledgements</td>
+<td>__ACKNOWLEDGEMENT__</td>
+</tr>
+#ENDIF __HAS_ACKNOWLEDGEMENTS__
+@
+@ Temporal Range
+#IF __HAS_TEMPORAL_RANGE__
+<tr style="vertical-align: top">
+<td class="bold nowrap">Temporal Range:</td>
+<td>
+#IF __HAS_TEMPORAL_BY_GROUP1__
+__TEMPORAL_RANGE__<span class="fs13px"> (Entire dataset)</span>
+<br />
+<span id="D__N_TEMPORAL__"><a href="javascript:swapDivs(__N_TEMPORAL__,__N_TEMPORAL1__)" title="Expand dataset product period list"><img src="/images/bluetriangle.gif" width="12" height="15" border="0"><span class="fs13px">Period details by dataset product</span></a></span><span style="visibility: hidden; position: absolute; top: 0" id="D__N_TEMPORAL1__"><a href="javascript:swapDivs(__N_TEMPORAL1__,__N_TEMPORAL__)"><img src="/images/bluetriangle90.gif" width="15" height="12" border="0" title="Collapse dataset product period list"></a><span class="fs13px">Period details by dataset product:
+#ENDIF __HAS_TEMPORAL_BY_GROUP1__
+#REPEAT __TEMPORAL_RANGE__
+__TEMPORAL_RANGE__
+#ENDREPEAT __TEMPORAL_RANGE__
+#IF __HAS_TEMPORAL_BY_GROUP2__
+</span></span>
+#ENDIF __HAS_TEMPORAL_BY_GROUP2__
+</td>
+</tr>
+#ENDIF __HAS_TEMPORAL_RANGE__
+@
+@ Update Frequency
+#IF __HAS_UPDATE_FREQUENCY__
+<tr style="vertical-align: top">
+<td class="bold">Updates:</td>
+<td>__UPDATE_FREQUENCY__</td>
+</tr>
+#ENDIF __HAS_UPDATE_FREQUENCY__
+@
+@ Access Restrictions
+#IF __HAS_ACCESS_RESTRICTIONS__
+<tr style="vertical-align: top">
+<td class="bold">Access Restrictions:</td>
+<td>__ACCESS_RESTRICTIONS__</td>
+</tr>
+#ENDIF __HAS_ACCESS_RESTRICTIONS__
+@
+@ Usage Restrictions
+#IF __HAS_USAGE_RESTRICTIONS__
+<tr style="vertical-align: top">
+<td class="bold">Usage Restrictions:</td>
+<td>__USAGE_RESTRICTIONS__</td>
+</tr>
+#ENDIF __HAS_USAGE_RESTRICTIONS__
+@
+@ Variables
+<tr style="vertical-align: top">
+<td class="bold">Variables:</td>
+<td>
+__VARIABLES__
+#IF __HAS_DETAILED_VARIABLES__
+<a href="__DETAILED_VARIABLES_LINK__">Detailed Variable List</a><br />
+#ENDIF __HAS_DETAILED_VARIABLES__
+#IF __FOUND_GRIB_TABLE__
+__GRIB_TABLE__
+#ENDIF __FOUND_GRIB_TABLE__
+#IF __FOUND_GRIB2_TABLE__
+__GRIB2_TABLE__
+#ENDIF __FOUND_GRIB2_TABLE__
+#IF __FOUND_ON84_TABLE__
+__ON84_TABLE__
+#ENDIF __FOUND_ON84_TABLE__
+#IF __HAS_VARIABLES_BY_PRODUCT__
+__VARIABLES_BY_PRODUCT__
+#ENDIF __HAS_VARIABLES_BY_PRODUCT__
+</td>
+</tr>
+@
+@ Vertical Levels
+#IF __HAS_VERTICAL_LEVELS__
+<tr style="vertical-align: top">
+<td class="bold nowrap">Vertical Levels:</td>
+<td>
+__VERTICAL_LEVELS__
+</td>
+</tr>
+#ENDIF __HAS_VERTICAL_LEVELS__
+@
+@ Temporal Frequency
+#IF __HAS_TEMPORAL_FREQUENCY__
+<tr style="vertical-align: bottom">
+<td class="bold">Temporal Frequencies:</td>
+<td>
+__TEMPORAL_FREQUENCY__
+</td>
+</tr>
+#ENDIF __HAS_TEMPORAL_FREQUENCY__
+@
+@ Data Types
+#IF __HAS_DATA_TYPES__
+<tr style="vertical-align: top">
+<td class="bold nowrap">Data Types:</td>
+<td>
+__DATA_TYPES__
+</td>
+</tr>
+#ENDIF __HAS_DATA_TYPES__
+@
+@ Spatial Coverage
+#IF __HAS_SPATIAL_COVERAGE__
+<tr style="vertical-align: top">
+<td class="bold nowrap">Spatial Coverage:</td>
+<td>
+__SPATIAL_COVERAGE__
+</td>
+</tr>
+#ENDIF __HAS_SPATIAL_COVERAGE__
+@
+@ Data Contributors
+<tr style="vertical-align: top">
+<td class="bold nowrap">Data Contributors:</td>
+<td>
+__DATA__CONTRIBUTORS__
+</td>
+</tr>
+@
+@ NCAR Climate Data Guide
+<?php
+  if (strlen($cdg_page_path) > 0) {
+    print "<tr style=\"vertical-align: bottom\"><td class=\"bold\">NCAR Climate Data Guide:</td><td><a target=\"_cdg\" href=\"$cdg_page_path\">Dataset Assessment</a> | ";
+    if (strlen($cdg_guidance_path) > 0) {
+      print "<a target=\"_cdg\" href=\"$cdg_guidance_path\">Expert Guidance</a>";
+    }
+    else {
+      print "<span style=\"color: #6a6a6a\">Expert Guidance</span>";
+    }
+    print "</td></tr>\n";
+  }
+?>
+@
+@ Related Web Sites
+#IF __HAS_RELATED_WEB_SITES__
+<tr style="vertical-align: __WEB_SITES_VALIGN__">
+<td class="bold">Related Resources:</td>
+<td>
+__RELATED_WEB_SITES__
+</td>
+</tr>
+#ENDIF __HAS_RELATED_WEB_SITES__
+@
+@ WRF Preprocessing System
+<?php
+  if (file_exists("/usr/local/www/server_root/web/datasets/ds__DSNUM__/metadata/Vtable.RDA_ds__DSNUM__")) {
+    print "<tr style=\"vertical-align: bottom\"><td class=\"bold\">WRF Preprocessing System (WPS):</td><td>The GRIB-formatted data in this dataset can be used to initialize the Weather Research and Forecasting (WRF) Model.<br /><!--<a target=\"_vtable\" href=\"/datasets/ds__DSNUM__/metadata/Vtable.RDA_ds__DSNUM__\">Vtable</a>&nbsp;|&nbsp;--><a target=\"_wrf\" href=\"http://www2.mmm.ucar.edu/wrf/users/download/free_data.html\"><em>WRF Vtables</em></a></td></tr>";
+  }
+?>
+@
+@ Publications
+#IF __HAS_PUBLICATIONS__
+<tr style="vertical-align: top">
+<td class="bold">Publications:</td>
+<td>
+__PUBLICATIONS__
+</td>
+</tr>
+#ENDIF __HAS_PUBLICATIONS__
+@
+@ Citation
+<tr style="vertical-align: top">
+<td class="bold">How to Cite This Dataset:
+<div style="background-color: #2a70ae; color: white; width: 40px; padding: 1px; margin-top: 3px; font-size: 16px; font-weight: bold; border-radius: 5px 5px 5px 5px; text-align: center; cursor: pointer" onClick="javascript:location='/cgi-bin/datasets/citation?dsnum=__DSNUM__&style=ris'" title="download citation in RIS format">RIS</div><div style="background-color: #2a70ae; color: white; width: 60px; padding: 2px 8px 2px 8px; font-size: 16px; font-weight: bold; font-family: serif; border-radius: 5px 5px 5px 5px; text-align: center; cursor: pointer; margin-top: 5px" onClick="location='/cgi-bin/datasets/citation?dsnum=__DSNUM__&style=bibtex'" title="download citation in BibTeX format">BibTeX</div>
+</td>
+<td><div id="citation" style="border: thin solid black; padding: 5px"><img src="/images/transpace.gif" width="1" height="1" onLoad="getAjaxContent('GET',null,'/cgi-bin/datasets/citation?dsnum=__DSNUM__&style=esip','citation')" /></div>
+<?php
+  $signedin=false;
+  if (isSet($_SERVER["HTTP_COOKIE"])) {
+    $http_cookie=$_SERVER["HTTP_COOKIE"];
+    $parts=strtok($http_cookie,";");
+    while ($parts) {
+      $parts=trim($parts);
+      if (strcmp(substr($parts,0,6),"duser=") == 0) {
+        $signedin=true;
+      }
+      $parts=strtok(";");
+    }
+  }
+  if ($signedin) {
+    print "<a href=\"javascript:void(0)\" onClick=\"getAjaxContent('GET',null,'/php/ajax/mydatacitation.php?tab=ds_history&dsid=ds__DSNUM__&b=no','content_container')\">";
+  }
+  else
+    print "<span style=\"color: #a0a0a0\">";
+  print "Get a customized data citation";
+  if ($signedin) {
+    print "</a>";
+  }
+  else {
+    print " <span class=\"fs13px\">(must be signed in)</span></span>";
+  }
+?>
+</td>
+</tr>
+@
+@ Volume
+<tr style="vertical-align: top">
+<td class="bold nowrap">Total Volume:</td>
+<td>
+__VOLUME__
+</td>
+</tr>
+@
+@ Data Formats
+<tr style="vertical-align: top">
+<td class="bold nowrap">Data Formats:</td>
+<td>
+__DATA_FORMATS__
+</td>
+</tr>
+@
+@ Related Datasets
+#IF __HAS_RELATED_DATASETS__
+<tr style="vertical-align: __RELATED_DATASETS_VALIGN__">
+<td class="bold">Related RDA Datasets:</td>
+<td>
+<table cellspacing="0" cellpadding="2" border="0">
+__RELATED_DATASETS__
+</table>
+</td>
+</tr>
+#ENDIF __HAS_RELATED_DATASETS__
+@
+@ More Details
+#IF __HAS_MORE_DETAILS__
+<tr style="vertical-align: top"><td class="bold nowrap">More Details:</td><td>View <a href="#metadata/detailed.html?_do=y">more details</a> for this dataset, including dataset citation, data contributors, and other detailed metadata</td></tr>
+#ENDIF __HAS_MORE_DETAILS__
+@
+@ RDA Blog
+<?php
+  if ($rda_blog) {
+    print "<tr style=\"vertical-align: top\"><td class=\"bold nowrap\">RDA Blog:</td><td>Read <a href=\"http://ncarrda.blogspot.com/search/label/ds__DSNUM__\" target=\"_rdablog\">posts</a> on the RDA blog that are related to this dataset</td></tr>\n";
+  }
+?>
+@
+@ Data Access
+<tr style="vertical-align: top">
+<td class="bold nowrap">Data Access:</td>
+<td><div style="display: inline; float: left">Click the </div><a class="clean" href="#access"><div class="dstab dstab-off" style="width: 100px; margin: 0px 5px 0px 5px; text-align: center">Data Access</div></a><div style="display: inline; float: left"> tab here or in the navigation bar near the top of the page</div></td>
+</tr>
+@
+@ Metadata Record
+<tr style="vertical-align: top">
+<td class="bold nowrap">Metadata Record:</td>
+<td><div id="meta_record" style="display: inline; float: left"></div><img src="/images/transpace.gif" width="1" height="1" onload="getAjaxContent('GET',null,'/cgi-bin/datasets/showMetadata?dsnum=__DSNUM__','meta_record')" /></td>
+</tr>
+</table>
+#ENDELSE __IS_DEAD_DATASET__
