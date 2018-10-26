@@ -40,7 +40,7 @@ ifneq ($(findstring cheyenne,$(HOST)),)
 	OKAYTOMAKE = 1
 endif
 VMMACH = 0
-ifneq ($(or $(findstring rda-data,$(HOST)),$(findstring rda-web-dev,$(HOST))),)
+ifneq ($(or $(findstring rda-data,$(HOST)),$(findstring rda-web-prod,$(HOST))),)
 	VMMACH = 1
 	EXT = vm
 	COMPILER = g++49
@@ -292,6 +292,7 @@ endif
 else ifneq ($(strip $(TEMPLATE)),)
 	sudo -u rdadata cp ./templates/$(TEMPLATE) /glade/u/home/rdadata/share/templates/
 ifeq ($(VMMACH),1)
+	sudo -u rdadata mkdir -p /usr/local/dss/share/templates
 	sudo -u rdadata cp ./templates/$(TEMPLATE) /usr/local/dss/share/templates/
 endif
 else
