@@ -44,7 +44,15 @@ void generate_index(std::string type,std::string tdir_name)
   if (!ofs.is_open()) {
     metautils::log_error("unable to open output for 'index.html'","dsgen",user);
   }
-  TokenDocument tdoc("/glade/u/home/rdadata/share/templates/dsgen_index.tdoc");
+  auto t=new TokenDocument("/glade/u/home/rdadata/share/templates/dsgen_index.tdoc");
+  if (!*t) {
+    delete t;
+    t=new TokenDocument("/usr/local/dss/share/templates/dsgen_index.tdoc");
+    if (!*t) {
+	metautils::log_error("index template not found or unavailable","dsgen",user);
+    }
+  }
+  auto &tdoc=*t;
   tdoc.add_replacement("__DSNUM__",metautils::args.dsnum);
   if (dataset_type == "I") {
     tdoc.add_if("__IS_INTERNAL_DATASET__");
@@ -507,7 +515,14 @@ void generate_description(std::string type,std::string tdir_name)
   if (!ofs.is_open()) {
     metautils::log_error("unable to open output for 'description.html'","dsgen",user);
   }
-  TokenDocument tdoc("/glade/u/home/rdadata/share/templates/dsgen_description.tdoc");
+  auto t=new TokenDocument("/glade/u/home/rdadata/share/templates/dsgen_description.tdoc");
+  if (!*t) {
+    t=new TokenDocument("/usr/local/dss/share/templates/dsgen_description.tdoc");
+    if (!*t) {
+	metautils::log_error("description template not found or unavailable","dsgen",user);
+    }
+  }
+  auto &tdoc=*t;
 // abstract
   tdoc.add_replacement("__ABSTRACT__",text_field_from_element(xdoc.element("dsOverview/summary")));
   if (dataset_type == "D") {
