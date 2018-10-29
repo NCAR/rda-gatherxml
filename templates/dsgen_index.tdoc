@@ -55,7 +55,7 @@ __JSON_LD__
 </div>
 <div id="content_container" style="width: 980px; height: auto; overflow: visible; padding: 10px; background-color: #fffff5">
 <?php
-  if ($_POST["globus"] == "Y") {
+  if (isset($_POST["globus"]) && $_POST["globus"] == "Y") {
     print "<img src=\"/images/transpace.gif\" onLoad=\"getAjaxContent('POST','" . file_get_contents("php://input") . "','/php/dsrqst.php','content_container')\" />";
   }
   else {
