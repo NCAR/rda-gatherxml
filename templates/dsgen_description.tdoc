@@ -310,8 +310,6 @@ __RELATED_DATASETS__
 <td class="bold nowrap">Metadata Record:</td>
 <td><div id="meta_record" style="display: inline; float: left"></div><img src="/images/transpace.gif" width="1" height="1" onload="getAjaxContent('GET',null,'/cgi-bin/datasets/showMetadata?dsnum=__DSNUM__','meta_record')" /></td>
 </tr>
-</table>
-#ENDELSE __IS_DEAD_DATASET__
 @
 @ Data Citations
 #IF __HAS_DATA_CITATIONS__
@@ -333,3 +331,5 @@ __RELATED_DATASETS__
 #ENDIF __HAS_DATA_CITATIONS__
 @
 @ !! DON'T PUT ANYTHING BELOW THIS LINE !!
+</table>
+#ENDELSE __IS_DEAD_DATASET__
