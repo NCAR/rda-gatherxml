@@ -1511,6 +1511,153 @@ void generate_description(std::string type,std::string tdir_name)
   if (unixutils::exists_on_server(metautils::directives.web_server,"/data/web/datasets/ds"+metautils::args.dsnum+"/metadata/detailed.html",metautils::directives.rdadata_home)) {
     tdoc.add_if("__HAS_MORE_DETAILS__");
   }
+// data citations
+  query.set("select distinct d.DOI_work from citation.data_citations as d left join dssdb.dsvrsn as v on v.doi = d.DOI_data where v.dsid = 'ds"+metautils::args.dsnum+"'");
+  if (query.submit(server) == 0 && query.num_rows() > 0) {
+    std::vector<std::tuple<std::string,std::string>> citations;
+    for (const auto& row : query) {
+	auto doi=row[0];
+	MySQL::LocalQuery wquery("select title,pub_year,type from citation.works where DOI = '"+doi+"'");
+	MySQL::Row wrow;
+	if (wquery.submit(server) == 0 && wquery.fetch_row(wrow)) {
+	  auto title=htmlutils::unicode_escape_to_html(wrow[0]);
+	  auto pub_year=wrow[1];
+	  auto type=wrow[2];
+	  MySQL::LocalQuery aquery("select last_name,first_name,middle_name from citation.works_authors where ID = '"+doi+"' and ID_type = 'DOI' order by sequence");
+	  if (aquery.submit(server) == 0) {
+	    std::string citation;
+	    size_t n=1;
+	    for (const auto& arow : aquery) {
+		if (citation.empty()) {
+		  citation+=htmlutils::unicode_escape_to_html(arow[0])+", "+arow[1].substr(0,1)+".";
+		  if (!arow[2].empty()) {
+		    citation+=" "+arow[2].substr(0,1)+".";
+		  }
+		}
+		else {
+		  citation+=", ";
+		  if (n == aquery.num_rows()) {
+		    citation+="and ";
+		  }
+		  citation+=arow[1].substr(0,1)+". ";
+		  if (!arow[2].empty()) {
+		    citation+=arow[2].substr(0,1)+". ";
+		  }
+		  citation+=htmlutils::unicode_escape_to_html(arow[0]);
+		}
+		++n;
+	    }
+	    if (!citation.empty()) {
+		citation+=", "+pub_year+": ";
+		if (type == "C") {
+		  citation+="\"";
+		}
+		citation+=title;
+		switch (type[0]) {
+		  case 'C':
+		  {
+		    citation+="\", in ";
+		    MySQL::LocalQuery cquery("select pages,ISBN from citation.book_chapter_works where DOI = '"+doi+"'");
+		    MySQL::Row crow;
+		    if (cquery.submit(server) == 0 && cquery.fetch_row(crow)) {
+			MySQL::LocalQuery bquery("select title,publisher from citation.book_works where ISBN = '"+crow[1]+"'");
+			MySQL::Row brow;
+			if (bquery.submit(server) == 0 && bquery.fetch_row(brow)) {
+			  citation+=htmlutils::unicode_escape_to_html(brow[0])+". Ed. ";
+			  MySQL::LocalQuery equery("select first_name,middle_name,last_name from citation.works_authors where ID = '"+crow[1]+"' and ID_type = 'ISBN' order by sequence");
+			  if (equery.submit(server) == 0) {
+			    size_t n=1;
+			    for (const auto& erow : equery) {
+				if (n > 1) {
+				  citation+=", ";
+				  if (n == equery.num_rows()) {
+				    citation+="and ";
+				  }
+				}
+				citation+=erow[0].substr(0,1)+". ";
+				if (!erow[1].empty()) {
+				  citation+=erow[1].substr(0,1)+". ";
+				}
+				citation+=htmlutils::unicode_escape_to_html(erow[2]);
+				++n;
+			    }
+			    citation+=", "+htmlutils::unicode_escape_to_html(brow[1])+", "+crow[0]+".";
+			  }
+			  else {
+			    citation="";
+			  }
+			}
+			else {
+			  citation="";
+			}
+		    }
+		    else {
+			citation="";
+		    }
+		    break;
+		  }
+		  case 'J':
+		  {
+		    citation+=". ";
+		    MySQL::LocalQuery jquery("select pub_name,volume,pages from citation.journal_works where DOI = '"+doi+"'");
+		    MySQL::Row jrow;
+		    if (jquery.submit(server) == 0 && jquery.fetch_row(jrow)) {
+			citation+="<em>"+htmlutils::unicode_escape_to_html(jrow[0])+"</em>";
+			if (!jrow[1].empty()) {
+			  citation+=", <strong>"+jrow[1]+"</strong>";
+			}
+			if (!jrow[2].empty()) {
+			  citation+=", "+jrow[2];
+			}
+			citation+=", https://doi.org/"+doi;
+		    }
+		    else {
+			citation="";
+		    }
+		    break;
+		  }
+		}
+	    }
+	    if (!citation.empty()) {
+		citations.emplace_back(std::make_tuple(pub_year,citation));
+	    }
+	  }
+	}
+    }
+    if (citations.size() > 0) {
+	tdoc.add_if("__HAS_DATA_CITATIONS__");
+	if (query.num_rows() > 1) {
+	  tdoc.add_replacement("__NUM_DATA_CITATIONS__","<strong>"+strutils::itos(query.num_rows())+"</strong> times");
+	}
+	else {
+	  tdoc.add_replacement("__NUM_DATA_CITATIONS__","<strong>"+strutils::itos(query.num_rows())+"</strong> time");
+	}
+	std::sort(citations.begin(),citations.end(),
+        [](const std::tuple<std::string,std::string>& left,const std::tuple<std::string,std::string>& right) -> bool
+        {
+	  if (std::get<0>(left) > std::get<0>(right)) {
+	    return true;
+	  }
+	  else if (std::get<0>(left) < std::get<0>(right)) {
+	    return false;
+	  }
+	  else {
+	    return (std::get<1>(left) < std::get<1>(right));
+	  }
+        });
+	std::unordered_set<std::string> pub_years;
+	for (const auto& c : citations) {
+	  auto pub_year=std::get<0>(c);
+	  if (pub_years.find(pub_year) == pub_years.end()) {
+	    tdoc.add_repeat("__DATA_CITER__","CITATION[!]"+std::get<1>(c)+"<!>YEAR[!]"+pub_year);
+	    pub_years.emplace(pub_year);
+	  }
+	  else {
+	    tdoc.add_repeat("__DATA_CITER__","CITATION[!]"+std::get<1>(c));
+	  }
+	}
+    }
+  }
   ofs << tdoc;
   ofs.close();
   delete t;

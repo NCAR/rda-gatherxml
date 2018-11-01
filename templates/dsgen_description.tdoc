@@ -283,13 +283,19 @@ __RELATED_DATASETS__
 @
 @ More Details
 #IF __HAS_MORE_DETAILS__
-<tr style="vertical-align: top"><td class="bold nowrap">More Details:</td><td>View <a href="#metadata/detailed.html?_do=y">more details</a> for this dataset, including dataset citation, data contributors, and other detailed metadata</td></tr>
+<tr style="vertical-align: top">
+<td class="bold nowrap">More Details:</td>
+<td>View <a href="#metadata/detailed.html?_do=y">more details</a> for this dataset, including dataset citation, data contributors, and other detailed metadata</td>
+</tr>
 #ENDIF __HAS_MORE_DETAILS__
 @
 @ RDA Blog
 <?php
   if ($rda_blog) {
-    print "<tr style=\"vertical-align: top\"><td class=\"bold nowrap\">RDA Blog:</td><td>Read <a href=\"http://ncarrda.blogspot.com/search/label/ds__DSNUM__\" target=\"_rdablog\">posts</a> on the RDA blog that are related to this dataset</td></tr>\n";
+    print "<tr style=\"vertical-align: top\">\n";
+    print "<td class=\"bold nowrap\">RDA Blog:</td>\n";
+    print "<td>Read <a href=\"http://ncarrda.blogspot.com/search/label/ds__DSNUM__\" target=\"_rdablog\">posts</a> on the RDA blog that are related to this dataset</td>\n";
+    print "</tr>\n";
   }
 ?>
 @
@@ -306,3 +312,24 @@ __RELATED_DATASETS__
 </tr>
 </table>
 #ENDELSE __IS_DEAD_DATASET__
+@
+@ Data Citations
+#IF __HAS_DATA_CITATIONS__
+<tr style="vertical-align: top">
+<td class="bold nowrap">Data Citations:</td>
+<td>This dataset has been cited __NUM_DATA_CITATIONS__.<br />
+<span id="DDC0"><a href="javascript:swapDivs('DC0','DC1')" title="Expand the list of works that cited this dataset"><img src="/images/triangle.gif" width="12" height="15" border="0" /><span class="fs13px">Published works that cited this dataset</span></a></span>
+<span style="visibility: hidden; position: absolute; top: 0" id="DDC1"><a href="javascript:swapDivs('DC1','DC0')" title="Collapse the list of works that cited this dataset"><img src="/images/triangle90.gif" width="15" height="12" border="0" /></a><span class="fs13px">Published works that cited this dataset:
+<div style="margin-bottom: 5px"></div>
+#REPEAT __DATA_CITER__
+!REPIF __DATA_CITER__.YEAR
+<div style="margin-left: 10px; margin-bottom: 5px; font-size: 15px; font-weight: bold">__DATA_CITER__.YEAR</div>
+!ENDREPIF __DATA_CITER__.YEAR
+<div style="margin-left: 10px; margin-bottom: 5px">__DATA_CITER__.CITATION</div>
+#ENDREPEAT __DATA_CITER__
+</span></span>
+</td>
+</tr>
+#ENDIF __HAS_DATA_CITATIONS__
+@
+@ !! DON'T PUT ANYTHING BELOW THIS LINE !!
