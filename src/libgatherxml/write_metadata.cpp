@@ -34,7 +34,7 @@ void close(std::string filename,TempDir **tdir,std::ofstream& ofs,std::string cm
   std::stringstream output,error;
   if (insert_into_db) {
     auto iinv_command=metautils::directives.local_root+"/bin/iinv";
-    if (create_cache) {
+    if (!create_cache) {
 	iinv_command+=" -C";
     }
     iinv_command+=" -d "+metautils::args.dsnum+" -t "+(*tdir)->name()+" -f "+filename+"."+cmd_type+"_inv";
