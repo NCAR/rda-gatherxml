@@ -9,18 +9,18 @@
 #include <deque>
 #include <vector>
 #include <regex>
+#include <gatherxml.hpp>
 #include <grid.hpp>
 #include <mymap.hpp>
 #include <strutils.hpp>
 #include <utils.hpp>
 #include <xmlutils.hpp>
-#include <metadata.hpp>
 #include <netcdf.hpp>
 #include <myerror.hpp>
 
 metautils::Directives metautils::directives;
 metautils::Args metautils::args;
-my::map<metadata::GrML::GridEntry> grid_table;
+my::map<gatherxml::markup::GrML::GridEntry> grid_table;
 const std::string user=getenv("USER");
 TempFile *tfile=nullptr;
 std::string tfile_name,inv_file;
@@ -142,9 +142,9 @@ void scan_file()
   std::string units;
   DateTime first_valid_date_time,last_valid_date_time;
   metautils::StringEntry pe,ee;
-  metadata::GrML::GridEntry gentry;
-  metadata::GrML::LevelEntry lentry;
-  metadata::GrML::ParameterEntry pentry;
+  gatherxml::markup::GrML::GridEntry gentry;
+  gatherxml::markup::GrML::LevelEntry lentry;
+  gatherxml::markup::GrML::ParameterEntry pentry;
   my::map<InvEntry> inv_U_table,inv_G_table,inv_L_table,inv_P_table,inv_R_table,inv_E_table;
   std::list<std::string> inv_U_list,inv_G_list,inv_L_list,inv_P_list,inv_R_list,inv_E_list;
 
@@ -256,7 +256,7 @@ void scan_file()
     }
   }
   if ((file_format.empty() || file_format == "TAR") && (metautils::args.data_format == "grib" || metautils::args.data_format == "grib0" || metautils::args.data_format == "grib2")) {
-    metadata::open_inventory(inv_file,&inv_dir,inv_stream,"GrML","grid2xml",user);
+    gatherxml::fileInventory::open(inv_file,&inv_dir,inv_stream,"GrML","grid2xml",user);
   }
   else if (metautils::args.inventory_only) {
     metautils::log_error("scan_file() returned error: unable to inventory "+metautils::args.path+"/"+metautils::args.filename+" because archive format is '"+file_format+"'","grid2xml",user);
@@ -920,7 +920,7 @@ int main(int argc,char **argv)
   }
   scan_file();
   if (!metautils::args.inventory_only) {
-    auto tdir=metadata::GrML::write_grml(grid_table,"grid2xml",user);
+    auto tdir=gatherxml::markup::GrML::write(grid_table,"grid2xml",user);
     if (metautils::args.update_db) {
 	std::string flags;
 	if (!metautils::args.update_summary) {
@@ -948,7 +948,7 @@ int main(int argc,char **argv)
     }
   }
   if (inv_stream.is_open()) {
-    metadata::close_inventory(inv_file,&inv_dir,inv_stream,"GrML",true,metautils::args.update_summary,"grid2xml",user);
+    gatherxml::fileInventory::close(inv_file,&inv_dir,inv_stream,"GrML",true,metautils::args.update_summary,"grid2xml",user);
   }
   return 0;
 }
