@@ -158,7 +158,11 @@ ifeq ($(OKAYTOMAKE),1)
 ifeq ($(strip $(VERSION)),)
 	$(error no version number given)
 else
+<<<<<<< HEAD
 	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(JASPERRUNPATH) $(ZRUNPATH) $(SRCDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(JASPERLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lgatherxml -lgrids -ljasper -lutils -lutilsthread -lbitmap -lio -liometadata -lmetautils -lmetahelpers -lgridutils -lsearch -lxml -lerror -lpthread -lz -o $(BUILDDIR)/$@.$(VERSION)
+=======
+	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(JASPERRUNPATH) $(ZRUNPATH) $(SRCDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(JASPERLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lgatherxml -lgrids -ljasper -lutils -lutilsthread -lbitmap -lio -liometadata -lmetadata -lmetahelpers -lgridutils -lsearch -lxml -lerror -lpthread -lz -o $(BUILDDIR)/$@.$(VERSION)
+>>>>>>> b49c78b5e61914f06b3eedf9105add2f3ebe0477
 endif
 endif
 #
@@ -185,7 +189,11 @@ ifeq ($(OKAYTOMAKE),1)
 ifeq ($(strip $(VERSION)),)
 	$(error no version number given)
 else
+<<<<<<< HEAD
 	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(SRCDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -lmysql -lmysqlclient -lgatherxml -lutils -lutilsthread -lbitmap -lmetautils -lmetahelpers -lsearch -lxml -lgridutils -lpthread -lz -o $(BUILDDIR)/$@.$(VERSION)
+=======
+	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(SRCDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -lmysql -lmysqlclient -lgatherxml -lutils -lutilsthread -lbitmap -lmetadata -lmetahelpers -lsearch -lxml -lgridutils -lpthread -lz -o $(BUILDDIR)/$@.$(VERSION)
+>>>>>>> b49c78b5e61914f06b3eedf9105add2f3ebe0477
 endif
 endif
 #
