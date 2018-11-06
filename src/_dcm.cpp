@@ -4,10 +4,10 @@
 #include <sstream>
 #include <regex>
 #include <unordered_set>
+#include <gatherxml.hpp>
 #include <MySQL.hpp>
 #include <strutils.hpp>
 #include <utils.hpp>
-#include <metadata.hpp>
 #include <search.hpp>
 #include <myerror.hpp>
 
@@ -445,7 +445,7 @@ extern "C" void *t_summarize_frequencies(void *ts)
 {
   ThreadStruct *t=(ThreadStruct *)ts;
 
-  summarizeMetadata::summarize_frequencies(t->strings[0],"dcm",user);
+  gatherxml::summarizeMetadata::summarize_frequencies(t->strings[0],"dcm",user);
   return nullptr;
 }
 
@@ -453,7 +453,7 @@ extern "C" void *t_summarize_grids(void *ts)
 {
   ThreadStruct *t=(ThreadStruct *)ts;
 
-  summarizeMetadata::grids::summarize_grids(t->strings[0],"dcm",user);
+  gatherxml::summarizeMetadata::summarize_grids(t->strings[0],"dcm",user);
   return nullptr;
 }
 
@@ -461,7 +461,7 @@ extern "C" void *t_aggregate_grids(void *ts)
 {
   ThreadStruct *t=(ThreadStruct *)ts;
 
-  summarizeMetadata::grids::aggregate_grids(t->strings[0],"dcm",user);
+  gatherxml::summarizeMetadata::aggregate_grids(t->strings[0],"dcm",user);
   return nullptr;
 }
 
@@ -469,25 +469,25 @@ extern "C" void *t_summarize_grid_levels(void *ts)
 {
   ThreadStruct *t=(ThreadStruct *)ts;
 
-  summarizeMetadata::gridLevels::summarize_grid_levels(t->strings[0],"dcm",user);
+  gatherxml::summarizeMetadata::summarize_grid_levels(t->strings[0],"dcm",user);
   return nullptr;
 }
 
 extern "C" void *t_summarize_grid_resolutions(void *)
 {
-  summarizeMetadata::grids::summarize_grid_resolutions("dcm",user,"");
+  gatherxml::summarizeMetadata::summarize_grid_resolutions("dcm",user,"");
   return nullptr;
 }
 
 extern "C" void *t_create_file_list_cache(void *)
 {
-  summarizeMetadata::create_file_list_cache("MSS","dcm",user);
+  gatherxml::summarizeMetadata::create_file_list_cache("MSS","dcm",user);
   return nullptr;
 }
 
 extern "C" void *t_generate_detailed_metadata_view(void *)
 {
-  summarizeMetadata::detailedMetadata::generate_detailed_metadata_view("dcm",user);
+  gatherxml::detailedMetadata::generate_detailed_metadata_view("dcm",user);
   return nullptr;
 }
 
@@ -553,10 +553,10 @@ int main(int argc,char **argv)
     }
   }
   for (const auto& gindex : mss_gindex_set) {
-    summarizeMetadata::detailedMetadata::generate_group_detailed_metadata_view(gindex,"MSS","dcm",user);
+    gatherxml::detailedMetadata::generate_group_detailed_metadata_view(gindex,"MSS","dcm",user);
   }
   for (const auto& gindex : web_gindex_set) {
-    summarizeMetadata::detailedMetadata::generate_group_detailed_metadata_view(gindex,"Web","dcm",user);
+    gatherxml::detailedMetadata::generate_group_detailed_metadata_view(gindex,"Web","dcm",user);
   }
   std::stringstream oss,ess;
   if (removed_from_GrML) {
@@ -586,9 +586,9 @@ int main(int argc,char **argv)
   }
   if (removed_from_WGrML) {
     clear_grid_cache("WGrML");
-    summarizeMetadata::grids::summarize_grids("WGrML","dcm",user);
-    summarizeMetadata::grids::aggregate_grids("WGrML","dcm",user);
-    summarizeMetadata::gridLevels::summarize_grid_levels("WGrML","dcm",user);
+    gatherxml::summarizeMetadata::summarize_grids("WGrML","dcm",user);
+    gatherxml::summarizeMetadata::aggregate_grids("WGrML","dcm",user);
+    gatherxml::summarizeMetadata::summarize_grid_levels("WGrML","dcm",user);
     if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" -rw",oss,ess) < 0) {
 	std::cerr << ess.str() << std::endl;
     }
@@ -597,8 +597,8 @@ int main(int argc,char **argv)
     }
   }
   if (removed_from_ObML) {
-    summarizeMetadata::summarize_frequencies("dcm",user);
-    summarizeMetadata::obsData::summarize_obs_data("dcm",user);
+    gatherxml::summarizeMetadata::summarize_frequencies("dcm",user);
+    gatherxml::summarizeMetadata::summarize_obs_data("dcm",user);
     if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" -rm",oss,ess) < 0)
 	std::cerr << ess.str() << std::endl;
     if (metautils::args.update_graphics) {
@@ -619,8 +619,8 @@ int main(int argc,char **argv)
 	std::cerr << ess.str() << std::endl;
   }
   if (removed_from_FixML) {
-    summarizeMetadata::summarize_frequencies("dcm",user);
-    summarizeMetadata::fixData::summarize_fix_data("dcm",user);
+    gatherxml::summarizeMetadata::summarize_frequencies("dcm",user);
+    gatherxml::summarizeMetadata::summarize_fix_data("dcm",user);
     if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" -rm",oss,ess) < 0) {
 	std::cerr << ess.str() << std::endl;
     }
@@ -638,19 +638,19 @@ int main(int argc,char **argv)
     }
   }
   for (const auto& tindex : mss_tindex_set) {
-    summarizeMetadata::create_file_list_cache("MSS","dcm",user,tindex);
+    gatherxml::summarizeMetadata::create_file_list_cache("MSS","dcm",user,tindex);
   }
   if (create_Web_filelist_cache) {
-    summarizeMetadata::create_file_list_cache("Web","dcm",user);
+    gatherxml::summarizeMetadata::create_file_list_cache("Web","dcm",user);
   }
   for (const auto& tindex : web_tindex_set) {
-    summarizeMetadata::create_file_list_cache("Web","dcm",user,tindex);
+    gatherxml::summarizeMetadata::create_file_list_cache("Web","dcm",user,tindex);
   }
   if (create_inv_filelist_cache) {
-    summarizeMetadata::create_file_list_cache("inv","dcm",user);
+    gatherxml::summarizeMetadata::create_file_list_cache("inv","dcm",user);
   }
   for (const auto& tindex : inv_tindex_set) {
-    summarizeMetadata::create_file_list_cache("inv","dcm",user,tindex);
+    gatherxml::summarizeMetadata::create_file_list_cache("inv","dcm",user,tindex);
   }
   if (files.size() > 0) {
     std::cerr << "Warning: content metadata for the following files was not removed (maybe it never existed?):";
