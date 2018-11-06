@@ -117,7 +117,7 @@ void summarize_grids(std::string database,std::string caller,std::string user,st
   }
   std::string qspec;
   if (!fileID_code.empty()) {
-    qspec="select "+fileID+"_code,timeRange_code,gridDefinition_code,parameter,levelType_codes,start_date,end_date from "+database+".ds"+dsnum2+"_grids where p.code = "+fileID_code;
+    qspec="select "+fileID+"_code,timeRange_code,gridDefinition_code,parameter,levelType_codes,start_date,end_date from "+database+".ds"+dsnum2+"_grids where code = "+fileID_code;
   }
   else {
     qspec="select "+fileID+"_code,timeRange_codes,gridDefinition_codes,parameter,levelType_codes,start_date,end_date from "+database+".ds"+dsnum2+"_agrids";
