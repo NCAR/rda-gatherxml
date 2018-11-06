@@ -95,57 +95,108 @@ void summarize_grids(std::string database,std::string caller,std::string user,st
     fileID="webID";
   }
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
-  MySQL::LocalQuery query;
-  if (!fileID_code.empty()) {
-    query.set("select f.code,g.timeRange_code,g.gridDefinition_code,g.parameter,g.levelType_codes,g.start_date,g.end_date from "+database+".ds"+dsnum2+"_grids as g left join "+database+".ds"+dsnum2+filetable+" as p on p.code = g."+fileID+"_code left join "+database+".formats as f on f.code = p.format_code where p.code = "+fileID_code);
-  }
-  else {
-    query.set("select distinct f.code,a.timeRange_codes,a.gridDefinition_codes,a.parameter,a.levelType_codes,min(a.start_date),max(a.end_date) from "+database+".ds"+dsnum2+"_agrids as a left join "+database+".ds"+dsnum2+filetable+" as p on p.code = a."+fileID+"_code left join "+database+".formats as f on f.code = p.format_code where !isnull(f.code) group by f.code,a.timeRange_codes,a.gridDefinition_codes,a.parameter,a.levelType_codes");
-  }
+  MySQL::LocalQuery query("select distinct f.code from "+database+".ds"+dsnum2+filetable+" as p left join "+database+".formats as f on f.code = p.format_code");
   if (query.submit(server) < 0) {
     metautils::log_error("summarize_grids(): "+query.error()+" for query '"+query.show()+"'",caller,user);
   }
-  std::vector<size_t> time_range_values,grid_definition_values;
+  std::string format_code;
+  std::unordered_map<std::string,std::string> file_formats;
+  if (query.num_rows() == 1) {
+    MySQL::Row row;
+    query.fetch_row(row);
+    format_code=row[0];
+  }
+  else {
+    query.set("select p.code,f.code from "+database+".ds"+dsnum2+filetable+" as p left join "+database+".formats as f on f.code = p.format_code where !isnull(f.code)");
+    if (query.submit(server) < 0) {
+	metautils::log_error("summarize_grids(): "+query.error()+" for query '"+query.show()+"'",caller,user);
+    }
+    for (const auto& row : query) {
+        file_formats.emplace(row[0],row[1]);
+    }
+  }
+  std::string qspec;
+  if (!fileID_code.empty()) {
+    qspec="select "+fileID+"_code,timeRange_code,gridDefinition_code,parameter,levelType_codes,start_date,end_date from "+database+".ds"+dsnum2+"_grids where p.code = "+fileID_code;
+  }
+  else {
+    qspec="select "+fileID+"_code,timeRange_codes,gridDefinition_codes,parameter,levelType_codes,start_date,end_date from "+database+".ds"+dsnum2+"_agrids";
+  }
+  MySQL::Query squery(qspec);
+  if (squery.submit(server) < 0) {
+    metautils::log_error("summarize_grids(): "+squery.error()+" for query '"+squery.show()+"'",caller,user);
+  }
+  std::unordered_map<std::string,std::vector<size_t>> time_range_bitmaps,grid_definition_bitmaps,level_value_bitmaps;
   my::map<GridSummaryEntry> summary_table(99999);
-  MySQL::Row row;
-  while (query.fetch_row(row)) {
+  for (const auto& row : squery) {
+    std::vector<size_t> time_range_values,grid_definition_values;
     if (!fileID_code.empty()) {
-	time_range_values.clear();
 	time_range_values.emplace_back(std::stoi(row[1]));
-	grid_definition_values.clear();
 	grid_definition_values.emplace_back(std::stoi(row[2]));
     }
     else {
-	bitmap::uncompress_values(row[1],time_range_values);
-	bitmap::uncompress_values(row[2],grid_definition_values);
+	auto tr=time_range_bitmaps.find(row[1]);
+	if (tr == time_range_bitmaps.end()) {
+	  bitmap::uncompress_values(row[1],time_range_values);
+	  time_range_bitmaps.emplace(row[1],time_range_values);
+	}
+	else {
+	  time_range_values=tr->second;
+	}
+	auto gd=grid_definition_bitmaps.find(row[2]);
+	if (gd == grid_definition_bitmaps.end()) {
+	  bitmap::uncompress_values(row[2],grid_definition_values);
+	  grid_definition_bitmaps.emplace(row[2],grid_definition_values);
+	}
+	else {
+	  grid_definition_values=gd->second;
+	}
     }
     std::vector<size_t> level_values;
-    bitmap::uncompress_values(row[4],level_values);
+    auto lv=level_value_bitmaps.find(row[4]);
+    if (lv == level_value_bitmaps.end()) {
+	bitmap::uncompress_values(row[4],level_values);
+	level_value_bitmaps.emplace(row[4],level_values);
+    }
+    else {
+	level_values=lv->second;
+    }
     for (const auto& time_range_value : time_range_values) {
 	for (const auto& grid_definition_value : grid_definition_values) {
 	  GridSummaryEntry gse;
-	  gse.key=row[0]+","+strutils::itos(time_range_value)+","+strutils::itos(grid_definition_value)+",'"+row[3]+"'";
-	  if (!summary_table.found(gse.key,gse)) {
-	    gse.data.reset(new GridSummaryEntry::Data);
-	    gse.data->start=std::stoll(row[5]);
-	    gse.data->end=std::stoll(row[6]);
-	    for (const auto& level_value : level_values) {
-		gse.data->level_code_set.emplace(level_value);
-	    }
-	    summary_table.insert(gse);
+	  if (file_formats.size() == 0) {
+	    gse.key=format_code;
 	  }
 	  else {
-	    auto date=std::stoll(row[5]);
-	    if (date < gse.data->start) {
-		gse.data->start=date;
+	    auto ff=file_formats.find(row[0]);
+	    if (ff != file_formats.end()) {
+		gse.key=ff->second;
 	    }
-	    date=std::stoll(row[6]);
-	    if (date > gse.data->end) {
-		gse.data->end=date;
-	    }
-	    for (const auto& level_value : level_values) {
-		if (gse.data->level_code_set.find(level_value) == gse.data->level_code_set.end()) {
+	  }
+	  if (!gse.key.empty()) {
+	    gse.key+=","+strutils::itos(time_range_value)+","+strutils::itos(grid_definition_value)+",'"+row[3]+"'";
+	    if (!summary_table.found(gse.key,gse)) {
+		gse.data.reset(new GridSummaryEntry::Data);
+		gse.data->start=std::stoll(row[5]);
+		gse.data->end=std::stoll(row[6]);
+		for (const auto& level_value : level_values) {
 		  gse.data->level_code_set.emplace(level_value);
+		}
+		summary_table.insert(gse);
+	    }
+	    else {
+		auto date=std::stoll(row[5]);
+		if (date < gse.data->start) {
+		  gse.data->start=date;
+		}
+		date=std::stoll(row[6]);
+		if (date > gse.data->end) {
+		  gse.data->end=date;
+		}
+		for (const auto& level_value : level_values) {
+		  if (gse.data->level_code_set.find(level_value) == gse.data->level_code_set.end()) {
+		    gse.data->level_code_set.emplace(level_value);
+		  }
 		}
 	    }
 	  }
@@ -179,6 +230,7 @@ void summarize_grids(std::string database,std::string caller,std::string user,st
 	  if (q.submit(server) < 0) {
 	    metautils::log_error("summarize_grids(): "+q.error(),caller,user);
 	  }
+	  MySQL::Row row;
 	  q.fetch_row(row);
 	  std::vector<size_t> level_values;
 	  bitmap::uncompress_values(row[0],level_values);
