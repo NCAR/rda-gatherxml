@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <signal.h>
+#include <gatherxml.hpp>
 #include <hdf.hpp>
 #include <netcdf.hpp>
 #include <metadata.hpp>
@@ -86,12 +87,12 @@ struct InvEntry {
   std::string key;
   int num;
 };
-my::map<metadata::GrML::GridEntry> *grid_table=nullptr;
-metadata::GrML::GridEntry *gentry;
-metadata::GrML::LevelEntry *lentry;
-metadata::GrML::ParameterEntry *param_entry;
+my::map<gatherxml::markup::GrML::GridEntry> *grid_table=nullptr;
+gatherxml::markup::GrML::GridEntry *gentry;
+gatherxml::markup::GrML::LevelEntry *lentry;
+gatherxml::markup::GrML::ParameterEntry *param_entry;
 std::unordered_set<std::string> unique_observation_table,unique_data_type_observation_set;
-metadata::ObML::DataTypeEntry de;
+gatherxml::markup::ObML::DataTypeEntry de;
 size_t num_not_missing=0;
 std::string cmd_type="";
 enum {GrML_type=1,ObML_type};
@@ -196,10 +197,10 @@ extern "C" void int_handler(int)
 void grid_initialize()
 {
   if (grid_table == nullptr) {
-    grid_table=new my::map<metadata::GrML::GridEntry>;
-    gentry=new metadata::GrML::GridEntry;
-    lentry=new metadata::GrML::LevelEntry;
-    param_entry=new metadata::GrML::ParameterEntry;
+    grid_table=new my::map<gatherxml::markup::GrML::GridEntry>;
+    gentry=new gatherxml::markup::GrML::GridEntry;
+    lentry=new gatherxml::markup::GrML::LevelEntry;
+    param_entry=new gatherxml::markup::GrML::ParameterEntry;
   }
 }
 
@@ -557,18 +558,18 @@ wss << "unknown ID type (3) for station '"+le.data->id+"' "+strutils::ftos(le.da
   return ientry_key;
 }
 
-void scan_ispd_hdf5_file(InputHDF5Stream& istream,metadata::ObML::ObservationData& obs_data)
+void scan_ispd_hdf5_file(InputHDF5Stream& istream,gatherxml::markup::ObML::ObservationData& obs_data)
 {
   InputHDF5Stream::CompoundDatatype cpd;
   int m,l;
   InputHDF5Stream::DataValue dv;
   my::map<LibEntry> stn_library(9999);
   LibEntry le;
-  metadata::ObML::IDEntry ientry;
+  gatherxml::markup::ObML::IDEntry ientry;
   std::string timestamp,sdum;
   DateTime dt;
   double v[3]={0.,0.,0.};
-  metadata::ObML::DataTypeEntry de;
+  gatherxml::markup::ObML::DataTypeEntry de;
 
 // load the station library
   auto ds=istream.dataset("/Data/SpatialTemporalLocation/SpatialTemporalLocation");
@@ -939,7 +940,7 @@ void scan_ispd_hdf5_file(InputHDF5Stream& istream,metadata::ObML::ObservationDat
   write_type=ObML_type;
 }
 
-void scan_usarray_transportable_hdf5_file(InputHDF5Stream& istream,ScanData& scan_data,metadata::ObML::ObservationData& obs_data)
+void scan_usarray_transportable_hdf5_file(InputHDF5Stream& istream,ScanData& scan_data,gatherxml::markup::ObML::ObservationData& obs_data)
 {
   obs_data.set_track_unique_observations(false);
 // load the pressure dataset
@@ -964,7 +965,7 @@ void scan_usarray_transportable_hdf5_file(InputHDF5Stream& istream,ScanData& sca
   int num_values=0;
   float pres_miss_val=3.e48;
   short numeric_id=-1;
-  metadata::ObML::IDEntry ientry;
+  gatherxml::markup::ObML::IDEntry ientry;
   metautils::StringEntry se;
   std::string platform_type,datatype;
   float lat=-1.e38,lon=-1.e38;
@@ -1034,7 +1035,7 @@ void scan_usarray_transportable_hdf5_file(InputHDF5Stream& istream,ScanData& sca
 	++num_not_missing;
     }
   }
-  metadata::ObML::DataTypeEntry dte;
+  gatherxml::markup::ObML::DataTypeEntry dte;
   ientry.data->data_types_table.found(datatype,dte);
   ientry.data->nsteps=dte.data->nsteps=num_not_missing;
   scan_data.map_name=unixutils::remote_web_file("https://rda.ucar.edu/metadata/ParameterTables/HDF5.ds"+metautils::args.dsnum+".xml",scan_data.tdir->name());
@@ -1563,7 +1564,7 @@ void process_units_attribute(const InputHDF5Stream::DatasetEntry& ds_entry,Discr
   }
 }
 
-void scan_cf_point_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data,metadata::ObML::ObservationData& obs_data)
+void scan_cf_point_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data,gatherxml::markup::ObML::ObservationData& obs_data)
 {
   auto ds_entry_list=istream.datasets_with_attribute("units");
   DiscreteGeometriesData dgd;
@@ -1644,7 +1645,7 @@ void scan_cf_point_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data,met
   lats.reserve(time_vals.num_values);
   lons.reserve(time_vals.num_values);
   std::string platform_type="unknown";
-  metadata::ObML::IDEntry ientry;
+  gatherxml::markup::ObML::IDEntry ientry;
   ientry.key.reserve(32768);
   for (const auto& ds_entry : ds_entry_list) {
     if (ds_entry.key != dgd.indexes.time_var && ds_entry.key != dgd.indexes.lat_var && ds_entry.key != dgd.indexes.lon_var && ds_entry.key != dgd.indexes.stn_id_var) {
@@ -1752,7 +1753,7 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
   }
   auto found_time=false;
   grid_initialize();
-  metadata::open_inventory(inv_file,&inv_dir,inv_stream,"GrML","hdf2xml",user);
+  gatherxml::fileInventory::open(inv_file,&inv_dir,inv_stream,"GrML","hdf2xml",user);
   scan_data.map_name=unixutils::remote_web_file("https://rda.ucar.edu/metadata/ParameterTables/netCDF4.ds"+metautils::args.dsnum+".xml",scan_data.tdir->name());
 // rename the parameter map so that it is not overwritten by the level map,
 //   which has the same name
@@ -2476,7 +2477,7 @@ inv_R_table.insert(ie);
   }
 }
 
-void scan_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data,metadata::ObML::ObservationData& obs_data)
+void scan_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data,gatherxml::markup::ObML::ObservationData& obs_data)
 {
   auto ds=istream.dataset("/");
   if (ds == nullptr) {
@@ -2508,7 +2509,7 @@ void scan_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data,metadata::Ob
 
 void scan_hdf5_file(std::list<std::string>& filelist,ScanData& scan_data)
 {
-  metadata::ObML::ObservationData obs_data;
+  gatherxml::markup::ObML::ObservationData obs_data;
   InputHDF5Stream istream;
   for (const auto& file : filelist) {
     if (!istream.open(file.c_str())) {
@@ -2533,7 +2534,7 @@ void scan_hdf5_file(std::list<std::string>& filelist,ScanData& scan_data)
   if (write_type == GrML_type) {
     cmd_type="GrML";
     if (!metautils::args.inventory_only) {
-	xml_directory=metadata::GrML::write_grml(*grid_table,"hdf2xml",user);
+	xml_directory=gatherxml::markup::GrML::write(*grid_table,"hdf2xml",user);
     }
     grid_finalize();
   }
@@ -2541,7 +2542,7 @@ void scan_hdf5_file(std::list<std::string>& filelist,ScanData& scan_data)
     if (num_not_missing > 0) {
 	metautils::args.data_format="hdf5";
 	cmd_type="ObML";
-	metadata::ObML::write_obml(obs_data,"hdf2xml",user);
+	gatherxml::markup::ObML::write(obs_data,"hdf2xml",user);
     }
     else {
 	metautils::log_error("all stations have missing location information - no usable data found; no content metadata will be saved for this file","hdf2xml",user);
@@ -2686,6 +2687,6 @@ int main(int argc,char **argv)
     for (const auto& line : inv_lines) {
 	inv_stream << line << std::endl;
     }
-    metadata::close_inventory(inv_file,&inv_dir,inv_stream,"GrML",true,true,"hdf2xml",user);
+    gatherxml::fileInventory::close(inv_file,&inv_dir,inv_stream,"GrML",true,true,"hdf2xml",user);
   }
 }
