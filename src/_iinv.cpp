@@ -6,12 +6,14 @@
 #include <regex>
 #include <sstream>
 #include <unordered_map>
+#include <gatherxml.hpp>
 #include <strutils.hpp>
 #include <gridutils.hpp>
 #include <utils.hpp>
 #include <bitmap.hpp>
 #include <MySQL.hpp>
 #include <metadata.hpp>
+#include <metahelpers.hpp>
 #include <tempfile.hpp>
 #include <myerror.hpp>
 
@@ -800,9 +802,9 @@ void check_for_times_table(MySQL::Server& server,std::string type,std::string la
 void process_IDs(std::string type,MySQL::Server& server,std::string ID_index,std::string ID_data,std::unordered_map<std::string,std::string>& id_table)
 {
   auto id_parts=strutils::split(ID_data,"[!]");
-  std::string qspec="select i.code from WObML.ds"+local_args.dsnum2+"_IDs2 as i left join WObML.IDTypes as t on t.code = i.IDType_code where i.ID = '"+id_parts[1]+"' and t.IDType = '"+id_parts[0]+"' and i.sw_lat = "+metadata::ObML::string_coordinate_to_db(id_parts[2])+" and i.sw_lon = "+metadata::ObML::string_coordinate_to_db(id_parts[3]);
+  std::string qspec="select i.code from WObML.ds"+local_args.dsnum2+"_IDs2 as i left join WObML.IDTypes as t on t.code = i.IDType_code where i.ID = '"+id_parts[1]+"' and t.IDType = '"+id_parts[0]+"' and i.sw_lat = "+metatranslations::string_coordinate_to_db(id_parts[2])+" and i.sw_lon = "+metatranslations::string_coordinate_to_db(id_parts[3]);
   if (id_parts.size() > 4) {
-    qspec+=" and i.ne_lat = "+metadata::ObML::string_coordinate_to_db(id_parts[4])+" and ne_lon = "+metadata::ObML::string_coordinate_to_db(id_parts[5]);
+    qspec+=" and i.ne_lat = "+metatranslations::string_coordinate_to_db(id_parts[4])+" and ne_lon = "+metatranslations::string_coordinate_to_db(id_parts[5]);
   }
   MySQL::LocalQuery query(qspec);
   MySQL::Row row;
@@ -1191,7 +1193,7 @@ metautils::log_error("insert_obml_netcdf_point_inventory() can't insert for obse
 		times.str("");
 	    }
 	    auto tparts=strutils::split(sp[2],"[!]");
-	    times << ",(" << tparts[0] << "," << sp[1] << "," << metadata::ObML::string_coordinate_to_db(tparts[1]) << "," << metadata::ObML::string_coordinate_to_db(tparts[2]) << "," << web_ID_code << ",'" << uflag << "')";
+	    times << ",(" << tparts[0] << "," << sp[1] << "," << metatranslations::string_coordinate_to_db(tparts[1]) << "," << metatranslations::string_coordinate_to_db(tparts[2]) << "," << web_ID_code << ",'" << uflag << "')";
 	    times_list.emplace_back(sp[2]);
 	    last_decade=this_decade;
 	    break;
@@ -1718,9 +1720,9 @@ exit(0);
   temp_dir.create(metautils::directives.temp_path);
   insert_inventory();
   if (local_args.create_cache) {
-    summarizeMetadata::create_file_list_cache("inv","iinv",user);
+    gatherxml::summarizeMetadata::create_file_list_cache("inv","iinv",user);
     if (!tindex.empty() && tindex != "0") {
-	summarizeMetadata::create_file_list_cache("inv","iinv",user,tindex);
+	gatherxml::summarizeMetadata::create_file_list_cache("inv","iinv",user,tindex);
     }
   }
   if (local_args.notify) {
