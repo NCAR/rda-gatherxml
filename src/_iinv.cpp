@@ -438,6 +438,9 @@ void insert_grml_inventory()
 		  else if (std::stoi(gdef_params[0]) == Grid::gaussianLatitudeLongitudeType) {
 		    definition="gaussLatLon";
 		  }
+		  if (gdef_params[0].back() == 'C') {
+		    definition+="Cell";
+		  }
 		  definition_parameters=gdef_params[1]+":"+gdef_params[2]+":";
 		  if (gdef_params[3][0] == '-') {
 		    definition_parameters+=gdef_params[3].substr(1)+"S:";
