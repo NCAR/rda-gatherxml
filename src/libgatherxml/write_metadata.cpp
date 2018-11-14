@@ -41,6 +41,7 @@ void close(std::string filename,TempDir **tdir,std::ofstream& ofs,std::string cm
     unixutils::mysystem2(iinv_command,output,error);
     if (!error.str().empty()) {
 	metautils::log_warning("close(): '"+error.str()+"' while running iinv",caller,user);
+	(*tdir)->set_keep();
     }
   }
   if (*tdir != nullptr) {
