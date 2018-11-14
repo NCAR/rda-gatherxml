@@ -1679,7 +1679,7 @@ void insert_inventory()
     if (!local_args.wms_only) {
 	insert_grml_inventory();
     }
-    build_wms_capabilities();
+//    build_wms_capabilities();
   }
   else if (ext == "ObML_inv") {
     insert_obml_inventory();
