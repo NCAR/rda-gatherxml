@@ -1692,6 +1692,9 @@ int main(int argc,char **argv)
     metautils::log_error("unable to determine dataset type","dsgen",user);
   }
   dataset_type=row[0];
+  if (dataset_type != "P" && dataset_type != "H") {
+    no_dset_waf=true;
+  }
   TempDir dataset_doc_dir;
   if (!dataset_doc_dir.create(metautils::directives.temp_path)) {
     metautils::log_error("unable to create temporary document directory","dsgen",user);
