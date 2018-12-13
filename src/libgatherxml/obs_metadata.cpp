@@ -282,7 +282,9 @@ bool summarize_obs_data(std::string caller,std::string user)
   my::map<SummaryEntry> summary_table;
   for (const auto& res : query) {
     CodeEntry ce;
-    mss_table.found(res[0],ce);
+    if (!mss_table.found(res[0],ce)) {
+	metautils::log_error("summarize_obs_data() found an mssID ("+res[0]+") in ObML.ds"+dsnum2+"_locations that doesn't exist in ObML.ds"+dsnum2+"_primaries",caller,user);
+    }
     SummaryEntry se;
     se.key=ce.code+"<!>"+res[1]+"<!>"+res[2]+"<!>"+res[5];
     if (!summary_table.found(se.key,se)) {
@@ -330,7 +332,7 @@ bool summarize_obs_data(std::string caller,std::string user)
     auto sp=strutils::split(key,"<!>");
     SummaryEntry se;
     summary_table.found(key,se);
-    if (server.insert("search.obs_data","'"+metautils::args.dsnum+"',"+sp[0]+","+sp[1]+","+sp[2]+",'"+se.start_date+"','"+se.end_date+"',"+sp[3]+",'"+se.box1d_bitmap+"'") < 0) {
+    if (server.insert("search.obs_data","'"+metautils::args.dsnum+"',"+sp[0]+","+sp[1]+","+sp[2]+","+se.start_date+","+se.end_date+","+sp[3]+",'"+se.box1d_bitmap+"'") < 0) {
 	error=server.error();
 	if (!strutils::has_beginning(error,"Duplicate entry")) {
 	  std::cerr << error << std::endl;
