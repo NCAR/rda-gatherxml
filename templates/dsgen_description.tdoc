@@ -43,9 +43,28 @@
 <table class="fs16px" width="100%" cellspacing="10" cellpadding="0" border="0">
 @
 @ YouTube tutorial
-<tr style="vertical-align: bottom">
-<td class="bold nowrap">Help with this page:</td>
-<td><a href="http://ncarrda.blogspot.com/search/label/Tutorial+YouTube+Description" target="_tutorial">RDA dataset description page video tour</a></td>
+@<tr style="vertical-align: bottom">
+@td class="bold nowrap">Help with this page:</td>
+@td><a href="http://ncarrda.blogspot.com/search/label/Tutorial+YouTube+Description" target="_tutorial">RDA dataset description page video tour</a></td>
+@/tr>
+@
+@ Data Citations
+<tr style="vertical-align: top">
+<td class="bold nowrap">Data Citations:</td>
+<td>This dataset has been cited __NUM_DATA_CITATIONS__.<br />
+#IF __HAS_DATA_CITATIONS__
+<span id="DDC0"><a href="javascript:swapDivs('DC0','DC1')" title="Expand the list of works that cited this dataset"><img src="/images/triangle.gif" width="12" height="15" border="0" /><span class="fs13px">Published works that cited this dataset</span></a></span>
+<span style="visibility: hidden; position: absolute; top: 0" id="DDC1"><a href="javascript:swapDivs('DC1','DC0')" title="Collapse the list of works that cited this dataset"><img src="/images/triangle90.gif" width="15" height="12" border="0" /></a><span class="fs13px">Published works that cited this dataset:
+<div style="margin-bottom: 5px"></div>
+#REPEAT __DATA_CITER__
+!REPIF __DATA_CITER__.YEAR
+<div style="margin-left: 10px; margin-bottom: 5px; font-size: 15px; font-weight: bold">__DATA_CITER__.YEAR</div>
+!ENDREPIF __DATA_CITER__.YEAR
+<div style="margin-left: 10px; margin-bottom: 5px">__DATA_CITER__.CITATION</div>
+#ENDREPEAT __DATA_CITER__
+</span></span>
+#ENDIF __HAS_DATA_CITATIONS__
+</td>
 </tr>
 @
 @ Abstract
@@ -310,25 +329,6 @@ __RELATED_DATASETS__
 <td class="bold nowrap">Metadata Record:</td>
 <td><div id="meta_record" style="display: inline; float: left"></div><img src="/images/transpace.gif" width="1" height="1" onload="getAjaxContent('GET',null,'/cgi-bin/datasets/showMetadata?dsnum=__DSNUM__','meta_record')" /></td>
 </tr>
-@
-@ Data Citations
-#IF __HAS_DATA_CITATIONS__
-<tr style="vertical-align: top">
-<td class="bold nowrap">Data Citations:</td>
-<td>This dataset has been cited __NUM_DATA_CITATIONS__.<br />
-<span id="DDC0"><a href="javascript:swapDivs('DC0','DC1')" title="Expand the list of works that cited this dataset"><img src="/images/triangle.gif" width="12" height="15" border="0" /><span class="fs13px">Published works that cited this dataset</span></a></span>
-<span style="visibility: hidden; position: absolute; top: 0" id="DDC1"><a href="javascript:swapDivs('DC1','DC0')" title="Collapse the list of works that cited this dataset"><img src="/images/triangle90.gif" width="15" height="12" border="0" /></a><span class="fs13px">Published works that cited this dataset:
-<div style="margin-bottom: 5px"></div>
-#REPEAT __DATA_CITER__
-!REPIF __DATA_CITER__.YEAR
-<div style="margin-left: 10px; margin-bottom: 5px; font-size: 15px; font-weight: bold">__DATA_CITER__.YEAR</div>
-!ENDREPIF __DATA_CITER__.YEAR
-<div style="margin-left: 10px; margin-bottom: 5px">__DATA_CITER__.CITATION</div>
-#ENDREPEAT __DATA_CITER__
-</span></span>
-</td>
-</tr>
-#ENDIF __HAS_DATA_CITATIONS__
 @
 @ !! DON'T PUT ANYTHING BELOW THIS LINE !!
 </table>
