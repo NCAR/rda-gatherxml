@@ -1513,7 +1513,7 @@ void generate_description(std::string type,std::string tdir_name)
   }
 // data citations
   query.set("select distinct d.DOI_work from citation.data_citations as d left join dssdb.dsvrsn as v on v.doi = d.DOI_data where v.dsid = 'ds"+metautils::args.dsnum+"'");
-  if (query.submit(server) == 0 && query.num_rows() > 0) {
+  if (query.submit(server) == 0) {
     std::vector<std::tuple<std::string,std::string>> citations;
     for (const auto& row : query) {
 	auto doi=row[0];
@@ -1626,11 +1626,11 @@ void generate_description(std::string type,std::string tdir_name)
     }
     if (citations.size() > 0) {
 	tdoc.add_if("__HAS_DATA_CITATIONS__");
-	if (query.num_rows() > 1) {
-	  tdoc.add_replacement("__NUM_DATA_CITATIONS__","<strong>"+strutils::itos(query.num_rows())+"</strong> times");
+	if (citations.size() > 1) {
+	  tdoc.add_replacement("__NUM_DATA_CITATIONS__","<strong>"+strutils::itos(citations.size())+"</strong> times");
 	}
 	else {
-	  tdoc.add_replacement("__NUM_DATA_CITATIONS__","<strong>"+strutils::itos(query.num_rows())+"</strong> time");
+	  tdoc.add_replacement("__NUM_DATA_CITATIONS__","<strong>"+strutils::itos(citations.size())+"</strong> time");
 	}
 	std::sort(citations.begin(),citations.end(),
         [](const std::tuple<std::string,std::string>& left,const std::tuple<std::string,std::string>& right) -> bool
@@ -1656,6 +1656,9 @@ void generate_description(std::string type,std::string tdir_name)
 	    tdoc.add_repeat("__DATA_CITER__","CITATION[!]"+std::get<1>(c));
 	  }
 	}
+    }
+    else {
+	tdoc.add_replacement("__NUM_DATA_CITATIONS__","<strong>0</strong> times");
     }
   }
   ofs << tdoc;
