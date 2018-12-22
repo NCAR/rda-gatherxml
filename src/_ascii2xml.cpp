@@ -3,6 +3,7 @@
 #include <signal.h>
 #include <sstream>
 #include <regex>
+#include <gatherxml.hpp>
 #include <little_r.hpp>
 #include <marine.hpp>
 #include <metadata.hpp>
@@ -18,7 +19,7 @@ std::string mywarning="";
 std::string user=getenv("USER");
 TempFile *tfile=nullptr;
 TempDir *tdir=nullptr;
-metadata::ObML::IDEntry ientry;
+gatherxml::markup::ObML::IDEntry ientry;
 enum {grml_type=1,obml_type};
 int write_type=-1;
 
@@ -104,7 +105,7 @@ struct InvEntry {
   short plat_type;
 };
 
-void scan_ghcnv3_file(metadata::ObML::ObservationData& obs_data,std::list<std::string>& filelist)
+void scan_ghcnv3_file(gatherxml::markup::ObML::ObservationData& obs_data,std::list<std::string>& filelist)
 {
   TempDir tdir;
   if (!tdir.create(metautils::directives.temp_path)) {
@@ -194,7 +195,7 @@ void scan_ghcnv3_file(metadata::ObML::ObservationData& obs_data,std::list<std::s
   }
 }
 
-void scan_little_r_file(metadata::ObML::ObservationData& obs_data,std::list<std::string>& filelist)
+void scan_little_r_file(gatherxml::markup::ObML::ObservationData& obs_data,std::list<std::string>& filelist)
 {
   const char *DATA_TYPES[10]={"Pressure","Height","Temperature","Dew point","Wind speed","Wind direction","East-west wind","North-south wind","Relative humidity","Thickness"};
   std::unique_ptr<unsigned char []> buffer;
@@ -341,7 +342,7 @@ void scan_little_r_file(metadata::ObML::ObservationData& obs_data,std::list<std:
 	    auto date_time=obs.date_time();
 	    for (size_t n=0; n < data_present.size(); ++n) {
 		if (data_present[n] == 1) {
-		  metadata::ObML::DataTypeEntry de;
+		  gatherxml::markup::ObML::DataTypeEntry de;
 		  if (!obs_data.added_to_ids(obs_type,ientry,DATA_TYPES[n],"",obs.location().latitude,obs.location().longitude,-1,&date_time)) {
 		    metautils::log_error("scan_little_r_file() returned error: '"+myerror+"' while adding ID "+ientry.key,"ascii2xml",user);
 		  }
@@ -354,7 +355,7 @@ void scan_little_r_file(metadata::ObML::ObservationData& obs_data,std::list<std:
   }
 }
 
-void scan_nodc_sea_level_file(metadata::ObML::ObservationData& obs_data,std::list<std::string>& filelist)
+void scan_nodc_sea_level_file(gatherxml::markup::ObML::ObservationData& obs_data,std::list<std::string>& filelist)
 {
   std::unique_ptr<unsigned char[]> buffer(nullptr);
   for (const auto& file : filelist) {
@@ -407,7 +408,7 @@ void scan_nodc_sea_level_file(metadata::ObML::ObservationData& obs_data,std::lis
   metautils::args.data_format.insert(0,"NODC_");
 }
 
-void scan_file(metadata::ObML::ObservationData& obs_data)
+void scan_file(gatherxml::markup::ObML::ObservationData& obs_data)
 {
   tfile=new TempFile;
   tfile->open(metautils::directives.temp_path);
@@ -462,7 +463,7 @@ int main(int argc,char **argv)
   }
   atexit(clean_up);
   metautils::cmd_register("ascii2xml",user);
-  metadata::ObML::ObservationData obs_data;
+  gatherxml::markup::ObML::ObservationData obs_data;
   scan_file(obs_data);
   std::string ext;
   if (write_type == grml_type) {
@@ -471,7 +472,7 @@ int main(int argc,char **argv)
   else if (write_type == obml_type) {
     ext="ObML";
     if (!obs_data.is_empty) {
-	metadata::ObML::write_obml(obs_data,"ascii2xml",user);
+	gatherxml::markup::ObML::write(obs_data,"ascii2xml",user);
     }
     else {
 	std::cerr << "All stations have missing location information - no usable data found; no content metadata will be saved for this file" << std::endl;
