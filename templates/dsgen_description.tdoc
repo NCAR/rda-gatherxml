@@ -43,10 +43,10 @@
 <table class="fs16px" width="100%" cellspacing="10" cellpadding="0" border="0">
 @
 @ YouTube tutorial
-@<tr style="vertical-align: bottom">
-@td class="bold nowrap">Help with this page:</td>
-@td><a href="http://ncarrda.blogspot.com/search/label/Tutorial+YouTube+Description" target="_tutorial">RDA dataset description page video tour</a></td>
-@/tr>
+<tr style="vertical-align: bottom">
+<td class="bold nowrap">Help with this page:</td>
+<td><a href="http://ncarrda.blogspot.com/search/label/Tutorial+YouTube+Description" target="_tutorial">RDA dataset description page video tour</a></td>
+</tr>
 @
 @ Data Citations
 <tr style="vertical-align: top">
@@ -70,7 +70,11 @@
 @ Abstract
 <tr style="vertical-align: top">
 <td class="bold">Abstract:</td>
-<td>__ABSTRACT__</td>
+<td>
+<div id="abstract" class="expandable">
+__ABSTRACT__
+</div>
+</td>
 </tr>
 @
 @ Acknowledgements
@@ -129,6 +133,7 @@ __TEMPORAL_RANGE__
 <tr style="vertical-align: top">
 <td class="bold">Variables:</td>
 <td>
+<div id="variables" class="expandable">
 __VARIABLES__
 #IF __HAS_DETAILED_VARIABLES__
 <a href="__DETAILED_VARIABLES_LINK__">Detailed Variable List</a><br />
@@ -145,6 +150,7 @@ __ON84_TABLE__
 #IF __HAS_VARIABLES_BY_PRODUCT__
 __VARIABLES_BY_PRODUCT__
 #ENDIF __HAS_VARIABLES_BY_PRODUCT__
+</div>
 </td>
 </tr>
 @
@@ -215,7 +221,9 @@ __DATA__CONTRIBUTORS__
 <tr style="vertical-align: __WEB_SITES_VALIGN__">
 <td class="bold">Related Resources:</td>
 <td>
+<div id="related-res" class="expandable">
 __RELATED_WEB_SITES__
+</div>
 </td>
 </tr>
 #ENDIF __HAS_RELATED_WEB_SITES__
@@ -293,9 +301,11 @@ __DATA_FORMATS__
 <tr style="vertical-align: __RELATED_DATASETS_VALIGN__">
 <td class="bold">Related RDA Datasets:</td>
 <td>
+<div id="related-ds" class="expandable">
 <table cellspacing="0" cellpadding="2" border="0">
 __RELATED_DATASETS__
 </table>
+</div>
 </td>
 </tr>
 #ENDIF __HAS_RELATED_DATASETS__
@@ -332,4 +342,5 @@ __RELATED_DATASETS__
 @
 @ !! DON'T PUT ANYTHING BELOW THIS LINE !!
 </table>
+<img src="/images/transpace.gif" width="1" height="1" onload="checkExpandableFields()" />
 #ENDELSE __IS_DEAD_DATASET__
