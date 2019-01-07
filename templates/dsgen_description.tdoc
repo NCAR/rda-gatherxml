@@ -71,7 +71,7 @@
 <tr style="vertical-align: top">
 <td class="bold">Abstract:</td>
 <td>
-<div id="abstract" class="expandable">
+<div id="exp-abstract" class="expandable">
 __ABSTRACT__
 </div>
 </td>
@@ -81,7 +81,11 @@ __ABSTRACT__
 #IF __HAS_ACKNOWLEDGEMENTS__
 <tr style="vertical-align: top">
 <td class="bold">Acknowledgements</td>
-<td>__ACKNOWLEDGEMENT__</td>
+<td>
+<div id="exp-acknowledgements" class="expandable">
+__ACKNOWLEDGEMENT__
+</div>
+</td>
 </tr>
 #ENDIF __HAS_ACKNOWLEDGEMENTS__
 @
@@ -117,7 +121,11 @@ __TEMPORAL_RANGE__
 #IF __HAS_ACCESS_RESTRICTIONS__
 <tr style="vertical-align: top">
 <td class="bold">Access Restrictions:</td>
-<td>__ACCESS_RESTRICTIONS__</td>
+<td>
+<div id="exp-access" class="expandable">
+__ACCESS_RESTRICTIONS__
+</div>
+</td>
 </tr>
 #ENDIF __HAS_ACCESS_RESTRICTIONS__
 @
@@ -125,7 +133,11 @@ __TEMPORAL_RANGE__
 #IF __HAS_USAGE_RESTRICTIONS__
 <tr style="vertical-align: top">
 <td class="bold">Usage Restrictions:</td>
-<td>__USAGE_RESTRICTIONS__</td>
+<td>
+<div id="exp-usage" class="expandable">
+__USAGE_RESTRICTIONS__
+</div>
+</td>
 </tr>
 #ENDIF __HAS_USAGE_RESTRICTIONS__
 @
@@ -133,7 +145,7 @@ __TEMPORAL_RANGE__
 <tr style="vertical-align: top">
 <td class="bold">Variables:</td>
 <td>
-<div id="variables" class="expandable">
+<div id="exp-variables" class="expandable">
 __VARIABLES__
 #IF __HAS_DETAILED_VARIABLES__
 <a href="__DETAILED_VARIABLES_LINK__">Detailed Variable List</a><br />
@@ -159,7 +171,9 @@ __VARIABLES_BY_PRODUCT__
 <tr style="vertical-align: top">
 <td class="bold nowrap">Vertical Levels:</td>
 <td>
+<div id="exp-levels" class="expandable">
 __VERTICAL_LEVELS__
+</div>
 </td>
 </tr>
 #ENDIF __HAS_VERTICAL_LEVELS__
@@ -221,7 +235,7 @@ __DATA__CONTRIBUTORS__
 <tr style="vertical-align: __WEB_SITES_VALIGN__">
 <td class="bold">Related Resources:</td>
 <td>
-<div id="related-res" class="expandable">
+<div id="exp-related-res" class="expandable">
 __RELATED_WEB_SITES__
 </div>
 </td>
@@ -240,7 +254,9 @@ __RELATED_WEB_SITES__
 <tr style="vertical-align: top">
 <td class="bold">Publications:</td>
 <td>
+<div id="exp-publications" class="expandable">
 __PUBLICATIONS__
+</div>
 </td>
 </tr>
 #ENDIF __HAS_PUBLICATIONS__
@@ -292,7 +308,9 @@ __VOLUME__
 <tr style="vertical-align: top">
 <td class="bold nowrap">Data Formats:</td>
 <td>
+<div id="exp-formats" class="expandable">
 __DATA_FORMATS__
+</div>
 </td>
 </tr>
 @
@@ -301,7 +319,7 @@ __DATA_FORMATS__
 <tr style="vertical-align: __RELATED_DATASETS_VALIGN__">
 <td class="bold">Related RDA Datasets:</td>
 <td>
-<div id="related-ds" class="expandable">
+<div id="exp-related-ds" class="expandable">
 <table cellspacing="0" cellpadding="2" border="0">
 __RELATED_DATASETS__
 </table>
