@@ -24,8 +24,8 @@ metautils::Directives metautils::directives;
 metautils::Args metautils::args;
 std::string myerror="";
 std::string mywarning="";
+extern const std::string USER=getenv("USER");
 
-std::string user=getenv("USER");
 TempDir temp_dir;
 XMLDocument xdoc;
 MySQL::Server server;
@@ -42,14 +42,14 @@ void generate_index(std::string type,std::string tdir_name)
     ofs.open((tdir_name+"/index.html").c_str());
   }
   if (!ofs.is_open()) {
-    metautils::log_error("unable to open output for 'index.html'","dsgen",user);
+    metautils::log_error("unable to open output for 'index.html'","dsgen",USER);
   }
   auto t=new TokenDocument("/glade/u/home/rdadata/share/templates/dsgen_index.tdoc");
   if (!*t) {
     delete t;
     t=new TokenDocument("/usr/local/dss/share/templates/dsgen_index.tdoc");
     if (!*t) {
-	metautils::log_error("index template not found or unavailable","dsgen",user);
+	metautils::log_error("index template not found or unavailable","dsgen",USER);
     }
   }
   auto &tdoc=*t;
@@ -66,15 +66,15 @@ void generate_index(std::string type,std::string tdir_name)
     else {
 	ds_overview=unixutils::remote_web_file("https://rda.ucar.edu/datasets/ds"+metautils::args.dsnum+"/metadata/dsOverview.xml",temp_dir.name());
 	if (ds_overview.empty()) {
-	  metautils::log_error("dsOverview.xml does not exist for "+metautils::args.dsnum,"dsgen",user);
+	  metautils::log_error("dsOverview.xml does not exist for "+metautils::args.dsnum,"dsgen",USER);
 	}
     }
     if (!xdoc.open(ds_overview)) {
-	metautils::log_error("unable to open dsOverview.xml for "+metautils::args.dsnum+"; parse error: '"+xdoc.parse_error()+"'","dsgen",user);
+	metautils::log_error("unable to open dsOverview.xml for "+metautils::args.dsnum+"; parse error: '"+xdoc.parse_error()+"'","dsgen",USER);
     }
     std::stringstream dc_meta_tags_s;
     if (!metadataExport::export_to_dc_meta_tags(dc_meta_tags_s,metautils::args.dsnum,xdoc,0)) {
-	metautils::log_error("unable to export DC meta tags","dsgen",user);
+	metautils::log_error("unable to export DC meta tags","dsgen",USER);
     }
     tdoc.add_replacement("__DC_META_TAGS__",dc_meta_tags_s.str());
     auto e=xdoc.element("dsOverview/title");
@@ -82,7 +82,7 @@ void generate_index(std::string type,std::string tdir_name)
     tdoc.add_replacement("__TITLE__",title);
     std::stringstream json_ld_s;
     if (!metadataExport::export_to_json_ld(json_ld_s,metautils::args.dsnum,xdoc,0)) {
-	metautils::log_error("unable to export JSON-LD metadata","dsgen",user);
+	metautils::log_error("unable to export JSON-LD metadata","dsgen",USER);
     }
     tdoc.add_replacement("__JSON_LD__",json_ld_s.str());
     e=xdoc.element("dsOverview/logo");
@@ -109,10 +109,10 @@ void generate_index(std::string type,std::string tdir_name)
     auto contact_parts=strutils::split(e.content());
     query.set("select logname,phoneno from dssdb.dssgrp where fstname = '"+contact_parts[0]+"' and lstname = '"+contact_parts[1]+"'");
     if (query.submit(server) < 0) {
-	metautils::log_error("mysql error while trying to get specialist information: "+query.error(),"dsgen",user);
+	metautils::log_error("mysql error while trying to get specialist information: "+query.error(),"dsgen",USER);
     }
     if (!query.fetch_row(row)) {
-	metautils::log_error("no result returned for specialist '"+e.content()+"'","dsgen",user);
+	metautils::log_error("no result returned for specialist '"+e.content()+"'","dsgen",USER);
     }
     auto phoneno=row[1];
     strutils::replace_all(phoneno,"(","");
@@ -512,15 +512,20 @@ void generate_description(std::string type,std::string tdir_name)
 {
   std::string dsnum2=strutils::substitute(metautils::args.dsnum,".","");
   std::ofstream ofs;
-  ofs.open((tdir_name+"/description.html").c_str());
+  if (dataset_type == "W") {
+    ofs.open((tdir_name+"/test_description.html").c_str());
+  }
+  else {
+    ofs.open((tdir_name+"/description.html").c_str());
+  }
   if (!ofs.is_open()) {
-    metautils::log_error("unable to open output for 'description.html'","dsgen",user);
+    metautils::log_error("unable to open output for 'description.html'","dsgen",USER);
   }
   auto t=new TokenDocument("/glade/u/home/rdadata/share/templates/dsgen_description.tdoc");
   if (!*t) {
     t=new TokenDocument("/usr/local/dss/share/templates/dsgen_description.tdoc");
     if (!*t) {
-	metautils::log_error("description template not found or unavailable","dsgen",user);
+	metautils::log_error("description template not found or unavailable","dsgen",USER);
     }
   }
   auto &tdoc=*t;
@@ -541,7 +546,7 @@ void generate_description(std::string type,std::string tdir_name)
 */
   auto databases=metautils::cmd_databases("dsgen","x");
   if (databases.size() == 0) {
-    metautils::log_error("empty CMD database list","dsgen",user);
+    metautils::log_error("empty CMD database list","dsgen",USER);
   }
   std::vector<std::string> formats,types;
   auto found_content_metadata=false;
@@ -549,7 +554,7 @@ void generate_description(std::string type,std::string tdir_name)
     if (db[0] != 'V' && table_exists(server,db+".ds"+dsnum2+"_primaries")) {
 	MySQL::LocalQuery query("select distinct format from "+db+".formats as f left join "+db+".ds"+dsnum2+"_primaries as d on d.format_code = f.code where !isnull(d.format_code)");
 	if (query.submit(server) < 0) {
-	  metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",user);
+	  metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",USER);
 	}
 	MySQL::Row row;
 	while (query.fetch_row(row)) {
@@ -579,7 +584,7 @@ void generate_description(std::string type,std::string tdir_name)
 // temporal range(s)
   MySQL::LocalQuery query("select dsid from dssdb.dsgroup where dsid = 'ds"+metautils::args.dsnum+"'");
   if (query.submit(server) < 0) {
-    metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",user);
+    metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",USER);
   }
   if (query.num_rows() > 0) {
     query.set("select p.date_start,p.time_start,p.start_flag,p.date_end,p.time_end,p.end_flag,p.time_zone,g.title,g.grpid from dssdb.dsperiod as p left join dssdb.dsgroup as g on (p.dsid = g.dsid and p.gindex = g.gindex) where p.dsid = 'ds"+metautils::args.dsnum+"' and g.pindex = 0 and date_start > '0000-00-00' and date_start < '3000-01-01' and date_end > '0000-00-00' and date_end < '3000-01-01' union select p.date_start,p.time_start,p.start_flag,p.date_end,p.time_end,p.end_flag,p.time_zone,g2.title,g.grpid from dssdb.dsperiod as p left join dssdb.dsgroup as g on (p.dsid = g.dsid and p.gindex = g.gindex) left join dssdb.dsgroup as g2 on (p.dsid = g2.dsid and g.pindex = g2.gindex) where p.dsid = 'ds"+metautils::args.dsnum+"' and date_start > '0000-00-00' and date_start < '3000-01-01' and date_end > '0000-00-00' and date_end < '3000-01-01' and !isnull(g2.title) order by title");
@@ -588,12 +593,12 @@ void generate_description(std::string type,std::string tdir_name)
     query.set("select date_start,time_start,start_flag,date_end,time_end,end_flag,time_zone,NULL,NULL from dssdb.dsperiod where dsid = 'ds"+metautils::args.dsnum+"' and date_start > '0000-00-00' and date_start < '3000-01-01' and date_end > '0000-00-00' and date_end < '3000-01-01'");
   }
   if (query.submit(server) < 0) {
-    metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",user);
+    metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",USER);
   }
   if (query.num_rows() == 0) {
     query.set("select date_start,time_start,start_flag,date_end,time_end,end_flag,time_zone,NULL,NULL from dssdb.dsperiod where dsid = 'ds"+metautils::args.dsnum+"' and date_start > '0000-00-00' and date_start < '3000-01-01' and date_end > '0000-00-00' and date_end < '3000-01-01'");
     if (query.submit(server) < 0) {
-	metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",user);
+	metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",USER);
     }
   }
   auto div_num=0;
@@ -604,14 +609,14 @@ void generate_description(std::string type,std::string tdir_name)
     if (query.num_rows() > 1) {
 	MySQL::LocalQuery query2("distinct gindex","dssdb.dsperiod","dsid = 'ds"+metautils::args.dsnum+"'");
 	if (query2.submit(server) < 0) {
-	  metautils::log_error("query: "+query2.show()+" returned error: "+query2.error(),"dsgen",user);
+	  metautils::log_error("query: "+query2.show()+" returned error: "+query2.error(),"dsgen",USER);
 	}
 	if (query2.num_rows() > 1) {
 	  grouped_periods=true;
 	  tdoc.add_if("__HAS_TEMPORAL_BY_GROUP1__");
 	  query2.set("select gindex,title from dssdb.dsgroup where dsid = 'ds"+metautils::args.dsnum+"'");
 	  if (query2.submit(server) < 0) {
-	    metautils::log_error("error: "+query2.error()+" while getting groups data","dsgen",user);
+	    metautils::log_error("error: "+query2.error()+" while getting groups data","dsgen",USER);
 	  }
 	  MySQL::Row row2;
 	  while (query2.fetch_row(row2)) {
@@ -619,7 +624,7 @@ void generate_description(std::string type,std::string tdir_name)
 	  }
 	  query2.set("select mssfile,tindex from dssdb.mssfile where dsid = 'ds"+metautils::args.dsnum+"' and type = 'P' and status = 'P'");
 	  if (query2.submit(server) < 0) {
-	    metautils::log_error("error: "+query2.error()+" while getting RDA files data","dsgen",user);
+	    metautils::log_error("error: "+query2.error()+" while getting RDA files data","dsgen",USER);
 	  }
 	  while (query2.fetch_row(row2)) {
 	    rda_files_table.emplace(row2[0],row2[1]);
@@ -632,7 +637,7 @@ void generate_description(std::string type,std::string tdir_name)
 	  }
 	  query2.set("select min(concat(date_start,' ',time_start)),min(start_flag),max(concat(date_end,' ',time_end)),min(end_flag),any_value(time_zone) from dssdb.dsperiod where dsid = 'ds"+metautils::args.dsnum+"' and date_start > '0000-00-00' and date_start < '3000-01-01' and date_end > '0000-00-00' and date_end < '3000-01-01' group by dsid");
 	  if (query2.submit(server) < 0) {
-	    metautils::log_error("query: "+query2.show()+" returned error: "+query2.error(),"dsgen",user);
+	    metautils::log_error("query: "+query2.show()+" returned error: "+query2.error(),"dsgen",USER);
 	  }
 	  query2.fetch_row(row2);
 	  auto start_date_time=metatranslations::date_time(row2[0],row2[1],row2[4]);
@@ -733,7 +738,7 @@ void generate_description(std::string type,std::string tdir_name)
 // variables
   query.set("select substring_index(path,' > ',-1) as var from search.variables_new as v left join search.GCMD_sciencekeywords as g on g.uuid = v.keyword where v.vocabulary = 'GCMD' and v.dsid = '"+metautils::args.dsnum+"' order by var");
   if (query.submit(server) < 0) {
-    metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",user);
+    metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",USER);
   }
   std::list<std::string> strings;
   MySQL::Row row;
@@ -997,7 +1002,7 @@ void generate_description(std::string type,std::string tdir_name)
 	    query.set("select distinct gridDefinition_codes from GrML.ds"+dsnum2+"_agrids");
 	  }
 	  if (query.submit(server) < 0) {
-	    metautils::log_error("error: "+query.error()+" while getting grid definitions","dsgen",user);
+	    metautils::log_error("error: "+query.error()+" while getting grid definitions","dsgen",USER);
 	  }
 	  while (query.fetch_row(row)) {
 	    std::vector<size_t> values;
@@ -1007,7 +1012,7 @@ void generate_description(std::string type,std::string tdir_name)
 		if (grid_definition_table.find(value) == grid_definition_table.end()) {
 		  MySQL::LocalQuery query2("definition,defParams","GrML.gridDefinitions","code = "+strutils::itos(value));
 		  if (query2.submit(server) < 0) {
-		    metautils::log_error("query: "+query2.show()+" returned error: "+query2.error(),"dsgen",user);
+		    metautils::log_error("query: "+query2.show()+" returned error: "+query2.error(),"dsgen",USER);
 		  }
 		  MySQL::Row row2;
 		  query2.fetch_row(row2);
@@ -1173,7 +1178,7 @@ void generate_description(std::string type,std::string tdir_name)
 // data contributors
   query.set("select g.path from search.contributors_new as c left join search.GCMD_providers as g on g.uuid = c.keyword where c.dsid = '"+metautils::args.dsnum+"' and c.vocabulary = 'GCMD'");
   if (query.submit(server) < 0) {
-    metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",user);
+    metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",USER);
   }
   std::stringstream data_contributors_s;
   auto n=0;
@@ -1374,11 +1379,11 @@ void generate_description(std::string type,std::string tdir_name)
 // volume
   query.set("primary_size","dssdb.dataset","dsid = 'ds"+metautils::args.dsnum+"'");
   if (query.submit(server) < 0) {
-    metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",user);
+    metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",USER);
   }
   MySQL::LocalQuery query2("select primary_size,title,grpid from dssdb.dsgroup where dsid = 'ds"+metautils::args.dsnum+"' and pindex = 0 and primary_size > 0");
   if (query2.submit(server) < 0) {
-    metautils::log_error("query: "+query2.show()+" returned error: "+query2.error(),"dsgen",user);
+    metautils::log_error("query: "+query2.show()+" returned error: "+query2.error(),"dsgen",USER);
   }
   std::stringstream volume_s;
   const int VOLUME_LEN=4;
@@ -1432,7 +1437,7 @@ void generate_description(std::string type,std::string tdir_name)
     fdoc.open(file);
   }
   if (!fdoc) {
-    metautils::log_error("unable to open FormatReferences.xml","dsgen",user);
+    metautils::log_error("unable to open FormatReferences.xml","dsgen",USER);
   }
   std::string data_formats;
   n=0;
@@ -1498,7 +1503,7 @@ void generate_description(std::string type,std::string tdir_name)
     for (const auto& ele : elist) {
 	query.set("dsid,title","search.datasets","dsid = '"+ele.attribute_value("ID")+"' and (type = 'P' or type = 'H')");
 	if (query.submit(server) < 0) {
-          metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",user);
+          metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",USER);
 	}
 	if (query.fetch_row(row)) {
 	  related_datasets+="<tr valign=\"top\"><td><a href=\"/datasets/ds"+row[0]+"#description\">"+row[0]+"</a></td><td>-</td><td>"+row[1]+"</td></tr>";
@@ -1684,15 +1689,15 @@ int main(int argc,char **argv)
     metautils::args.dsnum=metautils::args.dsnum.substr(2);
   }
   metautils::args.args_string=unixutils::unix_args_string(argc,argv);
-  metautils::read_config("dsgen",user);
+  metautils::read_config("dsgen",USER);
   if (!temp_dir.create(metautils::directives.temp_path)) {
-    metautils::log_error("unable to create temporary directory","dsgen",user);
+    metautils::log_error("unable to create temporary directory","dsgen",USER);
   }
   server.connect(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   MySQL::LocalQuery query("select type from search.datasets where dsid = '"+metautils::args.dsnum+"'");
   MySQL::Row row;
   if (query.submit(server) < 0 || !query.fetch_row(row)) {
-    metautils::log_error("unable to determine dataset type","dsgen",user);
+    metautils::log_error("unable to determine dataset type","dsgen",USER);
   }
   dataset_type=row[0];
   if (dataset_type != "P" && dataset_type != "H") {
@@ -1700,7 +1705,7 @@ int main(int argc,char **argv)
   }
   TempDir dataset_doc_dir;
   if (!dataset_doc_dir.create(metautils::directives.temp_path)) {
-    metautils::log_error("unable to create temporary document directory","dsgen",user);
+    metautils::log_error("unable to create temporary document directory","dsgen",USER);
   }
   generate_index(dataset_type,dataset_doc_dir.name());
   if (dataset_type != "I") {
@@ -1709,7 +1714,7 @@ int main(int argc,char **argv)
   }
   if (!no_dset_waf) {
     if (server.insert("metautil.dset_waf","'"+metautils::args.dsnum+"',''","update dsid = values(dsid)") < 0) {
-	metautils::log_warning("not marked for DSET WAF update","dsgen",user);
+	metautils::log_warning("not marked for DSET WAF update","dsgen",USER);
     }
   }
   server.disconnect();
@@ -1720,6 +1725,6 @@ int main(int argc,char **argv)
   remote_path+="/datasets/ds"+metautils::args.dsnum;
   std::string error;
   if (unixutils::rdadata_sync(dataset_doc_dir.name(),".",remote_path,metautils::directives.rdadata_home,error) < 0) {
-    metautils::log_warning("couldn't sync dataset files - rdadata_sync error(s): '"+error+"'","dsgen",user);
+    metautils::log_warning("couldn't sync dataset files - rdadata_sync error(s): '"+error+"'","dsgen",USER);
   }
 }
