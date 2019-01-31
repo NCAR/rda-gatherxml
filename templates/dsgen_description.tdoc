@@ -358,6 +358,12 @@ __RELATED_DATASETS__
 <td><div id="meta_record" style="display: inline; float: left"></div><img src="/images/transpace.gif" width="1" height="1" onload="getAjaxContent('GET',null,'/cgi-bin/datasets/showMetadata?dsnum=__DSNUM__','meta_record')" /></td>
 </tr>
 @
+@ Data License
+<tr style="vertical-align: top">
+<td class="bold nowrap">Data License:</td>
+<td><div style="display: inline; float: left"><a rel="license" href="http://creativecommons.org/licenses/by/4.0/" target="_data_license"><img alt="Creative Commons License" style="border-width:0" src="https://i.creativecommons.org/l/by/4.0/88x31.png" hspace="5px" valign="top" /></a>This work is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by/4.0/" target="_data_license">Creative Commons Attribution 4.0 International License</a>.</td>
+</tr>
+@
 @ !! DON'T PUT ANYTHING BELOW THIS LINE !!
 </table>
 <img src="/images/transpace.gif" width="1" height="1" onload="checkExpandableFields()" />
