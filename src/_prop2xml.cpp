@@ -11,16 +11,15 @@
 
 metautils::Directives metautils::directives;
 metautils::Args metautils::args;
+bool gatherxml::verbose_operation;
+extern const std::string USER=getenv("USER");
 std::string myerror="";
 std::string mywarning="";
-
-std::string user=getenv("USER");
-auto verbose_operation=false;
 
 extern "C" void clean_up()
 {
   if (!myerror.empty()) {
-    metautils::log_error(myerror,"prop2xml",user);
+    metautils::log_error(myerror,"prop2xml",USER);
   }
 }
 
@@ -28,71 +27,13 @@ extern "C" void segv_handler(int)
 {
   clean_up();
   metautils::cmd_unregister();
-  metautils::log_error("core dump","ascii2xml",user);
+  metautils::log_error("core dump","ascii2xml",USER);
 }
 
 extern "C" void int_handler(int)
 {
   clean_up();
   metautils::cmd_unregister();
-}
-
-void parse_args()
-{
-  auto args=strutils::split(metautils::args.args_string,"!");
-  for (size_t n=0; n < args.size(); ++n) {
-    if (args[n] == "-d") {
-	metautils::args.dsnum=args[++n];
-	if (metautils::args.dsnum.substr(0,2) == "ds") {
-	  metautils::args.dsnum.erase(0,2);
-	}
-    }
-    else if (args[n] == "-f") {
-	metautils::args.data_format=args[++n];
-    }
-    else if (args[n] == "-i") {
-	metautils::args.local_name=args[++n];
-    }
-    else if (args[n] == "-V") {
-	verbose_operation=true;
-    }
-  }
-  if (metautils::args.data_format.empty()) {
-    std::cerr << "Error: no format specified" << std::endl;
-    exit(1);
-  }
-  else {
-    metautils::args.data_format=strutils::to_lower(metautils::args.data_format);
-    if (metautils::args.data_format != "ascii" && metautils::args.data_format != "binary") {
-	std::cerr << "Error: invalid data format" << std::endl;
-	exit(1);
-    }
-    else {
-	if (metautils::args.data_format == "ascii") {
-	  metautils::args.data_format="ASCII";
-	}
-	else if (metautils::args.data_format == "binary") {
-	  metautils::args.data_format="Binary";
-	}
-	metautils::args.data_format.insert(0,"proprietary_");
-    }
-  }
-  if (metautils::args.dsnum.empty()) {
-    std::cerr << "Error: no dataset number specified" << std::endl;
-    exit(1);
-  }
-  if (metautils::args.dsnum == "999.9") {
-    metautils::args.override_primary_check=true;
-    metautils::args.update_db=false;
-    metautils::args.update_summary=false;
-    metautils::args.regenerate=false;
-  }
-  metautils::args.filename=args.back();
-  auto idx=metautils::args.filename.rfind("/");
-  if (idx != std::string::npos) {
-    metautils::args.path=metautils::args.filename.substr(0,idx);
-    metautils::args.filename=metautils::args.filename.substr(idx+1);
-  }
 }
 
 DateTime fill_date(std::string date_s,const std::string& line)
@@ -251,7 +192,7 @@ void scan_input_file(gatherxml::markup::ObML::ObservationData& obs_data)
     exit(1);
   }
   long long num_input_lines=0;
-  if (verbose_operation) {
+  if (gatherxml::verbose_operation) {
     std::stringstream oss,ess;
     unixutils::mysystem2("/bin/tcsh -c \"wc -l "+metautils::args.local_name+" |awk '{print $1}'\"",oss,ess);
     num_input_lines=std::stoll(oss.str());
@@ -260,11 +201,11 @@ void scan_input_file(gatherxml::markup::ObML::ObservationData& obs_data)
   std::unordered_set<std::string> platform_types,id_types;
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   if (!server) {
-    metautils::log_error("scan_input_file(): unable to connect to the metadata database","prop2xml",user);
+    metautils::log_error("scan_input_file(): unable to connect to the metadata database","prop2xml",USER);
   }
   MySQL::LocalQuery query("platformType","ObML.platformTypes","platformType != 'unknown'");
   if (query.submit(server) != 0) {
-    metautils::log_error("scan_input_file(): platformTypes query error '"+query.error()+"'","prop2xml",user);
+    metautils::log_error("scan_input_file(): platformTypes query error '"+query.error()+"'","prop2xml",USER);
   }
   MySQL::Row row;
   while (query.fetch_row(row)) {
@@ -274,7 +215,7 @@ void scan_input_file(gatherxml::markup::ObML::ObservationData& obs_data)
   }
   query.set("IDType","ObML.IDTypes","IDType != 'generic' and IDType != 'unknown'");
   if (query.submit(server) != 0) {
-    metautils::log_error("scan_input_file(): IDTypes query error '"+query.error()+"'","prop2xml",user);
+    metautils::log_error("scan_input_file(): IDTypes query error '"+query.error()+"'","prop2xml",USER);
   }
   while (query.fetch_row(row)) {
     if (!row[0].empty()) {
@@ -299,20 +240,20 @@ void scan_input_file(gatherxml::markup::ObML::ObservationData& obs_data)
 	process_observation(sline,platform_types,id_types,variables,unique_datatypes,obs_data);
     }
     ++num_lines;
-    if (verbose_operation && (num_lines % 10000) == 0) {
+    if (gatherxml::verbose_operation && (num_lines % 10000) == 0) {
 	std::cout << "Processed " << num_lines << " input lines out of a total of " << num_input_lines << std::endl;
     }
     ifs.getline(line.get(),LINE_LENGTH);
   }
   ifs.close();
-  if (verbose_operation) {
+  if (gatherxml::verbose_operation) {
     std::cout << "... scanning of input file is completed." << std::endl;
   }
   server.disconnect();
   TempDir tdir;
   std::stringstream oss,ess;
   if (!tdir.create(metautils::directives.temp_path) || unixutils::mysystem2("/bin/mkdir -p "+tdir.name()+"/metadata/ParameterTables",oss,ess) < 0) {
-    metautils::log_error("can't create temporary directory for data type map","prop2xml",user);
+    metautils::log_error("can't create temporary directory for data type map","prop2xml",USER);
   }
   auto existing_datatype_map=unixutils::remote_web_file("https://rda.ucar.edu/metadata/ParameterTables/"+metautils::args.data_format+".ds"+metautils::args.dsnum+".xml",tdir.name());
   std::vector<std::string> existing_map_contents;
@@ -327,13 +268,13 @@ void scan_input_file(gatherxml::markup::ObML::ObservationData& obs_data)
     ifs.close();
     existing_map_contents.pop_back();
   }
-  if (verbose_operation) {
+  if (gatherxml::verbose_operation) {
     std::cout << "Writing parameter map ..." << std::endl;
   }
   std::string datatype_map=tdir.name()+"/metadata/ParameterTables/"+metautils::args.data_format+".ds"+metautils::args.dsnum+".xml";
   std::ofstream ofs(datatype_map.c_str());
   if (!ofs.is_open()) {
-    metautils::log_error("unable to write data type map to temporary directory","prop2xml",user);
+    metautils::log_error("unable to write data type map to temporary directory","prop2xml",USER);
   }
   if (existing_map_contents.size() == 0) {
     ofs << "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>" << std::endl;
@@ -383,12 +324,12 @@ void scan_input_file(gatherxml::markup::ObML::ObservationData& obs_data)
   ofs.close();
   std::string error;
   if (unixutils::rdadata_sync(tdir.name(),"metadata/ParameterTables/","/data/web",metautils::directives.rdadata_home,error) < 0) {
-    metautils::log_error("unable to sync data type map - error(s): '"+error+"'","prop2xml",user);
+    metautils::log_error("unable to sync data type map - error(s): '"+error+"'","prop2xml",USER);
   }
   if (unixutils::mysystem2("/bin/cp "+datatype_map+" "+metautils::directives.parameter_map_path+"/",oss,ess) < 0) {
-    metautils::log_warning("sync of data type map to share directory failed - error(s): '"+error+"'","prop2xml",user);
+    metautils::log_warning("sync of data type map to share directory failed - error(s): '"+error+"'","prop2xml",USER);
   }
-  if (verbose_operation) {
+  if (gatherxml::verbose_operation) {
     std::cout << "... parameter map written." << std::endl;
   }
 }
@@ -396,14 +337,14 @@ void scan_input_file(gatherxml::markup::ObML::ObservationData& obs_data)
 int main(int argc,char **argv)
 {
   if (argc < 7) {
-    std::cerr << "usage: prop2xml -f format -d [ds]nnn.n -i <csv-file> path" << std::endl;
+    std::cerr << "usage: prop2xml -f format -d [ds]nnn.n -l <csv-file> path" << std::endl;
     std::cerr << std::endl;
     std::cerr << "required (choose one):" << std::endl;
     std::cerr << "-f ascii    ASCII data file formats" << std::endl;
     std::cerr << "-f binary   Binary data file formats" << std::endl;
     std::cerr << std::endl;
     std::cerr << "required:" << std::endl;
-    std::cerr << "-i <csv-file>   input comma-separated-values file" << std::endl;
+    std::cerr << "-l <csv-file>   input comma-separated-values file" << std::endl;
     std::cerr << std::endl;
     std::cerr << "required:" << std::endl;
     std::cerr << "<path>    full HPSS path or URL of the file to read" << std::endl;
@@ -411,15 +352,25 @@ int main(int argc,char **argv)
   }
   signal(SIGSEGV,segv_handler);
   signal(SIGINT,int_handler);
-  metautils::args.args_string=unixutils::unix_args_string(argc,argv,'!');
-  metautils::read_config("prop2xml",user);
-  parse_args();
-  std::string flags="-f";
-  if (!std::regex_search(metautils::args.path,std::regex("^/FS/DSS"))) {
-    flags="-wf";
+  auto arg_delimiter='!';
+  metautils::args.args_string=unixutils::unix_args_string(argc,argv,arg_delimiter);
+  metautils::read_config("prop2xml",USER);
+  gatherxml::parse_args(arg_delimiter);
+  if (metautils::args.data_format != "ascii" && metautils::args.data_format != "binary") {
+    std::cerr << "Error: invalid data format" << std::endl;
+    exit(1);
+  }
+  else {
+    if (metautils::args.data_format == "ascii") {
+	metautils::args.data_format="ASCII";
+    }
+    else if (metautils::args.data_format == "binary") {
+	metautils::args.data_format="Binary";
+    }
+    metautils::args.data_format.insert(0,"proprietary_");
   }
   atexit(clean_up);
-  metautils::cmd_register("prop2xml",user);
+  metautils::cmd_register("prop2xml",USER);
   if (metautils::args.dsnum != "999.9") {
     auto verified_hpss_file=false;
     MySQL::Server server(metautils::directives.database_server,metautils::directives.rdadb_username,metautils::directives.rdadb_password,"dssdb");
@@ -433,12 +384,12 @@ int main(int argc,char **argv)
 	    }
 	  }
 	  else {
-	    metautils::log_error("database fetch error","prop2xml",user);
+	    metautils::log_error("database fetch error","prop2xml",USER);
 	  }
 	}
     }
     else {
-	metautils::log_error("database connection error","prop2xml",user);
+	metautils::log_error("database connection error","prop2xml",USER);
     }
     server.disconnect();
     if (!verified_hpss_file) {
@@ -448,11 +399,15 @@ int main(int argc,char **argv)
   }
   gatherxml::markup::ObML::ObservationData obs_data;
   if (obs_data.num_types == 0) {
-    metautils::log_error("scan_input_file(): unable to initialize for observations","prop2xml",user);
+    metautils::log_error("scan_input_file(): unable to initialize for observations","prop2xml",USER);
   }
   scan_input_file(obs_data);
-  gatherxml::markup::ObML::write(obs_data,"prop2xml",user);
+  gatherxml::markup::ObML::write(obs_data,"prop2xml",USER);
   if (metautils::args.update_db) {
+    std::string flags="-f";
+    if (!std::regex_search(metautils::args.path,std::regex("^/FS/DSS"))) {
+	flags="-wf";
+    }
     if (!metautils::args.regenerate) {
 	flags="-R "+flags;
     }
@@ -460,13 +415,13 @@ int main(int argc,char **argv)
 	flags="-S "+flags;
     }
     std::stringstream oss,ess;
-    if (verbose_operation) {
+    if (gatherxml::verbose_operation) {
 	std::cout << "Calling 'scm' ..." << std::endl;
     }
     if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" "+flags+" "+metautils::args.filename+".ObML",oss,ess) < 0) {
 	std::cerr << ess.str() << std::endl;
     }
-    if (verbose_operation) {
+    if (gatherxml::verbose_operation) {
 	std::cout << "... 'scm' completed." << std::endl;
     }
   }
