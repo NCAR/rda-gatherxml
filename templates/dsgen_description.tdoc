@@ -50,7 +50,7 @@
 @
 @ Data Citations
 <tr style="vertical-align: top">
-<td class="bold nowrap">Data Citations:</td>
+<td class="bold nowrap">Data Citations:&nbsp;<span class="glyphicon glyphicon-question-sign blue" onmouseover="popInfo(this,'icite',null,'center+25','bottom-30')" onmouseout="hideInfo('icite')" /></td>
 <td>This dataset has been cited __NUM_DATA_CITATIONS__.<br />
 #IF __HAS_DATA_CITATIONS__
 <span id="DDC0"><a href="javascript:swapDivs('DC0','DC1')" title="Expand the list of works that cited this dataset"><img src="/images/triangle.gif" width="12" height="15" border="0" /><span class="fs13px">Published works that cited this dataset</span></a></span>
@@ -367,4 +367,5 @@ __RELATED_DATASETS__
 @ !! DON'T PUT ANYTHING BELOW THIS LINE !!
 </table>
 <img src="/images/transpace.gif" width="1" height="1" onload="checkExpandableFields()" />
+<div id="icite" class="bubble-left-top-arrow" style="width: 600px">Citation counts are compiled through information provided by https://www.crossref.org/ according to the guidelines developed through the https://makedatacount.org/ project.  If journals do not provide citation information to https://www.crossref.org/, this citation information will not be included in RDA citation counts. Additionally citations that include dataset DOIs are the only types included in these counts, so legacy citations without DOIs, references found in publication acknowledgements, or references to a related publication that describes a dataset will not be included in these counts.</div>
 #ENDELSE __IS_DEAD_DATASET__
