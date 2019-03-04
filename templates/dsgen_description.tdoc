@@ -5,6 +5,16 @@
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 #IF __IS_DEAD_DATASET__
 <table class="fs16px" width="100%" cellspacing="10" cellpadding="0" border="0">
+@
+@ Abstract
+<tr style="vertical-align: top">
+<td class="bold">Abstract:</td>
+<td>
+<div id="exp-abstract" class="expandable">
+__ABSTRACT__
+</div>
+</td>
+</tr>
 </table>
 #ENDIF __IS_DEAD_DATASET__
 #ELSE __IS_DEAD_DATASET__
