@@ -21,7 +21,7 @@ void close(std::string filename,TempDir **tdir,std::ofstream& ofs,std::string cm
   ofs.close();
   ofs.clear();
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
-  if (std::regex_search(metautils::args.path,std::regex("^/FS/DSS/")) || std::regex_search(metautils::args.path,std::regex("^/DSS/"))) {
+  if (std::regex_search(metautils::args.path,std::regex("^/FS/DECS/"))) {
     server.update(cmd_type+".ds"+strutils::substitute(metautils::args.dsnum,".","")+"_primaries","inv = 'Y'","mssID = '"+strutils::substitute(filename,"%","/")+"'");
   }
   else {
@@ -58,11 +58,8 @@ void open(std::string& filename,TempDir **tdir,std::ofstream& ofs,std::string cm
     return;
   }
   filename=metautils::args.path+"/"+metautils::args.filename;
-  if (std::regex_search(metautils::args.path,std::regex("^/FS/DSS/"))) {
-    strutils::replace_all(filename,"/FS/DSS/","");
-  }
-  else if (std::regex_search(metautils::args.path,std::regex("^/DSS/"))) {
-    strutils::replace_all(filename,"/DSS/","");
+  if (std::regex_search(metautils::args.path,std::regex("^/FS/DECS/"))) {
+    strutils::replace_all(filename,"/FS/DECS/","");
   }
   else {
     filename=metautils::relative_web_filename(filename);
@@ -164,8 +161,7 @@ void write_initialize(bool& is_mss_file,std::string& filename,std::string ext,st
   }
   filename=metautils::args.path+"/"+metautils::args.filename;
   if (is_mss_file) {
-    strutils::replace_all(filename,"/FS/DSS/","");
-    strutils::replace_all(filename,"/DSS/","");
+    strutils::replace_all(filename,"/FS/DECS/","");
     strutils::replace_all(filename,"/","%");
     if (!metautils::args.member_name.empty()) {
 	filename+="..m.."+strutils::substitute(metautils::args.member_name,"/","%");

@@ -2546,7 +2546,7 @@ int main(int argc,char **argv)
     std::cerr << "-V               verbose operation" << std::endl;
     std::cerr << "\nrequired:" << std::endl;
     std::cerr << "<path>           full HPSS path or URL of the file to read" << std::endl;
-    std::cerr << "                 - HPSS paths must begin with \"/FS/DSS\"" << std::endl;
+    std::cerr << "                 - HPSS paths must begin with \"/FS/DECS\"" << std::endl;
     std::cerr << "                 - URLs must begin with \"http://{rda|dss}.ucar.edu\"" << std::endl;
     exit(1);
   }

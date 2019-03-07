@@ -6,6 +6,7 @@
 #include <regex>
 #include <sstream>
 #include <deque>
+#include <gatherxml.hpp>
 #include <strutils.hpp>
 #include <utils.hpp>
 #include <metadata.hpp>
@@ -14,6 +15,8 @@
 
 metautils::Directives metautils::directives;
 metautils::Args metautils::args;
+bool gatherxml::verbose_operation;
+extern const std::string USER=getenv("USER");
 std::string myerror="";
 std::string mywarning="";
 
@@ -24,7 +27,6 @@ struct Entry {
   std::string key;
   std::string string;
 };
-std::string user=getenv("USER");
 
 std::string webhome()
 {
@@ -44,11 +46,11 @@ void inventory_all()
   std::stringstream output,error;
 
   if (metautils::args.data_format != "grib" && metautils::args.data_format != "grib2" && metautils::args.data_format != "grib0" && metautils::args.data_format != "cfnetcdf" && metautils::args.data_format != "hdf5nc4") {
-    metautils::log_error("unable to inventory '"+metautils::args.data_format+"' files","gatherxml",user);
+    metautils::log_error("unable to inventory '"+metautils::args.data_format+"' files","gatherxml",USER);
   }
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   if (!server) {
-    metautils::log_error("unable to connected to RDA metadata database server","gatherxml",user);
+    metautils::log_error("unable to connected to RDA metadata database server","gatherxml",USER);
   }
   if (MySQL::table_exists(server,"IGrML.ds"+dsnum+"_inventory_summary")) {
     query.set("select w.webID,f.format from WGrML.ds"+dsnum+"_webfiles as w left join IGrML.ds"+dsnum+"_inventory_summary as i on i.webID_code = w.code left join WGrML.formats as f on f.code = w.format_code where isnull(i.webID_code) or isnull(inv)");
@@ -63,7 +65,7 @@ void inventory_all()
     query.set("select w.webID,f.format from WObML.ds"+dsnum+"_webfiles as w left join WObML.formats as f on f.code = w.format_code");
   }
   if (query.submit(server) < 0) {
-    metautils::log_error("inventory_all() returned error: '"+query.error()+"'","gatherxml",user);
+    metautils::log_error("inventory_all() returned error: '"+query.error()+"'","gatherxml",USER);
   }
   server.disconnect();
   size_t n=0;
@@ -118,16 +120,10 @@ int main(int argc,char **argv)
 	ignore_local_file=true;
     }
   }
-/*
-if (user == "chifan") {
-std::cerr << "Terminating." << std::endl;
-exit(1);
-}
-*/
-  metautils::read_config("gatherxml",user);
+  metautils::read_config("gatherxml",USER);
   ifs.open((metautils::directives.dss_root+"/bin/conf/gatherxml.conf").c_str());
   if (!ifs.is_open()) {
-    metautils::log_error("unable to open "+metautils::directives.dss_root+"/bin/conf/gatherxml.conf","gatherxml",user);
+    metautils::log_error("unable to open "+metautils::directives.dss_root+"/bin/conf/gatherxml.conf","gatherxml",USER);
   }
   ifs.getline(line,256);
   while (!ifs.eof()) {
@@ -232,7 +228,7 @@ exit(1);
 	exit(1);
     }
     metautils::args.path=sp.back();
-    if (!std::regex_search(metautils::args.path,std::regex("^(/FS){0,1}/DSS/")) && !std::regex_search(metautils::args.path,std::regex("^https://rda.ucar.edu"))) {
+    if (!std::regex_search(metautils::args.path,std::regex("^/FS/DECS/")) && !std::regex_search(metautils::args.path,std::regex("^https://rda.ucar.edu"))) {
 	if (metautils::args.path.length() > 128) {
 	  std::cerr << "Error: filename exceeds 128 characters in length" << std::endl;
 	  exit(1);
@@ -247,7 +243,7 @@ exit(1);
 	  metautils::args.path=sdum;
 	}
     }
-    if (std::regex_search(metautils::args.path,std::regex("^(/FS){0,1}/DSS/")) && std::regex_search(unixutils::host_name(),std::regex("^r([0-9]){1,}i([0-9]){1,}n([0-9]){1,}$"))) {
+    if (std::regex_search(metautils::args.path,std::regex("^/FS/DECS/")) && std::regex_search(unixutils::host_name(),std::regex("^r([0-9]){1,}i([0-9]){1,}n([0-9]){1,}$"))) {
 	std::cerr << "Terminating: cheyenne compute nodes do not have access to the HPSS" << std::endl;
 	exit(1);
     }
@@ -287,11 +283,11 @@ exit(1);
 	    std::cerr << ess.str() << std::endl;
 	  }
 	  else {
-	    metautils::log_error("-q"+ess.str(),"gatherxml",user);
+	    metautils::log_error("-q"+ess.str(),"gatherxml",USER);
 	  }
 	}
 	auto t2=std::time(nullptr);
-	metautils::log_warning("execution time: "+strutils::ftos(t2-t1)+" seconds","gatherxml.time",user);
+	metautils::log_warning("execution time: "+strutils::ftos(t2-t1)+" seconds","gatherxml.time",USER);
     }
     else {
 	if (alias_table.found(metautils::args.data_format,e)) {
@@ -303,11 +299,11 @@ exit(1);
 		  std::cerr << ess.str() << std::endl;
 		}
 		else {
-		  metautils::log_error("-q"+ess.str(),"gatherxml",user);
+		  metautils::log_error("-q"+ess.str(),"gatherxml",USER);
 		}
 	    }
 	    auto t2=std::time(nullptr);
-	    metautils::log_warning("execution time: "+strutils::ftos(t2-t1)+" seconds","gatherxml.time",user);
+	    metautils::log_warning("execution time: "+strutils::ftos(t2-t1)+" seconds","gatherxml.time",USER);
 	  }
 	  else {
 	    std::cerr << "format '" << metautils::args.data_format << "' does not map to a content metadata utility" << std::endl;

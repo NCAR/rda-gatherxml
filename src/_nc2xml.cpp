@@ -2343,25 +2343,29 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream,NetCDFVariables& nc_var
 		found_time=true;
 	    }
 	    else if (sdum == "degrees_north" || sdum == "degree_north" || sdum == "degrees_n" || sdum == "degree_n" || (sdum == "degrees" && vars[n].name == "lat")) {
+/*
 		if (found_lat) {
 		  metautils::log_warning("latitude was already identified - ignoring '"+vars[n].name+"'","nc2xml",USER);
 		}
 else {
+*/
 		latids.emplace_back(vars[n].name);
 		latdimids.emplace_back(vars[n].dimids[0]);
 		found_lat=true;
-}
+//}
 	    }
 	    else if (sdum == "degrees_east" || sdum == "degree_east" || sdum == "degrees_e" || sdum == "degree_e" || (sdum == "degrees" && vars[n].name == "lon")) {
+/*
 		if (found_lon) {
 		  metautils::log_warning("longitude was already identified - ignoring '"+vars[n].name+"'","nc2xml",USER);
 		}
 else {
+*/
 		lonids.emplace_back(vars[n].name);
 		lontypes.emplace_back(vars[n].nc_type);
 		londimids.emplace_back(vars[n].dimids[0]);
 		found_lon=true;
-}
+//}
 	    }
 	    else {
 		if (!found_time && vars[n].name == "time") {
@@ -4781,7 +4785,7 @@ int main(int argc,char **argv)
     std::cerr << std::endl;
     std::cerr << "required:" << std::endl;
     std::cerr << "<path>           full MSS path or URL of the file to read" << std::endl;
-    std::cerr << "                 - MSS paths must begin with \"/FS/DSS\" or \"/DSS\"" << std::endl;
+    std::cerr << "                 - MSS paths must begin with \"/FS/DECS\"" << std::endl;
     std::cerr << "                 - URLs must begin with \"https://rda.ucar.edu\"" << std::endl;
     exit(1);
   }

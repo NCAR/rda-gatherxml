@@ -106,7 +106,7 @@ query.set("select mssfile,meta_link,'mssfile' from mssfile where dsid = 'ds"+met
 void set_file_meta_link(std::string filename)
 {
   MySQL::LocalQuery query;
-  if (strutils::has_beginning(filename,"/FS/DSS/") || strutils::has_beginning(filename,"/DSS/")) {
+  if (strutils::has_beginning(filename,"/FS/DECS/")) {
     query.set("select meta_link,'mssfile' from mssfile where dsid = 'ds"+metautils::args.dsnum+"' and mssfile = '"+filename+"'");
   }
   else {

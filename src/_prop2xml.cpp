@@ -405,7 +405,7 @@ int main(int argc,char **argv)
   gatherxml::markup::ObML::write(obs_data,"prop2xml",USER);
   if (metautils::args.update_db) {
     std::string flags="-f";
-    if (!std::regex_search(metautils::args.path,std::regex("^/FS/DSS"))) {
+    if (!std::regex_search(metautils::args.path,std::regex("^/FS/DECS"))) {
 	flags="-wf";
     }
     if (!metautils::args.regenerate) {

@@ -884,7 +884,7 @@ int main(int argc,char **argv)
     std::cerr << std::endl;
     std::cerr << "required:" << std::endl;
     std::cerr << "<path>           full MSS path or URL of the file to read" << std::endl;
-    std::cerr << "                 - MSS paths must begin with \"/FS/DSS\" or \"/DSS\"" << std::endl;
+    std::cerr << "                 - MSS paths must begin with \"/FS/DECS\"" << std::endl;
     std::cerr << "                 - URLs must begin with \"https://{rda|dss}.ucar.edu\"" << std::endl;
     exit(1);
   }
