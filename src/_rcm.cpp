@@ -96,7 +96,6 @@ void rewrite_uri_in_cmd_file(std::string db)
   TempDir tdir;
   my::map<metautils::StringEntry> unique_stage_table;
   metautils::StringEntry se;
-  struct stat buf;
   bool old_is_gzipped=false;
 
   if (!tdir.create(metautils::directives.temp_path)) {
@@ -146,9 +145,11 @@ void rewrite_uri_in_cmd_file(std::string db)
     file_list.emplace_back(oname+"<!>"+nname);
   }
   if (db == (db_prefix+"GrML")) {
+/*
     for (const auto& file : file_list) {
 	sp=strutils::split(file,"<!>");
 	auto grml_filename=unixutils::remote_web_file("https://rda.ucar.edu/datasets/ds"+metautils::args.dsnum+"/metadata/"+cmdir+"/"+sp[0]+".GrML.gz",tdir.name());
+	struct stat buf;
 	if (stat(grml_filename.c_str(),&buf) == 0) {
 	  system(("gunzip "+grml_filename).c_str());
 	  strutils::chop(grml_filename,3);
@@ -211,6 +212,7 @@ void rewrite_uri_in_cmd_file(std::string db)
 	  }
 	}
     }
+*/
   }
   else if (db == (db_prefix+"ObML")) {
     std::string obml_filename="";
