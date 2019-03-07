@@ -640,6 +640,19 @@ first_valid_date_time=grid->reference_date_time().hours_added(grid->forecast_tim
 		gentry.key+=strutils::itos((reinterpret_cast<ON84Grid *>(grid))->F2())+"-hour Accumulation";
 		break;
 	    }
+	    case 4:
+	    {
+		first_valid_date_time.set_day(1);
+		short ndays=dateutils::days_in_month(last_valid_date_time.year(),last_valid_date_time.month());
+		if (grid->number_averaged() == ndays) {
+		  gentry.key+="<!>Monthly Mean of Analyses";
+		}
+		else {
+		  gentry.key+="<!>Mean of "+strutils::itos(grid->number_averaged())+" Analyses";
+		}
+		last_valid_date_time.set_day(grid->number_averaged());
+		break;
+	    }
 	    default:
 	    {
 		metautils::log_error("ON84 time marker "+strutils::itos((reinterpret_cast<ON84Grid *>(grid))->time_marker())+" not recognized","grid2xml",USER);
