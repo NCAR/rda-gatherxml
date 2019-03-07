@@ -13,6 +13,8 @@
 
 metautils::Directives metautils::directives;
 metautils::Args metautils::args;
+bool gatherxml::verbose_operation;
+extern const std::string USER=getenv("USER");
 std::string myerror="";
 std::string mywarning="";
 
@@ -33,7 +35,6 @@ struct ThreadStruct {
   pthread_t tid;
 };
 MySQL::Server server;
-extern const std::string USER=getenv("USER");
 std::string dsnum2;
 std::unordered_set<std::string> cmd_set;
 std::vector<std::string> files;
@@ -65,7 +66,7 @@ void parse_args()
     }
     else {
 	std::string cmd;
-	if (std::regex_search(*arg,std::regex("^/FS/DSS/")) || std::regex_search(*arg,std::regex("^/DSS/"))) {
+	if (std::regex_search(*arg,std::regex("^/FS/DECS/"))) {
 	  cmd="fmd";
 	}
 	else {
@@ -232,8 +233,7 @@ bool remove_from(std::string database,std::string table_ext,std::string file_fie
 	}
 	auto md_file=file;
 	if (md_directory == "fmd") {
-	  strutils::replace_all(md_file,"/FS/DSS/","");
-	  strutils::replace_all(md_file,"/DSS/","");
+	  strutils::replace_all(md_file,"/FS/DECS/","");
 	}
 	strutils::replace_all(md_file,"/","%");
 	md_file+=file_ext;
@@ -344,7 +344,7 @@ bool removed(std::string file)
   bool file_removed=false;
   std::string file_ID_code;
   bool is_version_controlled;
-  if (std::regex_search(file,std::regex("^/FS/DSS/")) || std::regex_search(file,std::regex("^/DSS/"))) {
+  if (std::regex_search(file,std::regex("^/FS/DECS/"))) {
     if ( (removed_from_GrML=remove_from("GrML","_primaries","mssID","fmd",file,".GrML",file_ID_code,is_version_controlled))) {
 	clear_tables_by_file_ID("GrML",file_ID_code,is_version_controlled);
 	file_removed=true;
@@ -507,7 +507,7 @@ int main(int argc,char **argv)
     std::cerr << "-N          notify with a message when dcm completes" << std::endl;
     std::cerr << std::endl;
     std::cerr << "NOTES:" << std::endl;
-    std::cerr << "  1) each file in <files...> must begin with \"/FS/DSS/\", \"/DSS/\", or" << std::endl;
+    std::cerr << "  1) each file in <files...> must begin with \"/FS/DECS/\" or" << std::endl;
     std::cerr << "       \"https://rda.ucar.edu\", or be specified as for the -WF option of" << std::endl;
     std::cerr << "       dsarch" << std::endl;
     std::cerr << "  2) for files that support individual members, you can either specify the" << std::endl;

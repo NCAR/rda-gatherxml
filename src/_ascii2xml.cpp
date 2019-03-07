@@ -397,7 +397,7 @@ int main(int argc,char **argv)
     std::cerr << std::endl;
     std::cerr << "required:" << std::endl;
     std::cerr << "<path>        full HPSS path or URL of the file to read" << std::endl;
-    std::cerr << "              - HPSS paths must begin with \"/FS/DSS\" or \"/DSS\"" << std::endl;
+    std::cerr << "              - HPSS paths must begin with \"/FS/DECS\"" << std::endl;
     std::cerr << "              - URLs must begin with \"https://rda.ucar.edu\"" << std::endl;
     exit(1);
   }

@@ -924,9 +924,13 @@ void process_ecmwf_bufr_observation(gatherxml::markup::ObML::ObservationData& ob
 void scan_file(gatherxml::markup::ObML::ObservationData& obs_data)
 {
   tfile.reset(new TempFile);
-  tfile->open(metautils::args.temp_loc);
+  if (!tfile->open(metautils::args.temp_loc)) {
+    metautils::log_error("scan_file() could not open temporary file in '"+metautils::args.temp_loc+"'","bufr2xml",USER);
+  }
   tdir.reset(new TempDir);
-  tdir->create(metautils::args.temp_loc);
+  if (!tdir->create(metautils::args.temp_loc)) {
+    metautils::log_error("scan_file() could not create temporary directory in '"+metautils::args.temp_loc+"'","bufr2xml",USER);
+  }
   std::string file_format,error;
   if (!metautils::primaryMetadata::prepare_file_for_metadata_scanning(*tfile,*tdir,NULL,file_format,error)) {
     metautils::log_error("prepare_file_for_metadata_scanning() returned '"+error+"'","bufr2xml",USER);
@@ -983,7 +987,7 @@ int main(int argc,char **argv)
   std::string flags;
 
   if (argc < 6) {
-    std::cerr << "usage: bufr2xml -f format -d [ds]nnn.n [options...] { [-l <local_name>] /FS/DSS/... | /DSS/... | https://rda.ucar.edu/...}" << std::endl;
+    std::cerr << "usage: bufr2xml -f format -d [ds]nnn.n [options...] { [-l <local_name>] /FS/DECS/... | https://rda.ucar.edu/...}" << std::endl;
     std::cerr << "\nrequired (choose one):" << std::endl;
     std::cerr << "-f ecmwfbufr     ECMWF BUFR" << std::endl;
     std::cerr << "-f adpbufr       NCEP ADP BUFR" << std::endl;

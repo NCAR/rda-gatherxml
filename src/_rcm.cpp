@@ -6,6 +6,7 @@
 #include <list>
 #include <regex>
 #include <sys/stat.h>
+#include <gatherxml.hpp>
 #include <MySQL.hpp>
 #include <metadata.hpp>
 #include <strutils.hpp>
@@ -19,18 +20,24 @@ extern const std::string USER=getenv("USER");
 std::string myerror="";
 std::string mywarning="";
 
-const std::string user=getenv("USER");
 std::string old_web_home;
 std::string old_name,new_name,new_dsnum;
 
+void strip_hpss_head(std::string& path)
+{
+  strutils::replace_all(path,"/FS/DECS/","");
+  strutils::replace_all(path,"/FS/DSS/","");
+  strutils::replace_all(path,"/DSS/","");
+}
+
 bool verified_new_file_is_archived(std::string& error)
 {
-  if (metautils::args.dsnum == "999.9") {
+  if (metautils::args.dsnum > "998.9") {
     return true;
   }
   MySQL::Server server(metautils::directives.database_server,metautils::directives.rdadb_username,metautils::directives.rdadb_password,"dssdb");
   std::string qstring,column;
-  if (std::regex_search(old_name,std::regex("^(/FS){0,1}/DSS"))) {
+  if (std::regex_search(old_name,std::regex("^(/FS){0,1}/(DSS|DECS)"))) {
     column="mssid";
     if (std::regex_search(new_name,std::regex("\\.\\.m\\.\\."))) {
 	auto new_name_parts=strutils::split(new_name,"..m..");
@@ -103,13 +110,11 @@ void rewrite_uri_in_cmd_file(std::string db)
   if (!tdir.create(metautils::directives.temp_path)) {
     metautils::log_error("unable to create temporary directory","rcm",USER);
   }
-  if (std::regex_search(old_name,std::regex("^(/FS){0,1}/DSS"))) {
+  if (std::regex_search(old_name,std::regex("^(/FS){0,1}/(DSS|DECS)"))) {
     cmdir="fmd";
     db_prefix="";
-    strutils::replace_all(oname,"/FS/DSS/","");
-    strutils::replace_all(oname,"/DSS/","");
-    strutils::replace_all(nname,"/FS/DSS/","");
-    strutils::replace_all(nname,"/DSS/","");
+    strip_hpss_head(oname);
+    strip_hpss_head(nname);
   }
   else if (std::regex_search(old_name,std::regex("^http(s){0,1}://(rda|dss)\\.ucar\\.edu/"))) {
     cmdir="wfmd";
@@ -355,7 +360,7 @@ bool renamed_cmd()
 
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   MySQL::Server server_d(metautils::directives.database_server,metautils::directives.rdadb_username,metautils::directives.rdadb_password,"dssdb");
-  if (std::regex_search(old_name,std::regex("^(/FS){0,1}/DSS"))) {
+  if (std::regex_search(old_name,std::regex("^(/FS){0,1}/(DSS|DECS)"))) {
     filetable="_primaries";
     column="mssID";
     dcolumn="mssfile";
@@ -441,11 +446,19 @@ bool renamed_cmd()
 	    if (unixutils::mysystem2(metautils::directives.local_root+"/bin/dcm -d "+metautils::args.dsnum+" "+old_name,oss,ess) < 0) {
 		std::cerr << ess.str() << std::endl;
 	    }
+	    auto scm_file=nname+".";
+	    strip_hpss_head(scm_file);
+	    if (db.front() == 'W') {
+		scm_file+=db.substr(1);
+	    }
+	    else {
+		scm_file+=db;
+	    }
 	    if (query.num_rows() == 1) {
-		if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+new_dsnum+" "+scm_flag+" "+strutils::substitute(strutils::substitute(strutils::substitute(strutils::substitute(nname,"/FS/DSS/",""),"/DSS/",""),"/","%")+"."+db,"W"+db,db),oss,ess) < 0) {
+		if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+new_dsnum+" "+scm_flag+" "+scm_file,oss,ess) < 0) {
 		  std::cerr << ess.str() << std::endl;
 		}
-		if (!std::regex_search(nname,std::regex("^/FS/DSS")) && db == "WGrML") {
+		if (!std::regex_search(nname,std::regex("^/FS/(DSS|DECS)")) && db == "WGrML") {
 // insert the inventory into the new dataset tables
 		  unixutils::mysystem2(metautils::directives.local_root+"/bin/iinv -d "+new_dsnum+" -f "+strutils::substitute(nname,"/","%")+".GrML_inv",oss,ess);
 		  server.update("WGrML.ds"+strutils::substitute(new_dsnum,".","")+"_webfiles","inv = 'Y'","webID = '"+nname+"'");
@@ -454,7 +467,7 @@ bool renamed_cmd()
 	    else {
 		while (query.fetch_row(row)) {
 		  sp=strutils::split(row[1],"..m..");
-		  if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+new_dsnum+" "+scm_flag+" "+strutils::substitute(strutils::substitute(strutils::substitute(strutils::substitute(nname,"/FS/DSS/",""),"/DSS/",""),"/","%")+"."+db,"W"+db,db)+"..m.."+sp[1],oss,ess) < 0) {
+		  if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+new_dsnum+" "+scm_flag+" "+scm_file+"..m.."+sp[1],oss,ess) < 0) {
 		    std::cerr << ess.str() << std::endl;
 		  }
 		}
@@ -490,9 +503,9 @@ int main(int argc,char **argv)
     std::cerr << "usage: rcm [-C] -d [ds]nnn.n [-nd [ds]nnn.n] [-o old_webhome] old_name new_name" << std::endl;
     std::cerr << "\nrequired:" << std::endl;
     std::cerr << "-d nnn.n        nnn.n is the dataset number where the original file resides" << std::endl;
-    std::cerr << "old_name        old data file name, beginning with '/FS/DSS', '/DSS', or" << std::endl;
+    std::cerr << "old_name        old data file name, beginning with '/FS/DECS','/FS/DSS', '/DSS', or" << std::endl;
     std::cerr << "                'https://rda.ucar.edu'" << std::endl;
-    std::cerr << "new_name        new data file name, beginning with '/FS/DSS', '/DSS'," << std::endl;
+    std::cerr << "new_name        new data file name, beginning with '/FS/DECS'," << std::endl;
     std::cerr << "                'https://rda.ucar.edu', or as for the -WF option of dsarch" << std::endl;
     std::cerr << "\noptions:" << std::endl;
     std::cerr << "-C              no file list cache created (to save time)" << std::endl;
@@ -533,16 +546,10 @@ int main(int argc,char **argv)
   }
   old_name=sp[sp.size()-2];
   new_name=sp[sp.size()-1];
-/*
-  if (!std::regex_search(old_name,std::regex("^(/FS){0,1}/DSS")) && !std::regex_search(old_name,std::regex("^http(s){0,1}://rda\\.ucar\\.edu/"))) {
-    std::cerr << "Error: old_name must begin with '/FS/DSS', '/DSS', or 'https://rda.ucar.edu'" << std::endl;
-    exit(1);
-  }
-*/
-  if (!std::regex_search(old_name,std::regex("^(/FS){0,1}/DSS"))) {
+  if (!std::regex_search(old_name,std::regex("^(/FS){0,1}/(DSS|DECS)"))) {
     old_name="https://rda.ucar.edu"+metautils::directives.data_root_alias+"/ds"+metautils::args.dsnum+"/"+old_name;
   }
-  if (std::regex_search(old_name,std::regex("^(/FS){0,1}/DSS"))) {
+  if (std::regex_search(old_name,std::regex("^(/FS){0,1}/(DSS|DECS)"))) {
     cmd_dir="fmd";
   }
   else if (std::regex_search(old_name,std::regex("^http(s){0,1}://rda\\.ucar\\.edu/"))) {
@@ -552,21 +559,15 @@ int main(int argc,char **argv)
     std::cerr << "Error: metadata directory not found for ds"+metautils::args.dsnum << std::endl;
     exit(1);
   }
-/*
-  if (!std::regex_search(new_name,std::regex("^(/FS){0,1}/DSS")) && !std::regex_search(new_name,std::regex("^https://rda.ucar.edu/"))) {
-    std::cerr << "Error: new_name must begin with '/FS/DSS', '/DSS', or 'https://rda.ucar.edu'" << std::endl;
-    exit(1);
-  }
-*/
-  if (!std::regex_search(new_name,std::regex("^(/FS){0,1}/DSS"))) {
+  if (!std::regex_search(new_name,std::regex("^/FS/DECS"))) {
     new_name="https://rda.ucar.edu"+metautils::directives.data_root_alias+"/ds"+metautils::args.dsnum+"/"+new_name;
   }
   if (new_name == old_name && new_dsnum == metautils::args.dsnum) {
     std::cerr << "Error: new_name must be different from old_name" << std::endl;
     exit(1);
   }
-  if ((std::regex_search(old_name,std::regex("^(/FS){0,1}/DSS")) && !std::regex_search(new_name,std::regex("^(/FS){0,1}/DSS"))) || (std::regex_search(old_name,std::regex("^http(s){0,1}://(rda|dss)\\.ucar\\.edu/")) && !std::regex_search(new_name,std::regex("^https://rda\\.ucar\\.edu/")))) {
-    std::cerr << "Error: you can only rename content metadata for MSS files OR for web files, but not from one to the other" << std::endl;
+  if ((std::regex_search(old_name,std::regex("^(/FS){0,1}/(DSS|DECS)")) && !std::regex_search(new_name,std::regex("^/FS/DECS"))) || (std::regex_search(old_name,std::regex("^http(s){0,1}://(rda|dss)\\.ucar\\.edu/")) && !std::regex_search(new_name,std::regex("^https://rda\\.ucar\\.edu/")))) {
+    std::cerr << "Error: you can only rename content metadata for HPSS files OR for web files, but not from one to the other" << std::endl;
     exit(1);
   }
   metautils::args.path=old_name;
@@ -579,7 +580,7 @@ int main(int argc,char **argv)
 	metautils::log_error("rcm main retured error: no content metadata were found for "+old_name,"rcm",USER);
     }
     if (!no_cache) {
-	if (std::regex_search(new_name,std::regex("^(/FS){0,1}/DSS"))) {
+	if (std::regex_search(new_name,std::regex("^/FS/DECS"))) {
 	  gatherxml::summarizeMetadata::create_file_list_cache("MSS","rcm",USER);
 	}
 	else {
