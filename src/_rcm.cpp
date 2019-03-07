@@ -580,10 +580,10 @@ int main(int argc,char **argv)
     }
     if (!no_cache) {
 	if (std::regex_search(new_name,std::regex("^(/FS){0,1}/DSS"))) {
-	  summarizeMetadata::create_file_list_cache("MSS","rcm",USER);
+	  gatherxml::summarizeMetadata::create_file_list_cache("MSS","rcm",USER);
 	}
 	else {
-	  summarizeMetadata::create_file_list_cache("Web","rcm",USER);
+	  gatherxml::summarizeMetadata::create_file_list_cache("Web","rcm",USER);
 	}
     }
     return 0;
