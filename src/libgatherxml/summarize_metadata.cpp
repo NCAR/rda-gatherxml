@@ -709,9 +709,14 @@ void create_non_cmd_file_list_cache(std::string file_type,my::map<CodeEntry>& fi
     if (strutils::is_numeric(line)) {
 	ifs.getline(line,32768);
 	ifs.getline(line,32768);
+	auto hpss_root_re=std::regex("^"+metautils::directives.hpss_root);
 	while (!ifs.eof()) {
 	  ++noncmdcnt;
 	  auto line_parts=strutils::split(line,"<!>");
+	  if (!std::regex_search(line_parts[0],hpss_root_re)) {
+	    cache_list.clear();
+	    break;
+	  }
 	  CodeEntry e;
 	  e.key=line_parts[0];
 	  if (!files_with_cmd_table.found(e.key,e)) {
