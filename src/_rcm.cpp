@@ -432,12 +432,14 @@ bool renamed_cmd()
 		  if (server.update(db+"."+table,column+" = '"+nname+"'","code = "+row[0]) < 0) {
 		    metautils::log_error("renamed_cmd() returned error: "+server.error(),"rcm",USER);
 		  }
+server.update(db+"."+table+"2",column+" = '"+nname+"'","code = "+row[0]);
 		}
 		else {
 		  sp=strutils::split(row[1],"..m..");
 		  if (server.update(db+"."+table,column+" = '"+nname+"..m.."+sp[1]+"'","code = "+row[0]) < 0) {
 		    metautils::log_error("renamed_cmd() returned error: "+server.error(),"rcm",USER);
 		  }
+server.update(db+"."+table+"2",column+" = '"+nname+"..m.."+sp[1]+"'","code = "+row[0]);
 		}
 	    }
 	  }
