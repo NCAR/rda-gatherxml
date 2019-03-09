@@ -8,7 +8,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <MySQL.hpp>
-#include <gatherxml.hpp>
+#include <metadata.hpp>
 #include <metahelpers.hpp>
 #include <metadata_export.hpp>
 #include <citation.hpp>
