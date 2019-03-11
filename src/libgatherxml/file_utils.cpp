@@ -7,16 +7,6 @@
 #include <metadata.hpp>
 #include <strutils.hpp>
 #include <utils.hpp>
-#include <bfstream.hpp>
-#include <grid.hpp>
-#include <bufr.hpp>
-#include <adpstream.hpp>
-#include <satellite.hpp>
-#include <marine.hpp>
-#include <raob.hpp>
-#include <surface.hpp>
-#include <td32.hpp>
-#include <cyclone.hpp>
 
 namespace metautils {
 
@@ -24,28 +14,8 @@ namespace primaryMetadata {
 
 bool prepare_file_for_metadata_scanning(TempFile& tfile,TempDir& tdir,std::list<std::string> *filelist,std::string& file_format,std::string& error)
 {
-  std::string filename,local_name;
-  std::ifstream ifs;
-  char line[256];
-  std::string sline,sdum;
-  icstream chkstream;
-  struct stat64 statbuf;
-  FILE *p,*ifs64,*ofs;
-  MySQL::Server server;
-  MySQL::LocalQuery query;
-  MySQL::Row row;
-  bool status;
-  std::deque<std::string> sp,spf;
-  int n,m;
-  std::list<std::string> flist,*f;
-  char buffer[32768];
-  long long size=-1;
-  std::string coscombine,fname,f1,web_home;
-  std::stringstream oss,ess;
-  TempDir temp_dir;
-  bool compare_hpss_to_local=false;
-
   error="";
+  TempDir temp_dir;
   if (!temp_dir.create(directives.temp_path)) {
     error="Error creating temporary directory";
     return false;
@@ -53,28 +23,32 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile,TempDir& tdir,std::list<
   if (filelist != NULL) {
     filelist->clear();
   }
-  server.connect(directives.database_server,directives.rdadb_username,directives.rdadb_password,"dssdb");
+  MySQL::Server server(directives.database_server,directives.rdadb_username,directives.rdadb_password,"dssdb");
   if (!server) {
     error="Error connecting to MySQL server";
     return false;
   }
-  if (std::regex_search(args.path,std::regex("^/FS/DSS")) || std::regex_search(args.path,std::regex("^/DSS"))) {
+  if (std::regex_search(args.path,std::regex("^/FS/DECS"))) {
 // HPSS file
+    auto compare_hpss_to_local=false;
     if (!args.override_primary_check) {
-	query.set("dsid,property,file_format","mssfile","mssfile = '"+args.path+"/"+args.filename+"'");
+	MySQL::LocalQuery query("dsid,property,file_format","mssfile","mssfile = '"+args.path+"/"+args.filename+"'");
 	if (query.submit(server) < 0) {
 	  error=query.error();
 	  return false;
 	}
-	status=query.fetch_row(row);
+	MySQL::Row row;
+	auto fetched_row=query.fetch_row(row);
 	if (query.num_rows() == 0 || row[0] != "ds"+args.dsnum || row[1] != "P") {
 	  error=args.path+"/"+args.filename+" is not a primary for this dataset";
 	  return false;
 	}
-	if (status) {
+	if (fetched_row) {
 	  file_format=row[2];
 	}
     }
+    std::string local_name;
+    struct stat64 statbuf;
     if (args.local_name.empty()) {
 	if (strutils::has_ending(strutils::to_lower(args.filename),".htar")) {
 // HTAR file
@@ -83,11 +57,12 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile,TempDir& tdir,std::list<
 	    return false;
  	  }
  	  else {
-	    query.set("file_format","htarfile","dsid = 'ds"+args.dsnum+"' and hfile = '"+args.member_name+"'");
+	    MySQL::LocalQuery query("file_format","htarfile","dsid = 'ds"+args.dsnum+"' and hfile = '"+args.member_name+"'");
 	    if (query.submit(server) < 0) {
 		error=query.error();
 		return false;
 	    }
+	    MySQL::Row row;
 	    if (query.fetch_row(row)) {
 		file_format=row[0];
 	    }
@@ -179,38 +154,41 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile,TempDir& tdir,std::list<
 	  if (!args.member_name.empty()) {
 	    strutils::replace_all(hsi_command,"hsi","htar");
 	  }
+	  long long size=-1;
 	  auto num_retries=0;
 	  while (num_retries < 5) {
+	    FILE *p;
 	    if (!args.member_name.empty()) {
 		p=popen((hsi_command+" -tf "+args.path+"/"+args.filename+" "+args.member_name+" 2>&1").c_str(),"r");
 	    }
 	    else {
 		p=popen((hsi_command+" ls -l "+args.path+"/"+args.filename+" 2>&1").c_str(),"r");
 	    }
+	    char line[256];
 	    while (fgets(line,256,p) != NULL) {
-		sline=line;
-		if ((strutils::contains(sline,"dss") && strutils::contains(sline,args.filename)) || (strutils::contains(sline,"HTAR:") && strutils::contains(sline,args.member_name))) {
-		  sp=strutils::split(sline);
-		  if (sp.size() < 5) {
+		if ((strutils::contains(line,"dss") && strutils::contains(line,args.filename)) || (strutils::contains(line,"HTAR:") && strutils::contains(line,args.member_name))) {
+		  auto line_parts=strutils::split(line);
+		  if (line_parts.size() < 5) {
 		    error="unable to obtain 'hsi ls -l' info for "+args.path+"/"+args.filename;
 		    return false;
 		  }
+		  size_t idx;
 		  if (!args.member_name.empty()) {
-		    n=3;
+		    idx=3;
 		  }
 		  else {
-		    n=4;
+		    idx=4;
 		  }
-		  size=std::stoll(sp[n]);
+		  size=std::stoll(line_parts[idx]);
 		  if (statbuf.st_size != size) {
-		    error="local file size "+strutils::lltos(statbuf.st_size)+" does not match HPSS file size "+sp[n];
+		    error="local file size "+strutils::lltos(statbuf.st_size)+" does not match HPSS file size "+line_parts[idx];
 		    return false;
 		  }
 		}
 	    }
 	    pclose(p);
 	    if (size < 0) {
-		if (strutils::contains(sline,"HTAR SUCCESSFUL")) {
+		if (strutils::contains(line,"HTAR SUCCESSFUL")) {
 		  error="'"+args.member_name+"' is not a member of "+args.path+"/"+args.filename;
 		  return false;
 		}
@@ -224,10 +202,11 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile,TempDir& tdir,std::list<
 	    }
 	  }
 	  if (size < 0) {
-	    error="bad file size "+strutils::lltos(size)+" from 'hsi ls -l' info for "+args.path+"/"+args.filename;
+	    error="bad file size "+strutils::lltos(size)+" from 'hsi ls -l' info for "+args.path+"/"+args.filename+"; hsi command: '"+hsi_command+"'; retries: "+strutils::itos(num_retries)+"; uids: "+strutils::itos(getuid())+"/"+strutils::itos(geteuid());
 	    return false;
 	  }
 	}
+	std::stringstream oss,ess;
 	if (unixutils::mysystem2("/bin/cp "+local_name+" "+tfile.name(),oss,ess) < 0) {
 	  error=ess.str();
 	  return false;
@@ -236,28 +215,30 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile,TempDir& tdir,std::list<
   }
   else if (std::regex_search(args.path,std::regex("^https://rda.ucar.edu"))) {
 // Web file
-    f1=metautils::relative_web_filename(args.path+"/"+args.filename);
-    query.set("property,file_format","wfile","dsid = 'ds"+args.dsnum+"' and wfile = '"+f1+"'");
+    auto wfile=metautils::relative_web_filename(args.path+"/"+args.filename);
+    MySQL::LocalQuery query("property,file_format","wfile","dsid = 'ds"+args.dsnum+"' and wfile = '"+wfile+"'");
     if (query.submit(server) < 0) {
 	error=query.error();
 	return false;
     }
-    status=query.fetch_row(row);
+    MySQL::Row row;
+    auto fetched_row=query.fetch_row(row);
     if (!args.override_primary_check) {
 	if (query.num_rows() == 0 || row[0] != "A") {
 	  error=args.path+"/"+args.filename+" is not active for this dataset";
 	  return false;
 	}
     }
-    if (status) {
+    if (fetched_row) {
 	file_format=row[1];
     }
-    local_name=args.path;
+    auto local_name=args.path;
     strutils::replace_all(local_name,"https://rda.ucar.edu","");
     if (std::regex_search(local_name,std::regex("^"+directives.data_root_alias))) {
 	local_name=directives.data_root+local_name.substr(directives.data_root_alias.length());
     }
     local_name=local_name+"/"+args.filename;
+    struct stat64 statbuf;
     if ( (stat64(local_name.c_str(),&statbuf)) != 0) {
 	local_name=unixutils::remote_web_file(args.path+"/"+args.filename,temp_dir.name());
 	if (local_name.empty()) {
@@ -271,7 +252,7 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile,TempDir& tdir,std::list<
     error="path of file '"+args.path+"' not recognized";
     return false;
   }
-  filename=tfile.name();
+  auto filename=tfile.name();
   if (strutils::has_ending(file_format,"HTAR")) {
     strutils::chop(file_format,4);
     if (file_format.back() == '.') {
@@ -281,14 +262,15 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile,TempDir& tdir,std::list<
   if (file_format.empty()) {
     if (args.data_format == "grib" ||  args.data_format == "grib2" || strutils::contains(args.data_format,"bufr") || args.data_format == "mcidas") {
 // check to see if file is COS-blocked
-	if (!chkstream.open(filename.c_str())) {
-	  error="unable to open "+filename;
-	  return false;
-	}
-	if (chkstream.ignore() > 0) {
+	std::stringstream oss,ess;
+	unixutils::mysystem2(directives.dss_bindir+"/cosfile "+filename,oss,ess);
+	if (ess.str().empty()) {
 	  system((directives.dss_bindir+"/cosconvert -b "+filename+" 1> /dev/null").c_str());
 	}
-	chkstream.close();
+	else if (!std::regex_search(ess.str(),std::regex("error on record 1"))) {
+	  error="unable to open '"+filename+"'; error: "+ess.str();
+	  return false;
+	}
 	while (expand_file(tdir.name(),filename,&file_format));
     }
     else {
@@ -299,15 +281,17 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile,TempDir& tdir,std::list<
     }
   }
   else {
-    spf=strutils::split(file_format,".");
-    if (spf.size() > 3) {
+    auto ffparts=strutils::split(file_format,".");
+    if (ffparts.size() > 3) {
 	error="archive file format is too complicated";
 	return false;
     }
-    for (n=spf.size()-1; n >= 0; n--) {
-	if (spf[n] == "BI") {
-	  if (n == 0 || spf[n-1] != "LVBS") {
+    std::list<std::string> flist;
+    for (int n=ffparts.size()-1; n >= 0; n--) {
+	if (ffparts[n] == "BI") {
+	  if (n == 0 || ffparts[n-1] != "LVBS") {
 	    if (args.data_format == "grib" || args.data_format == "grib2" || strutils::contains(args.data_format,"bufr") || args.data_format == "mcidas") {
+		std::stringstream oss,ess;
 		unixutils::mysystem2(directives.dss_bindir+"/cosconvert -b "+filename+" "+filename+".bi",oss,ess);
 		if (!ess.str().empty()) {
 		  error=ess.str();
@@ -319,49 +303,51 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile,TempDir& tdir,std::list<
 	    }
 	  }
 	}
-	else if (spf[n] == "CH" || spf[n] == "C1") {
+	else if (ffparts[n] == "CH" || ffparts[n] == "C1") {
 	  if (args.data_format == "grib" || args.data_format == "grib2" || strutils::contains(args.data_format,"bufr") || args.data_format == "mcidas") {
 	    system((directives.dss_bindir+"/cosconvert -c "+filename+" 1> /dev/null").c_str());
 	  }
 	}
-	else if (spf[n] == "GZ" || spf[n] == "BZ2") {
+	else if (ffparts[n] == "GZ" || ffparts[n] == "BZ2") {
 	  std::string command,ext;
-	  if (spf[n] == "GZ") {
+	  if (ffparts[n] == "GZ") {
 	    command="gunzip";
 	    ext="gz";
 	  }
-	  else if (spf[n] == "BZ2") {
+	  else if (ffparts[n] == "BZ2") {
 	    command="bunzip2";
 	    ext="bz2";
 	  }
-	  if (spf[n] == spf.back()) {
+	  if (ffparts[n] == ffparts.back()) {
 	    system(("mv "+filename+" "+filename+"."+ext+"; "+command+" -f "+filename+"."+ext).c_str());
 	  }
-	  else if (spf[n] == spf.front()) {
+	  else if (ffparts[n] == ffparts.front()) {
 	    if ((args.data_format == "cxml" || args.data_format == "tcvitals" || strutils::contains(args.data_format,"netcdf") || strutils::contains(args.data_format,"hdf") || strutils::contains(args.data_format,"bufr")) && filelist != NULL) {
 		for (const auto& file : *filelist) {
 		  flist.emplace_back(file);
 		}
 		filelist->clear();
 	    }
-	    ofs=fopen64(filename.c_str(),"w");
-	    for (const auto& file : flist) {
+	    auto ofs=fopen64(filename.c_str(),"w");
+	    for (auto file : flist) {
 		system((command+" -f "+file).c_str());
-		sdum=file;
-		strutils::replace_all(sdum,"."+ext,"");
+		strutils::replace_all(file,"."+ext,"");
 		if (args.data_format != "cxml" && args.data_format != "tcvitals" && !strutils::contains(args.data_format,"netcdf") && !strutils::contains(args.data_format,"hdf")) {
-		  if ( (ifs64=fopen64(sdum.c_str(),"r")) == NULL) {
-		    error="error while combining ."+ext+" files - could not open "+sdum;
+		  auto ifs64=fopen64(file.c_str(),"r");
+		  if (ifs64 == nullptr) {
+		    error="error while combining ."+ext+" files - could not open "+file;
 		    return false;
 		  }
-		  while ( (m=fread(buffer,1,32768,ifs64)) > 0) {
-		    fwrite(buffer,1,m,ofs);
+		  char buffer[32768];
+		  auto num_bytes=fread(buffer,1,32768,ifs64);
+		  while (num_bytes > 0) {
+		    fwrite(buffer,1,num_bytes,ofs);
 		  }
 		  fclose(ifs64);
 		}
 		else {
 		  if (filelist != nullptr) {
-		    filelist->emplace_back(sdum);
+		    filelist->emplace_back(file);
 		  }
 		  else {
 		    error="non-null filelist must be provided for format "+args.data_format;
@@ -376,13 +362,14 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile,TempDir& tdir,std::list<
 	    return false;
 	  }
 	}
-	else if (spf[n] == "TAR" || spf[n] == "TGZ") {
+	else if (ffparts[n] == "TAR" || ffparts[n] == "TGZ") {
 	  if (n == 0 && args.data_format != "cxml" && args.data_format != "tcvitals" && !strutils::contains(args.data_format,"netcdf") && !std::regex_search(args.data_format,std::regex("nc$")) && !strutils::contains(args.data_format,"hdf") && args.data_format != "mcidas" && args.data_format != "uadb") {
 	    if (std::regex_search(args.data_format,std::regex("^grib"))) {
 		expand_file(tdir.name(),filename,NULL);
 	    }
 	  }
-	  else if (args.data_format == "cxml" || args.data_format == "tcvitals" || strutils::contains(args.data_format,"netcdf") || std::regex_search(args.data_format,std::regex("nc$")) || strutils::contains(args.data_format,"hdf") || args.data_format == "mcidas" || args.data_format == "uadb" || strutils::contains(args.data_format,"bufr") || n == static_cast<int>(spf.size()-1)) {
+	  else if (args.data_format == "cxml" || args.data_format == "tcvitals" || strutils::contains(args.data_format,"netcdf") || std::regex_search(args.data_format,std::regex("nc$")) || strutils::contains(args.data_format,"hdf") || args.data_format == "mcidas" || args.data_format == "uadb" || strutils::contains(args.data_format,"bufr") || n == static_cast<int>(ffparts.size()-1)) {
+	    std::list<std::string> *f;
 	    if (args.data_format == "cxml" || args.data_format == "tcvitals" || strutils::contains(args.data_format,"netcdf") || std::regex_search(args.data_format,std::regex("nc$")) || strutils::contains(args.data_format,"hdf") || args.data_format == "mcidas" || args.data_format == "uadb") {
 		if (filelist != nullptr) {
 		  f=filelist;
@@ -395,43 +382,45 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile,TempDir& tdir,std::list<
 	    else {
 		f=&flist;
 	    }
-	    p=popen(("tar tvf "+filename+" 2>&1").c_str(),"r");
+	    auto p=popen(("tar tvf "+filename+" 2>&1").c_str(),"r");
+	    char line[256];
 	    while (fgets(line,256,p) != NULL) {
-		sline=line;
-		if (strutils::contains(sline,"checksum error")) {
+		if (strutils::contains(line,"checksum error")) {
 		  error="tar extraction failed - is it really a tar file?";
 		  return false;
 		}
-		else if (sline[0] == '-') {
+		else if (line[0] == '-') {
+		  std::string sline=line;
 		  strutils::chop(sline);
-		  sp=strutils::split(sline,"");
-		  f->emplace_back(tdir.name()+"/"+sp[sp.size()-1]);
+		  auto line_parts=strutils::split(sline,"");
+		  f->emplace_back(tdir.name()+"/"+line_parts.back());
 		}
 	    }
 	    pclose(p);
-	    sdum=filename.substr(filename.rfind("/")+1);
-	    system(("mv "+filename+" "+tdir.name()+"/; cd "+tdir.name()+"; tar xvf "+sdum+" 1> /dev/null 2>&1").c_str());
+	    auto tar_file=filename.substr(filename.rfind("/")+1);
+	    system(("mv "+filename+" "+tdir.name()+"/; cd "+tdir.name()+"; tar xvf "+tar_file+" 1> /dev/null 2>&1").c_str());
 	  }
 	  else {
 	    error="archive file format is too complicated";
 	    return false;
 	  }
 	}
-	else if (spf[n] == "VBS") {
-	  if (static_cast<int>(spf.size()) >= (n+2) && spf[n+1] == "BI") {
+	else if (ffparts[n] == "VBS") {
+	  if (static_cast<int>(ffparts.size()) >= (n+2) && ffparts[n+1] == "BI") {
 	    system((directives.dss_bindir+"/cosconvert -v "+filename+" "+filename+".vbs 1> /dev/null;mv "+filename+".vbs "+filename).c_str());
 	  }
 	}
-	else if (spf[n] == "LVBS") {
-	  if (static_cast<int>(spf.size()) >= (n+2) && spf[n+1] == "BI") {
+	else if (ffparts[n] == "LVBS") {
+	  if (static_cast<int>(ffparts.size()) >= (n+2) && ffparts[n+1] == "BI") {
 	    system((directives.dss_root+"/bin/cossplit -p "+filename+" "+filename).c_str());
-	    m=2;
-	    coscombine=directives.dss_root+"/bin/coscombine noeof";
-	    fname=filename+".f"+strutils::ftos(m,3,0,'0');
+	    auto file_num=2;
+	    std::string coscombine=directives.dss_root+"/bin/coscombine noeof";
+	    auto fname=filename+".f"+strutils::ftos(file_num,3,0,'0');
+	    struct stat64 statbuf;
 	    while (stat64(fname.c_str(),&statbuf) == 0) {
 		coscombine+=" "+fname;
-		m+=3;
-		fname=filename+".f"+strutils::ftos(m,3,0,'0');
+		file_num+=3;
+		fname=filename+".f"+strutils::ftos(file_num,3,0,'0');
 	    }
 	    coscombine+=" "+filename+" 1> /dev/null";
 	    system(coscombine.c_str());
@@ -439,31 +428,31 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile,TempDir& tdir,std::list<
 	    system((directives.dss_bindir+"/cosconvert -v "+filename+" "+filename+".vbs 1> /dev/null;mv "+filename+".vbs "+filename).c_str());
 	  }
 	}
-	else if (spf[n] == "Z") {
-	  if (n == static_cast<int>(spf.size()-1))
+	else if (ffparts[n] == "Z") {
+	  if (n == static_cast<int>(ffparts.size()-1))
 	    system(("mv "+filename+" "+filename+".Z; uncompress "+filename).c_str());
 	  else if (n == 0) {
-	    ofs=fopen64(filename.c_str(),"w");
-	    for (auto& file : flist) {
+	    auto ofs=fopen64(filename.c_str(),"w");
+	    for (auto file : flist) {
 		system(("uncompress "+file).c_str());
-		sdum=file;
-		strutils::replace_all(sdum,".Z","");
+		strutils::replace_all(file,".Z","");
 		if (!strutils::contains(args.data_format,"netcdf") && !strutils::contains(args.data_format,"hdf")) {
-		  ifs.open(sdum.c_str());
+		  std::ifstream ifs(file.c_str());
 		  if (!ifs) {
 		    error="error while combining .Z files";
 		    return false;
 		  }
 		  while (!ifs.eof()) {
+		    char buffer[32768];
 		    ifs.read(buffer,32768);
-		    m=ifs.gcount();
-		    fwrite(buffer,1,m,ofs);
+		    auto num_bytes=ifs.gcount();
+		    fwrite(buffer,1,num_bytes,ofs);
 		  }
 		  ifs.close();
 		}
 		else {
 		  if (filelist != NULL) {
-		    filelist->emplace_back(sdum);
+		    filelist->emplace_back(file);
 		  }
 		  else {
 		    error="non-null filelist must be provided for format "+args.data_format;
@@ -478,106 +467,17 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile,TempDir& tdir,std::list<
 	    return false;
 	  }
 	}
-	else if (spf[n] == "RPTOUT") {
+	else if (ffparts[n] == "RPTOUT") {
 // no action needed for these archive formats
 	}
 	else {
-	  error="don't recognize '"+spf[n]+"' in archive format field for this HPSS file";
+	  error="don't recognize '"+ffparts[n]+"' in archive format field for this HPSS file";
 	  return false;
 	}
     }
   }
   server.disconnect();
   return true;
-}
-
-bool open_file_for_metadata_scanning(void *istream,std::string filename,std::string& error)
-{
-  if (args.data_format == "on29" || args.data_format == "on124") {
-    return (reinterpret_cast<InputADPStream *>(istream))->open(filename);
-  }
-  else if (strutils::contains(args.data_format,"bufr")) {
-    return (reinterpret_cast<InputBUFRStream *>(istream))->open(filename);
-  }
-  else if (args.data_format == "grib" || args.data_format == "grib2") {
-    return (reinterpret_cast<InputGRIBStream *>(istream))->open(filename);
-  }
-  else if (args.data_format == "jraieeemm") {
-    return (reinterpret_cast<InputJRAIEEEMMGridStream *>(istream))->open(filename);
-  }
-  else if (args.data_format == "ll") {
-    return (reinterpret_cast<InputLatLonGridStream *>(istream))->open(filename);
-  }
-  else if (args.data_format == "mcidas") {
-    return (reinterpret_cast<InputMcIDASStream *>(istream))->open(filename.c_str());
-  }
-  else if (args.data_format == "navy") {
-    return (reinterpret_cast<InputNavyGridStream *>(istream))->open(filename);
-  }
-  else if (args.data_format == "noaapod") {
-    return (reinterpret_cast<InputNOAAPolarOrbiterDataStream *>(istream))->open(filename.c_str());
-  }
-  else if (args.data_format == "oct") {
-    return (reinterpret_cast<InputOctagonalGridStream *>(istream))->open(filename);
-  }
-  else if (args.data_format == "tropical") {
-    return (reinterpret_cast<InputTropicalGridStream *>(istream))->open(filename);
-  }
-  else if (args.data_format == "on84") {
-    return (reinterpret_cast<InputON84GridStream *>(istream))->open(filename);
-  }
-  else if (args.data_format == "slp") {
-    return (reinterpret_cast<InputSLPGridStream *>(istream))->open(filename);
-  }
-  else if (args.data_format == "tsr") {
-    return (reinterpret_cast<InputTsraobStream *>(istream))->open(filename);
-  }
-  else if (args.data_format == "ussrslp") {
-    return (reinterpret_cast<InputUSSRSLPGridStream *>(istream))->open(filename);
-  }
-  else if (args.data_format == "cpcsumm") {
-    return (reinterpret_cast<InputCPCSummaryObservationStream *>(istream))->open(filename);
-  }
-  else if (args.data_format == "imma") {
-    return (reinterpret_cast<InputIMMAObservationStream *>(istream))->open(filename);
-  }
-  else if (args.data_format == "isd") {
-    return (reinterpret_cast<InputISDObservationStream *>(istream))->open(filename);
-  }
-  else if (args.data_format == "nodcbt") {
-    return (reinterpret_cast<InputNODCBTObservationStream *>(istream))->open(filename);
-  }
-  else if (std::regex_search(args.data_format,std::regex("^td32"))) {
-    return (reinterpret_cast<InputTD32Stream *>(istream))->open(filename);
-  }
-  else if (args.data_format == "wmssc") {
-    return (reinterpret_cast<InputWMSSCObservationStream *>(istream))->open(filename);
-  }
-  else if (args.data_format == "hurdat") {
-    return (reinterpret_cast<InputHURDATCycloneStream *>(istream))->open(filename);
-  }
-  else if (args.data_format == "tcvitals") {
-    return (reinterpret_cast<InputTCVitalsCycloneStream *>(istream))->open(filename);
-  }
-  else if (args.data_format == "cgcm1") {
-    return (reinterpret_cast<InputCGCM1GridStream *>(istream))->open(filename);
-  }
-  else if (args.data_format == "cmorph025") {
-    return (reinterpret_cast<InputCMORPH025GridStream *>(istream))->open(filename);
-  }
-  else if (args.data_format == "cmorph8km") {
-    return (reinterpret_cast<InputCMORPH8kmGridStream *>(istream))->open(filename);
-  }
-  else if (args.data_format == "gpcp") {
-    return (reinterpret_cast<InputGPCPGridStream *>(istream))->open(filename);
-  }
-  else if (args.data_format == "uadb") {
-    return (reinterpret_cast<InputUADBRaobStream *>(istream))->open(filename);
-  }
-  else {
-    error=args.data_format+"-formatted files not recognized";
-    return false;
-  }
 }
 
 } // end namespace primaryMetadata
