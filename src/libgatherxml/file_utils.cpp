@@ -166,7 +166,8 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile,TempDir& tdir,std::list<
 	    }
 	    char line[256];
 	    while (fgets(line,256,p) != NULL) {
-		if ((strutils::contains(line,"dss") && strutils::contains(line,args.filename)) || (strutils::contains(line,"HTAR:") && strutils::contains(line,args.member_name))) {
+// look for owner rdadata or indication that it is an HTAR file
+		if ((strutils::contains(line,"rdadata") && strutils::contains(line,args.filename)) || (strutils::contains(line,"HTAR:") && strutils::contains(line,args.member_name))) {
 		  auto line_parts=strutils::split(line);
 		  if (line_parts.size() < 5) {
 		    error="unable to obtain 'hsi ls -l' info for "+args.path+"/"+args.filename;
