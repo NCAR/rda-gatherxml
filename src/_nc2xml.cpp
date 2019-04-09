@@ -4856,6 +4856,27 @@ int main(int argc,char **argv)
 	std::cout << "...'scm' finished." << std::endl;
     }
   }
+  else if (metautils::args.dsnum == "999.9") {
+    std::cout << "Output is in:" << std::endl;
+    std::cout << "  " << tdir << "/" << metautils::args.filename << ".";
+    switch (write_type) {
+	case GrML_type:
+	{
+	  std::cout << "Gr";
+	  break;
+	}
+	case ObML_type:
+	{
+	  std::cout << "Ob";
+	  break;
+	}
+	default:
+	{
+	  std::cout << "??";
+	}
+    }
+    std::cout << "ML" << std::endl;
+  }
   if (inv_stream.is_open()) {
     std::vector<std::pair<int,std::string>> sorted_keys;
     if (write_type == GrML_type) {

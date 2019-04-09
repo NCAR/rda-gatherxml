@@ -2588,6 +2588,27 @@ int main(int argc,char **argv)
 	std::cerr << ess.str() << std::endl;
     }
   }
+  else if (metautils::args.dsnum == "999.9") {
+    std::cout << "Output is in:" << std::endl;
+    std::cout << "  " << xml_directory << "/" << metautils::args.filename << ".";
+    switch (write_type) {
+	case GrML_type:
+	{
+	  std::cout << "Gr";
+	  break;
+	}
+	case ObML_type:
+	{
+	  std::cout << "Ob";
+	  break;
+	}
+	default:
+	{
+	  std::cout << "??";
+	}
+    }
+    std::cout << "ML" << std::endl;
+  }
   if (inv_stream.is_open()) {
     InvEntry ie;
     for (const auto& key : inv_U_table.keys()) {
