@@ -121,9 +121,9 @@ int main(int argc,char **argv)
     }
   }
   metautils::read_config("gatherxml",USER);
-  ifs.open((metautils::directives.dss_root+"/bin/conf/gatherxml.conf").c_str());
+  ifs.open((metautils::directives.decs_root+"/bin/conf/gatherxml.conf").c_str());
   if (!ifs.is_open()) {
-    metautils::log_error("unable to open "+metautils::directives.dss_root+"/bin/conf/gatherxml.conf","gatherxml",USER);
+    metautils::log_error("unable to open "+metautils::directives.decs_root+"/bin/conf/gatherxml.conf","gatherxml",USER);
   }
   ifs.getline(line,256);
   while (!ifs.eof()) {
@@ -187,7 +187,7 @@ int main(int argc,char **argv)
   }
   if (showinfo) {
     for (const auto& key : utility_table.keys()) {
-	p=popen((metautils::directives.dss_bindir+"/"+key+" 2>&1").c_str(),"r");
+	p=popen((metautils::directives.decs_bindir+"/"+key+" 2>&1").c_str(),"r");
 	std::cerr << "\nutility:" << strutils::substitute(key,"_"," ") << std::endl;
 	std::cerr << "supported formats (\"-f\" flag):" << std::endl;
 	while (fgets(line,256,p) != nullptr) {
@@ -278,13 +278,16 @@ int main(int argc,char **argv)
     }
     if (utility_lookup_table.found(metautils::args.data_format,e)) {
 	auto t1=std::time(nullptr);
-	if (unixutils::mysystem2(metautils::directives.dss_bindir+"/"+e.string+" "+strutils::substitute(metautils::args.args_string,"%"," "),oss,ess) < 0) {
+	if (unixutils::mysystem2(metautils::directives.decs_bindir+"/"+e.string+" "+strutils::substitute(metautils::args.args_string,"%"," "),oss,ess) < 0) {
 	  if (std::regex_search(ess.str(),std::regex("^Terminating"))) {
 	    std::cerr << ess.str() << std::endl;
 	  }
 	  else {
 	    metautils::log_error("-q"+ess.str(),"gatherxml",USER);
 	  }
+	}
+	else if (!oss.str().empty()) {
+	  std::cout << oss.str() << std::endl;
 	}
 	auto t2=std::time(nullptr);
 	metautils::log_warning("execution time: "+strutils::ftos(t2-t1)+" seconds","gatherxml.time",USER);
@@ -294,7 +297,7 @@ int main(int argc,char **argv)
 	  if (utility_lookup_table.found(e.string,e)) {
 	    strutils::replace_all(metautils::args.args_string,"-f%"+metautils::args.data_format,"-f%"+e.key);
 	    auto t1=std::time(nullptr);
-	    if (unixutils::mysystem2(metautils::directives.dss_bindir+"/"+e.string+" "+strutils::substitute(metautils::args.args_string,"%"," "),oss,ess) < 0) {
+	    if (unixutils::mysystem2(metautils::directives.decs_bindir+"/"+e.string+" "+strutils::substitute(metautils::args.args_string,"%"," "),oss,ess) < 0) {
 		if (std::regex_search(ess.str(),std::regex("^Terminating"))) {
 		  std::cerr << ess.str() << std::endl;
 		}
