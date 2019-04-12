@@ -356,13 +356,13 @@ std::string gridded_time_method(const netCDFStream::Variable& var,std::string ti
 	strutils::replace_all(cell_methods,"comment:","");
 	strutils::replace_all(cell_methods,"comments:","");
 	if (!cell_methods.empty() && std::regex_search(cell_methods,std::regex(strutils::substitute(timeid,".","\\.")+":"))) {
-	  auto idx=cell_methods.find(timeid+":");
+	  auto idx=cell_methods.find(timeid+": ");
 	  if (idx != std::string::npos) {
 	    cell_methods=cell_methods.substr(idx);
 	  }
-	  strutils::replace_all(cell_methods,timeid+":","");
+	  strutils::replace_all(cell_methods,timeid+": ","");
 	  strutils::trim(cell_methods);
-	  idx=cell_methods.find(":");
+	  idx=cell_methods.find(": ");
 	  if (idx == std::string::npos) {
 	    return cell_methods;
 	  }
@@ -371,7 +371,7 @@ std::string gridded_time_method(const netCDFStream::Variable& var,std::string ti
 	    auto idx2=cell_methods.find(" ");
 	    while (idx2 != std::string::npos && idx2 > idx) {
 		cell_methods=cell_methods.substr(idx2+1);
-		idx=cell_methods.find(":");
+		idx=cell_methods.find(": ");
 		idx2=cell_methods.find(" ");
 	    }
 	    idx=cell_methods.find(")");
@@ -460,7 +460,7 @@ void add_gridded_parameters_to_netcdf_level_entry(const std::vector<netCDFStream
 	if (!error.empty()) {
 	  metautils::log_error(error,"nc2xml",USER);
 	}
-	tr_description=strutils::capitalize(tr_description);
+//	tr_description=strutils::capitalize(tr_description);
 	if (strutils::has_ending(gentry_key,tr_description)) {
 // check as a zonal mean grid variable
 	  if (std::regex_search(gentry_key,std::regex("^[12]<!>1<!>"))) {
@@ -507,7 +507,6 @@ void add_gridded_time_range(std::string key_start,std::vector<std::string>& gent
 	  found_var_with_no_time_method=true;
 	}
 	else {
-	  time_method=strutils::capitalize(time_method);
 	  std::string error;
 	  gentry_key=key_start+metautils::NcTime::gridded_netcdf_time_range_description(tre,time_data,time_method,error);
 	  if (!error.empty()) {
@@ -2270,31 +2269,36 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream,NetCDFVariables& nc_var
 		  for (size_t l=0; l < vars.size(); ++l) {
 		    if (vars[l].name == climo_bounds_name) {
 			istream.variable_data(vars[l].name,var_data);
+/*
 			std::unique_ptr<double[]> ta1(new double[var_data.size()/2]);
 			std::unique_ptr<double[]> ta2(new double[var_data.size()/2]);
 			for (size_t x=0; x < static_cast<size_t>(var_data.size()); x+=2) {
 			  ta1[x/2]=var_data[x];
 			  ta2[x/2]=var_data[x+1];
 			}
+*/
+			time_bounds_s.t1=var_data.front();
+			time_bounds_s.t2=var_data.back();
 			size_t nsteps=var_data.size()/2;
 			for (size_t x=0; x < nsteps; ++x) {
 			  DateTime d1,d2;
 			  if (time_data.units == "hours") {
-			    d1=time_data.reference.hours_added(ta1[x]);
-			    d2=time_data.reference.hours_added(ta2[x]);
+			    d1=time_data.reference.hours_added(var_data[x*2]);
+			    d2=time_data.reference.hours_added(var_data[x*2+1]);
 			  }
 			  else if (time_data.units == "days") {
-			    d1=time_data.reference.days_added(ta1[x]);
-			    d2=time_data.reference.days_added(ta2[x]);
+			    d1=time_data.reference.days_added(var_data[x*2]);
+			    d2=time_data.reference.days_added(var_data[x*2+1]);
 			  }
 			  else if (time_data.units == "months") {
-			    d1=time_data.reference.months_added(ta1[x]);
-			    d2=time_data.reference.months_added(ta2[x]);
+			    d1=time_data.reference.months_added(var_data[x*2]);
+			    d2=time_data.reference.months_added(var_data[x*2+1]);
 			  }
 			  else {
 			    metautils::log_error("don't understand climatology_bounds units in "+time_data.units,"nc2xml",USER);
 			  }
-			  tre.key=d2.years_since(d1)+1;
+//			  tre.key=d2.years_since(d1)+1;
+tre.key=d2.months_since(d1)/12;
 			  if (!tr_table.found(tre.key,tre)) {
 			    tre.data.reset(new metautils::NcTime::TimeRangeEntry::Data);
 			    tre.data->instantaneous.first_valid_datetime.set(static_cast<long long>(30001231235959));
@@ -2336,6 +2340,13 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream,NetCDFVariables& nc_var
 			  ++(tre.data->num_steps);
 			}
 			l=vars.size();
+		    }
+		  }
+		  if (gatherxml::verbose_operation) {
+		    for (const auto& tr_key : tr_table.keys()) {
+			tr_table.found(tr_key,tre);
+			std::cout << "   ...setting temporal range for climatology key " << tr_key << " to:" << std::endl;
+			std::cout << "      " << tre.data->bounded.first_valid_datetime.to_string() << " to " << tre.data->bounded.last_valid_datetime.to_string() << ", units=" << tre.data->unit << std::endl;
 		    }
 		  }
 		}
