@@ -1713,7 +1713,7 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
 	  units_value=std::string(reinterpret_cast<char *>(&attr.value.vlen.buffer[4]),len);
 	}
 	if (gatherxml::verbose_operation) {
-	  std::cerr << "      ...units attribute: '" << units_value << "'" << std::endl;
+	  std::cout << "      ...units attribute: '" << units_value << "'" << std::endl;
 	}
 	std::string standard_name_value;
 	if (var.dataset->attributes.found("standard_name",attr) && (attr.value._class_ == 3 || (attr.value._class_ == 9 && attr.value.vlen.class_ == 3))) {
@@ -1771,6 +1771,9 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
 	    }
 	  }
 	  time_data.reference.set(dt);
+	  if (var.dataset->attributes.found("calendar",attr)) {
+	    time_data.calendar.assign(reinterpret_cast<char *>(attr.value.get()),attr.value.size);
+	  }
 	  found_time=true;
 	}
 	else if (units_value == "degrees_north") {
@@ -2279,6 +2282,9 @@ std::cerr << floatutils::myequalf(data_array_value(gcoords.latitude.data_array,c
 	    time_range_table.found(key,tre);
 	    add_gridded_lat_lon_keys(gentry_table,dim,def,tre,gcoords,istream);
 	    for (const auto& key2 : gentry_table.keys()) {
+		if (gatherxml::verbose_operation) {
+		  std::cout << "   ...processing grid entry: " << key2 << std::endl;
+		}
 		gentry->key=key2;
 		sp=strutils::split(gentry->key,"<!>");
 		InvEntry uie,gie;
