@@ -355,7 +355,7 @@ std::string gridded_time_method(const netCDFStream::Variable& var,std::string ti
 	strutils::replace_all(cell_methods,"comments: ","");
 	strutils::replace_all(cell_methods,"comment:","");
 	strutils::replace_all(cell_methods,"comments:","");
-	if (!cell_methods.empty() && std::regex_search(cell_methods,std::regex(strutils::substitute(timeid,".","\\.")+":"))) {
+	if (!cell_methods.empty() && std::regex_search(cell_methods,std::regex(strutils::substitute(timeid,".","\\.")+": "))) {
 	  auto idx=cell_methods.find(timeid+": ");
 	  if (idx != std::string::npos) {
 	    cell_methods=cell_methods.substr(idx);
