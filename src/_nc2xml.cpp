@@ -2297,8 +2297,7 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream,NetCDFVariables& nc_var
 			  else {
 			    metautils::log_error("don't understand climatology_bounds units in "+time_data.units,"nc2xml",USER);
 			  }
-//			  tre.key=d2.years_since(d1)+1;
-tre.key=d2.months_since(d1)/12;
+			  tre.key=d2.years_since(d1)+1;
 			  if (!tr_table.found(tre.key,tre)) {
 			    tre.data.reset(new metautils::NcTime::TimeRangeEntry::Data);
 			    tre.data->instantaneous.first_valid_datetime.set(static_cast<long long>(30001231235959));
