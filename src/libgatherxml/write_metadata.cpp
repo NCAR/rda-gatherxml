@@ -366,6 +366,233 @@ void write(my::map<FeatureEntry>& feature_table,my::map<StageEntry>& stage_table
 
 namespace GrML {
 
+void write_latitude_longitude_grid(std::deque<std::string>& grid_params,bool is_cell,std::ofstream& ofs)
+{
+  auto slat=grid_params[3];
+  if (std::regex_search(slat,std::regex("^-"))) {
+    slat=slat.substr(1)+"S";
+  }
+  else {
+    slat+="N";
+  }
+  auto slon=grid_params[4];
+  if (std::regex_search(slon,std::regex("^-"))) {
+    slon=slon.substr(1)+"W";
+  }
+  else {
+    slon+="E";
+  }
+  auto elat=grid_params[5];
+  if (std::regex_search(elat,std::regex("^-"))) {
+    elat=elat.substr(1)+"S";
+  }
+  else {
+    elat+="N";
+  }
+  auto elon=grid_params[6];
+  if (std::regex_search(elon,std::regex("^-"))) {
+    elon=elon.substr(1)+"W";
+  }
+  else {
+    elon+="E";
+  }
+  ofs << "  <grid timeRange=\"" << grid_params[9] << "\" definition=\"latLon\" numX=\"" << grid_params[1] << "\" numY=\"" << grid_params[2] << "\" startLat=\"" << slat << "\" startLon=\"" << slon << "\" endLat=\"" << elat << "\" endLon=\"" << elon << "\" xRes=\"" << grid_params[7] << "\" yRes=\"" << grid_params[8] << "\"";
+  if (is_cell) {
+    ofs << " isCell=\"true\"";
+  }
+  ofs << ">" << std::endl;
+}
+
+void write_gaussian_latitude_longitude_grid(std::deque<std::string>& grid_params,bool is_cell,std::ofstream& ofs)
+{
+  auto slat=grid_params[3];
+  if (strutils::has_beginning(slat,"-")) {
+    slat=slat.substr(1)+"S";
+  }
+  else {
+    slat+="N";
+  }
+  auto slon=grid_params[4];
+  if (strutils::has_beginning(slon,"-")) {
+    slon=slon.substr(1)+"W";
+  }
+  else {
+    slon+="E";
+  }
+  auto elat=grid_params[5];
+  if (strutils::has_beginning(elat,"-")) {
+    elat=elat.substr(1)+"S";
+  }
+  else {
+    elat+="N";
+  }
+  auto elon=grid_params[6];
+  if (strutils::has_beginning(elon,"-")) {
+    elon=elon.substr(1)+"W";
+  }
+  else {
+    elon+="E";
+  }
+  ofs << "  <grid timeRange=\"" << grid_params[9] << "\" definition=\"gaussLatLon\" numX=\"" << grid_params[1] << "\" numY=\"" << grid_params[2] << "\" startLat=\"" << slat << "\" startLon=\"" << slon << "\" endLat=\"" << elat << "\" endLon=\"" << elon << "\" xRes=\"" << grid_params[7] << "\" circles=\"" << grid_params[8] << "\">" << std::endl;
+}
+
+void write_polar_stereographic_grid(std::deque<std::string>& grid_params,bool is_cell,std::ofstream& ofs)
+{
+  auto slat=grid_params[3];
+  if (strutils::has_beginning(slat,"-")) {
+    slat=slat.substr(1)+"S";
+  }
+  else {
+    slat+="N";
+  }
+  auto slon=grid_params[4];
+  if (strutils::has_beginning(slon,"-")) {
+    slon=slon.substr(1)+"W";
+  }
+  else {
+    slon+="E";
+  }
+  auto elat=grid_params[5];
+  if (strutils::has_beginning(elat,"-")) {
+    elat=elat.substr(1)+"S";
+  }
+  else {
+    elat+="N";
+  }
+  auto elon=grid_params[6];
+  if (strutils::has_beginning(elon,"-")) {
+    elon=elon.substr(1)+"W";
+  }
+  else {
+    elon+="E";
+  }
+  ofs << "  <grid timeRange=\"" << grid_params[10] << "\" definition=\"polarStereographic\" numX=\"" << grid_params[1] << "\" numY=\"" << grid_params[2] << "\"  startLat=\"" << slat << "\" startLon=\"" << slon << "\" resLat=\"" << elat << "\" projLon=\"" << elon << "\" pole=\"" << grid_params[9] << "\" xRes=\"" << grid_params[7] << "\" yRes=\"" << grid_params[8] << "\">" << std::endl;
+}
+
+void write_lambert_conformal_grid(std::deque<std::string>& grid_params,bool is_cell,std::ofstream& ofs)
+{
+  auto slat=grid_params[3];
+  if (strutils::has_beginning(slat,"-")) {
+    slat=slat.substr(1)+"S";
+  }
+  else {
+    slat+="N";
+  }
+  auto slon=grid_params[4];
+  if (strutils::has_beginning(slon,"-")) {
+    slon=slon.substr(1)+"W";
+  }
+  else {
+    slon+="E";
+  }
+  auto elat=grid_params[5];
+  if (strutils::has_beginning(elat,"-")) {
+    elat=elat.substr(1)+"S";
+  }
+  else {
+    elat+="N";
+  }
+  auto elon=grid_params[6];
+  if (strutils::has_beginning(elon,"-")) {
+    elon=elon.substr(1)+"W";
+  }
+  else {
+    elon+="E";
+  }
+  std::string stdpar1=grid_params[10];
+  if (strutils::has_beginning(stdpar1,"-")) {
+    stdpar1=stdpar1.substr(1)+"S";
+  }
+  else {
+    stdpar1+="N";
+  }
+  std::string stdpar2=grid_params[11];
+  if (strutils::has_beginning(stdpar2,"-")) {
+    stdpar2=stdpar2.substr(1)+"S";
+  }
+  else {
+    stdpar2+="N";
+  }
+  ofs << "  <grid timeRange=\"" << grid_params[12] << "\" definition=\"lambertConformal\" numX=\"" << grid_params[1] << "\" numY=\"" << grid_params[2] << "\"  startLat=\"" << slat << "\" startLon=\"" << slon << "\" resLat=\"" << elat << "\" projLon=\"" << elon << "\" pole=\"" << grid_params[9] << "\" xRes=\"" << grid_params[7] << "\" yRes=\"" << grid_params[8] << "\" stdParallel1=\"" << stdpar1 << "\" stdParallel2=\"" << stdpar2 << "\">" << std::endl;
+}
+
+void write_mercator_grid(std::deque<std::string>& grid_params,bool is_cell,std::ofstream& ofs)
+{
+  auto slat=grid_params[3];
+  if (strutils::has_beginning(slat,"-")) {
+    slat=slat.substr(1)+"S";
+  }
+  else {
+    slat+="N";
+  }
+  auto slon=grid_params[4];
+  if (strutils::has_beginning(slon,"-")) {
+    slon=slon.substr(1)+"W";
+  }
+  else {
+    slon+="E";
+  }
+  auto elat=grid_params[5];
+  if (strutils::has_beginning(elat,"-")) {
+    elat=elat.substr(1)+"S";
+  }
+  else {
+    elat+="N";
+  }
+  auto elon=grid_params[6];
+  if (strutils::has_beginning(elon,"-")) {
+    elon=elon.substr(1)+"W";
+  }
+  else {
+    elon+="E";
+  }
+  ofs << "  <grid timeRange=\"" << grid_params[9] << "\" definition=\"mercator\" numX=\"" << grid_params[1] << "\" numY=\"" << grid_params[2] << "\" startLat=\"" << slat << "\" startLon=\"" << slon << "\" endLat=\"" << elat << "\" endLon=\"" << elon << "\" xRes=\"" << grid_params[7] << "\" yRes=\"" << grid_params[8] << "\">" << std::endl;
+}
+
+void write_spherical_harmonics_grid(std::deque<std::string>& grid_params,bool is_cell,std::ofstream& ofs)
+{
+  ofs << "  <grid timeRange=\"" << grid_params[4] << "\" definition=\"sphericalHarmonics\" t1=\"" << grid_params[1] << "\" t2=\"" << grid_params[2] << "\" t3=\"" << grid_params[3] << "\">" << std::endl;
+}
+
+void write_grid(std::string grid_entry_key,std::ofstream& ofs,std::string caller,std::string user)
+{
+  auto grid_params=strutils::split(grid_entry_key,"<!>");
+  auto is_cell=false;
+  if (grid_params.front().back() == 'C') {
+    is_cell=true;
+    grid_params.front().pop_back();
+  }
+  switch (std::stoi(grid_params.front())) {
+    case Grid::latitudeLongitudeType: {
+	write_latitude_longitude_grid(grid_params,is_cell,ofs);
+	break;
+    }
+    case Grid::gaussianLatitudeLongitudeType: {
+	write_gaussian_latitude_longitude_grid(grid_params,is_cell,ofs);
+	break;
+    }
+    case Grid::polarStereographicType: {
+	write_polar_stereographic_grid(grid_params,is_cell,ofs);
+	break;
+    }
+    case Grid::lambertConformalType: {
+	write_lambert_conformal_grid(grid_params,is_cell,ofs);
+	break;
+    }
+    case Grid::mercatorType: {
+	write_mercator_grid(grid_params,is_cell,ofs);
+	break;
+    }
+    case Grid::sphericalHarmonicsType: {
+	write_spherical_harmonics_grid(grid_params,is_cell,ofs);
+	break;
+    }
+    default: {
+      metautils::log_error("write_grid(): no grid definition map for "+grid_params.front(),caller,user);
+    }
+  }
+}
+
 std::string write(my::map<GridEntry>& grid_table,std::string caller,std::string user)
 {
   bool is_mss_file=true;
@@ -463,196 +690,7 @@ std::string write(my::map<GridEntry>& grid_table,std::string caller,std::string 
   for (size_t m=0; m < grid_table.size(); ++m) {
     GridEntry gentry;
     grid_table.found(array[m],gentry);
-    auto g_parts=strutils::split(gentry.key,"<!>");
-// lat-lon grid
-    bool is_cell=false;
-    if (g_parts.front().back() == 'C') {
-	is_cell=true;
-	g_parts.front().pop_back();
-    }
-    if (std::stoi(g_parts.front()) == Grid::latitudeLongitudeType) {
-	auto slat=g_parts[3];
-	if (std::regex_search(slat,std::regex("^-"))) {
-	  slat=slat.substr(1,32768)+"S";
-	}
-	else {
-	  slat+="N";
-	}
-	auto slon=g_parts[4];
-	if (std::regex_search(slon,std::regex("^-"))) {
-	  slon=slon.substr(1,32768)+"W";
-	}
-	else {
-	  slon+="E";
-	}
-	auto elat=g_parts[5];
-	if (std::regex_search(elat,std::regex("^-"))) {
-	  elat=elat.substr(1,32768)+"S";
-	}
-	else {
-	  elat+="N";
-	}
-	auto elon=g_parts[6];
-	if (std::regex_search(elon,std::regex("^-"))) {
-	  elon=elon.substr(1,32768)+"W";
-	}
-	else {
-	  elon+="E";
-	}
-	ofs << "  <grid timeRange=\"" << g_parts[9] << "\" definition=\"latLon\" numX=\"" << g_parts[1] << "\" numY=\"" << g_parts[2] << "\" startLat=\"" << slat << "\" startLon=\"" << slon << "\" endLat=\"" << elat << "\" endLon=\"" << elon << "\" xRes=\"" << g_parts[7] << "\" yRes=\"" << g_parts[8] << "\"";
-	if (is_cell) {
-	  ofs << " isCell=\"true\"";
-	}
-	ofs << ">" << std::endl;
-    }
-// gaussian lat-lon grid
-    else if (std::stoi(g_parts.front()) == Grid::gaussianLatitudeLongitudeType) {
-	auto slat=g_parts[3];
-	if (strutils::has_beginning(slat,"-")) {
-	  slat=slat.substr(1,32768)+"S";
-	}
-	else {
-	  slat+="N";
-	}
-	auto slon=g_parts[4];
-	if (strutils::has_beginning(slon,"-")) {
-	  slon=slon.substr(1,32768)+"W";
-	}
-	else {
-	  slon+="E";
-	}
-	auto elat=g_parts[5];
-	if (strutils::has_beginning(elat,"-")) {
-	  elat=elat.substr(1,32768)+"S";
-	}
-	else {
-	  elat+="N";
-	}
-	auto elon=g_parts[6];
-	if (strutils::has_beginning(elon,"-")) {
-	  elon=elon.substr(1,32768)+"W";
-	}
-	else {
-	  elon+="E";
-	}
-	ofs << "  <grid timeRange=\"" << g_parts[9] << "\" definition=\"gaussLatLon\" numX=\"" << g_parts[1] << "\" numY=\"" << g_parts[2] << "\" startLat=\"" << slat << "\" startLon=\"" << slon << "\" endLat=\"" << elat << "\" endLon=\"" << elon << "\" xRes=\"" << g_parts[7] << "\" circles=\"" << g_parts[8] << "\">" << std::endl;
-    }
-// polar-stereographic grid
-    else if (std::stoi(g_parts.front()) == Grid::polarStereographicType) {
-	auto slat=g_parts[3];
-	if (strutils::has_beginning(slat,"-")) {
-	  slat=slat.substr(1,32768)+"S";
-	}
-	else {
-	  slat+="N";
-	}
-	auto slon=g_parts[4];
-	if (strutils::has_beginning(slon,"-")) {
-	  slon=slon.substr(1,32768)+"W";
-	}
-	else {
-	  slon+="E";
-	}
-	auto elat=g_parts[5];
-	if (strutils::has_beginning(elat,"-")) {
-	  elat=elat.substr(1,32768)+"S";
-	}
-	else {
-	  elat+="N";
-	}
-	auto elon=g_parts[6];
-	if (strutils::has_beginning(elon,"-")) {
-	  elon=elon.substr(1,32768)+"W";
-	}
-	else {
-	  elon+="E";
-	}
-	ofs << "  <grid timeRange=\"" << g_parts[10] << "\" definition=\"polarStereographic\" numX=\"" << g_parts[1] << "\" numY=\"" << g_parts[2] << "\"  startLat=\"" << slat << "\" startLon=\"" << slon << "\" resLat=\"" << elat << "\" projLon=\"" << elon << "\" pole=\"" << g_parts[9] << "\" xRes=\"" << g_parts[7] << "\" yRes=\"" << g_parts[8] << "\">" << std::endl;
-    }
-// lambert-conformal grid
-    else if (std::stoi(g_parts.front()) == Grid::lambertConformalType) {
-	auto slat=g_parts[3];
-	if (strutils::has_beginning(slat,"-")) {
-	  slat=slat.substr(1,32768)+"S";
-	}
-	else {
-	  slat+="N";
-	}
-	auto slon=g_parts[4];
-	if (strutils::has_beginning(slon,"-")) {
-	  slon=slon.substr(1,32768)+"W";
-	}
-	else {
-	  slon+="E";
-	}
-	auto elat=g_parts[5];
-	if (strutils::has_beginning(elat,"-")) {
-	  elat=elat.substr(1,32768)+"S";
-	}
-	else {
-	  elat+="N";
-	}
-	auto elon=g_parts[6];
-	if (strutils::has_beginning(elon,"-")) {
-	  elon=elon.substr(1,32768)+"W";
-	}
-	else {
-	  elon+="E";
-	}
-	std::string stdpar1=g_parts[10];
-	if (strutils::has_beginning(stdpar1,"-")) {
-	  stdpar1=stdpar1.substr(1,32768)+"S";
-	}
-	else {
-	  stdpar1+="N";
-	}
-	std::string stdpar2=g_parts[11];
-	if (strutils::has_beginning(stdpar2,"-")) {
-	  stdpar2=stdpar2.substr(1,32768)+"S";
-	}
-	else {
-	  stdpar2+="N";
-	}
-	ofs << "  <grid timeRange=\"" << g_parts[12] << "\" definition=\"lambertConformal\" numX=\"" << g_parts[1] << "\" numY=\"" << g_parts[2] << "\"  startLat=\"" << slat << "\" startLon=\"" << slon << "\" resLat=\"" << elat << "\" projLon=\"" << elon << "\" pole=\"" << g_parts[9] << "\" xRes=\"" << g_parts[7] << "\" yRes=\"" << g_parts[8] << "\" stdParallel1=\"" << stdpar1 << "\" stdParallel2=\"" << stdpar2 << "\">" << std::endl;
-    }
-    else if (std::stoi(g_parts.front()) == Grid::mercatorType) {
-	auto slat=g_parts[3];
-	if (strutils::has_beginning(slat,"-")) {
-	  slat=slat.substr(1,32768)+"S";
-	}
-	else {
-	  slat+="N";
-	}
-	auto slon=g_parts[4];
-	if (strutils::has_beginning(slon,"-")) {
-	  slon=slon.substr(1,32768)+"W";
-	}
-	else {
-	  slon+="E";
-	}
-	auto elat=g_parts[5];
-	if (strutils::has_beginning(elat,"-")) {
-	  elat=elat.substr(1,32768)+"S";
-	}
-	else {
-	  elat+="N";
-	}
-	auto elon=g_parts[6];
-	if (strutils::has_beginning(elon,"-")) {
-	  elon=elon.substr(1,32768)+"W";
-	}
-	else {
-	  elon+="E";
-	}
-	ofs << "  <grid timeRange=\"" << g_parts[9] << "\" definition=\"mercator\" numX=\"" << g_parts[1] << "\" numY=\"" << g_parts[2] << "\" startLat=\"" << slat << "\" startLon=\"" << slon << "\" endLat=\"" << elat << "\" endLon=\"" << elon << "\" xRes=\"" << g_parts[7] << "\" yRes=\"" << g_parts[8] << "\">" << std::endl;
-    }
-// spherical harmonics
-    else if (std::stoi(g_parts.front()) == Grid::sphericalHarmonicsType) {
-	ofs << "  <grid timeRange=\"" << g_parts[4] << "\" definition=\"sphericalHarmonics\" t1=\"" << g_parts[1] << "\" t2=\"" << g_parts[2] << "\" t3=\"" << g_parts[3] << "\">" << std::endl;
-    }
-    else {
-	metautils::log_error("write(): no grid definition map for "+g_parts.front(),caller,user);
-    }
+    write_grid(gentry.key,ofs,caller,user);
 // print out process elements
     for (const auto& key : gentry.process_table.keys()) {
 	ofs << "    <process value=\"" << key << "\" />" << std::endl;
