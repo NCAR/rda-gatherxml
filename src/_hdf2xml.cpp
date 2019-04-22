@@ -2420,6 +2420,7 @@ void scan_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data,gatherxml::m
   InputHDF5Stream::Attribute attr;
   if (ds->attributes.found("featureType",attr)) {
     std::string feature_type=reinterpret_cast<char *>(attr.value.value);
+    auto l_feature_type=strutils::to_lower(feature_type);
 // patch for ICOADS netCDF4 IDs, which may be a mix, so ignore case
     if (ds->attributes.found("product_version",attr)) {
 	std::string product_version=reinterpret_cast<char *>(attr.value.value);
@@ -2427,7 +2428,7 @@ void scan_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data,gatherxml::m
 	  scan_data.convert_ids_to_upper_case=true;
 	}
     }
-    if (feature_type == "point") {
+    if (l_feature_type == "point") {
 	scan_cf_point_hdf5nc4_file(istream,scan_data,obs_data);
     }
     else {

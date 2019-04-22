@@ -3370,10 +3370,11 @@ void scan_wrf_simulation_netcdf_file(InputNetCDFStream& istream,bool& found_map,
 void scan_cf_netcdf_file(InputNetCDFStream& istream,gatherxml::markup::ObML::ObservationData& obs_data,NetCDFVariables& nc_vars)
 {
   auto attrs=istream.global_attributes();
-  std::string feature_type,platform;
+  std::string feature_type,l_feature_type,platform;
   for (size_t n=0; n < attrs.size(); ++n) {
     if (attrs[n].name == "featureType") {
 	feature_type=*(reinterpret_cast<std::string *>(attrs[n].values));
+	l_feature_type=strutils::to_lower(feature_type);
 	strutils::trim(feature_type);
     }
     else if (attrs[n].name == "platform") {
@@ -3409,16 +3410,16 @@ void scan_cf_netcdf_file(InputNetCDFStream& istream,gatherxml::markup::ObML::Obs
 	  server.disconnect();
 	}
     }
-    if (feature_type == "point") {
+    if (l_feature_type == "point") {
 	scan_cf_point_netcdf_file(istream,platform_type,obs_data,nc_vars);
     }
-    else if (feature_type == "timeSeries") {
+    else if (l_feature_type == "timeseries") {
 	scan_cf_time_series_netcdf_file(istream,platform_type,obs_data,nc_vars);
     }
-    else if (feature_type == "profile") {
+    else if (l_feature_type == "profile") {
 	scan_cf_profile_netcdf_file(istream,platform_type,obs_data,nc_vars);
     }
-    else if (feature_type == "timeSeriesProfile") {
+    else if (l_feature_type == "timeseriesprofile") {
 	scan_cf_time_series_profile_netcdf_file(istream,platform_type,obs_data,nc_vars);
     }
     else {
