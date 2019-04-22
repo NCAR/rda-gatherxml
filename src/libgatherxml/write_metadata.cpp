@@ -690,12 +690,13 @@ std::string write(my::map<GridEntry>& grid_table,std::string caller,std::string 
   for (size_t m=0; m < grid_table.size(); ++m) {
     GridEntry gentry;
     grid_table.found(array[m],gentry);
+// print out <grid> element
     write_grid(gentry.key,ofs,caller,user);
-// print out process elements
+// print out <process> elements
     for (const auto& key : gentry.process_table.keys()) {
 	ofs << "    <process value=\"" << key << "\" />" << std::endl;
     }
-// print out ensemble elements
+// print out <ensemble> elements
     for (const auto& e_key : gentry.ensemble_table.keys()) {
 	auto e_parts=strutils::split(e_key,"<!>");
 	ofs << "    <ensemble type=\"" << e_parts[0] << "\"";
@@ -707,7 +708,7 @@ std::string write(my::map<GridEntry>& grid_table,std::string caller,std::string 
 	}
 	ofs << " />" << std::endl;
     }
-// print out level elements
+// print out <level> elements
     std::list<std::string> keys_to_remove;
     for (const auto& l_key : gentry.level_table.keys()) {
 	LevelEntry lentry;
@@ -808,7 +809,7 @@ std::string write(my::map<GridEntry>& grid_table,std::string caller,std::string 
     for (const auto& r_key : keys_to_remove) {
 	gentry.level_table.remove(r_key);
     }
-// print out layer elements
+// print out <layer> elements
     keys_to_remove.clear();
     for (const auto& key : gentry.level_table.keys()) {
 	LevelEntry lentry;
