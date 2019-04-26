@@ -321,12 +321,11 @@ bool remove_from(std::string database,std::string table_ext,std::string file_fie
 	  }
 	  if (is_version_controlled) {
 	    auto f=unixutils::remote_web_file("https://rda.ucar.edu/datasets/ds"+metautils::args.dsnum+"/metadata/"+md_directory+"/"+md_file,tdir->name()+"/metadata/"+md_directory+"/v");
-	    if (f.empty()) {
-		metautils::log_error("remove_from() could not get remote file https://rda.ucar.edu/datasets/ds"+metautils::args.dsnum+"/metadata/"+md_directory+"/"+md_file,"dcm",USER);
-	    }
-	    std::string error;
-	    if (unixutils::rdadata_sync(tdir->name(),"metadata/"+md_directory+"/v/","/data/web/datasets/ds"+metautils::args.dsnum,metautils::directives.rdadata_home,error) < 0) {
-		metautils::log_error("unable to move version-controlled metadata file "+file+"; error: "+error,"dcm",USER);
+	    if (!f.empty()) {
+		std::string error;
+		if (unixutils::rdadata_sync(tdir->name(),"metadata/"+md_directory+"/v/","/data/web/datasets/ds"+metautils::args.dsnum,metautils::directives.rdadata_home,error) < 0) {
+		  metautils::log_error("unable to move version-controlled metadata file "+file+"; error: "+error,"dcm",USER);
+		}
 	    }
 	  }
 	  if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+md_directory+"/"+md_file,metautils::directives.rdadata_home,error) < 0) {
