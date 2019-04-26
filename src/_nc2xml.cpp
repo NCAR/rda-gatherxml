@@ -1085,7 +1085,7 @@ void scan_cf_non_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,s
 platform_types.emplace_back(platform_type);
 id_types.emplace_back("unknown");
 	if (!obs_data.added_to_platforms("surface",platform_types[n],lats[n],lons[n])) {
-	  metautils::log_error("scan_cf_point_netcdf_file() returned error: '"+myerror+"' when adding platform "+platform_types[n],"nc2xml",USER);
+	  metautils::log_error("scan_cf_non_orthogonal_time_series_netcdf_file() returned error: '"+myerror+"' when adding platform "+platform_types[n],"nc2xml",USER);
 	}
     }
   }
@@ -1097,7 +1097,7 @@ id_types.emplace_back("unknown");
 platform_types.emplace_back("unknown");
 id_types.emplace_back("unknown");
 	if (!obs_data.added_to_platforms("surface",platform_types[n],lats[n],lons[n])) {
-	  metautils::log_error("scan_cf_point_netcdf_file() returned error: '"+myerror+"' when adding platform "+platform_types[n],"nc2xml",USER);
+	  metautils::log_error("scan_cf_non_orthogonal_time_series_netcdf_file() returned error: '"+myerror+"' when adding platform "+platform_types[n],"nc2xml",USER);
 	}
     }
   }
@@ -1394,7 +1394,7 @@ void scan_cf_orthogonal_profile_netcdf_file(InputNetCDFStream& istream,std::stri
     if (var.name != vars[dgd.indexes.z_var].name && var.dimids.size() > 0 && var.dimids.back() == vars[dgd.indexes.z_var].dimids.front()) {
 	netCDFStream::VariableData var_data;
 	if (istream.variable_data(var.name,var_data) == netCDFStream::NcType::_NULL) {
-	  metautils::log_error("scan_cf_non_orthogonal_profile_netcdf_file() returned error: unable to get data for variable '"+var.name+"'","nc2xml",USER);
+	  metautils::log_error("scan_cf_orthogonal_profile_netcdf_file() returned error: unable to get data for variable '"+var.name+"'","nc2xml",USER);
 	}
 	NetCDFVariableAttributeData nc_va_data;
 	extract_from_variable_attribute(var.attrs,var.nc_type,nc_va_data);
@@ -1419,7 +1419,7 @@ void scan_cf_orthogonal_profile_netcdf_file(InputNetCDFStream& istream,std::stri
 	  }
 	  if (nlvls > 0) {
 	    if (!obs_data.added_to_platforms(obs_type,platform_type,lats[n],lons[n])) {
-		metautils::log_error("scan_cf_point_netcdf_file() returned error: '"+myerror+"' when adding platform "+obs_type+" "+platform_type,"nc2xml",USER);
+		metautils::log_error("scan_cf_orthogonal_profile_netcdf_file() returned error: '"+myerror+"' when adding platform "+obs_type+" "+platform_type,"nc2xml",USER);
 	    }
 	    auto dt=compute_nc_time(times,n);
 	    ientry.key=platform_type+"[!]"+id_type+"[!]";
@@ -1430,7 +1430,7 @@ void scan_cf_orthogonal_profile_netcdf_file(InputNetCDFStream& istream,std::stri
 		ientry.key+=std::string(&(reinterpret_cast<char *>(ids.get()))[n*id_len],id_len);
 	    }
 	    if (!obs_data.added_to_ids(obs_type,ientry,var.name,"",lats[n],lons[n],times[n],&dt)) {
-		metautils::log_error("scan_cf_non_orthogonal_profile_netcdf_file() returned error: '"+myerror+"' when adding ID "+ientry.key,"nc2xml",USER);
+		metautils::log_error("scan_cf_orthogonal_profile_netcdf_file() returned error: '"+myerror+"' when adding ID "+ientry.key,"nc2xml",USER);
 	    }
 	    gatherxml::markup::ObML::DataTypeEntry dte;
 	    ientry.data->data_types_table.found(var.name,dte);
@@ -1563,7 +1563,7 @@ void scan_cf_non_orthogonal_profile_netcdf_file(InputNetCDFStream& istream,std::
 platform_types.emplace_back(platform_type);
 id_types.emplace_back("unknown");
 	if (!obs_data.added_to_platforms(obs_type,platform_types[n],lats[n],lons[n])) {
-	  metautils::log_error("scan_cf_point_netcdf_file() returned error: '"+myerror+"' when adding platform "+obs_type+" "+platform_types[n],"nc2xml",USER);
+	  metautils::log_error("scan_cf_non_orthogonal_profile_netcdf_file() returned error: '"+myerror+"' when adding platform "+obs_type+" "+platform_types[n],"nc2xml",USER);
 	}
     }
   }
@@ -1575,7 +1575,7 @@ id_types.emplace_back("unknown");
 platform_types.emplace_back(platform_type);
 id_types.emplace_back("unknown");
 	if (!obs_data.added_to_platforms(obs_type,platform_types[n],lats[n],lons[n])) {
-	  metautils::log_error("scan_cf_point_netcdf_file() returned error: '"+myerror+"' when adding platform "+obs_type+" "+platform_types[n],"nc2xml",USER);
+	  metautils::log_error("scan_cf_non_orthogonal_profile_netcdf_file() returned error: '"+myerror+"' when adding platform "+obs_type+" "+platform_types[n],"nc2xml",USER);
 	}
     }
   }
@@ -1594,7 +1594,7 @@ id_types.emplace_back("unknown");
 // continuous ragged array H.10
     netCDFStream::VariableData row_sizes;
     if (istream.variable_data(vars[dgd.indexes.sample_dim_var].name,row_sizes) == netCDFStream::NcType::_NULL) {
-	metautils::log_error("scan_cf_non_orthogonal_profile_netcdf_file() returned error: unable to get level data","nc2xml",USER);
+	metautils::log_error("scan_cf_non_orthogonal_profile_netcdf_file() returned error: unable to get row size data","nc2xml",USER);
     }
     for (const auto& var : vars) {
 	if (var.name != vars[dgd.indexes.z_var].name && var.dimids.size() > 0 && var.dimids.back() == vars[dgd.indexes.z_var].dimids.front()) {
