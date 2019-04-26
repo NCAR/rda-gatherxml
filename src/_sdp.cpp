@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <sys/stat.h>
 #include <regex>
-#include <gatherxml.hpp>
+#include <metadata.hpp>
 #include <strutils.hpp>
 #include <utils.hpp>
 #include <MySQL.hpp>

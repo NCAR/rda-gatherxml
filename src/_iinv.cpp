@@ -19,6 +19,8 @@
 
 metautils::Directives metautils::directives;
 metautils::Args metautils::args;
+bool gatherxml::verbose_operation;
+extern const std::string USER=getenv("USER");
 std::string myerror="";
 std::string mywarning="";
 
@@ -47,7 +49,6 @@ struct AncillaryEntry {
   std::string key;
   std::shared_ptr<std::string> code;
 };
-std::string user=getenv("USER");
 std::string server_root=strutils::token(unixutils::host_name(),".",0);
 std::string tindex;
 TempDir temp_dir;
@@ -88,7 +89,7 @@ void parse_args(int argc,char **argv)
 
 extern "C" void segv_handler(int)
 {
-  metautils::log_error("Error: core dump","iinv",user);
+  metautils::log_error("Error: core dump","iinv",USER);
 }
 
 struct TimeRangeEntry {
@@ -130,26 +131,26 @@ void build_wms_capabilities()
   if (!xdoc.open(file)) {
     file=unixutils::remote_web_file(wms_resource,temp_dir.name());
     if (!xdoc.open(file)) {
-        metautils::log_error("unable to open "+wms_resource,"iinv",user);
+        metautils::log_error("unable to open "+wms_resource,"iinv",USER);
     }
   }
   auto *tdir=new TempDir;
   if (!tdir->create(metautils::directives.temp_path)) {
-    metautils::log_error("build_wms_capabilities() could not create a temporary directory","iinv",user);
+    metautils::log_error("build_wms_capabilities() could not create a temporary directory","iinv",USER);
   }
   std::stringstream oss,ess;
   if (unixutils::mysystem2("/bin/mkdir -p "+tdir->name()+"/metadata/wms",oss,ess) < 0) {
-    metautils::log_error("build_wms_capabilities() could not create the directory tree","iinv",user);
+    metautils::log_error("build_wms_capabilities() could not create the directory tree","iinv",USER);
   }
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   if (!server) {
-    metautils::log_error("build_wms_capabilities() could not connect to the metadata database","iinv",user);
+    metautils::log_error("build_wms_capabilities() could not connect to the metadata database","iinv",USER);
   }
   xmlutils::LevelMapper lmapper("/glade/u/home/rdadata/share/metadata/LevelTables");
   xmlutils::ParameterMapper pmapper("/glade/u/home/rdadata/share/metadata/ParameterTables");
   auto filename=xdoc.element("GrML").attribute_value("uri")+".GrML";
   if (!std::regex_search(filename,std::regex("^http(s){0,1}://rda.ucar.edu/"))) {
-    metautils::log_warning("build_wms_capabilities() found an invalid uri: "+filename,"iinv",user);
+    metautils::log_warning("build_wms_capabilities() found an invalid uri: "+filename,"iinv",USER);
     return;
   }
   filename=filename.substr(filename.find("rda.ucar.edu")+12);
@@ -159,7 +160,7 @@ void build_wms_capabilities()
   strutils::replace_all(filename,"/","%");
   std::ofstream ofs((tdir->name()+"/metadata/wms/"+filename).c_str());
   if (!ofs.is_open()) {
-    metautils::log_error("build_wms_capabilities() could not open the output file","iinv",user);
+    metautils::log_error("build_wms_capabilities() could not open the output file","iinv",USER);
   }
   ofs.setf(std::ios::fixed);
   ofs.precision(4);
@@ -171,7 +172,7 @@ void build_wms_capabilities()
     data_format_code=row[0];
   }
   else {
-    metautils::log_error("build_wms_capabilities(): query '"+query.show()+"' failed","iinv",user);
+    metautils::log_error("build_wms_capabilities(): query '"+query.show()+"' failed","iinv",USER);
   }
   std::string error;
   auto tables=table_names(server,"IGrML","%ds%"+local_args.dsnum2+"_inventory_"+data_format_code+"!%",error);
@@ -191,12 +192,12 @@ void build_wms_capabilities()
 	grid_definition_code=row[0];
     }
     else {
-	metautils::log_error("build_wms_capabilities(): query '"+query.show()+"' failed","iinv",user);
+	metautils::log_error("build_wms_capabilities(): query '"+query.show()+"' failed","iinv",USER);
     }
     if (grid_definition_code != last_grid_definition_code) {
 	double west_lon,south_lat,east_lon,north_lat;
 	if (!gridutils::fill_spatial_domain_from_grid_definition(grid.attribute_value("definition")+"<!>"+def_params,"primeMeridian",west_lon,south_lat,east_lon,north_lat)) {
-	  metautils::log_info("build_wms_capabilities() could not get the spatial domain from '"+filename+"'","iinv",user);
+	  metautils::log_info("build_wms_capabilities() could not get the spatial domain from '"+filename+"'","iinv",USER);
 	  return;
 	}
 	if (last_grid_definition_code != "-1") {
@@ -224,7 +225,7 @@ void build_wms_capabilities()
 	time_range_code=row[0];
     }
     else {
-	metautils::log_error("build_wms_capabilities(): query '"+query.show()+"' failed","iinv",user);
+	metautils::log_error("build_wms_capabilities(): query '"+query.show()+"' failed","iinv",USER);
     }
     ofs << "      <Layer>" << std::endl;
     ofs << "        <Title>" << grid.attribute_value("timeRange") << "</Title>" << std::endl;
@@ -239,7 +240,7 @@ void build_wms_capabilities()
 	    level_code=row[0];
 	}
 	else {
-	    metautils::log_error("build_wms_capabilities(): query '"+query.show()+"' failed","iinv",user);
+	    metautils::log_error("build_wms_capabilities(): query '"+query.show()+"' failed","iinv",USER);
 	}
 	auto level_title=lmapper.description(data_format,ltype,lmap);
 	if (level_title.empty()) {
@@ -274,7 +275,7 @@ void build_wms_capabilities()
 		}
 	    }
 	    else {
-		metautils::log_error("build_wms_capabilities(): query '"+query.show()+"' failed","iinv",user);
+		metautils::log_error("build_wms_capabilities(): query '"+query.show()+"' failed","iinv",USER);
 	    }
 	    ofs << "          </Layer>" << std::endl;
 	}
@@ -292,7 +293,7 @@ void build_wms_capabilities()
 	    layer_code=row[0];
 	}
 	else {
-	    metautils::log_error("build_wms_capabilities(): query '"+query.show()+"' failed","iinv",user);
+	    metautils::log_error("build_wms_capabilities(): query '"+query.show()+"' failed","iinv",USER);
 	}
 	auto layer_title=lmapper.description(data_format,ltype,lmap);
 	if (layer_title.empty()) {
@@ -331,7 +332,7 @@ void build_wms_capabilities()
 		}
 	    }
 	    else {
-		metautils::log_error("build_wms_capabilities(): query '"+query.show()+"' failed","iinv",user);
+		metautils::log_error("build_wms_capabilities(): query '"+query.show()+"' failed","iinv",USER);
 	    }
 	    ofs << "          </Layer>" << std::endl;
 	}
@@ -344,7 +345,7 @@ void build_wms_capabilities()
   ofs.close();
   unixutils::mysystem2("/bin/sh -c 'gzip "+tdir->name()+"/metadata/wms/"+filename+"'",oss,ess);
   if (unixutils::rdadata_sync(tdir->name(),"metadata/wms/","/data/web/datasets/ds"+metautils::args.dsnum,metautils::directives.rdadata_home,error) < 0) {
-    metautils::log_error("build_wms_capabilities() could not sync the capabilities file for '"+filename+"'","iinv",user);
+    metautils::log_error("build_wms_capabilities() could not sync the capabilities file for '"+filename+"'","iinv",USER);
   }
   delete tdir;
 }
@@ -354,16 +355,16 @@ void insert_grml_inventory()
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   std::ifstream ifs(local_args.temp_directory+"/"+metautils::args.filename.c_str());
   if (!ifs.is_open()) {
-    metautils::log_error("insert_grml_inventory() was not able to open "+metautils::args.filename,"iinv",user);
+    metautils::log_error("insert_grml_inventory() was not able to open "+metautils::args.filename,"iinv",USER);
   }
   auto web_id=strutils::substitute(metautils::args.filename,".GrML_inv","");
   strutils::replace_all(web_id,"%","/");
   MySQL::LocalQuery query("select code,format_code,tindex from WGrML.ds"+local_args.dsnum2+"_webfiles as w left join dssdb.wfile as x on (x.dsid = 'ds"+metautils::args.dsnum+"' and x.type = 'D' and x.wfile = w.webID) where webID = '"+web_id+"'");
   if (query.submit(server) < 0) {
-    metautils::log_error("insert_grml_inventory() returned error: "+query.error()+" while looking for code from webfiles","iinv",user);
+    metautils::log_error("insert_grml_inventory() returned error: "+query.error()+" while looking for code from webfiles","iinv",USER);
   }
   if (query.num_rows() == 0) {
-    metautils::log_error("insert_grml_inventory() did not find "+web_id+" in WGrML.ds"+local_args.dsnum2+"_webfiles","iinv",user);
+    metautils::log_error("insert_grml_inventory() did not find "+web_id+" in WGrML.ds"+local_args.dsnum2+"_webfiles","iinv",USER);
   }
   MySQL::Row row;
   query.fetch_row(row);
@@ -373,7 +374,7 @@ void insert_grml_inventory()
   if (!MySQL::table_exists(server,"IGrML.ds"+local_args.dsnum2+"_inventory_summary")) {
     std::string result;
     if (server.command("create table IGrML.ds"+local_args.dsnum2+"_inventory_summary like IGrML.template_inventory_summary",result) < 0) {
-	metautils::log_error("insert_grml_inventory() returned error: "+server.error()+" while trying to create inventory_summary table","iinv",user);
+	metautils::log_error("insert_grml_inventory() returned error: "+server.error()+" while trying to create inventory_summary table","iinv",USER);
     }
   }
   struct InitTimeEntry {
@@ -412,14 +413,14 @@ void insert_grml_inventory()
 		tre.hour_diff=std::stoi(hr);
 	    }
 	    else {
-		metautils::log_warning("insert_grml_inventory() does not recognize product '"+line_parts[2]+"'","iinv",user);
+		metautils::log_warning("insert_grml_inventory() does not recognize product '"+line_parts[2]+"'","iinv",USER);
 	    }
 	    query.set("code","WGrML.timeRanges","timeRange = '"+line_parts[2]+"'");
 	    if (query.submit(server) < 0) {
-		metautils::log_error("insert_grml_inventory() returned error: "+query.error()+" while trying to get timeRange code","iinv",user);
+		metautils::log_error("insert_grml_inventory() returned error: "+query.error()+" while trying to get timeRange code","iinv",USER);
 	    }
 	    if (query.num_rows() == 0) {
-		metautils::log_error("no timeRange code for '"+line_parts[2]+"'","iinv",user);
+		metautils::log_error("no timeRange code for '"+line_parts[2]+"'","iinv",USER);
 	    }
 	    query.fetch_row(row);
 	    tre.code=row[0];
@@ -590,15 +591,15 @@ void insert_grml_inventory()
 		}
 		default:
 		{
-		  metautils::log_error("insert_grml_inventory() does not understand grid type "+gdef_params[0],"iinv",user);
+		  metautils::log_error("insert_grml_inventory() does not understand grid type "+gdef_params[0],"iinv",USER);
 		}
 	    }
 	    query.set("code","WGrML.gridDefinitions","definition = '"+definition+"' and defParams = '"+definition_parameters+"'");
 	    if (query.submit(server) < 0) {
-		metautils::log_error("insert_grml_inventory() returned error: "+query.error()+" while trying to get gridDefinition code","iinv",user);
+		metautils::log_error("insert_grml_inventory() returned error: "+query.error()+" while trying to get gridDefinition code","iinv",USER);
 	    }
 	    if (query.num_rows() == 0) {
-		metautils::log_error("no gridDefinition code for '"+definition+","+definition_parameters+"'","iinv",user);
+		metautils::log_error("no gridDefinition code for '"+definition+","+definition_parameters+"'","iinv",USER);
 	    }
 	    query.fetch_row(row);
 	    grid_definition_codes.emplace_back(row[0]);
@@ -608,7 +609,7 @@ void insert_grml_inventory()
 	  {
 	    auto lev_parts=strutils::split(line_parts[2],":");
 	    if (lev_parts.size() < 2 || lev_parts.size() > 3) {
-		metautils::log_error("insert_grml_inventory() found bad level code: "+line_parts[2],"iinv",user);
+		metautils::log_error("insert_grml_inventory() found bad level code: "+line_parts[2],"iinv",USER);
 	    }
 	    std::string map,type;
 	    if (std::regex_search(lev_parts[0],std::regex(","))) {
@@ -635,10 +636,10 @@ void insert_grml_inventory()
 	    }
 	    query.set("code","WGrML.levels","map = '"+map+"' and type = '"+type+"' and value = '"+value+"'");
 	    if (query.submit(server) < 0) {
-		metautils::log_error("insert_grml_inventory() returned error: "+query.error()+" while trying to get level code","iinv",user);
+		metautils::log_error("insert_grml_inventory() returned error: "+query.error()+" while trying to get level code","iinv",USER);
 	    }
 	    if (query.num_rows() == 0) {
-		metautils::log_error("no level code for '"+map+","+type+","+value+"'","iinv",user);
+		metautils::log_error("no level code for '"+map+","+type+","+value+"'","iinv",USER);
 	    }
 	    query.fetch_row(row);
 	    level_codes.emplace_back(row[0]);
@@ -652,12 +653,12 @@ void insert_grml_inventory()
 		std::string result;
 		if (line_parts.size() > 3 && line_parts[3] == "BIG") {
 		  if (server.command("create table IGrML.`ds"+local_args.dsnum2+"_inventory_"+pcode+"` like IGrML.template_inventory_p_big",result) < 0) {
-		    metautils::log_error("insert_grml_inventory() returned error: "+server.error()+" while trying to create parameter inventory table","iinv",user);
+		    metautils::log_error("insert_grml_inventory() returned error: "+server.error()+" while trying to create parameter inventory table","iinv",USER);
 		  }
 		}
 		else {
 		  if (server.command("create table IGrML.`ds"+local_args.dsnum2+"_inventory_"+pcode+"` like IGrML.template_inventory_p",result) < 0) {
-		    metautils::log_error("insert_grml_inventory() returned error: "+server.error()+" while trying to create parameter inventory table","iinv",user);
+		    metautils::log_error("insert_grml_inventory() returned error: "+server.error()+" while trying to create parameter inventory table","iinv",USER);
 		  }
 		}
 	    }
@@ -737,7 +738,7 @@ void insert_grml_inventory()
 	auto pcode=format_code+"!"+parameters[std::stoi(inv_parts[6])];
 	if (server.insert("IGrML.`ds"+local_args.dsnum2+"_inventory_"+pcode+"`","webID_code,byte_offset,byte_length,valid_date,init_date,timeRange_code,gridDefinition_code,level_code,process,ensemble,uflag",insert_string,"") < 0) {
 	  if (!std::regex_search(server.error(),std::regex("Duplicate entry"))) {
-	    metautils::log_error("insert_grml_inventory() returned error: "+server.error()+" while inserting row '"+insert_string+"'","iinv",user);
+	    metautils::log_error("insert_grml_inventory() returned error: "+server.error()+" while inserting row '"+insert_string+"'","iinv",USER);
 	  }
 	  else {
 	    std::string dupe_where="webID_code = "+web_id_code+" and valid_date = "+inv_parts[2]+" and timeRange_code = "+time_range_codes[tr_index].code+" and gridDefinition_code = "+grid_definition_codes[std::stoi(inv_parts[4])]+" and level_code = "+level_codes[std::stoi(inv_parts[5])];
@@ -755,7 +756,7 @@ void insert_grml_inventory()
 	    }
 	    query.set("uflag","IGrML.`ds"+local_args.dsnum2+"_inventory_"+pcode+"`",dupe_where);
 	    if (query.submit(server) < 0 || !query.fetch_row(row)) {
-		metautils::log_error("insert_grml_inventory() returned error: "+server.error()+" while trying to get flag for duplicate row: '"+dupe_where+"'","iinv",user);
+		metautils::log_error("insert_grml_inventory() returned error: "+server.error()+" while trying to get flag for duplicate row: '"+dupe_where+"'","iinv",USER);
 	    }
 	    if (row[0] == uflag) {
 		++num_dupes;
@@ -765,7 +766,7 @@ void insert_grml_inventory()
 	    }
 	    else {
 		if (server.update("IGrML.`ds"+local_args.dsnum2+"_inventory_"+pcode+"`","byte_offset = "+inv_parts[0]+", byte_length = "+inv_parts[1]+",init_date = "+init_date+",uflag = '"+uflag+"'",dupe_where) < 0) {
-		  metautils::log_error("insert_grml_inventory() returned error: "+server.error()+" while updating duplicate row: '"+dupe_where+"'","iinv",user);
+		  metautils::log_error("insert_grml_inventory() returned error: "+server.error()+" while updating duplicate row: '"+dupe_where+"'","iinv",USER);
 		}
 	    }
 	  }
@@ -780,12 +781,12 @@ void insert_grml_inventory()
 //  server.issueCommand("unlock tables",error);
   if (server.insert("IGrML.ds"+local_args.dsnum2+"_inventory_summary","webID_code,byte_length,dupe_vdates",web_id_code+","+strutils::lltos(total_bytes)+",'"+dupe_vdates+"'","update byte_length = "+strutils::lltos(total_bytes)+", dupe_vdates = '"+dupe_vdates+"'") < 0) {
     if (!std::regex_search(server.error(),std::regex("Duplicate entry"))) {
-	metautils::log_error("insert_grml_inventory() returned error: "+server.error()+" while inserting row '"+web_id_code+","+strutils::lltos(total_bytes)+",'"+dupe_vdates+"''","iinv",user);
+	metautils::log_error("insert_grml_inventory() returned error: "+server.error()+" while inserting row '"+web_id_code+","+strutils::lltos(total_bytes)+",'"+dupe_vdates+"''","iinv",USER);
     }
   }
   server.disconnect();
   if (num_dupes > 0) {
-    metautils::log_warning(strutils::itos(num_dupes)+" duplicate grids were ignored","iinv_dupes",user);
+    metautils::log_warning(strutils::itos(num_dupes)+" duplicate grids were ignored","iinv_dupes",USER);
   }
 }
 
@@ -794,7 +795,7 @@ void check_for_times_table(MySQL::Server& server,std::string type,std::string la
   if (!MySQL::table_exists(server,"IObML.ds"+local_args.dsnum2+"_"+type+"_times_"+last_decade+"0")) {
     std::string result;
     if (server.command("create table IObML.ds"+local_args.dsnum2+"_"+type+"_times_"+last_decade+"0 like IObML.template_"+type+"_times_decade",result) < 0) {
-	metautils::log_error("check_for_times_table() returned error: "+server.error()+" while trying to create 'ds"+local_args.dsnum2+"_"+type+"_times_"+last_decade+"0'","iinv",user);
+	metautils::log_error("check_for_times_table() returned error: "+server.error()+" while trying to create 'ds"+local_args.dsnum2+"_"+type+"_times_"+last_decade+"0'","iinv",USER);
     }
   }
 }
@@ -814,7 +815,7 @@ void process_IDs(std::string type,MySQL::Server& server,std::string ID_index,std
 	error+=","+id_parts[4]+","+id_parts[5];
     }
     error+="'";
-    metautils::log_error(error,"iinv",user);
+    metautils::log_error(error,"iinv",USER);
   }
   size_t min_lat_i,min_lon_i,max_lat_i,max_lon_i;
   geoutils::convert_lat_lon_to_box(36,std::stof(id_parts[2]),std::stof(id_parts[3]),min_lat_i,min_lon_i);
@@ -840,7 +841,7 @@ void process_IDs(std::string type,MySQL::Server& server,std::string ID_index,std
 	  }
 	  std::string result;
 	  if (server.command(command,result) < 0) {
-	    metautils::log_error("process_IDs() returned error: "+server.error()+" while trying to create '"+check_table+"'","iinv",user);
+	    metautils::log_error("process_IDs() returned error: "+server.error()+" while trying to create '"+check_table+"'","iinv",USER);
 	  }
 	}
 	auto s=row[0]+"|"+strutils::itos(min_lat_i)+"|"+strutils::itos(min_lon_i);
@@ -884,27 +885,27 @@ void insert_obml_netcdf_time_series_inventory(std::ifstream& ifs,MySQL::Server& 
   StringEntry se;
 
 if (rec_size > 0) {
-metautils::log_error("insert_obml_netcdf_time_series_inventory() can't insert for observations with a record dimension","iinv",user);
+metautils::log_error("insert_obml_netcdf_time_series_inventory() can't insert for observations with a record dimension","iinv",USER);
 }
   std::string uflag=strutils::strand(3);
 //std::cerr << "uflag='" << uflag << "'" << std::endl;
   if (!MySQL::table_exists(server,"IObML.ds"+local_args.dsnum2+"_inventory_summary")) {
     std::string result;
     if (server.command("create table IObML.ds"+local_args.dsnum2+"_inventory_summary like IObML.template_inventory_summary",result) < 0) {
-	metautils::log_error("insert_obml_netcdf_time_series_inventory() returned error: "+server.error()+" while trying to create 'ds"+local_args.dsnum2+"_inventory_summary'","iinv",user);
+	metautils::log_error("insert_obml_netcdf_time_series_inventory() returned error: "+server.error()+" while trying to create 'ds"+local_args.dsnum2+"_inventory_summary'","iinv",USER);
     }
     if (server.command("create table IObML.ds"+local_args.dsnum2+"_dataTypes like IObML.template_dataTypes",result) < 0) {
-	metautils::log_error("insert_obml_netcdf_time_series_inventory() returned error: "+server.error()+" while trying to create 'ds"+local_args.dsnum2+"_dataTypes'","iinv",user);
+	metautils::log_error("insert_obml_netcdf_time_series_inventory() returned error: "+server.error()+" while trying to create 'ds"+local_args.dsnum2+"_dataTypes'","iinv",USER);
     }
   }
   else {
 /*
     if (server._delete("IObML.ds"+local_args.dsnum2+"_dataTypes","webID_code = "+web_ID_code) < 0) {
-	metautils::log_error("insert_obml_netcdf_time_series_inventory() returned error: "+server.error()+" while trying to delete from 'ds"+local_args.dsnum2+"_dataTypes' where webID_code = "+web_ID_code,"iinv",user);
+	metautils::log_error("insert_obml_netcdf_time_series_inventory() returned error: "+server.error()+" while trying to delete from 'ds"+local_args.dsnum2+"_dataTypes' where webID_code = "+web_ID_code,"iinv",USER);
     }
 */
     if (server._delete("IObML.ds"+local_args.dsnum2+"_inventory_summary","webID_code = "+web_ID_code) < 0) {
-	metautils::log_error("insert_obml_netcdf_time_series_inventory() returned error: "+server.error()+" while trying to delete from 'ds"+local_args.dsnum2+"_inventory_summary' where webID_code = "+web_ID_code,"iinv",user);
+	metautils::log_error("insert_obml_netcdf_time_series_inventory() returned error: "+server.error()+" while trying to delete from 'ds"+local_args.dsnum2+"_inventory_summary' where webID_code = "+web_ID_code,"iinv",USER);
     }
   }
   std::stringstream times;
@@ -940,7 +941,7 @@ metautils::log_error("insert_obml_netcdf_time_series_inventory() can't insert fo
 	  case 'O':
 	    query.set("code","WObML.obsTypes","obsType = '"+sp[2]+"'");
 	    if (query.submit(server) < 0 || !query.fetch_row(row)) {
-		metautils::log_error("insert_obml_netcdf_time_series_inventory() returned error: "+query.error()+" while trying to get obsType code for '"+sp[2]+"'","iinv",user);
+		metautils::log_error("insert_obml_netcdf_time_series_inventory() returned error: "+query.error()+" while trying to get obsType code for '"+sp[2]+"'","iinv",USER);
 	    }
 	    ae.key=sp[1];
 	    ae.code.reset(new std::string);
@@ -950,7 +951,7 @@ metautils::log_error("insert_obml_netcdf_time_series_inventory() can't insert fo
 	  case 'P':
 	    query.set("code","WObML.platformTypes","platformType = '"+sp[2]+"'");
 	    if (query.submit(server) < 0 || !query.fetch_row(row)) {
-		metautils::log_error("insert_obml_netcdf_time_series_inventory() returned error: "+query.error()+" while trying to get platform code for '"+sp[2]+"'","iinv",user);
+		metautils::log_error("insert_obml_netcdf_time_series_inventory() returned error: "+query.error()+" while trying to get platform code for '"+sp[2]+"'","iinv",USER);
 	    }
 	    ae.key=sp[1];
 	    ae.code.reset(new std::string);
@@ -965,7 +966,7 @@ metautils::log_error("insert_obml_netcdf_time_series_inventory() can't insert fo
 		  check_for_times_table(server,"timeSeries",last_decade);
 		  std::string result;
 		  if (server.command("insert into IObML.ds"+local_args.dsnum2+"_timeSeries_times_"+last_decade+"0 values "+times.str().substr(1)+" on duplicate key update time_index=values(time_index),uflag=values(uflag)",result) < 0) {
-		    metautils::log_error("insert_obml_netcdf_time_series_inventory() returned error: "+server.error()+" while trying to insert list of times into IObML.ds"+local_args.dsnum2+"_timeSeries_times_"+last_decade+"0","iinv",user);
+		    metautils::log_error("insert_obml_netcdf_time_series_inventory() returned error: "+server.error()+" while trying to insert list of times into IObML.ds"+local_args.dsnum2+"_timeSeries_times_"+last_decade+"0","iinv",USER);
 		  }
 		  server._delete("IObML.ds"+local_args.dsnum2+"_timeSeries_times_"+last_decade+"0","webID_code = "+web_ID_code+" and uflag != '"+uflag+"'");
 		  server.command("analyze NO_WRITE_TO_BINLOG table IObML.ds"+local_args.dsnum2+"_timeSeries_times_"+last_decade+"0",result);
@@ -995,7 +996,7 @@ metautils::log_error("insert_obml_netcdf_time_series_inventory() can't insert fo
     check_for_times_table(server,"timeSeries",last_decade);
     std::string result;
     if (server.command("insert into IObML.ds"+local_args.dsnum2+"_timeSeries_times_"+last_decade+"0 values "+times.str().substr(1)+" on duplicate key update time_index=values(time_index),uflag=values(uflag)",result) < 0) {
-	metautils::log_error("insert_obml_netcdf_time_series_inventory() returned error: "+server.error()+" while trying to insert list of times into IObML.ds"+local_args.dsnum2+"_timeSeries_times_"+last_decade+"0","iinv",user);
+	metautils::log_error("insert_obml_netcdf_time_series_inventory() returned error: "+server.error()+" while trying to insert list of times into IObML.ds"+local_args.dsnum2+"_timeSeries_times_"+last_decade+"0","iinv",USER);
     }
     server._delete("IObML.ds"+local_args.dsnum2+"_timeSeries_times_"+last_decade+"0","webID_code = "+web_ID_code+" and uflag != '"+uflag+"'");
     server.command("analyze NO_WRITE_TO_BINLOG table IObML.ds"+local_args.dsnum2+"_timeSeries_times_"+last_decade+"0",result);
@@ -1034,13 +1035,13 @@ metautils::log_error("insert_obml_netcdf_time_series_inventory() can't insert fo
 	    if (!datatype_table.found(ae.key,ae)) {
 		query.set("code","WObML.ds"+local_args.dsnum2+"_dataTypesList","observationType_code = "+*(ae_obs.code)+" and platformType_code = "+*(ae_plat.code)+" and dataType = 'ds"+metautils::args.dsnum+":"+dve.data->var_name+"'");
 		if (query.submit(server) < 0 || !query.fetch_row(row)) {
-		  metautils::log_error("insert_obml_netcdf_time_series_inventory() returned error: "+query.error()+" while trying to get dataType code for '"+*(ae_obs.code)+","+*(ae_plat.code)+",'"+dve.data->var_name+"''","iinv",user);
+		  metautils::log_error("insert_obml_netcdf_time_series_inventory() returned error: "+query.error()+" while trying to get dataType code for '"+*(ae_obs.code)+","+*(ae_plat.code)+",'"+dve.data->var_name+"''","iinv",USER);
 		}
 		ae.code.reset(new std::string);
 		*(ae.code)=row[0];
 		datatype_table.insert(ae);
 		if (server.insert("IObML.ds"+local_args.dsnum2+"_dataTypes",web_ID_code+","+id_parts[0]+","+*(ae.code)+",'"+dve.data->value_type+"',"+strutils::itos(dve.data->offset)+","+strutils::itos(dve.data->byte_len)+","+missing_ind+",'"+uflag+"'","update value_type='"+dve.data->value_type+"',byte_offset="+strutils::itos(dve.data->offset)+",byte_length="+strutils::itos(dve.data->byte_len)+",missing_ind="+missing_ind+",uflag='"+uflag+"'") < 0) {
-		  metautils::log_error("insert_obml_netcdf_time_series_inventory() returned error: "+server.error()+" while trying to insert dataType information for '"+*(ae.code)+"'","iinv",user);
+		  metautils::log_error("insert_obml_netcdf_time_series_inventory() returned error: "+server.error()+" while trying to insert dataType information for '"+*(ae.code)+"'","iinv",USER);
 		}
 	    }
 	    std::string key_end="|"+obstype+"|"+platform+"|"+id_entry.first+"|"+datavar;
@@ -1052,7 +1053,7 @@ metautils::log_error("insert_obml_netcdf_time_series_inventory() can't insert fo
 		    if (num_inserts >= 10000) {
 			std::string result;
 			if (server.command("insert into "+inventory_file+" values "+inv_insert.substr(1)+" on duplicate key update uflag=values(uflag)",result) < 0) {
-			  metautils::log_error("insert_obml_netcdf_time_series_inventory() returned error: "+server.error()+" while trying to insert inventory data","iinv",user);
+			  metautils::log_error("insert_obml_netcdf_time_series_inventory() returned error: "+server.error()+" while trying to insert inventory data","iinv",USER);
 			}
 			num_inserts=0;
 			inv_insert="";
@@ -1069,7 +1070,7 @@ metautils::log_error("insert_obml_netcdf_time_series_inventory() can't insert fo
     }
     std::string result;
     if (!inv_insert.empty()  && server.command("insert into "+inventory_file+" values "+inv_insert.substr(1)+" on duplicate key update uflag=values(uflag)",result) < 0) {
-	metautils::log_error("insert_obml_netcdf_time_series_inventory() returned error: "+server.error()+" while trying to insert inventory data","iinv",user);
+	metautils::log_error("insert_obml_netcdf_time_series_inventory() returned error: "+server.error()+" while trying to insert inventory data","iinv",USER);
     }
     server._delete(inventory_file,"webID_code = "+web_ID_code+" and uflag != '"+uflag+"'");
     server.command("analyze NO_WRITE_TO_BINLOG table "+inventory_file,result);
@@ -1078,7 +1079,7 @@ metautils::log_error("insert_obml_netcdf_time_series_inventory() can't insert fo
   std::string result;
   server.command("analyze NO_WRITE_TO_BINLOG table IObML.ds"+local_args.dsnum2+"_dataTypes",result);
   if (server.command("insert into IObML.ds"+local_args.dsnum2+"_inventory_summary values ("+web_ID_code+","+strutils::itos(nbytes)+","+strutils::itos(ndbytes)+",'"+uflag+"') on duplicate key update byte_length=values(byte_length),dataType_length=values(dataType_length),uflag=values(uflag)",result) < 0) {
-    metautils::log_error("insert_obml_netcdf_time_series_inventory() returned error: "+server.error()+" while trying to insert file size data for '"+web_ID_code+"'","iinv",user);
+    metautils::log_error("insert_obml_netcdf_time_series_inventory() returned error: "+server.error()+" while trying to insert file size data for '"+web_ID_code+"'","iinv",USER);
   }
   server._delete("IObML.ds"+local_args.dsnum2+"_inventory_summary","webID_code = "+web_ID_code+" and uflag != '"+uflag+"'");
 }
@@ -1110,17 +1111,17 @@ void insert_obml_netcdf_point_inventory(std::ifstream& ifs,MySQL::Server& server
   StringEntry se;
 
 if (rec_size > 0) {
-metautils::log_error("insert_obml_netcdf_point_inventory() can't insert for observations with a record dimension","iinv",user);
+metautils::log_error("insert_obml_netcdf_point_inventory() can't insert for observations with a record dimension","iinv",USER);
 }
   std::string uflag=strutils::strand(3);
 //std::cerr << "uflag='" << uflag << "'" << std::endl;
   std::string result;
   if (!MySQL::table_exists(server,"IObML.ds"+local_args.dsnum2+"_inventory_summary")) {
     if (server.command("create table IObML.ds"+local_args.dsnum2+"_inventory_summary like IObML.template_inventory_summary",result) < 0) {
-	metautils::log_error("insert_obml_netcdf_point_inventory() returned error: "+server.error()+" while trying to create 'ds"+local_args.dsnum2+"_inventory_summary'","iinv",user);
+	metautils::log_error("insert_obml_netcdf_point_inventory() returned error: "+server.error()+" while trying to create 'ds"+local_args.dsnum2+"_inventory_summary'","iinv",USER);
     }
     if (server.command("create table IObML.ds"+local_args.dsnum2+"_dataTypes like IObML.template_dataTypes",result) < 0) {
-	metautils::log_error("insert_obml_netcdf_point_inventory() returned error: "+server.error()+" while trying to create 'ds"+local_args.dsnum2+"_dataTypes'","iinv",user);
+	metautils::log_error("insert_obml_netcdf_point_inventory() returned error: "+server.error()+" while trying to create 'ds"+local_args.dsnum2+"_dataTypes'","iinv",USER);
     }
   }
   std::stringstream times;
@@ -1157,7 +1158,7 @@ metautils::log_error("insert_obml_netcdf_point_inventory() can't insert for obse
 	  {
 	    query.set("code","WObML.obsTypes","obsType = '"+sp[2]+"'");
 	    if (query.submit(server) < 0 || !query.fetch_row(row)) {
-		metautils::log_error("insert_obml_netcdf_point_inventory() returned error: "+query.error()+" while trying to get obsType code for '"+sp[2]+"'","iinv",user);
+		metautils::log_error("insert_obml_netcdf_point_inventory() returned error: "+query.error()+" while trying to get obsType code for '"+sp[2]+"'","iinv",USER);
 	    }
 	    ae.key=sp[1];
 	    ae.code.reset(new std::string);
@@ -1169,7 +1170,7 @@ metautils::log_error("insert_obml_netcdf_point_inventory() can't insert for obse
 	  {
 	    query.set("code","WObML.platformTypes","platformType = '"+sp[2]+"'");
 	    if (query.submit(server) < 0 || !query.fetch_row(row)) {
-		metautils::log_error("insert_obml_netcdf_point_inventory() returned error: "+query.error()+" while trying to get platform code for '"+sp[2]+"'","iinv",user);
+		metautils::log_error("insert_obml_netcdf_point_inventory() returned error: "+query.error()+" while trying to get platform code for '"+sp[2]+"'","iinv",USER);
 	    }
 	    ae.key=sp[1];
 	    ae.code.reset(new std::string);
@@ -1185,7 +1186,7 @@ metautils::log_error("insert_obml_netcdf_point_inventory() can't insert for obse
 		  check_for_times_table(server,"point",last_decade);
 		  std::string result;
 		  if (server.command("insert into IObML.ds"+local_args.dsnum2+"_point_times_"+last_decade+"0 values "+times.str().substr(1)+" on duplicate key update time_index=values(time_index),lat=values(lat),lon=values(lon),uflag=values(uflag)",result) < 0) {
-		    metautils::log_error("insert_obml_netcdf_point_inventory() returned error: "+server.error()+" while trying to insert list of times into IObML.ds"+local_args.dsnum2+"_point_times_"+last_decade+"0","iinv",user);
+		    metautils::log_error("insert_obml_netcdf_point_inventory() returned error: "+server.error()+" while trying to insert list of times into IObML.ds"+local_args.dsnum2+"_point_times_"+last_decade+"0","iinv",USER);
 		  }
 		  server._delete("IObML.ds"+local_args.dsnum2+"_point_times_"+last_decade+"0","webID_code = "+web_ID_code+" and uflag != '"+uflag+"'");
 		  server.command("analyze NO_WRITE_TO_BINLOG table IObML.ds"+local_args.dsnum2+"_point_times_"+last_decade+"0",result);
@@ -1216,7 +1217,7 @@ metautils::log_error("insert_obml_netcdf_point_inventory() can't insert for obse
     check_for_times_table(server,"point",last_decade);
     std::string result;
     if (server.command("insert into IObML.ds"+local_args.dsnum2+"_point_times_"+last_decade+"0 values "+times.str().substr(1)+" on duplicate key update time_index=values(time_index),lat=values(lat),lon=values(lon),uflag=values(uflag)",result) < 0) {
-	metautils::log_error("insert_obml_netcdf_point_inventory() returned error: "+server.error()+" while trying to insert list of times into IObML.ds"+local_args.dsnum2+"_point_times_"+last_decade+"0","iinv",user);
+	metautils::log_error("insert_obml_netcdf_point_inventory() returned error: "+server.error()+" while trying to insert list of times into IObML.ds"+local_args.dsnum2+"_point_times_"+last_decade+"0","iinv",USER);
     }
     server._delete("IObML.ds"+local_args.dsnum2+"_point_times_"+last_decade+"0","webID_code = "+web_ID_code+" and uflag != '"+uflag+"'");
     server.command("analyze NO_WRITE_TO_BINLOG table IObML.ds"+local_args.dsnum2+"_point_times_"+last_decade+"0",result);
@@ -1253,7 +1254,7 @@ metautils::log_error("insert_obml_netcdf_point_inventory() can't insert for obse
 	    if (!datatype_table.found(ae.key,ae)) {
 		query.set("code","WObML.ds"+local_args.dsnum2+"_dataTypesList","observationType_code = "+*(ae_obs.code)+" and platformType_code = "+*(ae_plat.code)+" and dataType = 'ds"+metautils::args.dsnum+":"+dve.data->var_name+"'");
 		if (query.submit(server) < 0 || !query.fetch_row(row)) {
-		  metautils::log_error("insert_obml_netcdf_point_inventory() returned error: "+query.error()+" while trying to get dataType code for '"+*(ae_obs.code)+","+*(ae_plat.code)+",'"+dve.data->var_name+"''","iinv",user);
+		  metautils::log_error("insert_obml_netcdf_point_inventory() returned error: "+query.error()+" while trying to get dataType code for '"+*(ae_obs.code)+","+*(ae_plat.code)+",'"+dve.data->var_name+"''","iinv",USER);
 		}
 		ae.code.reset(new std::string);
 		*(ae.code)=row[0];
@@ -1278,7 +1279,7 @@ metautils::log_error("insert_obml_netcdf_point_inventory() can't insert for obse
 		    if (inse.data->num_inserts >= 10000) {
 			std::string result;
 			if (server.command("insert into IObML.ds"+local_args.dsnum2+"_inventory_"+inse.key+" values "+inse.data->inv_insert.substr(1)+" on duplicate key update uflag=values(uflag)",result) < 0) {
-			  metautils::log_error("insert_obml_netcdf_point_inventory() returned error: "+server.error()+" while trying to insert inventory data","iinv",user);
+			  metautils::log_error("insert_obml_netcdf_point_inventory() returned error: "+server.error()+" while trying to insert inventory data","iinv",USER);
 			}
 			inse.data->num_inserts=0;
 			inse.data->inv_insert="";
@@ -1298,19 +1299,19 @@ metautils::log_error("insert_obml_netcdf_point_inventory() can't insert for obse
 	insert_table.found(key,inse);
 	std::string result;
 	if (!inse.data->inv_insert.empty()  && server.command("insert into IObML.ds"+local_args.dsnum2+"_inventory_"+key+" values "+inse.data->inv_insert.substr(1)+" on duplicate key update uflag=values(uflag)",result) < 0) {
-	  metautils::log_error("insert_obml_netcdf_point_inventory() returned error: "+server.error()+" while trying to insert inventory data","iinv",user);
+	  metautils::log_error("insert_obml_netcdf_point_inventory() returned error: "+server.error()+" while trying to insert inventory data","iinv",USER);
 	}
 	server._delete("IObML.ds"+local_args.dsnum2+"_inventory_"+key,"webID_code = "+web_ID_code+" and uflag != '"+uflag+"'");
 	server.command("analyze NO_WRITE_TO_BINLOG table IObML.ds"+local_args.dsnum2+"_inventory_"+key,result);
     }
   }
   if (server.command("insert into IObML.ds"+local_args.dsnum2+"_dataTypes values "+data_type_ss.str().substr(1)+" on duplicate key update value_type=values(value_type),byte_offset=values(byte_offset),byte_length=values(byte_length),missing_ind=values(missing_ind),uflag=values(uflag)",result) < 0) {
-    metautils::log_error("insert_obml_netcdf_point_inventory() returned error: "+server.error()+" while trying to insert dataType information for '"+*(ae.code)+"'","iinv",user);
+    metautils::log_error("insert_obml_netcdf_point_inventory() returned error: "+server.error()+" while trying to insert dataType information for '"+*(ae.code)+"'","iinv",USER);
   }
   server._delete("IObML.ds"+local_args.dsnum2+"_dataTypes","webID_code = "+web_ID_code+" and uflag != '"+uflag+"'");
   server.command("analyze NO_WRITE_TO_BINLOG table IObML.ds"+local_args.dsnum2+"_dataTypes",result);
   if (server.command("insert into IObML.ds"+local_args.dsnum2+"_inventory_summary values ("+web_ID_code+","+strutils::itos(nbytes)+","+strutils::itos(ndbytes)+",'"+uflag+"') on duplicate key update byte_length=values(byte_length),dataType_length=values(dataType_length),uflag=values(uflag)",result) < 0) {
-    metautils::log_error("insert_obml_netcdf_point_inventory() returned error: "+server.error()+" while trying to insert file size data for '"+web_ID_code+"'","iinv",user);
+    metautils::log_error("insert_obml_netcdf_point_inventory() returned error: "+server.error()+" while trying to insert file size data for '"+web_ID_code+"'","iinv",USER);
   }
   server._delete("IObML.ds"+local_args.dsnum2+"_inventory_summary","webID_code = "+web_ID_code+" and uflag != '"+uflag+"'");
 }
@@ -1322,13 +1323,13 @@ void insert_generic_point_inventory(std::ifstream& ifs,MySQL::Server& server,std
   if (!MySQL::table_exists(server,"IObML.ds"+local_args.dsnum2+"_dataTypesList_b")) {
     std::string result;
     if (server.command("create table IObML.ds"+local_args.dsnum2+"_dataTypesList_b like IObML.template_dataTypesList_b",result) < 0) {
-	metautils::log_error("insert_generic_point_inventory() returned error: "+server.error()+" while trying to create 'ds"+local_args.dsnum2+"_dataTypesList_b'","iinv",user);
+	metautils::log_error("insert_generic_point_inventory() returned error: "+server.error()+" while trying to create 'ds"+local_args.dsnum2+"_dataTypesList_b'","iinv",USER);
     }
     if (server.command("create table IObML.ds"+local_args.dsnum2+"_dataTypes like IObML.template_dataTypes",result) < 0) {
-	metautils::log_error("insert_generic_point_inventory() returned error: "+server.error()+" while trying to create 'ds"+local_args.dsnum2+"_dataTypes'","iinv",user);
+	metautils::log_error("insert_generic_point_inventory() returned error: "+server.error()+" while trying to create 'ds"+local_args.dsnum2+"_dataTypes'","iinv",USER);
     }
     if (server.command("create table IObML.ds"+local_args.dsnum2+"_inventory_summary like IObML.template_inventory_summary",result) < 0) {
-	metautils::log_error("insert_generic_point_inventory() returned error: "+server.error()+" while trying to create 'ds"+local_args.dsnum2+"_inventory_summary'","iinv",user);
+	metautils::log_error("insert_generic_point_inventory() returned error: "+server.error()+" while trying to create 'ds"+local_args.dsnum2+"_inventory_summary'","iinv",USER);
     }
   }
   std::unordered_map<std::string,std::string> times_table,obs_table,platform_table,id_table;
@@ -1352,7 +1353,7 @@ void insert_generic_point_inventory(std::ifstream& ifs,MySQL::Server& server,std
 	    MySQL::LocalQuery query("code","WObML.obsTypes","obsType = '"+lparts[2]+"'");
 	    MySQL::Row row;
 	    if (query.submit(server) < 0 || !query.fetch_row(row)) {
-		metautils::log_error("insert_generic_point_inventory() returned error: "+query.error()+" while trying to get obsType code for '"+lparts[2]+"'","iinv",user);
+		metautils::log_error("insert_generic_point_inventory() returned error: "+query.error()+" while trying to get obsType code for '"+lparts[2]+"'","iinv",USER);
 	    }
 	    obs_table.emplace(lparts[1],row[0]);
 	    break;
@@ -1362,7 +1363,7 @@ void insert_generic_point_inventory(std::ifstream& ifs,MySQL::Server& server,std
 	    MySQL::LocalQuery query("code","WObML.platformTypes","platformType = '"+lparts[2]+"'");
 	    MySQL::Row row;
 	    if (query.submit(server) < 0 || !query.fetch_row(row)) {
-		metautils::log_error("insert_generic_point_inventory() returned error: "+query.error()+" while trying to get platformType code for '"+lparts[2]+"'","iinv",user);
+		metautils::log_error("insert_generic_point_inventory() returned error: "+query.error()+" while trying to get platformType code for '"+lparts[2]+"'","iinv",USER);
 	    }
 	    platform_table.emplace(lparts[1],row[0]);
 	    break;
@@ -1379,7 +1380,7 @@ void insert_generic_point_inventory(std::ifstream& ifs,MySQL::Server& server,std
 		MySQL::LocalQuery query("code","WObML.ds"+local_args.dsnum2+"_dataTypesList","observationType_code = "+obs_table[dparts[0]]+" and platformType_code = "+platform_table[dparts[1]]+" and dataType = '"+dparts[2]+"'");
 		MySQL::Row row;
 		if (query.submit(server) < 0 || !query.fetch_row(row)) {
-		  metautils::log_error("insert_generic_point_inventory() returned error: "+query.error()+" while trying to get dataType code for '"+lparts[2]+"'","iinv",user);
+		  metautils::log_error("insert_generic_point_inventory() returned error: "+query.error()+" while trying to get dataType code for '"+lparts[2]+"'","iinv",USER);
 		}
 		data_type_table.emplace(std::stoi(lparts[1]),std::make_tuple(std::stoi(row[0]),std::stoi(dparts[3].substr(1))));
 		std::string value_type;
@@ -1409,7 +1410,7 @@ void insert_generic_point_inventory(std::ifstream& ifs,MySQL::Server& server,std
 		}
 		if (server.insert("IObML.ds"+local_args.dsnum2+"_dataTypesList_b",row[0]+",'"+value_type+"',"+scale+","+dparts[3].substr(1)+",NULL") < 0) {
 		  if (!std::regex_search(server.error(),std::regex("Duplicate entry"))) {
-		    metautils::log_error("insert_generic_point_inventory() returned error: "+server.error()+" while inserting row '"+row[0]+",'"+value_type+"',"+scale+","+dparts[3].substr(1)+",NULL'","iinv",user);
+		    metautils::log_error("insert_generic_point_inventory() returned error: "+server.error()+" while inserting row '"+row[0]+",'"+value_type+"',"+scale+","+dparts[3].substr(1)+",NULL'","iinv",USER);
 		  }
 		}
 	    }
@@ -1469,7 +1470,7 @@ void insert_generic_point_inventory(std::ifstream& ifs,MySQL::Server& server,std
 	for (int n=min_lat_i; n <= max_lat_i; ++n) {
 	  for (int m=min_lon_i; m <= max_lon_i; ++m) {
 	    if (server.insert("IObML.ds"+local_args.dsnum2+"_inventory_"+strutils::itos(n)+"_"+strutils::itos(m)+"_b",web_ID_code+","+times_table.at(iparts[1])+","+idparts[0]+",'"+bitmap+"',"+strutils::itos(min_dval)+","+strutils::itos(max_dval)+",'"+iparts[0]+"','"+uflag+"'","update dataType_codes = '"+bitmap+"', byte_offsets = '"+iparts[0]+"', uflag = '"+uflag+"'") < 0) {
-		metautils::log_error("insert_generic_point_inventory() returned error: "+server.error()+" for insert: '"+web_ID_code+","+times_table.at(iparts[1])+","+idparts[0]+",'"+bitmap+"',"+strutils::itos(min_dval)+","+strutils::itos(max_dval)+",'"+iparts[0]+"'' into table IObML.ds"+local_args.dsnum2+"_inventory_"+strutils::itos(n)+"_"+strutils::itos(m)+"_b","iinv",user);
+		metautils::log_error("insert_generic_point_inventory() returned error: "+server.error()+" for insert: '"+web_ID_code+","+times_table.at(iparts[1])+","+idparts[0]+",'"+bitmap+"',"+strutils::itos(min_dval)+","+strutils::itos(max_dval)+",'"+iparts[0]+"'' into table IObML.ds"+local_args.dsnum2+"_inventory_"+strutils::itos(n)+"_"+strutils::itos(m)+"_b","iinv",USER);
 	    }
 	  }
 	}
@@ -1483,13 +1484,13 @@ void insert_generic_point_inventory(std::ifstream& ifs,MySQL::Server& server,std
     }
   }
   if (server.insert("IObML.ds"+local_args.dsnum2+"_inventory_summary",web_ID_code+","+strutils::itos(byte_length)+",0,'"+uflag+"'","update byte_length = "+strutils::itos(byte_length)+", uflag = '"+uflag+"'") < 0) {
-    metautils::log_error("insert_generic_point_inventory() returned error: "+server.error()+" for insert: '"+web_ID_code+","+strutils::itos(byte_length)+"' into table IObML.ds"+local_args.dsnum2+"_inventory_summary","iinv",user);
+    metautils::log_error("insert_generic_point_inventory() returned error: "+server.error()+" for insert: '"+web_ID_code+","+strutils::itos(byte_length)+"' into table IObML.ds"+local_args.dsnum2+"_inventory_summary","iinv",USER);
   }
   server._delete("IObML.ds"+local_args.dsnum2+"_inventory_summary","webID_code = "+web_ID_code+" and uflag != '"+uflag+"'");
   for (const auto& e : datatypes_table) {
     for (const auto& e2 : *e.second) {
 	if (server.insert("IObML.ds"+local_args.dsnum2+"_dataTypes",web_ID_code+","+e.first+","+strutils::itos(e2.first)+",'',0,"+strutils::itos(e2.second)+",0,'"+uflag+"'","update value_type = '', byte_offset = 0, byte_length = "+strutils::itos(e2.second)+", missing_ind = 0, uflag = '"+uflag+"'") < 0) {
-	  metautils::log_error("insert_generic_point_inventory() returned error: "+server.error()+" for insert: '"+web_ID_code+","+e.first+","+strutils::itos(e2.first)+",'',0,"+strutils::itos(e2.second)+",0'","iinv",user);
+	  metautils::log_error("insert_generic_point_inventory() returned error: "+server.error()+" for insert: '"+web_ID_code+","+e.first+","+strutils::itos(e2.first)+",'',0,"+strutils::itos(e2.second)+",0'","iinv",USER);
 	}
     }
   }
@@ -1520,14 +1521,14 @@ void insert_obml_inventory()
   }
   ifs.open(sdum.c_str());
   if (!ifs.is_open()) {
-    metautils::log_error("insert_obml_inventory() was not able to open "+metautils::args.filename,"iinv",user);
+    metautils::log_error("insert_obml_inventory() was not able to open "+metautils::args.filename,"iinv",USER);
   }
   sdum=strutils::substitute(metautils::args.filename,".ObML_inv","");
   strutils::replace_all(sdum,"%","/");
   MySQL::LocalQuery query;
   query.set("select code,format_code,tindex from WObML.ds"+local_args.dsnum2+"_webfiles as w left join dssdb.wfile as x on (x.dsid = 'ds"+metautils::args.dsnum+"' and x.type = 'D' and x.wfile = w.webID) where webID = '"+sdum+"'");
   if (query.submit(server) < 0) {
-    metautils::log_error("insert_obml_inventory() returned error: "+query.error()+" while looking for code from webfiles","iinv",user);
+    metautils::log_error("insert_obml_inventory() returned error: "+query.error()+" while looking for code from webfiles","iinv",USER);
   }
   MySQL::Row row;
   query.fetch_row(row);
@@ -1566,7 +1567,7 @@ void insert_obml_inventory()
 	    auto spx=strutils::split(sp[2],"[!]");
 	    query.set("select i.code from WObML.ds"+local_args.dsnum2+"_IDs2 as i left join WObML.IDTypes as t on t.code = i.IDType_code where t.IDType= '"+spx[0]+"' and i.ID = '"+spx[1]+"'");
 	    if (query.submit(server) < 0) {
-		metautils::log_error("insert_obml_inventory() returned error: "+query.error()+" while trying to get ID code","iinv",user);
+		metautils::log_error("insert_obml_inventory() returned error: "+query.error()+" while trying to get ID code","iinv",USER);
 	    }
 	    query.fetch_row(row);
 	    ID_codes.emplace_back(row[0]);
@@ -1584,18 +1585,18 @@ void insert_obml_inventory()
 	  if (!MySQL::table_exists(server,"IObML.ds"+local_args.dsnum2+"_inventory_summary")) {
 	    std::string result;
 	    if (server.command("create table IObML.ds"+local_args.dsnum2+"_inventory_summary like IObML.template_inventory_summary",result) < 0) {
-		metautils::log_error("insert_obml_inventory() returned error: "+server.error()+" while trying to create 'ds"+local_args.dsnum2+"_inventory_summary'","iinv",user);
+		metautils::log_error("insert_obml_inventory() returned error: "+server.error()+" while trying to create 'ds"+local_args.dsnum2+"_inventory_summary'","iinv",USER);
 	    }
 	  }
 	  if (server._delete("IObML.ds"+local_args.dsnum2+"_inventory_summary","webID_code = "+web_ID_code) < 0) {
-	    metautils::log_error("insert_obml_inventory() returned error: "+server.error()+" while deleting web_ID_code "+web_ID_code+" from IObML.ds"+local_args.dsnum2+"_inventory_summary","iinv",user);
+	    metautils::log_error("insert_obml_inventory() returned error: "+server.error()+" while deleting web_ID_code "+web_ID_code+" from IObML.ds"+local_args.dsnum2+"_inventory_summary","iinv",USER);
 	  }
 	  inventory_tables=MySQL::table_names(server,"IObML","ds"+local_args.dsnum2+"_inventory_%",error);
 	  lockstring="IObML.ds"+local_args.dsnum2+"_inventory_summary write";
 	  for (auto& table : inventory_tables) {
 	    if (!regex_search(table,std::regex("_summary$"))) {
 		if (server._delete("IObML."+table,"webID_code = "+web_ID_code) < 0) {
-		  metautils::log_error("insert_obml_inventory() returned error: "+server.error()+" while trying to delete web_ID_code "+web_ID_code+" from 'IObML."+table+"'","iinv",user);
+		  metautils::log_error("insert_obml_inventory() returned error: "+server.error()+" while trying to delete web_ID_code "+web_ID_code+" from 'IObML."+table+"'","iinv",USER);
 		}
 		lockstring+=", IObML."+table+" write";
 	    }
@@ -1603,25 +1604,25 @@ void insert_obml_inventory()
 	  lockstring+=", IObML.template_inventory_lati_loni write";
 	  std::string result;
 	  if (server.command("lock tables "+lockstring,result) < 0) {
-	    metautils::log_error("unable to lock tables "+lockstring+"; error: "+server.error(),"iinv",user);
+	    metautils::log_error("unable to lock tables "+lockstring+"; error: "+server.error(),"iinv",USER);
 	  }
 	  first=false;
 	}
 	auto sp=strutils::split(sline,"|");
 	total_bytes+=std::stoll(sp[1]);
 	if (convert_lat_lon_to_box(36,std::stof(sp[6]),std::stof(sp[7]),lat_i,lon_i) < 0)
-	  metautils::log_error("insert_obml_inventory() was not able to convert lat/lon: "+sp[6]+","+sp[7]+" to a 36-degree box","iinv",user);
+	  metautils::log_error("insert_obml_inventory() was not able to convert lat/lon: "+sp[6]+","+sp[7]+" to a 36-degree box","iinv",USER);
 	sdum="IObML.ds"+local_args.dsnum2+"_inventory_"+strutils::itos(lat_i)+"_"+strutils::itos(lon_i);
 	if (!latlon_table.found(sdum,se)) {
 	  if (!MySQL::table_exists(server,sdum)) {
 	    std::string result;
 	    server.command("unlock tables",result);
 	    if (server.command("create table "+sdum+" like IObML.template_inventory_lati_loni",result) < 0) {
-		metautils::log_error("insert_obml_inventory() returned error: "+server.error()+" while trying to create '"+sdum+"'","iinv",user);
+		metautils::log_error("insert_obml_inventory() returned error: "+server.error()+" while trying to create '"+sdum+"'","iinv",USER);
 	    }
 	    lockstring+=", "+sdum+" write";
 	    if (server.command("lock tables "+lockstring,result) < 0) {
-		metautils::log_error("unable to lock tables "+lockstring+"; error: "+server.error(),"iinv",user);
+		metautils::log_error("unable to lock tables "+lockstring+"; error: "+server.error(),"iinv",USER);
 	    }
 	  }
 	  se.key=sdum;
@@ -1650,22 +1651,22 @@ void insert_obml_inventory()
   for (auto& key : inventory_table.keys()) {
     inventory_table.found(key,ie);
     if (server.insert(ie.key,*(ie.list)) < 0) {
-	metautils::log_error("insert_obml_inventory() returned error: "+server.error()+" while inserting multiple rows into "+ie.key,"iinv",user);
+	metautils::log_error("insert_obml_inventory() returned error: "+server.error()+" while inserting multiple rows into "+ie.key,"iinv",USER);
     }
   }
   if (server.insert("IObML.ds"+local_args.dsnum2+"_inventory_summary",web_ID_code+","+strutils::lltos(total_bytes)) < 0) {
-    metautils::log_error("insert_obml_inventory() returned error: "+server.error()+" while inserting row '"+web_ID_code+","+strutils::lltos(total_bytes)+"'","iinv",user);
+    metautils::log_error("insert_obml_inventory() returned error: "+server.error()+" while inserting row '"+web_ID_code+","+strutils::lltos(total_bytes)+"'","iinv",USER);
   }
   if (server.insert("IObML.ds"+local_args.dsnum2+"_inventory_summary",web_ID_code+","+strutils::lltos(total_bytes)) < 0) {
     error=server.error();
     if (!std::regex_search(error,std::regex("Duplicate entry"))) {
-	metautils::log_error("insert_obml_inventory() returned error: "+server.error()+" while inserting row '"+web_ID_code+","+strutils::lltos(total_bytes)+"'","iinv",user);
+	metautils::log_error("insert_obml_inventory() returned error: "+server.error()+" while inserting row '"+web_ID_code+","+strutils::lltos(total_bytes)+"'","iinv",USER);
     }
   }
   std::string result;
   server.command("unlock tables",result);
   if (num_dupes > 0) {
-    metautils::log_warning(strutils::itos(num_dupes)+" duplicate observations were ignored","iinv_dupes",user);
+    metautils::log_warning(strutils::itos(num_dupes)+" duplicate observations were ignored","iinv_dupes",USER);
   }
 */
   server.disconnect();
@@ -1685,7 +1686,7 @@ void insert_inventory()
     insert_obml_inventory();
   }
   else {
-    metautils::log_error("insert_inventory() does not recognize inventory extension "+ext,"iinv",user);
+    metautils::log_error("insert_inventory() does not recognize inventory extension "+ext,"iinv",USER);
   }
 }
 
@@ -1705,7 +1706,7 @@ int main(int argc,char **argv)
   }
   auto t1=time(nullptr);
   signal(SIGSEGV,segv_handler);
-  metautils::read_config("iinv",user);
+  metautils::read_config("iinv",USER);
   parse_args(argc,argv);
 /*
   if (metautils::args.dsnum == "999.9") {
@@ -1713,21 +1714,21 @@ int main(int argc,char **argv)
   }
 */
 /*
-metautils::log_warning("this command will be run by Bob later - you can ignore this warning","iinv",user);
+metautils::log_warning("this command will be run by Bob later - you can ignore this warning","iinv",USER);
 exit(0);
 */
-  metautils::cmd_register("iinv",user);
+  metautils::cmd_register("iinv",USER);
   temp_dir.create(metautils::directives.temp_path);
   insert_inventory();
   if (local_args.create_cache) {
-    gatherxml::summarizeMetadata::create_file_list_cache("inv","iinv",user);
+    gatherxml::summarizeMetadata::create_file_list_cache("inv","iinv",USER);
     if (!tindex.empty() && tindex != "0") {
-	gatherxml::summarizeMetadata::create_file_list_cache("inv","iinv",user,tindex);
+	gatherxml::summarizeMetadata::create_file_list_cache("inv","iinv",USER,tindex);
     }
   }
   if (local_args.notify) {
     std::cout << argv[0] << " has completed successfully" << std::endl;
   }
   auto t2=time(nullptr);
-  metautils::log_warning("execution time: "+strutils::ftos(t2-t1)+" seconds","iinv.time",user);
+  metautils::log_warning("execution time: "+strutils::ftos(t2-t1)+" seconds","iinv.time",USER);
 }
