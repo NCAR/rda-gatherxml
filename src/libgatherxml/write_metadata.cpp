@@ -1008,6 +1008,9 @@ void write(ObservationData& obs_data,std::string caller,std::string user)
   else if (metautils::args.data_format == "wmssc") {
     ofs << "DSS_WMSSC";
   }
+  else if (metautils::args.data_format == "hdf5nc4") {
+    ofs << "netCDF4";
+  }
   else if (metautils::args.data_format == "hdf5") {
     ofs << "HDF5";
   }
