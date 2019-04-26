@@ -6,6 +6,10 @@
 
 namespace gatherxml {
 
+extern bool verbose_operation;
+
+extern void parse_args(char arg_delimiter);
+
 namespace detailedMetadata {
 
 extern void generate_detailed_metadata_view(std::string caller,std::string user);
@@ -98,7 +102,7 @@ extern void summarize_grids(std::string database,std::string caller,std::string 
 extern std::string summarize_locations(std::string database);
 extern bool summarize_obs_data(std::string caller,std::string user);
 
-} // end gatherxml::summarizeMetadata
+} // end namespace gatherxml::summarizeMetadata
 
 namespace fileInventory {
 
