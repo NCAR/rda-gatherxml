@@ -74,7 +74,7 @@ void generate_index(std::string type,std::string tdir_name)
     }
     std::stringstream dc_meta_tags_s;
     if (!metadataExport::export_to_dc_meta_tags(dc_meta_tags_s,metautils::args.dsnum,xdoc,0)) {
-	metautils::log_error("unable to export DC meta tags","dsgen",USER);
+	metautils::log_error("unable to export DC meta tags: '"+myerror+"'","dsgen",USER);
     }
     tdoc.add_replacement("__DC_META_TAGS__",dc_meta_tags_s.str());
     auto e=xdoc.element("dsOverview/title");
