@@ -236,7 +236,7 @@ void rewrite_uri_in_cmd_file(std::string db)
 	ifs.open(obml_filename.c_str());
     }
     if (!ifs.is_open()) {
-	metautils::log_error("unable to open old file for input","rcm",USER);
+	metautils::log_error("unable to open old file ("+obml_filename+") for input","rcm",USER);
     }
     ofs.open((tdir.name()+"/metadata/"+cmdir+"/"+nname+".ObML").c_str());
     if (!ofs.is_open()) {
@@ -303,7 +303,15 @@ void rewrite_uri_in_cmd_file(std::string db)
     }
   }
   else if (db == (db_prefix+"FixML")) {
-    ifs.open(unixutils::remote_web_file("https://rda.ucar.edu/datasets/ds"+metautils::args.dsnum+"/metadata/"+cmdir+"/"+oname+".FixML",tdir.name()).c_str());
+    auto fixml_filename=unixutils::remote_web_file("https://rda.ucar.edu/datasets/ds"+metautils::args.dsnum+"/metadata/"+cmdir+"/"+oname+".FixML.gz",tdir.name());
+    if (fixml_filename.empty()) {
+	fixml_filename=unixutils::remote_web_file("https://rda.ucar.edu/datasets/ds"+metautils::args.dsnum+"/metadata/"+cmdir+"/"+oname+".FixML",tdir.name()).c_str();
+    }
+    else {
+	system(("gunzip "+fixml_filename).c_str());
+	strutils::chop(fixml_filename,3);
+    }
+    ifs.open(fixml_filename.c_str());
     if (!ifs.is_open()) {
 	metautils::log_error("unable to open old file for input","rcm",USER);
     }
@@ -331,6 +339,7 @@ void rewrite_uri_in_cmd_file(std::string db)
     }
     ifs.close();
     ofs.close();
+    system(("gzip -f "+tdir.name()+"/metadata/"+cmdir+"/"+nname+".FixML").c_str());
     if (oname != nname) {
 // remove the old file
  	if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+cmdir+"/"+oname+".FixML",metautils::directives.rdadata_home,error) < 0) {
@@ -575,8 +584,9 @@ int main(int argc,char **argv)
   metautils::args.path=old_name;
   metautils::args.filename=new_name;
   metautils::cmd_register("rcm",USER);
-  if (!verified_new_file_is_archived(error))
+  if (!verified_new_file_is_archived(error)) {
     metautils::log_error("rcm main returned error: "+error,"rcm",USER);
+  }
   else {
     if (!renamed_cmd()) {
 	metautils::log_error("rcm main retured error: no content metadata were found for "+old_name,"rcm",USER);
