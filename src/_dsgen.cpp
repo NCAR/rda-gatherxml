@@ -1370,7 +1370,7 @@ void generate_description(std::string type,std::string tdir_name)
 	tdoc.add_if("__HAS_PUBLICATIONS__");
     }
     for (const auto& ele : elist) {
-	ofs << "<a href=\"" << ele.attribute_value("url") << "\">" << ele.content() << "</a><br>" << std::endl;
+	publications_s << "<a href=\"" << ele.attribute_value("url") << "\">" << ele.content() << "</a><br>" << std::endl;
     }
   }
   if (!publications_s.str().empty()) {
