@@ -358,6 +358,72 @@ namespace markup {
 
 namespace ObML {
 
+void DataTypeEntry::fill_vertical_resolution_data(std::vector<double>& level_list,std::string z_positive_direction,std::string z_units)
+{
+  auto min=1.e38,max=-1.e38;
+  for (size_t n=0; n < level_list.size(); ++n) {
+    if (level_list[n] < min) {
+	min=level_list[n];
+    }
+    if (level_list[n] > max) {
+	max=level_list[n];
+    }
+  }
+  if (data->vdata == nullptr) {
+    data->vdata.reset(new gatherxml::markup::ObML::DataTypeEntry::Data::VerticalData);
+  }
+  if (z_positive_direction == "down") {
+    std::sort(level_list.begin(),level_list.end(),
+    [](const double& left,const double& right) -> bool
+    {
+	if (left > right) {
+	  return true;
+	}
+	else {
+	  return false;
+	}
+    });
+    if (data->vdata->min_altitude > 1.e37) {
+	data->vdata->min_altitude=-data->vdata->min_altitude;
+    }
+    if (data->vdata->max_altitude < -1.e37) {
+	data->vdata->max_altitude=-data->vdata->max_altitude;
+    }
+    if (max > data->vdata->min_altitude) {
+	data->vdata->min_altitude=max;
+    }
+    if (min < data->vdata->max_altitude) {
+	data->vdata->max_altitude=min;
+    }
+  }
+  else {
+    std::sort(level_list.begin(),level_list.end(),
+    [](const double& left,const double& right) -> bool
+    {
+	if (left < right) {
+	  return true;
+	}
+	else {
+	  return false;
+	}
+    });
+    if (min < data->vdata->min_altitude) {
+	data->vdata->min_altitude=min;
+    }
+    if (max > data->vdata->max_altitude) {
+	data->vdata->max_altitude=max;
+    }
+  }
+  data->vdata->units=z_units;
+  data->vdata->avg_nlev+=level_list.size();
+  auto avg_vres=0.;
+  for (size_t n=1; n < level_list.size(); ++n) {
+    avg_vres+=fabs(level_list[n]-level_list[n-1]);
+  }
+  data->vdata->avg_res+=(avg_vres/(level_list.size()-1));
+  ++data->vdata->res_cnt;
+}
+
 ObservationData::ObservationData() : num_types(0),observation_types(),observation_indexes(),id_tables(),platform_tables(),unique_observation_table(),unknown_id_re("unknown"),unknown_ids(nullptr),track_unique_observations(true),is_empty(true)
 {
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
