@@ -536,7 +536,11 @@ void add_gridded_lat_lon_keys(std::vector<std::string>& gentry_keys,Grid::GridDi
     case Grid::latitudeLongitudeType:
     case Grid::gaussianLatitudeLongitudeType:
     {
-	key_start=strutils::itos(def.type)+"<!>"+strutils::itos(dim.x)+"<!>"+strutils::itos(dim.y)+"<!>"+strutils::ftos(def.slatitude,3)+"<!>"+strutils::ftos(def.slongitude,3)+"<!>"+strutils::ftos(def.elatitude,3)+"<!>"+strutils::ftos(def.elongitude,3)+"<!>"+strutils::ftos(def.loincrement,3)+"<!>"+strutils::ftos(def.laincrement,3)+"<!>";
+	key_start=strutils::itos(def.type);
+	if (def.is_cell) {
+	  key_start+="C";
+	}
+	key_start+="<!>"+strutils::itos(dim.x)+"<!>"+strutils::itos(dim.y)+"<!>"+strutils::ftos(def.slatitude,3)+"<!>"+strutils::ftos(def.slongitude,3)+"<!>"+strutils::ftos(def.elatitude,3)+"<!>"+strutils::ftos(def.elongitude,3)+"<!>"+strutils::ftos(def.loincrement,3)+"<!>"+strutils::ftos(def.laincrement,3)+"<!>";
 	add_gridded_time_range(key_start,gentry_keys,timeid,timedimid,levdimid,latdimid,londimid,tre,vars);
 	key_start=strutils::itos(def.type)+"<!>1<!>"+strutils::itos(dim.y)+"<!>"+strutils::ftos(def.slatitude,3)+"<!>0<!>"+strutils::ftos(def.elatitude,3)+"<!>360<!>"+strutils::ftos(def.laincrement,3)+"<!>"+strutils::ftos(def.laincrement,3)+"<!>";
 	add_gridded_time_range(key_start,gentry_keys,timeid,timedimid,levdimid,latdimid,londimid,tre,vars);
@@ -544,7 +548,11 @@ void add_gridded_lat_lon_keys(std::vector<std::string>& gentry_keys,Grid::GridDi
     }
     case Grid::polarStereographicType:
     {
-	key_start=strutils::itos(def.type)+"<!>"+strutils::itos(dim.x)+"<!>"+strutils::itos(dim.y)+"<!>"+strutils::ftos(def.slatitude,3)+"<!>"+strutils::ftos(def.slongitude,3)+"<!>"+strutils::ftos(def.llatitude,3)+"<!>"+strutils::ftos(def.olongitude,3)+"<!>"+strutils::ftos(def.dx,3)+"<!>"+strutils::ftos(def.dy,3)+"<!>";
+	key_start=strutils::itos(def.type);
+	if (def.is_cell) {
+	  key_start+="C";
+	}
+	key_start+="<!>"+strutils::itos(dim.x)+"<!>"+strutils::itos(dim.y)+"<!>"+strutils::ftos(def.slatitude,3)+"<!>"+strutils::ftos(def.slongitude,3)+"<!>"+strutils::ftos(def.llatitude,3)+"<!>"+strutils::ftos(def.olongitude,3)+"<!>"+strutils::ftos(def.dx,3)+"<!>"+strutils::ftos(def.dy,3)+"<!>";
 	if (def.projection_flag == 0) {
 	  key_start+="N";
 	}
@@ -557,7 +565,11 @@ void add_gridded_lat_lon_keys(std::vector<std::string>& gentry_keys,Grid::GridDi
     }
     case Grid::mercatorType:
     {
-	key_start=strutils::itos(def.type)+"<!>"+strutils::itos(dim.x)+"<!>"+strutils::itos(dim.y)+"<!>"+strutils::ftos(def.slatitude,3)+"<!>"+strutils::ftos(def.slongitude,3)+"<!>"+strutils::ftos(def.elatitude,3)+"<!>"+strutils::ftos(def.elongitude,3)+"<!>"+strutils::ftos(def.loincrement,3)+"<!>"+strutils::ftos(def.laincrement,3)+"<!>";
+	key_start=strutils::itos(def.type);
+	if (def.is_cell) {
+	  key_start+="C";
+	}
+	key_start+="<!>"+strutils::itos(dim.x)+"<!>"+strutils::itos(dim.y)+"<!>"+strutils::ftos(def.slatitude,3)+"<!>"+strutils::ftos(def.slongitude,3)+"<!>"+strutils::ftos(def.elatitude,3)+"<!>"+strutils::ftos(def.elongitude,3)+"<!>"+strutils::ftos(def.loincrement,3)+"<!>"+strutils::ftos(def.laincrement,3)+"<!>";
 	add_gridded_time_range(key_start,gentry_keys,timeid,timedimid,levdimid,latdimid,londimid,tre,vars);
 	break;
     }
@@ -2172,7 +2184,7 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream,NetCDFVariables& nc_var
 {
   std::string sdum;
   std::string timeid;
-  std::vector<std::string> levids,latids,lonids;
+  std::vector<std::string> levids,latids,latboundsids,lonids,lonboundsids;
   std::vector<netCDFStream::NcType> levtypes,lontypes;
   size_t timedimid=0x3fffffff;
   std::vector<size_t> latdimids,londimids,levdimids;
@@ -2361,6 +2373,13 @@ else {
 		latids.emplace_back(vars[n].name);
 		latdimids.emplace_back(vars[n].dimids[0]);
 		found_lat=true;
+		std::string latboundsid;
+		for (size_t l=0; l < vars[n].attrs.size(); ++l) {
+		  if (vars[n].attrs[l].nc_type == netCDFStream::NcType::CHAR && vars[n].attrs[l].name == "bounds") {
+		    latboundsid=*(reinterpret_cast<std::string *>(vars[n].attrs[l].values));
+		  }
+		}
+		latboundsids.emplace_back(latboundsid);
 //}
 	    }
 	    else if (sdum == "degrees_east" || sdum == "degree_east" || sdum == "degrees_e" || sdum == "degree_e" || (sdum == "degrees" && vars[n].name == "lon")) {
@@ -2374,6 +2393,13 @@ else {
 		lontypes.emplace_back(vars[n].nc_type);
 		londimids.emplace_back(vars[n].dimids[0]);
 		found_lon=true;
+		std::string lonboundsid;
+		for (size_t l=0; l < vars[n].attrs.size(); ++l) {
+		  if (vars[n].attrs[l].nc_type == netCDFStream::NcType::CHAR && vars[n].attrs[l].name == "bounds") {
+		    lonboundsid=*(reinterpret_cast<std::string *>(vars[n].attrs[l].values));
+		  }
+		}
+		lonboundsids.emplace_back(lonboundsid);
 //}
 	    }
 	    else {
@@ -2770,12 +2796,29 @@ else {
 	    grid_defs.back().type=Grid::gaussianLatitudeLongitudeType;
 	    grid_defs.back().laincrement=var_data.size()/2;
 	  }
+	  if (!latboundsids[n].empty()) {
+	    if (lonboundsids[n].empty()) {
+		metautils::log_error("found a lat bounds but no lon bounds","nc2xml",USER);
+	    }
+	    istream.variable_data(latboundsids[n],var_data);
+	    grid_defs.back().slatitude=var_data.front();
+	    grid_defs.back().elatitude=var_data.back();
+	    grid_defs.back().is_cell=true;
+	  }
 // get the longitude range
 	  istream.variable_data(lonids[n],var_data);
 	  grid_dims.back().x=var_data.size();
 	  grid_defs.back().slongitude=var_data.front();
 	  grid_defs.back().elongitude=var_data.back();
 	  grid_defs.back().loincrement=fabs((grid_defs.back().elongitude-grid_defs.back().slongitude)/(var_data.size()-1));
+	  if (!lonboundsids[n].empty()) {
+	    if (latboundsids[n].empty()) {
+		metautils::log_error("found a lon bounds but no lat bounds","nc2xml",USER);
+	    }
+	    istream.variable_data(lonboundsids[n],var_data);
+	    grid_defs.back().slongitude=var_data.front();
+	    grid_defs.back().elongitude=var_data.back();
+	  }
 	}
     }
     for (size_t m=0; m < levtypes.size(); ++m) {
