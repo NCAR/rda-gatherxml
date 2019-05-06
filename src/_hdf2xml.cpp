@@ -1861,6 +1861,9 @@ void scan_cf_point_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data,gat
 void scan_cf_non_orthogonal_profile_hdf5nc4_file(InputHDF5Stream& istream,const DiscreteGeometriesData& dgd,const HDF5::DataArray& time_vals,const NetCDFVariableAttributeData& nc_ta_data,ScanData& scan_data,gatherxml::markup::ObML::ObservationData& obs_data,std::string obs_type)
 {
   static const std::string THIS_FUNC=__func__;
+  if (gatherxml::verbose_operation) {
+    std::cout << "...beginning function "+THIS_FUNC+"()..." << std::endl;
+  }
   auto ds=istream.dataset("/"+dgd.indexes.stn_id_var);
   if (ds == nullptr) {
     metautils::log_error(THIS_FUNC+"() returned error: unable to access station ID variable","hdf2xml",USER);
@@ -1942,53 +1945,55 @@ id_types.emplace_back("unknown");
 	    metautils::log_error(THIS_FUNC+"() returned error: unable to get variable values for "+var.key,"hdf2xml",USER);
 	  }
 	  HDF5::DataArray var_vals(istream,*ds);
-	  NetCDFVariableAttributeData nc_va_data;
-	  extract_from_hdf5_variable_attribute(var.dataset->attributes,nc_va_data);
-	  metautils::StringEntry se;
-	  se.key=var.key+"<!>"+nc_va_data.long_name+"<!>"+nc_va_data.units;
-	  scan_data.varlist.emplace_back(se.key);
-	  if (scan_data.found_map) {
-	    se.key=var.key;
-	    scan_data.var_changes_table.insert(se);
-	  }
-	  auto var_off=0;
-	  auto z_off=0;
-	  for (size_t n=0; n < time_vals.num_values; ++n) {
-	    auto lat=lat_vals.value(n);
-	    if (lat < -90. || lat > 90.) {
-		lat=-999.;
+	  if (var_vals.type != HDF5::DataArray::null_) {
+	    NetCDFVariableAttributeData nc_va_data;
+	    extract_from_hdf5_variable_attribute(var.dataset->attributes,nc_va_data);
+	    metautils::StringEntry se;
+	    se.key=var.key+"<!>"+nc_va_data.long_name+"<!>"+nc_va_data.units;
+	    scan_data.varlist.emplace_back(se.key);
+	    if (scan_data.found_map) {
+		se.key=var.key;
+		scan_data.var_changes_table.insert(se);
 	    }
-	    auto lon=lon_vals.value(n);
-	    if (lon < -180. || lon > 360.) {
-		lon=-999.;
-	    }
-	    std::vector<double> level_list;
-	    for (size_t m=0; m < rowsize_vals.value(n); ++m) {
-		if (!found_missing(time_vals.value(n),time_vals.type,&nc_ta_data.missing_value,var_vals.value(var_off),var_vals.type,nc_va_data.missing_value)) {
-		  level_list.emplace_back(z_vals.value(z_off+m));
+	    auto var_off=0;
+	    auto z_off=0;
+	    for (size_t n=0; n < time_vals.num_values; ++n) {
+		auto lat=lat_vals.value(n);
+		if (lat < -90. || lat > 90.) {
+		  lat=-999.;
 		}
-		++var_off;
-	    }
-	    z_off+=z_rowsize_vals.value(n);
-	    if (level_list.size() > 0 && lat > -999. && lon > -999.) {
-		auto dt=compute_NcTime(time_vals,n);
-		gatherxml::markup::ObML::IDEntry ientry;
-		ientry.key=platform_types[n]+"[!]"+id_types[n]+"[!]";
-		if (id_vals.type == HDF5::DataArray::int_ || id_vals.type == HDF5::DataArray::float_ || id_vals.type == HDF5::DataArray::double_) {
-		  ientry.key+=strutils::ftos(id_vals.value(n));
+		auto lon=lon_vals.value(n);
+		if (lon < -180. || lon > 360.) {
+		  lon=-999.;
 		}
-		else if (id_vals.type == HDF5::DataArray::string_) {
-		  ientry.key+=id_vals.string_value(n);
+		std::vector<double> level_list;
+		for (size_t m=0; m < rowsize_vals.value(n); ++m) {
+		  if (!found_missing(time_vals.value(n),time_vals.type,&nc_ta_data.missing_value,var_vals.value(var_off),var_vals.type,nc_va_data.missing_value)) {
+		    level_list.emplace_back(z_vals.value(z_off+m));
+		  }
+		  ++var_off;
 		}
-		if (!obs_data.added_to_ids(obs_type,ientry,var.key,"",lat_vals.value(n),lon_vals.value(n),time_vals.value(n),&dt)) {
-		  metautils::log_error(THIS_FUNC+"() returned error: '"+myerror+"' when adding ID "+ientry.key,"nc2xml",USER);
+		z_off+=z_rowsize_vals.value(n);
+		if (level_list.size() > 0 && lat > -999. && lon > -999.) {
+		  auto dt=compute_NcTime(time_vals,n);
+		  gatherxml::markup::ObML::IDEntry ientry;
+		  ientry.key=platform_types[n]+"[!]"+id_types[n]+"[!]";
+		  if (id_vals.type == HDF5::DataArray::int_ || id_vals.type == HDF5::DataArray::float_ || id_vals.type == HDF5::DataArray::double_) {
+		    ientry.key+=strutils::ftos(id_vals.value(n));
+		  }
+		  else if (id_vals.type == HDF5::DataArray::string_) {
+		    ientry.key+=id_vals.string_value(n);
+		  }
+		  if (!obs_data.added_to_ids(obs_type,ientry,var.key,"",lat_vals.value(n),lon_vals.value(n),time_vals.value(n),&dt)) {
+		    metautils::log_error(THIS_FUNC+"() returned error: '"+myerror+"' when adding ID "+ientry.key,"nc2xml",USER);
+		  }
+		  if (level_list.size() > 1) {
+		    gatherxml::markup::ObML::DataTypeEntry dte;
+		    ientry.data->data_types_table.found(var.key,dte);
+		    dte.fill_vertical_resolution_data(level_list,dgd.z_pos,dgd.z_units);
+		  }
+		  ++num_not_missing;
 		}
-		if (level_list.size() > 1) {
-		  gatherxml::markup::ObML::DataTypeEntry dte;
-		  ientry.data->data_types_table.found(var.key,dte);
-		  dte.fill_vertical_resolution_data(level_list,dgd.z_pos,dgd.z_units);
-		}
-		++num_not_missing;
 	    }
 	  }
 	}
@@ -1998,10 +2003,19 @@ id_types.emplace_back("unknown");
 // indexed ragged array H.11
 metautils::log_error(THIS_FUNC+"() returned error: indexed ragged array not implemented","hdf2xml",USER);
   }
+  if (gatherxml::verbose_operation) {
+    std::cout << "...function "+THIS_FUNC+"() done." << std::endl;
+  }
 }
 
 void scan_cf_orthogonal_profile_hdf5nc4_file(InputHDF5Stream& istream,const DiscreteGeometriesData& dgd,const HDF5::DataArray& time_vals,const NetCDFVariableAttributeData& nc_ta_data,ScanData& scan_data,gatherxml::markup::ObML::ObservationData& obs_data,std::string obs_type)
 {
+  if (gatherxml::verbose_operation) {
+    std::cout << "...beginning function scan_cf_orthogonal_profile_hdf5nc4_file()..." << std::endl;
+  }
+  if (gatherxml::verbose_operation) {
+    std::cout << "...function scan_cf_orthogonal_profile_hdf5nc4_file() done." << std::endl;
+  }
 }
 
 void scan_cf_profile_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data,gatherxml::markup::ObML::ObservationData& obs_data)
@@ -2935,6 +2949,9 @@ void scan_hdf5_file(std::list<std::string>& filelist,ScanData& scan_data)
 
 void scan_file()
 {
+  if (gatherxml::verbose_operation) {
+    std::cout << "Beginning file scan..." << std::endl;
+  }
   work_file.reset(new TempFile);
   if (!work_file->open(metautils::directives.temp_path)) {
     metautils::log_error("scan_file() was not able to create a temporary file in "+metautils::directives.temp_path,"hdf2xml",USER);
@@ -2965,6 +2982,9 @@ void scan_file()
   else {
     std::cerr << "Error: bad data format specified" << std::endl;
     exit(1);
+  }
+  if (gatherxml::verbose_operation) {
+    std::cout << "File scan complete." << std::endl;
   }
 }
 
