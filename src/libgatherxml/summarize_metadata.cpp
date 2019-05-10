@@ -888,13 +888,12 @@ struct FileEntry {
 };
 void get_file_data(MySQL::Server& server,MySQL::Query& query,std::string unit,std::string unit_plural,my::map<XEntry>& gindex_table,my::map<XEntry>& rda_files_table,my::map<XEntry>& data_formats,my::map<FileEntry>& table)
 {
-  MySQL::Row row;
-  XEntry xe,xe2;
-  FileEntry fe;
-
-  while (query.fetch_row(row)) {
+  for (const auto& row : query) {
+    XEntry xe;
     if (rda_files_table.found(row[0],xe)) {
+	FileEntry fe;
 	fe.key=row[0];
+	XEntry xe2;
 	data_formats.found(row[1],xe2);
 	fe.data_format=xe2.strings->at(0);
 	fe.units=row[2]+" "+unit;
@@ -1231,6 +1230,7 @@ void write_groups(std::string& file_type,std::string db,std::ofstream& ofs,std::
 
 void create_file_list_cache(std::string file_type,std::string caller,std::string user,std::string tindex)
 {
+  static const std::string THIS_FUNC=__func__;
   std::string dsnum2=strutils::substitute(metautils::args.dsnum,".","");
   MySQL::LocalQuery satellite_query;
   MySQL::LocalQuery ocustom,fquery;
@@ -1268,7 +1268,7 @@ void create_file_list_cache(std::string file_type,std::string caller,std::string
     if (table_exists(server,"SatML.ds"+dsnum2+"_primaries")) {
 	satellite_query.set("select p.mssID,f.format,p.num_products,p.start_date,p.end_date,m.file_format,m.data_size,g.grpid,g.gindex,p.product from SatML.ds"+dsnum2+"_primaries as p left join SatML.formats as f on f.code = p.format_code left join dssdb.mssfile as m on m.mssfile = p.mssID left join dssdb.dsgroup as g on m.gindex = g.gindex where g.dsid = 'ds"+metautils::args.dsnum+"' or m.gindex = 0");
 	if (satellite_query.submit(server) < 0)
-	  metautils::log_error("create_file_list_cache(): "+satellite_query.error()+" from query: "+satellite_query.show(),caller,user);
+	  metautils::log_error(THIS_FUNC+"(): "+satellite_query.error()+" from query: "+satellite_query.show(),caller,user);
     }
     if (table_exists(server,"FixML.ds"+dsnum2+"_primaries")) {
 	fixml_file_data(file_type,gindex_table,rda_files_table,fixml_file_data_table,caller,user);
@@ -1327,16 +1327,16 @@ void create_file_list_cache(std::string file_type,std::string caller,std::string
 	}
 	TempDir tdir;
 	if (!tdir.create(metautils::directives.temp_path)) {
-	  metautils::log_error("create_file_list_cache(): unable to create temporary directory (1)",caller,user);
+	  metautils::log_error(THIS_FUNC+"(): unable to create temporary directory (1)",caller,user);
 	}
 // create the directory tree in the temp directory
 	std::stringstream oss,ess;
 	if (unixutils::mysystem2("/bin/mkdir -p "+tdir.name()+"/metadata",oss,ess) < 0) {
-	  metautils::log_error("create_file_list_cache(): unable to create a temporary directory tree (1) - '"+ess.str()+"'",caller,user);
+	  metautils::log_error(THIS_FUNC+"(): unable to create a temporary directory tree (1) - '"+ess.str()+"'",caller,user);
 	}
 	ofs.open((tdir.name()+"/metadata/"+filename).c_str());
 	if (!ofs.is_open()) {
-	  metautils::log_error("create_file_list_cache(): unable to open temporary file for "+filename,caller,user);
+	  metautils::log_error(THIS_FUNC+"(): unable to open temporary file for "+filename,caller,user);
 	}
 	if (unixutils::exists_on_server(metautils::directives.web_server,"/data/web/datasets/ds"+metautils::args.dsnum+"/metadata/inv",metautils::directives.rdadata_home)) {
 	  ofs << "curl_subset=Y" << std::endl;
@@ -1356,12 +1356,12 @@ void create_file_list_cache(std::string file_type,std::string caller,std::string
 	ofs.close();
 	if (max == "0") {
 	  if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+filename,metautils::directives.rdadata_home,error) < 0) {
-	    metautils::log_warning("create_file_list_cache() couldn't unsync '"+filename+"' - rdadata_unsync error(s): '"+error+"'",caller,user);
+	    metautils::log_warning(THIS_FUNC+"() couldn't unsync '"+filename+"' - rdadata_unsync error(s): '"+error+"'",caller,user);
 	  }
 	}
 	else {
 	  if (unixutils::rdadata_sync(tdir.name(),"metadata/","/data/web/datasets/ds"+metautils::args.dsnum,metautils::directives.rdadata_home,error) < 0) {
-	    metautils::log_warning("create_file_list_cache() couldn't sync '"+filename+"' - rdadata_sync error(s): '"+error+"'",caller,user);
+	    metautils::log_warning(THIS_FUNC+"() couldn't sync '"+filename+"' - rdadata_sync error(s): '"+error+"'",caller,user);
 	  }
 	}
     }
@@ -1369,7 +1369,7 @@ void create_file_list_cache(std::string file_type,std::string caller,std::string
   xmlutils::DataTypeMapper data_type_mapper(metautils::directives.parameter_map_path);
   if (ocustom) {
     if (ocustom.submit(server) < 0) {
-	metautils::log_error("create_file_list_cache(): "+ocustom.error()+" from query: "+ocustom.show(),caller,user);
+	metautils::log_error(THIS_FUNC+"(): "+ocustom.error()+" from query: "+ocustom.show(),caller,user);
     }
     ext="";
     ocustom.fetch_row(row);
@@ -1391,16 +1391,16 @@ void create_file_list_cache(std::string file_type,std::string caller,std::string
 	}
 	TempDir tdir;
 	if (!tdir.create(metautils::directives.temp_path)) {
-	  metautils::log_error("create_file_list_cache(): unable to create temporary directory (2)",caller,user);
+	  metautils::log_error(THIS_FUNC+"(): unable to create temporary directory (2)",caller,user);
 	}
 // create the directory tree in the temp directory
 	std::stringstream oss,ess;
 	if (unixutils::mysystem2("/bin/mkdir -p "+tdir.name()+"/metadata",oss,ess) < 0) {
-	  metautils::log_error("create_file_list_cache(): unable to create a temporary directory tree (2) - '"+ess.str()+"'",caller,user);
+	  metautils::log_error(THIS_FUNC+"(): unable to create a temporary directory tree (2) - '"+ess.str()+"'",caller,user);
 	}
 	ofs.open((tdir.name()+"/metadata/"+filename).c_str());
 	if (!ofs.is_open()) {
-	  metautils::log_error("create_file_list_cache(): unable to open temporary file for "+filename,caller,user);
+	  metautils::log_error(THIS_FUNC+"(): unable to open temporary file for "+filename,caller,user);
 	}
 // date range
 	ofs << row[0] << " " << row[1] << std::endl;
@@ -1420,7 +1420,7 @@ void create_file_list_cache(std::string file_type,std::string caller,std::string
 	  ocustom.set("select distinct l.platformType_code,p.platformType from WObML.ds"+dsnum2+"_dataTypes2 as d left join WObML.ds"+dsnum2+"_dataTypesList as l on l.code = d.dataType_code left join WObML.platformTypes as p on p.code = l.platformType_code left join (select distinct webID_code from IObML.ds"+dsnum2+"_dataTypes) as dt on dt.webID_code = d.webID_code where !isnull(dt.webID_code)");
 	}
 	if (ocustom.submit(server) < 0) {
-	  metautils::log_error("create_file_list_cache(): "+ocustom.error()+" from query: "+ocustom.show(),caller,user);
+	  metautils::log_error(THIS_FUNC+"(): "+ocustom.error()+" from query: "+ocustom.show(),caller,user);
 	}
 	ofs << ocustom.num_rows() << std::endl;
 	while (ocustom.fetch_row(row)) {
@@ -1441,10 +1441,10 @@ void create_file_list_cache(std::string file_type,std::string caller,std::string
 	  ocustom.set("select distinct l.dataType from WObML.ds"+dsnum2+"_dataTypes2 as d left join WObML.ds"+dsnum2+"_dataTypesList as l on l.code = d.dataType_code");
 	}
 	if (fquery.submit(server) < 0) {
-	  metautils::log_error("create_file_list_cache(): "+fquery.error()+" from query: "+fquery.show(),caller,user);
+	  metautils::log_error(THIS_FUNC+"(): "+fquery.error()+" from query: "+fquery.show(),caller,user);
 	}
 	if (ocustom.submit(server) < 0) {
-	  metautils::log_error("create_file_list_cache(): "+ocustom.error()+" from query: "+ocustom.show(),caller,user);
+	  metautils::log_error(THIS_FUNC+"(): "+ocustom.error()+" from query: "+ocustom.show(),caller,user);
 	}
 	std::vector<std::string> data_formats;
 	while (fquery.fetch_row(row)) {
@@ -1507,7 +1507,7 @@ void create_file_list_cache(std::string file_type,std::string caller,std::string
 	    }
 	  }
 	  if (ocustom.submit(server) < 0) {
-	    metautils::log_error("create_file_list_cache(): "+ocustom.error()+" from query: "+ocustom.show(),caller,user);
+	    metautils::log_error(THIS_FUNC+"(): "+ocustom.error()+" from query: "+ocustom.show(),caller,user);
 	  }
 	  if (ocustom.num_rows() > 1) {
 	    while (ocustom.fetch_row(row)) {
@@ -1521,7 +1521,7 @@ void create_file_list_cache(std::string file_type,std::string caller,std::string
 	}
 	ofs.close();
 	if (unixutils::rdadata_sync(tdir.name(),"metadata/","/data/web/datasets/ds"+metautils::args.dsnum,metautils::directives.rdadata_home,error) < 0) {
-	  metautils::log_warning("create_file_list_cache() couldn't sync '"+filename+"' - rdadata_sync error(s): '"+error+"'",caller,user);
+	  metautils::log_warning(THIS_FUNC+"() couldn't sync '"+filename+"' - rdadata_sync error(s): '"+error+"'",caller,user);
 	}
     }
   }
@@ -1669,11 +1669,11 @@ void create_file_list_cache(std::string file_type,std::string caller,std::string
 // create the directory tree in the temp directory
     std::stringstream oss,ess;
     if (unixutils::mysystem2("/bin/mkdir -p "+tdir.name()+"/metadata",oss,ess) < 0) {
-	metautils::log_error("create_file_list_cache(): unable to create a temporary directory tree (3) - '"+ess.str()+"'",caller,user);
+	metautils::log_error(THIS_FUNC+"(): unable to create a temporary directory tree (3) - '"+ess.str()+"'",caller,user);
     }
     ofs.open((tdir.name()+"/metadata/"+filename).c_str());
     if (!ofs.is_open()) {
-	metautils::log_error("create_file_list_cache(): unable to open temporary file for "+filename,caller,user);
+	metautils::log_error(THIS_FUNC+"(): unable to open temporary file for "+filename,caller,user);
     }
     ofs << num << std::endl;
     size_t num_missing_data_size=0;
@@ -1683,7 +1683,7 @@ void create_file_list_cache(std::string file_type,std::string caller,std::string
 	  data_size=strutils::ftos(std::stof(array[n].data_size)/1000000.,8,2);
 	}
 	else {
-metautils::log_warning("create_file_list_cache() returned warning: empty data size for '"+array[n].key+"'",caller,user);
+metautils::log_warning(THIS_FUNC+"() returned warning: empty data size for '"+array[n].key+"'",caller,user);
 //	  ++num_missing_data_size;
 	  data_size="";
 	}
@@ -1692,11 +1692,11 @@ metautils::log_warning("create_file_list_cache() returned warning: empty data si
 	ofs << std::endl;
     }
     if (num_missing_data_size > 0) {
-	metautils::log_warning("create_file_list_cache() returned warning: empty data sizes for "+strutils::itos(num_missing_data_size)+" files",caller,user);
+	metautils::log_warning(THIS_FUNC+"() returned warning: empty data sizes for "+strutils::itos(num_missing_data_size)+" files",caller,user);
     }
     ofs.close();
     if (unixutils::rdadata_sync(tdir.name(),"metadata/","/data/web/datasets/ds"+metautils::args.dsnum,metautils::directives.rdadata_home,error) < 0) {
-	metautils::log_warning("create_file_list_cache() couldn't sync '"+filename+"' - rdadata_sync error(s): '"+error+"'",caller,user);
+	metautils::log_warning(THIS_FUNC+"() couldn't sync '"+filename+"' - rdadata_sync error(s): '"+error+"'",caller,user);
     }
   }
   else if (tindex.empty()) {
@@ -1708,7 +1708,7 @@ metautils::log_warning("create_file_list_cache() returned warning: empty data si
 	filename="getWebList.cache";
     }
     if (!filename.empty() && unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+filename,metautils::directives.rdadata_home,error) < 0) {
-	metautils::log_warning("create_file_list_cache() couldn't unsync '"+filename+"' - rdadata_unsync error(s): '"+error+"'",caller,user);
+	metautils::log_warning(THIS_FUNC+"() couldn't unsync '"+filename+"' - rdadata_unsync error(s): '"+error+"'",caller,user);
     }
   }
   server.disconnect();
