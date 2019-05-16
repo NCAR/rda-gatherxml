@@ -1081,7 +1081,7 @@ void scan_usarray_transportable_hdf5_file(InputHDF5Stream& istream,ScanData& sca
   scan_data.found_map=(!scan_data.map_name.empty());
   se.key=datatype+"<!>"+se.key+"<!>Hz";
   scan_data.varlist.emplace_back(se.key);
-  if (scan_data.found_map) {
+  if (scan_data.found_map && !scan_data.var_changes_table.found(datatype,se)) {
     se.key=datatype;
     scan_data.var_changes_table.insert(se);
   }
@@ -1286,8 +1286,10 @@ void add_gridded_netcdf_parameter(const InputHDF5Stream::DatasetEntry& var,ScanD
     else {
 	parameter_data.table.insert(se);
 	scan_data.varlist.emplace_back(se.key);
-	se.key=var.key;
-	scan_data.var_changes_table.insert(se);
+	if (!scan_data.var_changes_table.found(var.key,se)) {
+	  se.key=var.key;
+	  scan_data.var_changes_table.insert(se);
+	}
     }
   }
   param_entry->start_date_time=time_range.first_valid_datetime;
@@ -1804,7 +1806,7 @@ void scan_cf_point_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data,gat
 	metautils::StringEntry se;
 	se.key=ds_entry.key+"<!>"+descr+"<!>"+units;
 	scan_data.varlist.emplace_back(se.key);
-	if (scan_data.found_map) {
+	if (scan_data.found_map && !scan_data.var_changes_table.found(ds_entry.key,se)) {
 	  se.key=ds_entry.key;
 	  scan_data.var_changes_table.insert(se);
 	}
@@ -1952,7 +1954,7 @@ id_types.emplace_back("unknown");
 	    metautils::StringEntry se;
 	    se.key=var.key+"<!>"+nc_va_data.long_name+"<!>"+nc_va_data.units;
 	    scan_data.varlist.emplace_back(se.key);
-	    if (scan_data.found_map) {
+	    if (scan_data.found_map && !scan_data.var_changes_table.found(var.key,se)) {
 		se.key=var.key;
 		scan_data.var_changes_table.insert(se);
 	    }
