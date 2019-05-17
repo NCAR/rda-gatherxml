@@ -359,7 +359,7 @@ __RELATED_DATASETS__
 @ Data Access
 <tr style="vertical-align: top">
 <td class="bold nowrap">Data Access:</td>
-<td><div style="display: inline; float: left">Click the </div><a class="clean" href="#access"><div class="dstab dstab-off" style="width: 100px; margin: 0px 5px 0px 5px; text-align: center">Data Access</div></a><div style="display: inline; float: left"> tab here or in the navigation bar near the top of the page</div></td>
+<td>Click <a href="#access">here</a> or on the "Data Access" tab in the navigation bar near the top of the page</td>
 </tr>
 @
 @ Metadata Record
