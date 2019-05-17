@@ -2187,6 +2187,9 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
 	    gcoords.forecast_period.id=var.key;
 	    if (!units_value.empty()) {
 		fcst_period_time_data.units=units_value;
+		if (fcst_period_time_data.units.back() != 's') {
+		  fcst_period_time_data.units.append(1,'s');
+		}
 	    }
 	  }
 	  else {
