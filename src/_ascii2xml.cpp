@@ -161,9 +161,17 @@ void scan_hcn_file(gatherxml::markup::ObML::ObservationData& obs_data,std::list<
   const size_t LINE_LENGTH=32768;
   char line[LINE_LENGTH];
   ifs.getline(line,LINE_LENGTH);
+  std::string xref;
   while (!ifs.eof()) {
     if (line[44] == ' ') {
-	std::string stn_id(&line[0],6);
+	std::string stn_id;
+	if (xref.empty()) {
+	  stn_id.assign(&line[0],6);
+	}
+	else {
+	  stn_id.assign(&line[0],2);
+	  stn_id+=xref;
+	}
 	if (stn_history.find(stn_id) == stn_history.end()) {
 	  stn_history.emplace(stn_id,std::vector<std::tuple<int,int,float,float>>());
 	}
@@ -184,6 +192,14 @@ void scan_hcn_file(gatherxml::markup::ObML::ObservationData& obs_data,std::list<
 	strutils::strget(&line[56],min,3);
 	float lon=-(deg+min/60.);
 	stn_history[stn_id].emplace_back(start_date,end_date,lat,lon);
+    }
+    else {
+	if (std::string(&line[61],5) == "FROM ") {
+	  xref.assign(&line[66],4);
+	}
+	else {
+	  xref="";
+	}
     }
     ifs.getline(line,LINE_LENGTH);
   }
