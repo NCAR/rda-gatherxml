@@ -984,7 +984,7 @@ void write(ObservationData& obs_data,std::string caller,std::string user)
   else if (strutils::contains(metautils::args.data_format,"bufr")) {
     ofs << "WMO_BUFR";
   }
-  else if (metautils::args.data_format == "cpcsumm" || metautils::args.data_format == "ghcnmv3" || metautils::args.data_format == "uadb") {
+  else if (metautils::args.data_format == "cpcsumm" || metautils::args.data_format == "ghcnmv3" || metautils::args.data_format == "hcn" || metautils::args.data_format == "uadb") {
     ofs << "proprietary_ASCII";
   }
   else if (metautils::args.data_format == "imma") {
@@ -1023,7 +1023,7 @@ void write(ObservationData& obs_data,std::string caller,std::string user)
   ofs << "\">" << std::endl;
   ofs << "  <timeStamp value=\"" << dateutils::current_date_time().to_string("%Y-%m-%d %T %Z") << "\" />" << std::endl;
   std::string datatype_map;
-  if (metautils::args.data_format == "cpcsumm" || metautils::args.data_format == "netcdf" || metautils::args.data_format == "hdf5" || metautils::args.data_format == "ghcnmv3" || metautils::args.data_format == "proprietary_ASCII" || metautils::args.data_format == "proprietary_Binary") {
+  if (metautils::args.data_format == "cpcsumm" || metautils::args.data_format == "netcdf" || metautils::args.data_format == "hdf5" || metautils::args.data_format == "ghcnmv3" || metautils::args.data_format == "hcn" || metautils::args.data_format == "proprietary_ASCII" || metautils::args.data_format == "proprietary_Binary") {
     datatype_map="ds"+metautils::args.dsnum;
   }
   for (size_t xx=0; xx < obs_data.num_types; ++xx) {
