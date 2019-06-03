@@ -55,27 +55,28 @@ struct InvEntry {
 
 void scan_ghcnv3_file(gatherxml::markup::ObML::ObservationData& obs_data,std::list<std::string>& filelist)
 {
+  static const std::string THIS_FUNC=__func__;
   TempDir stn_tdir;
   if (!stn_tdir.create(metautils::directives.temp_path)) {
-    metautils::log_error("scan_ghcnv3_file(): unable to create temporary directory","ascii2xml",USER);
+    metautils::log_error(THIS_FUNC+"() returned error: unable to create temporary directory","ascii2xml",USER);
   }
 // load the station inventory
   MySQL::Server server(metautils::directives.database_server,metautils::directives.rdadb_username,metautils::directives.rdadb_password,"dssdb");
   if (!server) {
-    metautils::log_error("scan_ghcnv3_file(): '"+server.error()+"' while trying to connect to RDADB","ascii2xml",USER);
+    metautils::log_error(THIS_FUNC+"() returned error: '"+server.error()+"' while trying to connect to RDADB","ascii2xml",USER);
   }
   MySQL::Query query("select wfile from dssdb.wfile where dsid = 'ds564.1' and type = 'O' and wfile like '%qcu.inv'");
   if (query.submit(server) < 0) {
-    metautils::log_error("scan_ghcnv3_file(): '"+query.error()+"' while trying to query for station inventory name","ascii2xml",USER);
+    metautils::log_error(THIS_FUNC+"() returned error: '"+query.error()+"' while trying to query for station inventory name","ascii2xml",USER);
   }
   MySQL::Row row;
   if (!query.fetch_row(row)) {
-    metautils::log_error("scan_ghcnv3_file(): unable to get station inventory name","ascii2xml",USER);
+    metautils::log_error(THIS_FUNC+"() returned error: unable to get station inventory name","ascii2xml",USER);
   }
   auto ghcn_inventory=unixutils::remote_web_file("https://rda.ucar.edu/datasets/ds564.1/docs/"+row[0],stn_tdir.name());
   std::ifstream ifs(ghcn_inventory.c_str());
   if (!ifs.is_open()) {
-    metautils::log_error("scan_ghcnv3_file(): unable to open station inventory file","ascii2xml",USER);
+    metautils::log_error(THIS_FUNC+"() returned error: unable to open station inventory file","ascii2xml",USER);
   }
   my::map<InvEntry> inv_table(9999);
   char line[32768];
@@ -125,7 +126,7 @@ void scan_ghcnv3_file(gatherxml::markup::ObML::ObservationData& obs_data,std::li
 	    min_datetime.set(year,month,1,0);
 	    max_datetime.set(year,month,dateutils::days_in_month(year,month),235959);
 	    if (!obs_data.added_to_ids("surface",ientry,std::string(&line[15],4),"",ie.lat,ie.lon,-1.,&min_datetime,&max_datetime)) {
-	      metautils::log_error("scan_ghcnv3_file() returned error: '"+myerror+"' while adding ID "+ientry.key,"ascii2xml",USER);
+	      metautils::log_error(THIS_FUNC+"() returned error: '"+myerror+"' while adding ID "+ientry.key,"ascii2xml",USER);
 	    }
 	    add_platform_entry=true;
 	  }
@@ -133,10 +134,128 @@ void scan_ghcnv3_file(gatherxml::markup::ObML::ObservationData& obs_data,std::li
 	}
 	if (add_platform_entry) {
 	  if (!obs_data.added_to_platforms("surface",platform_type,ie.lat,ie.lon)) {
-	    metautils::log_error("scan_ghcnv3_file() returned error: '"+myerror+"' while adding platform "+platform_type,"ascii2xml",USER);
+	    metautils::log_error(THIS_FUNC+"() returned error: '"+myerror+"' while adding platform "+platform_type,"ascii2xml",USER);
 	  }
 	}
 	ifs.getline(line,32768);
+    }
+    ifs.close();
+    ifs.clear();
+  }
+}
+
+void scan_hcn_file(gatherxml::markup::ObML::ObservationData& obs_data,std::list<std::string>& filelist)
+{
+  static const std::string THIS_FUNC=__func__;
+  TempDir stn_tdir;
+  if (!stn_tdir.create(metautils::directives.temp_path)) {
+    metautils::log_error(THIS_FUNC+"() returned error: unable to create temporary directory","ascii2xml",USER);
+  }
+// get the station inventory
+  auto hcn_inventory=unixutils::remote_web_file("https://rda.ucar.edu/datasets/ds511.0/station_libraries/history.txt",stn_tdir.name());
+  std::ifstream ifs(hcn_inventory.c_str());
+  if (!ifs.is_open()) {
+    metautils::log_error(THIS_FUNC+"() returned error: unable to open station history file","ascii2xml",USER);
+  }
+  std::unordered_map<std::string,std::vector<std::tuple<int,int,float,float>>> stn_history;
+  const size_t LINE_LENGTH=32768;
+  char line[LINE_LENGTH];
+  ifs.getline(line,LINE_LENGTH);
+  while (!ifs.eof()) {
+    if (line[44] == ' ') {
+	std::string stn_id(&line[0],6);
+	if (stn_history.find(stn_id) == stn_history.end()) {
+	  stn_history.emplace(stn_id,std::vector<std::tuple<int,int,float,float>>());
+	}
+	int yr,mo,dy;
+	strutils::strget(&line[7],mo,2);
+	strutils::strget(&line[10],dy,2);
+	strutils::strget(&line[13],yr,4);
+	auto start_date=yr*10000+mo*100+dy;
+	strutils::strget(&line[18],mo,2);
+	strutils::strget(&line[21],dy,2);
+	strutils::strget(&line[24],yr,4);
+	auto end_date=yr*10000+mo*100+dy;
+	int deg,min;
+	strutils::strget(&line[45],deg,3);
+	strutils::strget(&line[48],min,3);
+	float lat=deg+min/60.;
+	strutils::strget(&line[53],deg,3);
+	strutils::strget(&line[56],min,3);
+	float lon=-(deg+min/60.);
+	stn_history[stn_id].emplace_back(start_date,end_date,lat,lon);
+    }
+    ifs.getline(line,LINE_LENGTH);
+  }
+  ifs.close();
+  ifs.clear();
+  for (const auto& file : filelist) {
+    ifs.open(file.c_str());
+    if (!ifs.is_open()) {
+	myerror="Error opening '"+file+"'";
+	exit(1);
+    }
+    ifs.getline(line,LINE_LENGTH);
+    while (!ifs.eof()) {
+	std::string stn_id(&line[0],6);
+	if (stn_id[0] == ' ') {
+	  stn_id[0]='0';
+	}
+	if (stn_history.find(stn_id) == stn_history.end()) {
+	  metautils::log_error(THIS_FUNC+"() returned error: no history entry for '"+stn_id+"'","ascii2xml",USER);
+	}
+	int yr,mo;
+	strutils::strget(&line[13],yr,4);
+	strutils::strget(&line[17],mo,2);
+	auto date=yr*10000+mo*100+1;
+	float lat=-999.,lon;
+	for (size_t n=0; n < stn_history[stn_id].size(); ++n) {
+	  auto entry=stn_history[stn_id][n];
+	  if (date >= std::get<0>(entry) && date <= std::get<1>(entry)) {
+	    lat=std::get<2>(entry);
+	    lon=std::get<3>(entry);
+	    break;
+	  }
+	  else if (date < std::get<0>(entry)) {
+	    if (n > 0 && date > std::get<1>(stn_history[stn_id][n-1])) {
+		lat=std::get<2>(stn_history[stn_id][n-1]);
+		lon=std::get<3>(stn_history[stn_id][n-1]);
+		break;
+	    }
+	    else if (n == 0) {
+		lat=std::get<2>(entry);
+		lon=std::get<3>(entry);
+		break;
+	    }
+	  }
+	}
+	if (lat < -900.) {
+	  lat=std::get<2>(stn_history[stn_id].back());
+	  lon=std::get<3>(stn_history[stn_id].back());
+	}
+	ientry.key="land_station[!]COOP[!]"+stn_id;
+	auto add_platform_entry=false;
+	size_t ndays;
+	strutils::strget(&line[20],ndays,2);
+	auto off=24;
+	for (size_t n=0; n < ndays; ++n) {
+	  std::string value(&line[off],4);
+	  if (value != "-999") {
+	    DateTime min_datetime(yr,mo,n+1,0,-2400);
+	    DateTime max_datetime=min_datetime.days_added(1);
+	    if (!obs_data.added_to_ids("surface",ientry,std::string(&line[7],4),"",lat,lon,-1.,&min_datetime,&max_datetime)) {
+	      metautils::log_error(THIS_FUNC+"() returned error: '"+myerror+"' while adding ID "+ientry.key,"ascii2xml",USER);
+	    }
+	    add_platform_entry=true;
+	  }
+	  off+=8;
+	}
+	if (add_platform_entry) {
+	  if (!obs_data.added_to_platforms("surface","land_station",lat,lon)) {
+	    metautils::log_error(THIS_FUNC+"() returned error: '"+myerror+"' while adding platform","ascii2xml",USER);
+	  }
+	}
+	ifs.getline(line,LINE_LENGTH);
     }
     ifs.close();
     ifs.clear();
@@ -222,21 +341,18 @@ void scan_little_r_file(gatherxml::markup::ObML::ObservationData& obs_data,std::
 		case 32:
 		case 34:
 		case 35:
-		case 38:
-		{
+		case 38: {
 		  platform_type="land_station";
 		  break;
 		}
 		case 13:
 		case 33:
-		case 36:
-		{
+		case 36: {
 		  platform_type="roving_ship";
 		  break;
 		}
 		case 18:
-		case 19:
-		{
+		case 19: {
 		  platform_type="drifting_buoy";
 		  break;
 		}
@@ -244,8 +360,7 @@ void scan_little_r_file(gatherxml::markup::ObML::ObservationData& obs_data,std::
 		case 42:
 		case 96:
 		case 97:
-		case 101:
-		{
+		case 101: {
 		  platform_type="aircraft";
 		  break;
 		}
@@ -255,29 +370,24 @@ void scan_little_r_file(gatherxml::markup::ObML::ObservationData& obs_data,std::
 		case 121:
 		case 122:
 		case 133:
-		case 281:
-		{
+		case 281: {
 		  platform_type="satellite";
 		  break;
 		}
 		case 111:
-		case 114:
-		{
+		case 114: {
 		  platform_type="gps_receiver";
 		  break;
 		}
-		case 132:
-		{
+		case 132: {
 		  platform_type="wind_profiler";
 		  break;
 		}
-		case 135:
-		{
+		case 135: {
 		  platform_type="bogus";
 		  break;
 		}
-		default:
-		{
+		default: {
 		  metautils::log_error("scan_little_r_file() encountered an undocumented platform code: "+strutils::itos(obs.platform_code()),"ascii2xml",USER);
 		}
 	    }
@@ -373,6 +483,10 @@ void scan_file(gatherxml::markup::ObML::ObservationData& obs_data)
   }
   if (metautils::args.data_format == "ghcnmv3") {
     scan_ghcnv3_file(obs_data,filelist);
+    write_type=obml_type;
+  }
+  else if (metautils::args.data_format == "hcn") {
+    scan_hcn_file(obs_data,filelist);
     write_type=obml_type;
   }
   else if (metautils::args.data_format == "little_r") {
