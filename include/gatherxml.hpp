@@ -205,6 +205,7 @@ struct DataTypeEntry {
   };
 
   DataTypeEntry() : key(),data(nullptr) {}
+  void fill_vertical_resolution_data(std::vector<double>& level_list,std::string z_positive_direction,std::string z_units);
 
   std::string key;
   std::shared_ptr<Data> data;
