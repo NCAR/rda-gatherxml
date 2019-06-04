@@ -264,9 +264,9 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile,TempDir& tdir,std::list<
     if (args.data_format == "grib" ||  args.data_format == "grib2" || strutils::contains(args.data_format,"bufr") || args.data_format == "mcidas") {
 // check to see if file is COS-blocked
 	std::stringstream oss,ess;
-	unixutils::mysystem2(directives.dss_bindir+"/cosfile "+filename,oss,ess);
+	unixutils::mysystem2(directives.decs_bindir+"/cosfile "+filename,oss,ess);
 	if (ess.str().empty()) {
-	  system((directives.dss_bindir+"/cosconvert -b "+filename+" 1> /dev/null").c_str());
+	  system((directives.decs_bindir+"/cosconvert -b "+filename+" 1> /dev/null").c_str());
 	}
 	else if (!std::regex_search(ess.str(),std::regex("error on record 1"))) {
 	  error="unable to open '"+filename+"'; error: "+ess.str();
@@ -293,7 +293,7 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile,TempDir& tdir,std::list<
 	  if (n == 0 || ffparts[n-1] != "LVBS") {
 	    if (args.data_format == "grib" || args.data_format == "grib2" || strutils::contains(args.data_format,"bufr") || args.data_format == "mcidas") {
 		std::stringstream oss,ess;
-		unixutils::mysystem2(directives.dss_bindir+"/cosconvert -b "+filename+" "+filename+".bi",oss,ess);
+		unixutils::mysystem2(directives.decs_bindir+"/cosconvert -b "+filename+" "+filename+".bi",oss,ess);
 		if (!ess.str().empty()) {
 		  error=ess.str();
 		  return false;
@@ -306,7 +306,7 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile,TempDir& tdir,std::list<
 	}
 	else if (ffparts[n] == "CH" || ffparts[n] == "C1") {
 	  if (args.data_format == "grib" || args.data_format == "grib2" || strutils::contains(args.data_format,"bufr") || args.data_format == "mcidas") {
-	    system((directives.dss_bindir+"/cosconvert -c "+filename+" 1> /dev/null").c_str());
+	    system((directives.decs_bindir+"/cosconvert -c "+filename+" 1> /dev/null").c_str());
 	  }
 	}
 	else if (ffparts[n] == "GZ" || ffparts[n] == "BZ2") {
@@ -340,8 +340,8 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile,TempDir& tdir,std::list<
 		    return false;
 		  }
 		  char buffer[32768];
-		  auto num_bytes=fread(buffer,1,32768,ifs64);
-		  while (num_bytes > 0) {
+		  int num_bytes;
+		  while ( (num_bytes=fread(buffer,1,32768,ifs64)) > 0) {
 		    fwrite(buffer,1,num_bytes,ofs);
 		  }
 		  fclose(ifs64);
@@ -408,14 +408,14 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile,TempDir& tdir,std::list<
 	}
 	else if (ffparts[n] == "VBS") {
 	  if (static_cast<int>(ffparts.size()) >= (n+2) && ffparts[n+1] == "BI") {
-	    system((directives.dss_bindir+"/cosconvert -v "+filename+" "+filename+".vbs 1> /dev/null;mv "+filename+".vbs "+filename).c_str());
+	    system((directives.decs_bindir+"/cosconvert -v "+filename+" "+filename+".vbs 1> /dev/null;mv "+filename+".vbs "+filename).c_str());
 	  }
 	}
 	else if (ffparts[n] == "LVBS") {
 	  if (static_cast<int>(ffparts.size()) >= (n+2) && ffparts[n+1] == "BI") {
-	    system((directives.dss_root+"/bin/cossplit -p "+filename+" "+filename).c_str());
+	    system((directives.decs_root+"/bin/cossplit -p "+filename+" "+filename).c_str());
 	    auto file_num=2;
-	    std::string coscombine=directives.dss_root+"/bin/coscombine noeof";
+	    std::string coscombine=directives.decs_root+"/bin/coscombine noeof";
 	    auto fname=filename+".f"+strutils::ftos(file_num,3,0,'0');
 	    struct stat64 statbuf;
 	    while (stat64(fname.c_str(),&statbuf) == 0) {
@@ -426,7 +426,7 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile,TempDir& tdir,std::list<
 	    coscombine+=" "+filename+" 1> /dev/null";
 	    system(coscombine.c_str());
 	    system(("rm -f "+filename+".f*").c_str());
-	    system((directives.dss_bindir+"/cosconvert -v "+filename+" "+filename+".vbs 1> /dev/null;mv "+filename+".vbs "+filename).c_str());
+	    system((directives.decs_bindir+"/cosconvert -v "+filename+" "+filename+".vbs 1> /dev/null;mv "+filename+".vbs "+filename).c_str());
 	  }
 	}
 	else if (ffparts[n] == "Z") {
