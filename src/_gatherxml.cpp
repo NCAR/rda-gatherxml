@@ -239,7 +239,11 @@ int main(int argc,char **argv)
 	}
 	else {
 	  std::string sdum= (metautils::args.path[0] == '/') ? "https://rda.ucar.edu"+webhome()+metautils::args.path : "https://rda.ucar.edu"+webhome()+"/"+metautils::args.path;
-	  strutils::replace_all(metautils::args.args_string,metautils::args.path,sdum);
+	  auto idx=metautils::args.args_string.rfind(separator);
+	  if (idx == std::string::npos) {
+	    metautils::log_error("bad arguments string: '"+metautils::args.args_string,"gatherxml",USER);
+	  }
+	  metautils::args.args_string=metautils::args.args_string.substr(0,idx+1)+sdum;
 	  metautils::args.path=sdum;
 	}
     }
