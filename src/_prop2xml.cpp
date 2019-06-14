@@ -372,15 +372,30 @@ int main(int argc,char **argv)
   atexit(clean_up);
   metautils::cmd_register("prop2xml",USER);
   if (metautils::args.dsnum != "999.9") {
-    auto verified_hpss_file=false;
+    auto verified_file=false;
     MySQL::Server server(metautils::directives.database_server,metautils::directives.rdadb_username,metautils::directives.rdadb_password,"dssdb");
-    MySQL::LocalQuery query("dsid","mssfile","mssfile = '"+metautils::args.path+"/"+metautils::args.filename+"'");
+    std::string file_type;
+    MySQL::LocalQuery query;
+    if (std::regex_search(metautils::args.path,std::regex("^/FS/DECS"))) {
+	query.set("dsid","mssfile","mssfile = '"+metautils::args.path+"/"+metautils::args.filename+"' and dsid = 'ds"+metautils::args.dsnum+"'");
+    }
+    else {
+	auto path=metautils::args.path;
+	strutils::replace_all(path,"https://rda.ucar.edu/data/ds"+metautils::args.dsnum,"");
+	if (!path.empty()) {
+	  path=path.substr(1)+"/"+metautils::args.filename;
+	}
+	else {
+	  path=metautils::args.filename;
+	}
+	query.set("dsid","wfile","wfile = '"+path+"' and dsid = 'ds"+metautils::args.dsnum+"'");
+    }
     if (query.submit(server) == 0) {
 	if (query.num_rows() > 0) {
 	  MySQL::Row row;
 	  if (query.fetch_row(row)) {
 	    if (row[0] == "ds"+metautils::args.dsnum) {
-		verified_hpss_file=true;
+		verified_file=true;
 	    }
 	  }
 	  else {
@@ -392,8 +407,8 @@ int main(int argc,char **argv)
 	metautils::log_error("database connection error","prop2xml",USER);
     }
     server.disconnect();
-    if (!verified_hpss_file) {
-	std::cerr << "Error: the HPSS file you specified is not in RDADB" << std::endl;
+    if (!verified_file) {
+	std::cerr << "Error: the data file you specified is not in RDADB" << std::endl;
 	exit(1);
     }
   }
