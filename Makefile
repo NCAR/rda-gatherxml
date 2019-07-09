@@ -72,9 +72,9 @@ all: _ascii2xml _bufr2xml _dcm _dsgen _fix2xml _gatherxml _grid2xml _gsi _hdf2xm
 #
 # libgatherxml.so
 #
-$(BUILDDIR)/libgatherxml/%.o: $(SOURCEDIR)/libgatherxml/%.cpp
+$(BUILDDIR)/libgatherxml/%.o: $(SOURCEDIR)/libgatherxml/%.cpp $(INCLUDEDIR)/gatherxml.hpp
 	$(COMPILER) $(C_OPTIONS) $< -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -o $@
-libgatherxml.so: builddir $(GATHERXMLOBJS)
+libgatherxml.so: builddir $(GATHERXMLOBJS) $(INCLUDEDIR)/gatherxml.hpp
 ifeq ($(OKAYTOMAKE),1)
 ifeq ($(strip $(LIBVERSION)),)
 	$(error libgatherxml.so: no version number given)
@@ -90,7 +90,7 @@ ifeq ($(OKAYTOMAKE),1)
 ifeq ($(strip $(VERSION)),)
 	$(error no version number given)
 else
-	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(ZRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lgatherxml -lobs -lutils -lutilsthread -lbitmap -lio -lmetautils -lmetahelpers -lgridutils -lsearch -lxml -lz -lpthread -o $(BUILDDIR)/$@.$(VERSION)
+	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(ZRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lgatherxml -lobs -lutils -lutilsthread -ldatetime -lbitmap -lio -lmetautils -lmetahelpers -lgridutils -lsearch -lxml -lz -lpthread -o $(BUILDDIR)/$@.$(VERSION)
 endif
 endif
 #
@@ -99,7 +99,7 @@ ifeq ($(OKAYTOMAKE),1)
 ifeq ($(strip $(VERSION)),)
 	$(error no version number given)
 else
-	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(ZRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lgatherxml -lio -lutils -lutilsthread -lmetautils -lmetahelpers -lbufr -lobs -lbitmap -lgridutils -lsearch -lxml -lz -lpthread -o $(BUILDDIR)/$@.$(VERSION)
+	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(ZRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lgatherxml -lio -lutils -lutilsthread -ldatetime -lmetautils -lmetahelpers -lbufr -lobs -lbitmap -lgridutils -lsearch -lxml -lz -lpthread -o $(BUILDDIR)/$@.$(VERSION)
 endif
 endif
 #
@@ -108,7 +108,7 @@ ifeq ($(OKAYTOMAKE),1)
 ifeq ($(strip $(VERSION)),)
 	$(error no version number given)
 else
-	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -lmysql -lmysqlclient -lutils -lutilsthread -lmetautils -lmetahelpers -lgridutils -lbitmap -lsearch -lxml -lz -o $(BUILDDIR)/$@.$(VERSION)
+	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -lmysql -lmysqlclient -lutils -lutilsthread -ldatetime -lmetautils -lmetahelpers -lgridutils -lbitmap -lsearch -lxml -lz -o $(BUILDDIR)/$@.$(VERSION)
 	sudo -u rdadata cp $(BUILDDIR)/$@.$(VERSION) $(LOCALBINDIR)/$@.$(VERSION)
 	sudo -u rdadata chmod 4710 $(LOCALBINDIR)/$@.$(VERSION)
 	rm -f $(LOCALBINDIR)/$@
@@ -121,7 +121,7 @@ ifeq ($(OKAYTOMAKE),1)
 ifeq ($(strip $(VERSION)),)
 	$(error no version number given)
 else
-	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(ZRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lgatherxml -lutils -lutilsthread -lmetautils -lmetahelpers -lgridutils -lsearch -lxml -lbitmap -lz -lpthread -o $(BUILDDIR)/$@.$(VERSION)
+	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(ZRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lgatherxml -lutils -lutilsthread -ldatetime -lmetautils -lmetahelpers -lgridutils -lsearch -lxml -lbitmap -lz -lpthread -o $(BUILDDIR)/$@.$(VERSION)
 endif
 endif
 #
@@ -130,7 +130,7 @@ ifeq ($(OKAYTOMAKE),1)
 ifeq ($(strip $(VERSION)),)
 	$(error no version number given)
 else
-	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(ZRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lutils -lutilsthread -lmetautils -lmetahelpers -lmetaexport -lmetaexporthelpers -lgridutils -lsearch -lxml -lbitmap -lcitation -lz -lpthread -o $(BUILDDIR)/$@.$(VERSION)
+	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(ZRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lutils -lutilsthread -ldatetime -lmetautils -lmetahelpers -lmetaexport -lmetaexporthelpers -lgridutils -lsearch -lxml -lbitmap -lcitation -lz -lpthread -o $(BUILDDIR)/$@.$(VERSION)
 endif
 endif
 #
@@ -139,7 +139,7 @@ ifeq ($(OKAYTOMAKE),1)
 ifeq ($(strip $(VERSION)),)
 	($error no version number given)
 else
-	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(JASPERRUNPATH) $(ZRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(JASPERLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lgatherxml -lcyclone -lutils -lutilsthread -lio -lmetautils -lmetahelpers -lgridutils -lbitmap -lsearch -lxml -lz -lpthread -o $(BUILDDIR)/$@.$(VERSION)
+	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(JASPERRUNPATH) $(ZRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(JASPERLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lgatherxml -lcyclone -lutils -lutilsthread -ldatetime -lio -lmetautils -lmetahelpers -lgridutils -lbitmap -lsearch -lxml -lz -lpthread -o $(BUILDDIR)/$@.$(VERSION)
 endif
 endif
 #
@@ -148,7 +148,7 @@ ifeq ($(OKAYTOMAKE),1)
 ifeq ($(strip $(VERSION)),)
 	$(error no version number given)
 else
-	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(ZRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lgatherxml -lutils -lutilsthread -lmetautils -lmetahelpers -lgridutils -lbitmap -lsearch -lxml -lz -lpthread -o $(BUILDDIR)/$@.$(VERSION)
+	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(ZRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lgatherxml -lutils -lutilsthread -ldatetime -lmetautils -lmetahelpers -lgridutils -lbitmap -lsearch -lxml -lz -lpthread -o $(BUILDDIR)/$@.$(VERSION)
 endif
 endif
 #
@@ -157,7 +157,7 @@ ifeq ($(OKAYTOMAKE),1)
 ifeq ($(strip $(VERSION)),)
 	$(error no version number given)
 else
-	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(JASPERRUNPATH) $(ZRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(JASPERLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lgatherxml -lgrids -ljasper -lutils -lutilsthread -lbitmap -lio -lmetautils -lmetahelpers -lgridutils -lsearch -lxml -lerror -lpthread -lz -o $(BUILDDIR)/$@.$(VERSION)
+	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(JASPERRUNPATH) $(ZRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(JASPERLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lgatherxml -lgrids -ljasper -lutils -lutilsthread -ldatetime -lbitmap -lio -lmetautils -lmetahelpers -lgridutils -lsearch -lxml -lerror -lpthread -lz -o $(BUILDDIR)/$@.$(VERSION)
 endif
 endif
 #
@@ -166,7 +166,7 @@ ifeq ($(OKAYTOMAKE),1)
 ifeq ($(strip $(VERSION)),)
 	$(error no version number given)
 else
-	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(ZRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lutils -lutilsthread -lmetautils -lmetahelpers -lgridutils -lbitmap -lxml -lsearch -lpthread -lz -o $(BUILDDIR)/$@.$(VERSION)
+	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(ZRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lutils -lutilsthread -ldatetime -lmetautils -lmetahelpers -lgridutils -lbitmap -lxml -lsearch -lpthread -lz -o $(BUILDDIR)/$@.$(VERSION)
 endif
 endif
 #
@@ -175,7 +175,7 @@ ifeq ($(OKAYTOMAKE),1)
 ifeq ($(strip $(VERSION)),)
 	$(error no version number given)
 else
-	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(ZRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lgatherxml -lio -lutils -lutilsthread -lbitmap -lhdf -lmetautils -lmetahelpers -lgridutils -lxml -lsearch -lpthread -lz -o $(BUILDDIR)/$@.$(VERSION)
+	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(ZRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lgatherxml -lio -lutils -lutilsthread -ldatetime -lbitmap -lhdf -lmetautils -lmetahelpers -lgridutils -lxml -lsearch -lpthread -lz -o $(BUILDDIR)/$@.$(VERSION)
 endif
 endif
 #
@@ -184,7 +184,7 @@ ifeq ($(OKAYTOMAKE),1)
 ifeq ($(strip $(VERSION)),)
 	$(error no version number given)
 else
-	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -lmysql -lmysqlclient -lgatherxml -lutils -lutilsthread -lbitmap -lmetautils -lmetahelpers -lsearch -lxml -lgridutils -lpthread -lz -o $(BUILDDIR)/$@.$(VERSION)
+	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -lmysql -lmysqlclient -lgatherxml -lutils -lutilsthread -ldatetime -lbitmap -lmetautils -lmetahelpers -lsearch -lxml -lgridutils -lpthread -lz -o $(BUILDDIR)/$@.$(VERSION)
 endif
 endif
 #
@@ -193,7 +193,7 @@ ifeq ($(OKAYTOMAKE),1)
 ifeq ($(strip $(VERSION)),)
 	$(error no version number given)
 else
-	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(JASPERRUNPATH) $(ZRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(JASPERLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lgatherxml -lio -lutils -lutilsthread -lmetautils -lmetahelpers -lgridutils -lsearch -lxml -lbufr -lbitmap -lerror -lpthread -lz -o $(BUILDDIR)/$@.$(VERSION)
+	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(JASPERRUNPATH) $(ZRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(JASPERLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lgatherxml -lio -lutils -lutilsthread -ldatetime -lmetautils -lmetahelpers -lgridutils -lsearch -lxml -lbufr -lbitmap -lerror -lpthread -lz -o $(BUILDDIR)/$@.$(VERSION)
 endif
 endif
 #
@@ -202,7 +202,7 @@ ifeq ($(OKAYTOMAKE),1)
 ifeq ($(strip $(VERSION)),)
 	$(error no version number given)
 else
-	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(JASPERRUNPATH) $(ZRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(JASPERLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lgatherxml -lio -lobs -lutils -lutilsthread -lbitmap -lmetautils -lmetahelpers -lsearch -lxml -lgridutils -lz -lpthread -o $(BUILDDIR)/$@.$(VERSION)
+	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(JASPERRUNPATH) $(ZRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(JASPERLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lgatherxml -lio -lobs -lutils -lutilsthread -ldatetime -lbitmap -lmetautils -lmetahelpers -lsearch -lxml -lgridutils -lz -lpthread -o $(BUILDDIR)/$@.$(VERSION)
 endif
 endif
 #
@@ -211,7 +211,7 @@ ifeq ($(OKAYTOMAKE),1)
 ifeq ($(strip $(VERSION)),)
 	$(error no version number given)
 else
-	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(ZRUNPATH) $(SOURCEDIR)/_prop2xml.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lgatherxml -lutils -lutilsthread -lmetautils -lmetahelpers -lbitmap -lgridutils -lsearch -lxml -lz -lpthread -o $(BUILDDIR)/_prop2xml.$(VERSION)
+	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(ZRUNPATH) $(SOURCEDIR)/_prop2xml.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lgatherxml -lutils -lutilsthread -ldatetime -lmetautils -lmetahelpers -lbitmap -lgridutils -lsearch -lxml -lz -lpthread -o $(BUILDDIR)/_prop2xml.$(VERSION)
 endif
 endif
 #
@@ -220,7 +220,7 @@ ifeq ($(OKAYTOMAKE),1)
 ifeq ($(strip $(VERSION)),)
 	$(error no version number given)
 else
-	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(ZRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lgatherxml -lutils -lutilsthread -lmetautils -lmetahelpers -lgridutils -lsearch -lxml -lbitmap -lz -lpthread -o $(BUILDDIR)/$@.$(VERSION)
+	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(ZRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lgatherxml -lutils -lutilsthread -ldatetime -lmetautils -lmetahelpers -lgridutils -lsearch -lxml -lbitmap -lz -lpthread -o $(BUILDDIR)/$@.$(VERSION)
 endif
 endif
 #
@@ -229,7 +229,7 @@ ifeq ($(OKAYTOMAKE),1)
 ifeq ($(strip $(VERSION)),)
 	$(error no version number given)
 else
-	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(ZRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lgatherxml -lutils -lutilsthread -lgridutils -lmetautils -lmetahelpers -lsearch -lxml -lbitmap -lz -lpthread -o $(BUILDDIR)/$@.$(VERSION)
+	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(ZRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lgatherxml -lutils -lutilsthread -ldatetime -lgridutils -lmetautils -lmetahelpers -lsearch -lxml -lbitmap -lz -lpthread -o $(BUILDDIR)/$@.$(VERSION)
 endif
 endif
 #
@@ -238,7 +238,7 @@ ifeq ($(OKAYTOMAKE),1)
 ifeq ($(strip $(VERSION)),)
 	$(error no version number given)
 else
-	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -lmysql -lmysqlclient -lgatherxml -lutils -lutilsthread -lgridutils -lbitmap -lmetadata -lmetahelpers -lsearch -lxml -lz -lpthread -o $(BUILDDIR)/$@.$(VERSION)
+	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -lmysql -lmysqlclient -lutils -lutilsthread -ldatetime -lgridutils -lbitmap -lmetadata -lmetahelpers -lsearch -lxml -lz -lpthread -o $(BUILDDIR)/$@.$(VERSION)
 endif
 endif
 #
@@ -247,7 +247,7 @@ ifeq ($(OKAYTOMAKE),1)
 ifeq ($(strip $(VERSION)),)
 	$(error no version number given)
 else
-	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -lmysql -lmysqlclient -lutils -lutilsthread -lgridutils -lbitmap -lmetautils -lmetahelpers -lsearch -lxml -lz -lpthread -o $(BUILDDIR)/$@.$(VERSION)
+	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -lmysql -lmysqlclient -lutils -lutilsthread -ldatetime -lgridutils -lbitmap -lmetautils -lmetahelpers -lsearch -lxml -lz -lpthread -o $(BUILDDIR)/$@.$(VERSION)
 endif
 endif
 #
