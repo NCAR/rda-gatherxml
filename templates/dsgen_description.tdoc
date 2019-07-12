@@ -18,22 +18,17 @@ __ABSTRACT__
 </table>
 #ENDIF __IS_DEAD_DATASET__
 #ELSE __IS_DEAD_DATASET__
+<?php include_once("MyDBI.inc"); ?>
 <?php
   $rda_blog=false;
   $cdg_page_path="";
   $cdg_guidance_path="";
-  $conn=mysql_connect("rda-db.ucar.edu","metadata","metadata");
-  if ($conn) {
-    $res=mysql_query("select dsid from metautil.rda_blog where dsid = '__DSNUM__'");
-    if (mysql_numrows($res) > 0) {
-      $rda_blog=true;
-    }
-    $res=mysql_query("select cdg_page_path,cdg_guidance_path from metautil.climate_data_guide where dsid = '__DSNUM__'");
-    if (mysql_numrows($res) > 0) {
-      @ $row=mysql_fetch_array($res,MYSQL_ASSOC);
-      $cdg_page_path=$row['cdg_page_path'];
-      $cdg_guidance_path=$row['cdg_guidance_path'];
-    }
+  if (myget("metautil.rda_blog","","dsid = '__DSNUM__'") > 0) {
+    $rda_blog=true;
+  }
+  if ( ($row=myget("metautil.climate_data_guide","cdg_page_path,cdg_guidance_path","dsid = '__DSNUM__'")) > 0) {
+    $cdg_page_path=$row['cdg_page_path'];
+    $cdg_guidance_path=$row['cdg_guidance_path'];
   }
 ?>
 <style id="border_style">
