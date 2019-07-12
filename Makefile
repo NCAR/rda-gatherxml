@@ -1,4 +1,3 @@
-ifeq ($(findstring rda-web-dev,$(HOST)),)
 OPTIONS = -Wall -Wold-style-cast -O3 -std=c++11 -Weffc++
 C_OPTIONS = -c -fPIC $(OPTIONS)
 GLOBALINCLUDEDIR = /glade/u/home/dattore/cpp/lib/include
@@ -40,20 +39,22 @@ ifneq ($(findstring cheyenne,$(HOST)),)
 	OKAYTOMAKE = 1
 endif
 VMMACH = 0
-ifneq ($(or $(findstring rda-data,$(HOST)),$(findstring rda-web-prod,$(HOST))),)
+ifneq ($(or $(findstring rda-data,$(HOST)),$(findstring rda-web-prod,$(HOST)),$(findstring rda-web-dev,$(HOST))),)
 	VMMACH = 1
 ifneq ($(findstring rda-data,$(HOST)),)
 	BUILDEXT = vm-data
 else ifneq ($(findstring rda-web-prod,$(HOST)),)
 	BUILDEXT = vm-web-prod
+else ifneq ($(findstring rda-web-dev,$(HOST)),)
+	BUILDEXT = vm-web-dev
 endif
 	COMPILER = g++49
         MYSQLINCLUDEDIR = /usr/include/mysql
-        LIBDIR = /usr/local/dss/lib
+        LIBDIR = /usr/local/decs/lib
         MYSQLLIBDIR = /usr/lib64/mysql
 	JASPERLIBDIR = /usr/lib64
 	ZLIBDIR = /usr/lib64
-	BINDIR = /usr/local/dss/bin
+	BINDIR = /usr/local/decs/bin
 	LOCALBINDIR = $(BINDIR)
 	RUNPATH = -Wl,-rpath,$(LIBDIR)
 	OKAYTOMAKE = 1
@@ -286,13 +287,9 @@ endif
 else ifneq ($(strip $(TEMPLATE)),)
 	sudo -u rdadata cp ./templates/$(TEMPLATE) /glade/u/home/rdadata/share/templates/
 ifeq ($(VMMACH),1)
-	sudo -u rdadata mkdir -p /usr/local/dss/share/templates
-	sudo -u rdadata cp ./templates/$(TEMPLATE) /usr/local/dss/share/templates/
+	sudo -u rdadata mkdir -p /usr/local/decs/share/templates
+	sudo -u rdadata cp ./templates/$(TEMPLATE) /usr/local/decs/share/templates/
 endif
 else
 	$(error Nothing was specified to install. Use EXECUTABLE= or TEMPLATE=)
-endif
-else
-%::
-	-@ echo "operational software must be built on operational machines"
 endif
