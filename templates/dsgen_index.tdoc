@@ -14,9 +14,12 @@
 <meta name="fragment" content="!" />
 __DC_META_TAGS__
 <title>CISL RDA: __TITLE__</title>
-<?php include ("main/styles.inc"); ?>
-<?php include ("main/scripts.inc"); ?>
-<?php include ("main/ds_scripts.inc"); ?>
+<?php
+  include ("main/styles.inc");
+  include ("main/scripts.inc");
+  include ("main/ds_scripts.inc");
+  include_once("MyDBI.inc");
+?>
 __JSON_LD__
 </head>
 <body>
@@ -29,18 +32,9 @@ __JSON_LD__
   if (strlen($duser) > 0) {
     $can_bookmark=true;
     $is_bookmarked=false;
-    $conn = mysql_connect("rda-db.ucar.edu","dssdb","dssdb");
-    if ($conn) {
-      $db=mysql_select_db("dssdb",$conn);
-      if ($db) {
-        $query="select dsid from dsbookmarks where email = '" . $duser . "' and dsid = '__DSNUM__'";
-        $res=mysql_query($query,$conn);
-        if ($res && mysql_num_rows($res) > 0) {
-          $is_bookmarked=true;
-        }
-      }
+    if (myget("dsbookmarks","","email = '$duser' and dsid = '__DSNUM__'") > 0) {
+	$is_bookmarked=true;
     }
-    mysql_close($conn);
   }
 ?>
 <tr valign="top"><td rowspan="2" width="1"><img style="float: left; margin-right: 5px" src="/images/ds_logos/__LOGO_IMAGE__" width="__LOGO_WIDTH__" height="70" /></td><td><span class="fs24px bold">__TITLE__</span><br /><span class="fs16px bold"><span class="blue">ds__DSNUM__</span>__DOI_SPAN__</span><div id="ds_bookmark" style="display: inline; margin-left: 2px"><?php if ($can_bookmark) { $dsid="__DSNUM__"; if ($is_bookmarked) { include("dsbookmarks/showunset.inc"); } else { include("dsbookmarks/showset.inc"); } } ?></div></td></tr>
