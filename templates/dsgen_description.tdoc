@@ -26,7 +26,7 @@ __ABSTRACT__
   if (myget("metautil.rda_blog","","dsid = '__DSNUM__'") > 0) {
     $rda_blog=true;
   }
-  if ( ($row=myget("metautil.climate_data_guide","cdg_page_path,cdg_guidance_path","dsid = '__DSNUM__'")) > 0) {
+  if ($row=myget("metautil.climate_data_guide","cdg_page_path,cdg_guidance_path","dsid = '__DSNUM__'")) {
     $cdg_page_path=$row['cdg_page_path'];
     $cdg_guidance_path=$row['cdg_guidance_path'];
   }
