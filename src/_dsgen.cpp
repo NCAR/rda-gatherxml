@@ -1522,7 +1522,7 @@ void generate_description(std::string type,std::string tdir_name)
     std::vector<std::tuple<std::string,std::string>> citations;
     for (const auto& row : query) {
 	auto doi=row[0];
-	MySQL::LocalQuery wquery("select title,pub_year,type from citation.works where DOI = '"+doi+"'");
+	MySQL::LocalQuery wquery("select title,pub_year,type,publisher from citation.works where DOI = '"+doi+"'");
 	MySQL::Row wrow;
 	if (wquery.submit(server) == 0 && wquery.fetch_row(wrow)) {
 	  auto title=htmlutils::unicode_escape_to_html(wrow[0]);
@@ -1559,8 +1559,7 @@ void generate_description(std::string type,std::string tdir_name)
 		}
 		citation+=title;
 		switch (type[0]) {
-		  case 'C':
-		  {
+		  case 'C': {
 		    citation+="\", in ";
 		    MySQL::LocalQuery cquery("select pages,ISBN from citation.book_chapter_works where DOI = '"+doi+"'");
 		    MySQL::Row crow;
@@ -1601,8 +1600,7 @@ void generate_description(std::string type,std::string tdir_name)
 		    }
 		    break;
 		  }
-		  case 'J':
-		  {
+		  case 'J': {
 		    citation+=". ";
 		    MySQL::LocalQuery jquery("select pub_name,volume,pages from citation.journal_works where DOI = '"+doi+"'");
 		    MySQL::Row jrow;
@@ -1615,6 +1613,18 @@ void generate_description(std::string type,std::string tdir_name)
 			  citation+=", "+jrow[2];
 			}
 			citation+=", https://doi.org/"+doi;
+		    }
+		    else {
+			citation="";
+		    }
+		    break;
+		  }
+		  case 'P': {
+		    citation+=". <em>Proc. ";
+		    MySQL::LocalQuery pquery("select pub_name,pages from citation.proceedings_works where DOI = '"+doi+"'");
+		    MySQL::Row prow;
+		    if (pquery.submit(server) == 0 && pquery.fetch_row(prow)) {
+			citation+=htmlutils::unicode_escape_to_html(prow[0])+"</em>, "+wrow[3]+", "+prow[1]+", https://doi.org/"+doi;;
 		    }
 		    else {
 			citation="";
