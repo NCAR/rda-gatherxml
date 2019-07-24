@@ -1612,7 +1612,7 @@ void generate_description(std::string type,std::string tdir_name)
 			if (!jrow[2].empty()) {
 			  citation+=", "+jrow[2];
 			}
-			citation+=", https://doi.org/"+doi;
+			citation+=", <a href=\"https://doi.org/"+doi+"\" target=\"_doi\">https://doi.org/"+doi+"</a>";
 		    }
 		    else {
 			citation="";
@@ -1624,7 +1624,7 @@ void generate_description(std::string type,std::string tdir_name)
 		    MySQL::LocalQuery pquery("select pub_name,pages from citation.proceedings_works where DOI = '"+doi+"'");
 		    MySQL::Row prow;
 		    if (pquery.submit(server) == 0 && pquery.fetch_row(prow)) {
-			citation+=htmlutils::unicode_escape_to_html(prow[0])+"</em>, "+wrow[3]+", "+prow[1]+", https://doi.org/"+doi;;
+			citation+=htmlutils::unicode_escape_to_html(prow[0])+"</em>, "+wrow[3]+", "+prow[1]+", <a href=\"https://doi.org/"+doi+"\" target=\"_doi\">https://doi.org/"+doi+"</a>";
 		    }
 		    else {
 			citation="";
