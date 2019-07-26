@@ -6,6 +6,7 @@
 #include <regex>
 #include <thread>
 #include <unordered_set>
+#include <unordered_map>
 #include <gatherxml.hpp>
 #include <grid.hpp>
 #include <mymap.hpp>
@@ -68,6 +69,8 @@ TempFile inv_lines2("/tmp");
 std::unordered_set<std::string> unknown_IDs;
 std::string conventions;
 bool is_large_offset=false;
+
+std::unordered_map<std::string,std::string> id_platform_map({{"AUSTRALIA","land_station"},{"COOP","land_station"},{"WBAN","land_station"}});
 
 void sort_inventory_map(std::unordered_map<std::string,std::pair<int,std::string>>& inv_table,std::vector<std::pair<int,std::string>>& sorted_keys)
 {
@@ -746,7 +749,7 @@ void scan_cf_point_netcdf_file(InputNetCDFStream& istream,std::string platform_t
     }
   }
   std::vector<DateTime> date_times;
-  std::vector<std::string> IDs;
+  std::vector<std::string> IDs,datatypes_list;
   for (const auto& var : vars) {
     if (var.name != vars[dgd.indexes.time_var].name && var.name != vars[dgd.indexes.lat_var].name && var.name != vars[dgd.indexes.lon_var].name) {
 	netCDFStream::VariableData var_data;
@@ -755,6 +758,7 @@ void scan_cf_point_netcdf_file(InputNetCDFStream& istream,std::string platform_t
 	}
 	NetCDFVariableAttributeData nc_va_data;
 	extract_from_variable_attribute(var.attrs,var.nc_type,nc_va_data);
+	datatypes_list.emplace_back(var.name+"<!>"+nc_va_data.long_name+"<!>"+nc_va_data.units+"<!>"+nc_va_data.cf_keyword);
 	for (size_t n=0; n < times.size(); ++n) {
 	  if (n == date_times.size()) {
 	    date_times.emplace_back(compute_nc_time(times,n));
@@ -789,13 +793,21 @@ void scan_cf_point_netcdf_file(InputNetCDFStream& istream,std::string platform_t
 	}
     }
   }
+  for (const auto& type : datatypes_list) {
+    auto descr=nc_vars.datatype_map.description(type.substr(0,type.find("<!>")));
+    if (descr.empty()) {
+	if (std::find(nc_vars.netcdf_variables.begin(),nc_vars.netcdf_variables.end(),type) == nc_vars.netcdf_variables.end()) {
+	  nc_vars.netcdf_variables.emplace_back(type);
+	}
+    }
+  }
   write_type=ObML_type;
   if (gatherxml::verbose_operation) {
     std::cout << "...function "+THIS_FUNC+"() done." << std::endl;
   }
 }
 
-void scan_cf_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,std::string platform_type,DiscreteGeometriesData& dgd,std::unordered_map<size_t,std::string>& T_map,gatherxml::markup::ObML::ObservationData& obs_data)
+void scan_cf_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,std::string platform_type,DiscreteGeometriesData& dgd,std::unordered_map<size_t,std::string>& T_map,gatherxml::markup::ObML::ObservationData& obs_data,NetCDFVariables& nc_vars)
 {
   static const std::string THIS_FUNC=__func__;
   if (gatherxml::verbose_operation) {
@@ -958,6 +970,7 @@ for (size_t n=0; n < lats.size(); ++n) {
     }
   }
   std::vector<DateTime> dts;
+  std::vector<std::string> datatypes_list;
   for (const auto& var : vars) {
     if (var.name != vars[dgd.indexes.time_var].name && var.dimids.size() > 0 && ((var.dimids[0] == vars[dgd.indexes.time_var].dimids[0] && (stn_dim == -1 || (var.dimids.size() > 1 && static_cast<int>(var.dimids[1]) == stn_dim))) || (var.dimids.size() > 1 && dgd.indexes.stn_id_var != 0xffffffff && var.dimids[0] == vars[dgd.indexes.stn_id_var].dimids[0] && var.dimids[1] == vars[dgd.indexes.time_var].dimids[0]))) {
 	if (gatherxml::verbose_operation) {
@@ -994,6 +1007,7 @@ for (size_t n=0; n < lats.size(); ++n) {
 	}
 	NetCDFVariableAttributeData nc_va_data;
 	extract_from_variable_attribute(var.attrs,var.nc_type,nc_va_data);
+	datatypes_list.emplace_back(var.name+"<!>"+nc_va_data.long_name+"<!>"+nc_va_data.units+"<!>"+nc_va_data.cf_keyword);
 	size_t num_times;
 	bool time_is_unlimited;
 	if (dims[vars[dgd.indexes.time_var].dimids[0]].is_rec) {
@@ -1044,12 +1058,20 @@ for (size_t n=0; n < lats.size(); ++n) {
 	}
     }
   }
+  for (const auto& type : datatypes_list) {
+    auto descr=nc_vars.datatype_map.description(type.substr(0,type.find("<!>")));
+    if (descr.empty()) {
+	if (std::find(nc_vars.netcdf_variables.begin(),nc_vars.netcdf_variables.end(),type) == nc_vars.netcdf_variables.end()) {
+	  nc_vars.netcdf_variables.emplace_back(type);
+	}
+    }
+  }
   if (gatherxml::verbose_operation) {
     std::cout << "...function "+THIS_FUNC+"() done." << std::endl;
   }
 }
 
-void scan_cf_non_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,std::string platform_type,DiscreteGeometriesData& dgd,std::unordered_map<size_t,std::string>& T_map,gatherxml::markup::ObML::ObservationData& obs_data)
+void scan_cf_non_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,std::string platform_type,DiscreteGeometriesData& dgd,std::unordered_map<size_t,std::string>& T_map,gatherxml::markup::ObML::ObservationData& obs_data,NetCDFVariables& nc_vars)
 {
   static const std::string THIS_FUNC=__func__;
   if (gatherxml::verbose_operation) {
@@ -1134,12 +1156,18 @@ void scan_cf_non_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,s
     auto network_len=networks.size()/num_stns;
     for (size_t n=0; n < num_stns; ++n) {
 	std::string id(&idbuf[n*id_len],id_len);
-	platform_types.emplace_back("unknown");
 	if (dgd.indexes.network_var != 0xffffffff) {
 	  id_types.emplace_back(std::string(&(reinterpret_cast<char *>(networks.get()))[n*network_len],network_len));
+	  if (id_platform_map.find(id_types.back()) != id_platform_map.end()) {
+	    platform_types.emplace_back(id_platform_map[id_types.back()]);
+	  }
+	  else {
+	    platform_types.emplace_back("unknown");
+	  }
 	}
 	else {
 	  id_types.emplace_back("unknown");
+	  platform_types.emplace_back("unknown");
 	}
 	for (size_t m=0; m < num_locs; ++m) {
 	  if (!obs_data.added_to_platforms("surface",platform_types[n],lats[n*num_locs+m],lons[n*num_locs+m])) {
@@ -1151,6 +1179,7 @@ void scan_cf_non_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,s
   else {
     metautils::log_error(THIS_FUNC+"() returned error: unable to determine platform type","nc2xml",USER);
   }
+  std::vector<std::string> datatypes_list;
   auto obs_dim= (vars[dgd.indexes.time_var].dimids[0] == stn_dim) ? vars[dgd.indexes.time_var].dimids[1] : vars[dgd.indexes.time_var].dimids[0];
   if (dgd.indexes.sample_dim_var != 0xffffffff) {
 // continuous ragged array H.6
@@ -1166,6 +1195,7 @@ void scan_cf_non_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,s
 	  }
 	  NetCDFVariableAttributeData nc_va_data;
 	  extract_from_variable_attribute(var.attrs,var.nc_type,nc_va_data);
+	  datatypes_list.emplace_back(var.name+"<!>"+nc_va_data.long_name+"<!>"+nc_va_data.units+"<!>"+nc_va_data.cf_keyword);
 	  long long offset=0;
 	  for (size_t n=0; n < dims[stn_dim].length; ++n) {
 	    auto end=offset+row_sizes[n];
@@ -1208,6 +1238,7 @@ void scan_cf_non_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,s
 	  }
 	  NetCDFVariableAttributeData nc_va_data;
 	  extract_from_variable_attribute(var.attrs,var.nc_type,nc_va_data);
+	  datatypes_list.emplace_back(var.name+"<!>"+nc_va_data.long_name+"<!>"+nc_va_data.units+"<!>"+nc_va_data.cf_keyword);
 	  for (size_t n=0; n < station_indexes.size(); ++n) {
 	    size_t idx=station_indexes[n];
 	    ientry.key=platform_types[idx]+"[!]"+id_types[idx]+"[!]";
@@ -1262,6 +1293,7 @@ void scan_cf_non_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,s
 	  }
 	  NetCDFVariableAttributeData nc_va_data;
 	  extract_from_variable_attribute(var.attrs,var.nc_type,nc_va_data);
+	  datatypes_list.emplace_back(var.name+"<!>"+nc_va_data.long_name+"<!>"+nc_va_data.units+"<!>"+nc_va_data.cf_keyword);
 	  if (var.dimids.front() == stn_dim) {
 	    for (size_t n=0; n < num_stns; ++n) {
 		ientry.key=platform_types[n]+"[!]"+id_types[n]+"[!]";
@@ -1312,6 +1344,14 @@ void scan_cf_non_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,s
 		}
 	    }
 	  }
+	}
+    }
+  }
+  for (const auto& type : datatypes_list) {
+    auto descr=nc_vars.datatype_map.description(type.substr(0,type.find("<!>")));
+    if (descr.empty()) {
+	if (std::find(nc_vars.netcdf_variables.begin(),nc_vars.netcdf_variables.end(),type) == nc_vars.netcdf_variables.end()) {
+	  nc_vars.netcdf_variables.emplace_back(type);
 	}
     }
   }
@@ -1376,7 +1416,7 @@ void scan_cf_time_series_netcdf_file(InputNetCDFStream& istream,std::string plat
   std::unordered_map<size_t,std::string> T_map;
   if (vars[dgd.indexes.time_var].is_coord) {
 // ex. H.2, H.4 (single version of H.2), H.5 (precise locations) stns w/same times
-    scan_cf_orthogonal_time_series_netcdf_file(istream,platform_type,dgd,T_map,obs_data);
+    scan_cf_orthogonal_time_series_netcdf_file(istream,platform_type,dgd,T_map,obs_data,nc_vars);
   }
   else {
 // ex. H.3 stns w/varying times but same # of obs
@@ -1442,7 +1482,7 @@ void scan_cf_time_series_netcdf_file(InputNetCDFStream& istream,std::string plat
 	  }
 	}
     }
-    scan_cf_non_orthogonal_time_series_netcdf_file(istream,platform_type,dgd,T_map,obs_data);
+    scan_cf_non_orthogonal_time_series_netcdf_file(istream,platform_type,dgd,T_map,obs_data,nc_vars);
   }
   write_type=ObML_type;
   if (inv_stream.is_open()) {
@@ -1469,7 +1509,7 @@ void scan_cf_time_series_netcdf_file(InputNetCDFStream& istream,std::string plat
   }
 }
 
-void scan_cf_orthogonal_profile_netcdf_file(InputNetCDFStream& istream,std::string platform_type,DiscreteGeometriesData& dgd,gatherxml::markup::ObML::ObservationData& obs_data,std::string obs_type)
+void scan_cf_orthogonal_profile_netcdf_file(InputNetCDFStream& istream,std::string platform_type,DiscreteGeometriesData& dgd,gatherxml::markup::ObML::ObservationData& obs_data,NetCDFVariables& nc_vars,std::string obs_type)
 {
   static const std::string THIS_FUNC=__func__;
   size_t id_len=1;
@@ -1500,6 +1540,7 @@ void scan_cf_orthogonal_profile_netcdf_file(InputNetCDFStream& istream,std::stri
   }
   NetCDFVariableAttributeData nc_ta_data;
   extract_from_variable_attribute(vars[dgd.indexes.time_var].attrs,vars[dgd.indexes.time_var].nc_type,nc_ta_data);
+  std::vector<std::string> datatypes_list;
   for (const auto& var : vars) {
     if (var.name != vars[dgd.indexes.z_var].name && var.dimids.size() > 0 && var.dimids.back() == vars[dgd.indexes.z_var].dimids.front()) {
 	netCDFStream::VariableData var_data;
@@ -1508,6 +1549,7 @@ void scan_cf_orthogonal_profile_netcdf_file(InputNetCDFStream& istream,std::stri
 	}
 	NetCDFVariableAttributeData nc_va_data;
 	extract_from_variable_attribute(var.attrs,var.nc_type,nc_va_data);
+	datatypes_list.emplace_back(var.name+"<!>"+nc_va_data.long_name+"<!>"+nc_va_data.units+"<!>"+nc_va_data.cf_keyword);
 	for (size_t n=0; n < times.size(); ++n) {
 	  auto nlvls=0,last_level=-1;
 	  auto avg_vres=0.;
@@ -1575,6 +1617,14 @@ void scan_cf_orthogonal_profile_netcdf_file(InputNetCDFStream& istream,std::stri
 	    ++dte.data->vdata->res_cnt;
 	    ++total_num_not_missing;
 	  }
+	}
+    }
+  }
+  for (const auto& type : datatypes_list) {
+    auto descr=nc_vars.datatype_map.description(type.substr(0,type.find("<!>")));
+    if (descr.empty()) {
+	if (std::find(nc_vars.netcdf_variables.begin(),nc_vars.netcdf_variables.end(),type) == nc_vars.netcdf_variables.end()) {
+	  nc_vars.netcdf_variables.emplace_back(type);
 	}
     }
   }
@@ -1648,7 +1698,7 @@ void fill_vertical_resolution_data(std::vector<double>& lvls,std::string z_pos,s
   ++datatype_entry.data->vdata->res_cnt;
 }
 
-void scan_cf_non_orthogonal_profile_netcdf_file(InputNetCDFStream& istream,std::string platform_type,DiscreteGeometriesData& dgd,gatherxml::markup::ObML::ObservationData& obs_data,std::string obs_type)
+void scan_cf_non_orthogonal_profile_netcdf_file(InputNetCDFStream& istream,std::string platform_type,DiscreteGeometriesData& dgd,gatherxml::markup::ObML::ObservationData& obs_data,NetCDFVariables& nc_vars,std::string obs_type)
 {
   static const std::string THIS_FUNC=__func__;
   size_t id_len=1;
@@ -1701,6 +1751,7 @@ id_types.emplace_back("unknown");
   }
   NetCDFVariableAttributeData nc_ta_data;
   extract_from_variable_attribute(vars[dgd.indexes.time_var].attrs,vars[dgd.indexes.time_var].nc_type,nc_ta_data);
+  std::vector<std::string> datatypes_list;
   if (dgd.indexes.sample_dim_var != 0xffffffff) {
 // continuous ragged array H.10
     netCDFStream::VariableData row_sizes;
@@ -1715,6 +1766,7 @@ id_types.emplace_back("unknown");
 	  }
 	  NetCDFVariableAttributeData nc_va_data;
 	  extract_from_variable_attribute(var.attrs,var.nc_type,nc_va_data);
+	  datatypes_list.emplace_back(var.name+"<!>"+nc_va_data.long_name+"<!>"+nc_va_data.units+"<!>"+nc_va_data.cf_keyword);
 	  auto off=0;
 	  for (size_t n=0; n < times.size(); ++n) {
 	    std::vector<double> lvls;
@@ -1759,6 +1811,7 @@ id_types.emplace_back("unknown");
 	  }
 	  NetCDFVariableAttributeData nc_va_data;
 	  extract_from_variable_attribute(var.attrs,var.nc_type,nc_va_data);
+	  datatypes_list.emplace_back(var.name+"<!>"+nc_va_data.long_name+"<!>"+nc_va_data.units+"<!>"+nc_va_data.cf_keyword);
 	  for (size_t n=0; n < times.size(); ++n) {
 	    std::vector<double> lvls;
 	    for (size_t m=0; m < profile_indexes.size(); ++m) {
@@ -1784,6 +1837,14 @@ id_types.emplace_back("unknown");
 		++total_num_not_missing;
 	    }
 	  }
+	}
+    }
+  }
+  for (const auto& type : datatypes_list) {
+    auto descr=nc_vars.datatype_map.description(type.substr(0,type.find("<!>")));
+    if (descr.empty()) {
+	if (std::find(nc_vars.netcdf_variables.begin(),nc_vars.netcdf_variables.end(),type) == nc_vars.netcdf_variables.end()) {
+	  nc_vars.netcdf_variables.emplace_back(type);
 	}
     }
   }
@@ -1888,11 +1949,11 @@ void scan_cf_profile_netcdf_file(InputNetCDFStream& istream,std::string platform
   }
   if (dgd.indexes.sample_dim_var != 0xffffffff || dgd.indexes.instance_dim_var != 0xffffffff) {
 // ex. H.10, H.11
-    scan_cf_non_orthogonal_profile_netcdf_file(istream,platform_type,dgd,obs_data,obs_type);
+    scan_cf_non_orthogonal_profile_netcdf_file(istream,platform_type,dgd,obs_data,nc_vars,obs_type);
   }
   else {
 // ex. H.8, H.9
-    scan_cf_orthogonal_profile_netcdf_file(istream,platform_type,dgd,obs_data,obs_type);
+    scan_cf_orthogonal_profile_netcdf_file(istream,platform_type,dgd,obs_data,nc_vars,obs_type);
   }
   write_type=ObML_type;
   if (gatherxml::verbose_operation) {
@@ -1900,7 +1961,7 @@ void scan_cf_profile_netcdf_file(InputNetCDFStream& istream,std::string platform
   }
 }
 
-void scan_cf_orthogonal_time_series_profile_netcdf_file(InputNetCDFStream& istream,std::string platform_type,DiscreteGeometriesData& dgd,gatherxml::markup::ObML::ObservationData& obs_data,std::string obs_type)
+void scan_cf_orthogonal_time_series_profile_netcdf_file(InputNetCDFStream& istream,std::string platform_type,DiscreteGeometriesData& dgd,gatherxml::markup::ObML::ObservationData& obs_data,NetCDFVariables& nc_vars,std::string obs_type)
 {
   static const std::string THIS_FUNC=__func__;
   size_t id_len=1;
@@ -1949,6 +2010,7 @@ id_types.emplace_back("unknown");
   if (istream.variable_data(vars[dgd.indexes.z_var].name,levels) == netCDFStream::NcType::_NULL) {
     metautils::log_error(THIS_FUNC+"() returned error: unable to get level data","nc2xml",USER);
   }
+  std::vector<std::string> datatypes_list;
   for (const auto& var : vars) {
     if (var.dimids.size() == 3 && var.dimids[0] == vars[dgd.indexes.time_var].dimids[0] && var.dimids[1] == vars[dgd.indexes.z_var].dimids[0] && var.dimids[2] == vars[dgd.indexes.stn_id_var].dimids[0]) {
 	netCDFStream::VariableData var_data;
@@ -1957,6 +2019,7 @@ id_types.emplace_back("unknown");
 	}
 	NetCDFVariableAttributeData nc_va_data;
 	extract_from_variable_attribute(var.attrs,var.nc_type,nc_va_data);
+	datatypes_list.emplace_back(var.name+"<!>"+nc_va_data.long_name+"<!>"+nc_va_data.units+"<!>"+nc_va_data.cf_keyword);
 	for (size_t n=0; n < times.size(); ++n) {
 	  auto dt=compute_nc_time(times,n);
 	  size_t num_stns=ids.size()/id_len;
@@ -1984,9 +2047,17 @@ id_types.emplace_back("unknown");
 	}
     }
   }
+  for (const auto& type : datatypes_list) {
+    auto descr=nc_vars.datatype_map.description(type.substr(0,type.find("<!>")));
+    if (descr.empty()) {
+	if (std::find(nc_vars.netcdf_variables.begin(),nc_vars.netcdf_variables.end(),type) == nc_vars.netcdf_variables.end()) {
+	  nc_vars.netcdf_variables.emplace_back(type);
+	}
+    }
+  }
 }
 
-void scan_cf_non_orthogonal_time_series_profile_netcdf_file(InputNetCDFStream& istream,std::string platform_type,DiscreteGeometriesData& dgd,gatherxml::markup::ObML::ObservationData& obs_data,std::string obs_type)
+void scan_cf_non_orthogonal_time_series_profile_netcdf_file(InputNetCDFStream& istream,std::string platform_type,DiscreteGeometriesData& dgd,gatherxml::markup::ObML::ObservationData& obs_data,NetCDFVariables& nc_vars,std::string obs_type)
 {
   static const std::string THIS_FUNC=__func__;
   size_t id_len=1;
@@ -2035,6 +2106,7 @@ id_types.emplace_back("unknown");
   if (istream.variable_data(vars[dgd.indexes.z_var].name,levels) == netCDFStream::NcType::_NULL) {
     metautils::log_error(THIS_FUNC+"() returned error: unable to get level data","nc2xml",USER);
   }
+  std::vector<std::string> datatypes_list;
   if (dgd.indexes.sample_dim_var != 0xffffffff) {
 // H.19
     if (dgd.indexes.instance_dim_var == 0xffffffff) {
@@ -2058,6 +2130,7 @@ id_types.emplace_back("unknown");
 	  }
 	  NetCDFVariableAttributeData nc_va_data;
 	  extract_from_variable_attribute(var.attrs,var.nc_type,nc_va_data);
+	  datatypes_list.emplace_back(var.name+"<!>"+nc_va_data.long_name+"<!>"+nc_va_data.units+"<!>"+nc_va_data.cf_keyword);
 	  auto off=0;
 	  for (size_t n=0; n < row_sizes.size(); ++n) {
 	    auto dt=compute_nc_time(times,n);
@@ -2095,6 +2168,7 @@ id_types.emplace_back("unknown");
 	  }
 	  NetCDFVariableAttributeData nc_va_data;
 	  extract_from_variable_attribute(var.attrs,var.nc_type,nc_va_data);
+	  datatypes_list.emplace_back(var.name+"<!>"+nc_va_data.long_name+"<!>"+nc_va_data.units+"<!>"+nc_va_data.cf_keyword);
 	  for (size_t n=0; n < var_data.size(); ) {
 	    auto stn_idx=n/stn_size;
 	    for (size_t m=0; m < ntimes; ++m) {
@@ -2134,6 +2208,14 @@ id_types.emplace_back("unknown");
 		}
 	    }
 	  }
+	}
+    }
+  }
+  for (const auto& type : datatypes_list) {
+    auto descr=nc_vars.datatype_map.description(type.substr(0,type.find("<!>")));
+    if (descr.empty()) {
+	if (std::find(nc_vars.netcdf_variables.begin(),nc_vars.netcdf_variables.end(),type) == nc_vars.netcdf_variables.end()) {
+	  nc_vars.netcdf_variables.emplace_back(type);
 	}
     }
   }
@@ -2200,11 +2282,11 @@ void scan_cf_time_series_profile_netcdf_file(InputNetCDFStream& istream,std::str
   }
   if (vars[dgd.indexes.time_var].is_coord && vars[dgd.indexes.z_var].is_coord) {
 // ex. H.17
-    scan_cf_orthogonal_time_series_profile_netcdf_file(istream,platform_type,dgd,obs_data,obs_type);
+    scan_cf_orthogonal_time_series_profile_netcdf_file(istream,platform_type,dgd,obs_data,nc_vars,obs_type);
   }
   else {
 // ex. H.16, H.18, H.19
-    scan_cf_non_orthogonal_time_series_profile_netcdf_file(istream,platform_type,dgd,obs_data,obs_type);
+    scan_cf_non_orthogonal_time_series_profile_netcdf_file(istream,platform_type,dgd,obs_data,nc_vars,obs_type);
   }
   write_type=ObML_type;
   if (gatherxml::verbose_operation) {
