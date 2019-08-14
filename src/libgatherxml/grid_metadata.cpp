@@ -421,7 +421,14 @@ void aggregate_grids(std::string database,std::string caller,std::string user,st
 	    std::string tr_bitmap;
 	    bitmap::compress_values(time_range_codes,tr_bitmap);
 	    if (tr_bitmap.length() > 255) {
-		metautils::log_error("aggregate_grids(): bitmap for time ranges is too long - fileID_code: "+fileID_code+" key: \""+last_key+"\" bitmap: '"+tr_bitmap+"'",caller,user);
+		std::stringstream vss;
+		for (const auto& value : time_range_codes) {
+		  if (!vss.str().empty()) {
+		    vss << ", ";
+		  }
+		  vss << value;
+		}
+		metautils::log_error("aggregate_grids(): bitmap for time ranges is too long (2) - fileID_code: "+fileID_code+" key: \""+last_key+"\" bitmap: '"+tr_bitmap+"'\nvalues: "+vss.str(),caller,user);
 	    }
 	    std::vector<size_t> grid_definition_codes;
 	    grid_definition_codes.reserve(grid_definition_code_set.size());
@@ -438,7 +445,7 @@ void aggregate_grids(std::string database,std::string caller,std::string user,st
 	    if (grid_definition_bitmap.length() > 255) {
 		metautils::log_error("aggregate_grids(): bitmap for grid definitions is too long",caller,user);
 	    }
-	    if (server.insert(database+".ds"+dsnum2+"_agrids",fileID_code+",'"+tr_bitmap+"','"+grid_definition_bitmap+"','"+last_key+"',"+start+","+end) < 0) {
+	    if (server.insert(database+".ds"+dsnum2+"_agrids",fileID_code+",'"+strutils::sql_ready(tr_bitmap)+"','"+strutils::sql_ready(grid_definition_bitmap)+"','"+last_key+"',"+start+","+end) < 0) {
 		metautils::log_error("aggregate_grids(): "+server.error()+" while trying to insert '"+fileID_code+",'"+tr_bitmap+"','"+grid_definition_bitmap+"','"+last_key+"',"+start+","+end+"'",caller,user);
 	    }
 	    std::stringstream ss;
@@ -451,7 +458,7 @@ void aggregate_grids(std::string database,std::string caller,std::string user,st
 		}
 	    }
 	    else {
-		ss << tr_bitmap;
+		ss << strutils::sql_ready(tr_bitmap);
 	    }
 	    ss << "'," << grid_definition_codes.front() << "," << grid_definition_codes.back() << ",'";
 	    if (grid_definition_codes.size() <= 2) {
@@ -461,7 +468,7 @@ void aggregate_grids(std::string database,std::string caller,std::string user,st
 		}
 	    }
 	    else {
-		ss << grid_definition_bitmap;
+		ss << strutils::sql_ready(grid_definition_bitmap);
 	    }
 	    std::deque<std::string> sp=strutils::split(last_key,"','");
 	    std::vector<size_t> l_values;
@@ -508,7 +515,14 @@ void aggregate_grids(std::string database,std::string caller,std::string user,st
 	std::string tr_bitmap;
 	bitmap::compress_values(time_range_codes,tr_bitmap);
 	if (tr_bitmap.length() > 255) {
-	  metautils::log_error("aggregate_grids(): bitmap for time ranges is too long - fileID_code: "+fileID_code+" key: \""+last_key+"\" bitmap: '"+tr_bitmap+"'",caller,user);
+	  std::stringstream vss;
+	  for (const auto& value : time_range_codes) {
+	    if (!vss.str().empty()) {
+		vss << ", ";
+	    }
+	    vss << value;
+	  }
+	  metautils::log_error("aggregate_grids(): bitmap for time ranges is too long (1) - fileID_code: "+fileID_code+" key: \""+last_key+"\" bitmap: '"+tr_bitmap+"'\nvalues: "+vss.str(),caller,user);
 	}
 	std::vector<size_t> grid_definition_codes;
 	grid_definition_codes.reserve(grid_definition_code_set.size());
@@ -525,7 +539,7 @@ void aggregate_grids(std::string database,std::string caller,std::string user,st
 	if (grid_definition_bitmap.length() > 255) {
 	  metautils::log_error("aggregate_grids(): bitmap for grid definitions is too long",caller,user);
 	}
-	if (!fileID_code.empty() && server.insert(database+".ds"+dsnum2+"_agrids",fileID_code+",'"+tr_bitmap+"','"+grid_definition_bitmap+"','"+last_key+"',"+start+","+end) < 0) {
+	if (!fileID_code.empty() && server.insert(database+".ds"+dsnum2+"_agrids",fileID_code+",'"+strutils::sql_ready(tr_bitmap)+"','"+strutils::sql_ready(grid_definition_bitmap)+"','"+last_key+"',"+start+","+end) < 0) {
 	  metautils::log_error("aggregate_grids(): "+server.error()+" while trying to insert '"+fileID_code+",'"+tr_bitmap+"','"+grid_definition_bitmap+"','"+last_key+"',"+start+","+end,caller,user);
 	}
 	std::stringstream ss;
@@ -538,7 +552,7 @@ void aggregate_grids(std::string database,std::string caller,std::string user,st
 	  }
 	}
 	else {
-	  ss << tr_bitmap;
+	  ss << strutils::sql_ready(tr_bitmap);
 	}
 	ss << "'," << grid_definition_codes.front() << "," << grid_definition_codes.back() << ",'";
 	if (grid_definition_codes.size() <= 2) {
@@ -548,7 +562,7 @@ void aggregate_grids(std::string database,std::string caller,std::string user,st
 	  }
 	}
 	else {
-	  ss << grid_definition_bitmap;
+	  ss << strutils::sql_ready(grid_definition_bitmap);
 	}
 	std::deque<std::string> sp=strutils::split(last_key,"','");
 	std::vector<size_t> l_values;
@@ -574,7 +588,7 @@ void aggregate_grids(std::string database,std::string caller,std::string user,st
     binary_sort(ds_grid_definition_codes,compare_codes);
     std::string ds_grid_definition_bitmap;
     bitmap::compress_values(ds_grid_definition_codes,ds_grid_definition_bitmap);
-    if (!fileID_code.empty() && server.insert(database+".ds"+dsnum2+"_grid_definitions",fileID_code+",'"+ds_grid_definition_bitmap+"'") < 0) {
+    if (!fileID_code.empty() && server.insert(database+".ds"+dsnum2+"_grid_definitions",fileID_code+",'"+strutils::sql_ready(ds_grid_definition_bitmap)+"'") < 0) {
 	if (!std::regex_search(server.error(),std::regex("^Duplicate entry"))) {
 	  metautils::log_error("aggregate_grids(): "+server.error()+" while trying to insert ("+fileID_code+",'"+ds_grid_definition_bitmap+"')",caller,user);
 	}
