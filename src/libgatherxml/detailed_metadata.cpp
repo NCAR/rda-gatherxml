@@ -2142,10 +2142,10 @@ void generate_detailed_metadata_view(std::string caller,std::string user)
     ofs << "<?php" << std::endl;
     ofs << "  include_once(\"MyDBI.inc\");" << std::endl;
     ofs << "  default_dbinfo(\"\",\"metadata\",\"metadata\");" << std::endl;
-    ofs << "  $title=myget(\"search.datasets\",\"title\",\"dsid = '633.0'\");" << std::endl;
-    ofs << "  $contributors=mymget(\"\",\"\",\"select g.path from search.contributors_new as c left join search.GCMD_providers as g on g.uuid = c.keyword where dsid = '633.0' order by disp_order\");" << std::endl;
-    ofs << "  $projects=mymget(\"\",\"\",\"select g.path from search.projects_new as p left join search.GCMD_projects as g on g.uuid = p.keyword  where dsid = '633.0'\");" << std::endl;
-    ofs << "  $supportedProjects=mymget(\"\",\"\",\"select g.path from search.supportedProjects_new as p left join search.GCMD_projects as g on g.uuid = p.keyword where dsid = '633.0'\");" << std::endl;
+    ofs << "  $title=myget(\"search.datasets\",\"title\",\"dsid = '" << metautils::args.dsnum << "'\");" << std::endl;
+    ofs << "  $contributors=mymget(\"\",\"\",\"select g.path from search.contributors_new as c left join search.GCMD_providers as g on g.uuid = c.keyword where dsid = '" << metautils::args.dsnum << "' order by disp_order\");" << std::endl;
+    ofs << "  $projects=mymget(\"\",\"\",\"select g.path from search.projects_new as p left join search.GCMD_projects as g on g.uuid = p.keyword  where dsid = '" << metautils::args.dsnum << "'\");" << std::endl;
+    ofs << "  $supportedProjects=mymget(\"\",\"\",\"select g.path from search.supportedProjects_new as p left join search.GCMD_projects as g on g.uuid = p.keyword where dsid = '" << metautils::args.dsnum << "'\");" << std::endl;
     ofs << "?>" << std::endl;
     ofs << "<p>The information presented here summarizes the data in the primary (NCAR HPSS) archive of ds"+metautils::args.dsnum+".  Some or all of these data may not be directly accessible from our web server.  If you have questions about data access, please contact the dataset specialist named above.</p>" << std::endl;
     ofs << "<br>" << std::endl;
