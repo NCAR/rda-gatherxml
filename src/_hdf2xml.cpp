@@ -2700,8 +2700,8 @@ std::cerr << floatutils::myequalf(data_array_value(gcoords.latitude.data_array,c
 	  for (const auto& key : time_range_table.keys()) {
 	    metautils::NcTime::TimeRangeEntry tre;
 	    time_range_table.found(key,tre);
-	    metautils::NcTime::TimeData &time_data= (gcoords.forecast_period.id.empty()) ? time_data : fcst_period_time_data;
-	    add_gridded_lat_lon_keys(gentry_table,dim,def,tre,time_data,gcoords,istream);
+	    metautils::NcTime::TimeData &tr_time_data= (gcoords.forecast_period.id.empty()) ? time_data : fcst_period_time_data;
+	    add_gridded_lat_lon_keys(gentry_table,dim,def,tre,tr_time_data,gcoords,istream);
 	    for (const auto& key2 : gentry_table.keys()) {
 		if (gatherxml::verbose_operation) {
 		  std::cout << "  processing grid entry: " << key2 << std::endl;
@@ -2722,7 +2722,7 @@ std::cerr << floatutils::myequalf(data_array_value(gcoords.latitude.data_array,c
 		  gentry->level_table.clear();
 		  lentry->parameter_code_table.clear();
 		  param_entry->num_time_steps=0;
-		  add_gridded_parameters_to_netcdf_level_entry(istream,gentry->key,gcoords,level_id,scan_data,tre,time_data,time_bounds,parameter_data);
+		  add_gridded_parameters_to_netcdf_level_entry(istream,gentry->key,gcoords,level_id,scan_data,tre,tr_time_data,time_bounds,parameter_data);
 		  if (!lentry->parameter_code_table.empty()) {
 		    for (size_t l=0; l < num_levels; ++l) {
 			lentry->key="ds"+metautils::args.dsnum+","+level_id+":";
@@ -2755,7 +2755,7 @@ std::cerr << floatutils::myequalf(data_array_value(gcoords.latitude.data_array,c
 			gentry->level_table.insert(*lentry);
 			level_info.write[m]=1;
 			if (inv_stream.is_open()) {
-			  update_inventory(uie.num,gie.num,gcoords,time_data);
+			  update_inventory(uie.num,gie.num,gcoords,tr_time_data);
 			}
 		    }
 		  }
@@ -2776,17 +2776,17 @@ std::cerr << floatutils::myequalf(data_array_value(gcoords.latitude.data_array,c
 		    }
 		    if (!gentry->level_table.found(lentry->key,*lentry)) {
 			lentry->parameter_code_table.clear();
-			add_gridded_parameters_to_netcdf_level_entry(istream,gentry->key,gcoords,level_id,scan_data,tre,time_data,time_bounds,parameter_data);
+			add_gridded_parameters_to_netcdf_level_entry(istream,gentry->key,gcoords,level_id,scan_data,tre,tr_time_data,time_bounds,parameter_data);
 			if (!lentry->parameter_code_table.empty()) {
 			  gentry->level_table.insert(*lentry);
 			  level_info.write[m]=1;
 			}
 		    }
 		    else {
- 			update_level_entry(istream,tre,time_data,time_bounds,gcoords,level_id,scan_data,parameter_data,level_info.write[m]);
+ 			update_level_entry(istream,tre,tr_time_data,time_bounds,gcoords,level_id,scan_data,parameter_data,level_info.write[m]);
 		    }
 		    if (level_info.write[m] == 1 && inv_stream.is_open()) {
-			update_inventory(uie.num,gie.num,gcoords,time_data);
+			update_inventory(uie.num,gie.num,gcoords,tr_time_data);
 		    }
 		  }
 		  grid_table->replace(*gentry);
