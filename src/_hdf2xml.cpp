@@ -1586,12 +1586,11 @@ void update_inventory(int unum,int gnum,const GridCoordinates& gcoords,const met
     ie.num=inv_L_table.size();
     inv_L_table.insert(ie);
   }
-  std::stringstream inv_line;
   for (size_t n=0; n < gcoords.valid_time.data_array.num_values; ++n) {
     for (const auto& key : lentry->parameter_code_table.keys()) {
 	InvEntry pie;
 	inv_P_table.found(key,pie);
-	inv_line.str("");
+	std::stringstream inv_line;
 	std::string error;
 	inv_line << "0|0|" << metautils::NcTime::actual_date_time(data_array_value(gcoords.valid_time.data_array,n,gcoords.valid_time.ds.get()),time_data,error).to_string("%Y%m%d%H%MM") << "|" << unum << "|" << gnum << "|" << ie.num << "|" << pie.num << "|0";
 	inv_lines.emplace_back(inv_line.str());
@@ -2112,7 +2111,7 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
   }
   std::string climo_bounds_id;
   GridCoordinates gcoords;
-  metautils::NcTime::TimeData time_data,fcst_period_time_data;
+  metautils::NcTime::TimeData time_data,forecast_period_time_data;
   metautils::NcLevel::LevelInfo level_info;
   std::vector<std::string> lat_ids,lon_ids;
   my::map<metautils::StringEntry> unique_level_id_table;
@@ -2186,9 +2185,9 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
 	  if (standard_name_value == "forecast_period") {
 	    gcoords.forecast_period.id=var.key;
 	    if (!units_value.empty()) {
-		fcst_period_time_data.units=units_value;
-		if (fcst_period_time_data.units.back() != 's') {
-		  fcst_period_time_data.units.append(1,'s');
+		forecast_period_time_data.units=units_value;
+		if (forecast_period_time_data.units.back() != 's') {
+		  forecast_period_time_data.units.append(1,'s');
 		}
 	    }
 	  }
@@ -2217,7 +2216,8 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
 	unique_level_id_table.insert(se);
     }
   }
-  fcst_period_time_data.calendar=time_data.calendar;
+  forecast_period_time_data.reference=time_data.reference;
+  forecast_period_time_data.calendar=time_data.calendar;
   if (gcoords.reference_time.id != gcoords.valid_time.id) {
     if (gatherxml::verbose_operation) {
 	std::cout << "...checking for forecasts..." << std::endl;
@@ -2459,8 +2459,8 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
 	  f_tre.key=data_array_value(gcoords.forecast_period.data_array,n,gcoords.forecast_period.ds.get());
 	  f_tre.data.reset(new metautils::NcTime::TimeRangeEntry::Data);
 	  *f_tre.data=*tre.data;
-	  f_tre.data->instantaneous.first_valid_datetime.add(fcst_period_time_data.units,f_tre.key);
-	  f_tre.data->instantaneous.last_valid_datetime.add(fcst_period_time_data.units,f_tre.key);
+	  f_tre.data->instantaneous.first_valid_datetime.add(forecast_period_time_data.units,f_tre.key);
+	  f_tre.data->instantaneous.last_valid_datetime.add(forecast_period_time_data.units,f_tre.key);
 	  if (f_tre.key == 0) {
 	    f_tre.key=-1;
 	  }
@@ -2700,7 +2700,7 @@ std::cerr << floatutils::myequalf(data_array_value(gcoords.latitude.data_array,c
 	  for (const auto& key : time_range_table.keys()) {
 	    metautils::NcTime::TimeRangeEntry tre;
 	    time_range_table.found(key,tre);
-	    metautils::NcTime::TimeData &tr_time_data= (gcoords.forecast_period.id.empty()) ? time_data : fcst_period_time_data;
+	    metautils::NcTime::TimeData &tr_time_data= (gcoords.forecast_period.id.empty()) ? time_data : forecast_period_time_data;
 	    add_gridded_lat_lon_keys(gentry_table,dim,def,tre,tr_time_data,gcoords,istream);
 	    for (const auto& key2 : gentry_table.keys()) {
 		if (gatherxml::verbose_operation) {
@@ -3015,29 +3015,31 @@ int main(int argc,char **argv)
   }
   ScanData scan_data;
   scan_file(scan_data);
-  if (metautils::args.update_db) {
-    std::string flags;
-    if (!metautils::args.update_summary) {
-	flags+=" -S ";
-    }
-    if (!metautils::args.regenerate) {
-	flags+=" -R ";
-    }
-    if (!xml_directory.empty()) {
-	flags+=" -t "+xml_directory;
-    }
-    if (!metautils::args.inventory_only && std::regex_search(metautils::args.path,std::regex("^https://rda.ucar.edu"))) {
-	flags+=" -wf";
-    }
-    else {
-	flags+=" -f";
-    }
-    if (scan_data.cmd_type.empty()) {
-	metautils::log_error("content metadata type was not specified","hdf2xml",USER);
-    }
-    std::stringstream oss,ess;
-    if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" "+flags+" "+metautils::args.filename+"."+scan_data.cmd_type,oss,ess) < 0) {
-	std::cerr << ess.str() << std::endl;
+  if (!metautils::args.inventory_only) {
+    if (metautils::args.update_db) {
+	std::string flags;
+	if (!metautils::args.update_summary) {
+	  flags+=" -S ";
+	}
+	if (!metautils::args.regenerate) {
+	  flags+=" -R ";
+	}
+	if (!xml_directory.empty()) {
+	  flags+=" -t "+xml_directory;
+	}
+	if (std::regex_search(metautils::args.path,std::regex("^https://rda.ucar.edu"))) {
+	  flags+=" -wf";
+	}
+	else {
+	  flags+=" -f";
+	}
+	if (scan_data.cmd_type.empty()) {
+	  metautils::log_error("content metadata type was not specified","hdf2xml",USER);
+	}
+	std::stringstream oss,ess;
+	if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" "+flags+" "+metautils::args.filename+"."+scan_data.cmd_type,oss,ess) < 0) {
+	  std::cerr << ess.str() << std::endl;
+	}
     }
   }
   else if (metautils::args.dsnum == "999.9" && !xml_directory.empty()) {
