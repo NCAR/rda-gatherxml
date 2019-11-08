@@ -304,11 +304,13 @@ void scan_file()
 	  griddim=grid->dimensions();
 	  gentry.key+=strutils::itos(griddim.x)+"<!>"+strutils::itos(griddim.y)+"<!>"+strutils::ftos(griddef.slatitude,3)+"<!>"+strutils::ftos(griddef.slongitude,3)+"<!>"+strutils::ftos(griddef.elatitude,3)+"<!>"+strutils::ftos(griddef.elongitude,3)+"<!>"+strutils::ftos(griddef.loincrement,3)+"<!>";
 	  switch (griddef.type) {
-	    case Grid::gaussianLatitudeLongitudeType:
+	    case Grid::gaussianLatitudeLongitudeType: {
 		gentry.key+=strutils::itos(griddef.num_circles);
 		break;
-	    default:
+	    }
+	    default: {
 		gentry.key+=strutils::ftos(griddef.laincrement,3);
+	    }
 	  }
 	  if (griddef.type == Grid::polarStereographicType || griddef.type == Grid::lambertConformalType) {
 	    auto pole= (griddef.projection_flag ==  0) ? "N" : "S";
@@ -330,6 +332,7 @@ void scan_file()
 	    metautils::args.data_format="grib0";
 	  }
 	  last_valid_date_time=first_valid_date_time;
+	  first_valid_date_time=grid->forecast_date_time();
 	  lentry.key=strutils::ftos(grid->source())+"-"+strutils::ftos((reinterpret_cast<GRIBGrid *>(grid))->sub_center_id());
 	  pentry.key=lentry.key;
 	  if (metautils::args.data_format == "grib") {
