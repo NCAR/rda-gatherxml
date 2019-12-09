@@ -1238,7 +1238,7 @@ void scan_cf_non_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,s
 	}
     }
     for (const auto& var : vars) {
-	if (var.name != vars[dgd.indexes.time_var].name && var.name != vars[dgd.indexes.instance_dim_var].name && var.dimids.size() == 1 && var.dimids[0] == obs_dim) {
+	if (var.name != vars[dgd.indexes.time_var].name && var.name != vars[dgd.indexes.instance_dim_var].name && var.dimids.size() >= 1 && var.dimids[0] == obs_dim) {
 	  netCDFStream::VariableData var_data;
 	  if (istream.variable_data(var.name,var_data) == netCDFStream::NcType::_NULL) {
 	    metautils::log_error(THIS_FUNC+"() returned error: unable to get data for variable '"+var.name+"'","nc2xml",USER);
