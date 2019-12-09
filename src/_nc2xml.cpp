@@ -1230,6 +1230,13 @@ void scan_cf_non_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,s
     if (istream.variable_data(vars[dgd.indexes.instance_dim_var].name,station_indexes) == netCDFStream::NcType::_NULL) {
 	metautils::log_error(THIS_FUNC+"() returned error: unable to get instance dimension data","nc2xml",USER);
     }
+    std::vector<DateTime> min_dts,max_dts;
+    if (dgd.indexes.time_bounds_var != 0xffffffff) {
+	for (size_t n=0; n < station_indexes.size(); ++n) {
+	  min_dts.emplace_back(compute_nc_time(*time_bounds,n*2));
+	  max_dts.emplace_back(compute_nc_time(*time_bounds,n*2+1));
+	}
+    }
     for (const auto& var : vars) {
 	if (var.name != vars[dgd.indexes.time_var].name && var.name != vars[dgd.indexes.instance_dim_var].name && var.dimids.size() == 1 && var.dimids[0] == obs_dim) {
 	  netCDFStream::VariableData var_data;
@@ -1252,10 +1259,8 @@ void scan_cf_non_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,s
 	    }
 	    if (!found_missing(times[n],nullptr,var_data[n],nc_va_data.missing_value)) {
 		if (dgd.indexes.time_bounds_var != 0xffffffff) {
-		  auto min_dt=compute_nc_time(*time_bounds,n*2);
-		  auto max_dt=compute_nc_time(*time_bounds,n*2+1);
 		  for (size_t m=0; m < num_locs; ++m) {
-		    if (!obs_data.added_to_ids("surface",ientry,var.name,"",lats[idx*num_locs+m],lons[idx*num_locs+m],times[n],&min_dt,&max_dt)) {
+		    if (!obs_data.added_to_ids("surface",ientry,var.name,"",lats[idx*num_locs+m],lons[idx*num_locs+m],times[n],&min_dts[n],&max_dts[n])) {
 			metautils::log_error(THIS_FUNC+"() returned error: '"+myerror+"' when adding ID "+ientry.key,"nc2xml",USER);
 		    }
 		  }
