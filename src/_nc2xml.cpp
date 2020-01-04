@@ -288,14 +288,10 @@ void add_gridded_netcdf_parameter(const netCDFStream::Variable& var,const DateTi
   extract_from_variable_attribute(var.attrs,var.nc_type,nc_va_data);
   auto param_key=var.name+"<!>"+nc_va_data.long_name+"<!>"+nc_va_data.units+"<!>"+nc_va_data.cf_keyword;
   if (parameter_table.find(param_key) == parameter_table.end()) {
+    parameter_table.emplace(param_key);
+    nc_vars.netcdf_variables.emplace_back(param_key);
     auto short_name=nc_vars.parameter_map.short_name(var.name);
-    if (short_name.empty()) {
-	parameter_table.emplace(param_key);
-	nc_vars.netcdf_variables.emplace_back(param_key);
-    }
-    else {
-	parameter_table.insert(param_key);
-	nc_vars.netcdf_variables.emplace_back(param_key);
+    if (!short_name.empty()) {
 	nc_vars.changed_variables.emplace(var.name);
     }
   }
