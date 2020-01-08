@@ -332,51 +332,43 @@ void process_ncep_adp_bufr_observation(gatherxml::markup::ObML::ObservationData&
     case 0:
     case 1:
     case 2:
-    case 7:
-    {
+    case 7: {
 	obs_type="surface";
 	platform_type="land_station";
 	break;
     }
     case 1001:
-    case 1013:
-    {
+    case 1013: {
 	obs_type="surface";
 	platform_type="roving_ship";
 	break;
     }
-    case 1002:
-    {
+    case 1002: {
 	obs_type="surface";
 	platform_type="drifting_buoy";
 	break;
     }
-    case 1003:
-    {
+    case 1003: {
 	obs_type="surface";
 	platform_type="moored_buoy";
 	break;
     }
-    case 1004:
-    {
+    case 1004: {
 	obs_type="surface";
 	platform_type="CMAN_station";
 	break;
     }
-    case 1005:
-    {
+    case 1005: {
 	obs_type="surface";
 	platform_type="automated_gauge";
 	break;
     }
-    case 1006:
-    {
+    case 1006: {
 	obs_type="surface";
 	platform_type="bogus";
 	break;
     }
-    case 1007:
-    {
+    case 1007: {
 	obs_type="surface";
 	platform_type="coastal_station";
 	break;
@@ -384,30 +376,26 @@ void process_ncep_adp_bufr_observation(gatherxml::markup::ObML::ObservationData&
     case 2001:
     case 2002:
     case 2101:
-    case 2102:
-    {
+    case 2102: {
 	platform_type="land_station";
 	obs_type="upper_air";
 	break;
     }
     case 2003:
-    case 2103:
-    {
+    case 2103: {
 	platform_type="roving_ship";
 	obs_type="upper_air";
 	break;
     }
     case 2004:
-    case 2104:
-    {
+    case 2104: {
 	platform_type="aircraft";
 	obs_type="upper_air";
 	break;
     }
     case 2005:
     case 2009:
-    case 2105:
-    {
+    case 2105: {
 	platform_type="land_station";
 	obs_type="upper_air";
 	break;
@@ -418,15 +406,13 @@ void process_ncep_adp_bufr_observation(gatherxml::markup::ObML::ObservationData&
     case 2013:
     case 2014:
     case 2016:
-    case 2018:
-    {
+    case 2018: {
 	platform_type="wind_profiler";
 	obs_type="upper_air";
 	break;
     }
     case 2008:
-    case 2017:
-    {
+    case 2017: {
 	platform_type="NEXRAD";
 	obs_type="upper_air";
 	break;
@@ -437,8 +423,7 @@ void process_ncep_adp_bufr_observation(gatherxml::markup::ObML::ObservationData&
     case 3010:
     case 3101:
     case 3102:
-    case 3104:
-    {
+    case 3104: {
 	platform_type="satellite";
 	obs_type="upper_air";
 	break;
@@ -458,8 +443,7 @@ void process_ncep_adp_bufr_observation(gatherxml::markup::ObML::ObservationData&
     case 4013:
     case 4014:
     case 4015:
-    case 4103:
-    {
+    case 4103: {
 	platform_type="aircraft";
 	obs_type="upper_air";
 	break;
@@ -485,6 +469,9 @@ void process_ncep_adp_bufr_observation(gatherxml::markup::ObML::ObservationData&
     case 5021:
     case 5022:
     case 5023:
+    case 5024:
+    case 5025:
+    case 5026:
     case 5030:
     case 5031:
     case 5032:
@@ -508,10 +495,10 @@ void process_ncep_adp_bufr_observation(gatherxml::markup::ObML::ObservationData&
     case 5071:
     case 5080:
     case 5090:
+    case 5091:
     case 8012:
     case 8013:
-    case 8015:
-    {
+    case 8015: {
 	platform_type="satellite";
 	obs_type="upper_air";
 	break;
@@ -542,14 +529,12 @@ void process_ncep_adp_bufr_observation(gatherxml::markup::ObML::ObservationData&
     case 12150:
     case 12160:
     case 12222:
-    case 12255:
-    {
+    case 12255: {
 	platform_type="satellite";
 	obs_type="surface";
 	break;
     }
-    default:
-    {
+    default: {
 	metautils::log_error("process_ncep_adp_bufr_observation() error:  rpt sub-type "+strutils::itos(rpt.data_subtype())+" not recognized for rpt type "+strutils::itos(rpt.data_type())+"  date: "+adata[subset_number]->datetime.to_string()+"  id: '"+adata[subset_number]->rpid+"'","bufr2xml",USER);
     }
   }
