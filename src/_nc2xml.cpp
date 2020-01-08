@@ -229,6 +229,10 @@ void extract_from_variable_attribute(const std::vector<InputNetCDFStream::Attrib
 	    nc_attribute_data.missing_value.set(*(reinterpret_cast<char *>(attr.values)));
 	    break;
 	  }
+	  case netCDFStream::NcType::SHORT: {
+	    nc_attribute_data.missing_value.set(*(reinterpret_cast<short *>(attr.values)));
+	    break;
+	  }
 	  case netCDFStream::NcType::INT: {
 	    nc_attribute_data.missing_value.set(*(reinterpret_cast<int *>(attr.values)));
 	    break;
@@ -1233,11 +1237,14 @@ void scan_cf_non_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,s
 	  max_dts.emplace_back(compute_nc_time(*time_bounds,n*2+1));
 	}
     }
+    std::unordered_set<std::string> ignore_vars{vars[dgd.indexes.time_var].name,vars[dgd.indexes.instance_dim_var].name};
+    if (dgd.indexes.time_bounds_var != 0xffffffff) {
+	ignore_vars.emplace(vars[dgd.indexes.time_bounds_var].name);
+    }
     for (const auto& var : vars) {
-	if (var.name != vars[dgd.indexes.time_var].name && var.name != vars[dgd.indexes.instance_dim_var].name && var.dimids.size() >= 1 && var.dimids[0] == obs_dim) {
-	  netCDFStream::VariableData var_data;
-	  if (istream.variable_data(var.name,var_data) == netCDFStream::NcType::_NULL) {
-	    metautils::log_error(THIS_FUNC+"() returned error: unable to get data for variable '"+var.name+"'","nc2xml",USER);
+	if (ignore_vars.find(var.name) == ignore_vars.end() && var.dimids.size() >= 1 && var.dimids[0] == obs_dim) {
+	  if (gatherxml::verbose_operation) {
+	    std::cout << "   ...scanning netCDF variable '" << var.name << "' ..." << std::endl;
 	  }
 	  NetCDFVariableAttributeData nc_va_data;
 	  extract_from_variable_attribute(var.attrs,var.nc_type,nc_va_data);
@@ -1253,7 +1260,7 @@ void scan_cf_non_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,s
 		strutils::trim(id);
 		ientry.key+=id;
 	    }
-	    if (!found_missing(times[n],nullptr,var_data[n],nc_va_data.missing_value)) {
+	    if (!found_missing(times[n],nullptr,istream.value_at(var.name,n),nc_va_data.missing_value)) {
 		if (dgd.indexes.time_bounds_var != 0xffffffff) {
 		  for (size_t m=0; m < num_locs; ++m) {
 		    if (!obs_data.added_to_ids("surface",ientry,var.name,"",lats[idx*num_locs+m],lons[idx*num_locs+m],times[n],&min_dts[n],&max_dts[n])) {
@@ -1271,6 +1278,9 @@ void scan_cf_non_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,s
 		}
 		++total_num_not_missing;
 	    }
+	  }
+	  if (gatherxml::verbose_operation) {
+	    std::cout << "   ...scanning netCDF variable '" << var.name << "' done." << std::endl;
 	  }
 	}
     }
