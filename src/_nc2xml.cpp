@@ -3782,14 +3782,17 @@ void scan_raf_aircraft_netcdf_file(InputNetCDFStream& istream,gatherxml::markup:
 	datatypes_list.emplace_back(datatype);
     }
   }
-  size_t seconds_mult=1;
-  if (timeunits == "minutes") {
+  size_t seconds_mult=0;
+  if (timeunits == "seconds") {
+    seconds_mult=1;
+  }
+  else if (timeunits == "minutes") {
     seconds_mult=60;
   }
   else if (timeunits == "hours") {
     seconds_mult=3600;
   }
-  else {
+  if (seconds_mult == 0) {
     metautils::log_error(THIS_FUNC+"() returned error: bad time units '"+timeunits+"' on time variable","nc2xml",USER);
   }
   double max_altitude=-99999.,min_altitude=999999.;
