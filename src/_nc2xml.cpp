@@ -3726,7 +3726,7 @@ void scan_raf_aircraft_netcdf_file(InputNetCDFStream& istream,gatherxml::markup:
 	    standard_name=attr_val;
 	  }
 	  attr_val=strutils::to_lower(attr_val);
-	  if (std::regex_search(attr_val,std::regex("time"))) {
+	  if (std::regex_search(attr_val,std::regex("time")) && timevarname.empty()) {
 	    timevarname=vars[n].name;
 	    istream.variable_data(vars[n].name,time_data);
 	  }
