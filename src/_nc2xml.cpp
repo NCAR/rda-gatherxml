@@ -1260,7 +1260,14 @@ void scan_cf_non_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,s
 		strutils::trim(id);
 		ientry.key+=id;
 	    }
-	    if (!found_missing(times[n],nullptr,istream.value_at(var.name,n),nc_va_data.missing_value)) {
+	    auto check_value=var._FillValue.get();
+	    for (const auto& value : istream.value_at(var.name,n)) {
+		if (value != check_value) {
+		  check_value=value;
+		  break;
+		}
+	    }
+	    if (!found_missing(times[n],nullptr,check_value,nc_va_data.missing_value)) {
 		if (dgd.indexes.time_bounds_var != 0xffffffff) {
 		  for (size_t m=0; m < num_locs; ++m) {
 		    if (!obs_data.added_to_ids("surface",ientry,var.name,"",lats[idx*num_locs+m],lons[idx*num_locs+m],times[n],&min_dts[n],&max_dts[n])) {
