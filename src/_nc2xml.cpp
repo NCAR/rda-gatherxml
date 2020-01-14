@@ -3746,14 +3746,14 @@ void scan_raf_aircraft_netcdf_file(InputNetCDFStream& istream,gatherxml::markup:
 	  timeunits=val_parts[0];
 	  auto date_parts=strutils::split(val_parts[2],"-");
 	  if (date_parts.size() != 3) {
-	    metautils::log_error(THIS_FUNC+"() returned error: bad units on time variable","nc2xml",USER);
+	    metautils::log_error(THIS_FUNC+"() returned error: bad date in time variable units '"+attr_val+"'","nc2xml",USER);
 	  }
 	  auto yr=std::stoi(date_parts[0]);
 	  auto mo=std::stoi(date_parts[1]);
 	  auto dy=std::stoi(date_parts[2]);
 	  auto time_parts=strutils::split(val_parts[3],":");
 	  if (time_parts.size() != 3) {
-	    metautils::log_error(THIS_FUNC+"() returned error: bad units on time variable","nc2xml",USER);
+	    metautils::log_error(THIS_FUNC+"() returned error: bad time in time variable units '"+attr_val+"'","nc2xml",USER);
 	  }
 	  auto time=std::stoi(time_parts[0])*10000+std::stoi(time_parts[1])*100+std::stoi(time_parts[2]);
 	  reftime.set(yr,mo,dy,time);
