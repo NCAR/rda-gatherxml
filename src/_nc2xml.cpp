@@ -1183,6 +1183,9 @@ void scan_cf_non_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,s
   auto obs_dim= (vars[dgd.indexes.time_var].dimids[0] == stn_dim) ? vars[dgd.indexes.time_var].dimids[1] : vars[dgd.indexes.time_var].dimids[0];
   if (dgd.indexes.sample_dim_var != 0xffffffff) {
 // continuous ragged array H.6
+    if (gatherxml::verbose_operation) {
+	std::cout << "   ...continuous ragged array" << std::endl;
+    }
     netCDFStream::VariableData row_sizes;
     if (istream.variable_data(vars[dgd.indexes.sample_dim_var].name,row_sizes) == netCDFStream::NcType::_NULL) {
 	metautils::log_error(THIS_FUNC+"() returned error: unable to get sample dimension data","nc2xml",USER);
@@ -1226,6 +1229,9 @@ void scan_cf_non_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,s
   }
   else if (dgd.indexes.instance_dim_var != 0xffffffff) {
 // indexed ragged array H.7
+    if (gatherxml::verbose_operation) {
+	std::cout << "   ...indexed ragged array" << std::endl;
+    }
     netCDFStream::VariableData station_indexes;
     if (istream.variable_data(vars[dgd.indexes.instance_dim_var].name,station_indexes) == netCDFStream::NcType::_NULL) {
 	metautils::log_error(THIS_FUNC+"() returned error: unable to get instance dimension data","nc2xml",USER);
@@ -1294,6 +1300,9 @@ void scan_cf_non_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,s
   }
   else {
 // incomplete multidimensional array H.3
+    if (gatherxml::verbose_operation) {
+	std::cout << "   ...incomplete multidimensional array" << std::endl;
+    }
     NetCDFVariableAttributeData nc_ta_data;
     extract_from_variable_attribute(vars[dgd.indexes.time_var].attrs,vars[dgd.indexes.time_var].nc_type,nc_ta_data);
     size_t num_obs;
@@ -3719,6 +3728,7 @@ void scan_raf_aircraft_netcdf_file(InputNetCDFStream& istream,gatherxml::markup:
     nc_vars.map_filled=true;
   }
   netCDFStream::VariableData time_data,lat_data,lon_data,alt_data;
+  NetCDFVariableAttributeData lat_nc_va_data,lon_nc_va_data;
   auto vars=istream.variables();
   for (size_t n=0; n < vars.size(); ++n) {
     ignore_as_datatype=false;
@@ -3769,9 +3779,11 @@ void scan_raf_aircraft_netcdf_file(InputNetCDFStream& istream,gatherxml::markup:
     auto var_name_l=strutils::to_lower(vars[n].name);
     if (std::regex_search(var_name_l,std::regex("lat")) && coords_table.found(vars[n].name,se)) {
 	istream.variable_data(vars[n].name,lat_data);
+	extract_from_variable_attribute(vars[n].attrs,vars[n].nc_type,lat_nc_va_data);
     }
     else if (std::regex_search(var_name_l,std::regex("lon")) && coords_table.found(vars[n].name,se)) {
 	istream.variable_data(vars[n].name,lon_data);
+	extract_from_variable_attribute(vars[n].attrs,vars[n].nc_type,lon_nc_va_data);
     }
     else if (std::regex_search(var_name_l,std::regex("alt")) && coords_table.found(vars[n].name,se)) {
 	for (size_t m=0; m < vars[n].attrs.size(); ++m) {
@@ -3804,32 +3816,47 @@ void scan_raf_aircraft_netcdf_file(InputNetCDFStream& istream,gatherxml::markup:
   }
   double max_altitude=-99999.,min_altitude=999999.;
   for (size_t n=0; n < time_data.size(); ++n) {
-    ++total_num_not_missing;
-    if (!obs_data.added_to_platforms(obs_type,platform_type,lat_data[n],lon_data[n])) {
-	metautils::log_error(THIS_FUNC+"() returned error: '"+myerror+"' when adding platform "+obs_type+" "+platform_type,"nc2xml",USER);
-    }
-    DateTime dt=reftime.seconds_added(time_data[n]*seconds_mult);
-    for (const auto& var : datatypes_list) {
-	auto datatype=var.substr(0,var.find("<!>"));
-	if (!obs_data.added_to_ids(obs_type,ientry,datatype,"",lat_data[n],lon_data[n],time_data[n],&dt)) {
-	  metautils::log_error(THIS_FUNC+"() returned error: '"+myerror+"' when adding ID "+ientry.key,"nc2xml",USER);
+//    if (static_cast<double>(lat_data[n]) != lat_nc_va_data.missing_value.get() && static_cast<double>(lon_data[n]) != lon_nc_va_data.missing_value.get()) {
+if (lat_data[n] >= -90. && lat_data[n] <= 90. && lon_data[n] >= -180. && lon_data[n] <= 180.) {
+	if (!obs_data.added_to_platforms(obs_type,platform_type,lat_data[n],lon_data[n])) {
+	  metautils::log_error(THIS_FUNC+"() returned error: '"+myerror+"' when adding platform "+obs_type+" "+platform_type,"nc2xml",USER);
 	}
-    }
-    if (alt_data.size() > 0) {
-	if (alt_data[n] > max_altitude) {
-	  max_altitude=alt_data[n];
+	auto dt=reftime.seconds_added(time_data[n]*seconds_mult);
+	auto non_missing=0;
+	for (const auto& var : datatypes_list) {
+	  auto datatype=var.substr(0,var.find("<!>"));
+	  auto check_value=istream.variable(datatype)._FillValue.get();
+	  for (const auto& value : istream.value_at(datatype,n)) {
+	    if (value != check_value) {
+		check_value=value;
+		break;
+	    }
+	  }
+	  if (check_value != istream.variable(datatype)._FillValue.get()) {
+	    if (!obs_data.added_to_ids(obs_type,ientry,datatype,"",lat_data[n],lon_data[n],time_data[n],&dt)) {
+		metautils::log_error(THIS_FUNC+"() returned error: '"+myerror+"' when adding ID "+ientry.key,"nc2xml",USER);
+	    }
+	    non_missing=1;
+	  }
 	}
-	if (alt_data[n] < min_altitude) {
-	  min_altitude=alt_data[n];
+	total_num_not_missing+=non_missing;
+	if (alt_data.size() > 0) {
+	  if (alt_data[n] > max_altitude) {
+	    max_altitude=alt_data[n];
+	  }
+	  if (alt_data[n] < min_altitude) {
+	    min_altitude=alt_data[n];
+	  }
 	}
-    }
-    else {
-	ignore_altitude=true;
+	else {
+	  ignore_altitude=true;
+	}
     }
   }
   for (const auto& type : datatypes_list) {
     gatherxml::markup::ObML::DataTypeEntry dte;
     dte.key=type.substr(0,type.find("<!>"));
+/*
     if (!ientry.data->data_types_table.found(dte.key,dte)) {
 	dte.data.reset(new gatherxml::markup::ObML::DataTypeEntry::Data);
 	if (!ignore_altitude) {
@@ -3860,6 +3887,9 @@ void scan_raf_aircraft_netcdf_file(InputNetCDFStream& istream,gatherxml::markup:
 	if (std::find(nc_vars.netcdf_variables.begin(),nc_vars.netcdf_variables.end(),type) == nc_vars.netcdf_variables.end()) {
 	  nc_vars.netcdf_variables.emplace_back(type);
 	}
+    }
+*/
+    if (!ignore_altitude && ientry.data->data_types_table.found(dte.key,dte)) {
     }
   }
   write_type=ObML_type;
