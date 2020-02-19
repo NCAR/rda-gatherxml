@@ -28,12 +28,12 @@ std::string user=getenv("USER");
 std::string myerror="";
 std::string mywarning="";
 
-void write_ncl_head(TempFile *ncl_file,TempFile *ncgm_file)
+void write_ncl_head(TempFile *ncl_file,TempFile *png_file)
 {
   ncl_file->writeln("load \"$NCARG_ROOT/lib/ncarg/nclscripts/csm/gsn_code.ncl\"");
   ncl_file->writeln("load \"$NCARG_ROOT/lib/ncarg/nclscripts/csm/gsn_csm.ncl\"");
   ncl_file->writeln("begin");
-  ncl_file->writeln("  wks = gsn_open_wks(\"ncgm\",\""+ncgm_file->base_name()+"\")");
+  ncl_file->writeln("  wks = gsn_open_wks(\"png\",\""+png_file->base_name()+"\")");
 //  ncl_file->writeln("  cmap=(/ (/1.,1.,1./), (/0.,0.,0./), (/.55294,.513725,.443137/), (/.3529,.3882,.58039/), (/.4,.4,.4/), (/.55,.55,.55/), (/.87,.87,.87/) /)");
 ncl_file->writeln("  cmap=(/ (/1.,1.,1./), (/0.,0.,0./), (/0.3294,0.4588,0.3529/), (/0.1529,0.6667,0.8960/), (/0.55,0.55,0.55/), (/.55,.55,.55/), (/1.0,1.0,0.8608/) /)");
   ncl_file->writeln("  gsn_define_colormap(wks,cmap)");
@@ -72,6 +72,7 @@ ncl_file->writeln("  cmap=(/ (/1.,1.,1./), (/0.,0.,0./), (/0.3294,0.4588,0.3529/
   ncl_file->writeln("  mres = True");
   ncl_file->writeln("  mres@gsMarkerIndex = 6");
   ncl_file->writeln("  mres@gsMarkerSizeF = 0.002634");
+  ncl_file->writeln("  mres@gsMarkerThicknessF = 13.");
   ncl_file->writeln("  mres@gsMarkerColor = 6");
 }
 
@@ -89,9 +90,8 @@ extern "C" void *thread_ncl(void *tnc)
     }
   }
   auto ncl_file=new TempFile(metautils::directives.temp_path,".ncl");
-  auto ncgm_file=new TempFile(metautils::directives.temp_path,".ncgm");
-  auto tiff_file=new TempFile(metautils::directives.temp_path,".tiff");
-  write_ncl_head(ncl_file,ncgm_file);
+  auto png_file=new TempFile(metautils::directives.temp_path,".png");
+  write_ncl_head(ncl_file,png_file);
   ncl_file->writeln("  p=new((/500000,2/),\"float\",-999)");
   auto cnt=0;
   MySQL::Row row;
@@ -121,6 +121,7 @@ extern "C" void *thread_ncl(void *tnc)
   ncl_file->writeln("  do i=0,"+strutils::itos(cnt-1));
   ncl_file->writeln("    gsn_polymarker(wks,map,p(i,0),p(i,1),mres)");
   ncl_file->writeln("  end do");
+  ncl_file->writeln("  frame(wks)");
   ncl_file->writeln("end");
   ncl_file->close();
   auto tdir=new TempDir;
@@ -131,15 +132,14 @@ extern "C" void *thread_ncl(void *tnc)
   if (unixutils::mysystem2("/bin/mkdir -p "+tdir->name()+"/datasets/ds"+metautils::args.dsnum+"/metadata",oss,ess) < 0) {
     metautils::log_error("thread_ncl() can't create directory tree","gsi",user);
   }
-  if (std::regex_search(unixutils::host_name(),std::regex("^(cheyenne|geyser|caldera|pronghorn|yslogin)"))) {
-    unixutils::mysystem2("/bin/tcsh -c \"module delete intel; module load gnu ncl; ncl "+ncl_file->name()+"; ctrans -d sun -res 360x360 "+ncgm_file->name()+" |convert sun:- "+tiff_file->name()+"; mogrify -crop 360x180+0+90! "+tiff_file->name()+"; convert "+tiff_file->name()+" "+tdir->name()+"/datasets/ds"+metautils::args.dsnum+"/metadata/spatial_coverage."+t->imagetag+".gif\"",oss,ess);
+  if (std::regex_search(unixutils::host_name(),std::regex("^(cheyenne|casper)"))) {
+    unixutils::mysystem2("/bin/tcsh -c \"module delete intel; module load gnu ncl; ncl "+ncl_file->name()+"; convert -trim +repage -resize 360x180 "+png_file->name()+" "+tdir->name()+"/datasets/ds"+metautils::args.dsnum+"/metadata/spatial_coverage."+t->imagetag+".gif\"",oss,ess);
   }
   else {
-    unixutils::mysystem2("/bin/tcsh -c \"setenv NCARG_NCARG /usr/share/ncarg; /usr/bin/ncl "+ncl_file->name()+"; /usr/bin/ctrans -d sun -res 360x360 "+ncgm_file->name()+" |convert sun:- "+tiff_file->name()+"; mogrify -crop 360x180+0+90! "+tiff_file->name()+"; convert "+tiff_file->name()+" "+tdir->name()+"/datasets/ds"+metautils::args.dsnum+"/metadata/spatial_coverage."+t->imagetag+".gif\"",oss,ess);
+    unixutils::mysystem2("/bin/tcsh -c \"setenv NCARG_NCARG /usr/share/ncarg; /usr/bin/ncl "+ncl_file->name()+"; convert -trim +repage -resize 360x180 "+png_file->name()+" "+tdir->name()+"/datasets/ds"+metautils::args.dsnum+"/metadata/spatial_coverage."+t->imagetag+".gif\"",oss,ess);
   }
   delete ncl_file;
-  delete ncgm_file;
-  delete tiff_file;
+  delete png_file;
   std::string error;
   if (unixutils::rdadata_sync(tdir->name(),"datasets/ds"+metautils::args.dsnum+"/metadata/","/data/web",metautils::directives.rdadata_home,error) < 0) {
     metautils::log_warning("rdadata_sync errors: '"+error+"'","gsi",user);
@@ -150,7 +150,6 @@ extern "C" void *thread_ncl(void *tnc)
 
 void generate_graphics(MySQL::LocalQuery& query,std::string type,std::string table,std::string gindex)
 {
-  ThreadStruct *tnc;
   if (query.submit(server) < 0) {
     metautils::log_error("generate_graphics() returned error: "+query.error(),"gsi",user);
   }
@@ -159,7 +158,7 @@ void generate_graphics(MySQL::LocalQuery& query,std::string type,std::string tab
 	summary_bitmap[n][m]=0;
     }
   }
-  tnc=new ThreadStruct[query.num_rows()];
+  auto *tnc=new ThreadStruct[query.num_rows()];
   size_t nn=0;
   MySQL::Row row;
   while (query.fetch_row(row)) {
@@ -191,9 +190,8 @@ void generate_graphics(MySQL::LocalQuery& query,std::string type,std::string tab
   }
   delete[] tnc;
   auto ncl_file=new TempFile(metautils::directives.temp_path,".ncl");
-  auto ncgm_file=new TempFile(metautils::directives.temp_path,".ncgm");
-  auto tiff_file=new TempFile(metautils::directives.temp_path,".tiff");
-  write_ncl_head(ncl_file,ncgm_file);
+  auto png_file=new TempFile(metautils::directives.temp_path,".png");
+  write_ncl_head(ncl_file,png_file);
   ncl_file->writeln("  p=new((/500000,2/),\"float\",-999)");
   auto cnt=0;
   for (size_t n=0; n < 60; ++n) {
@@ -210,6 +208,7 @@ void generate_graphics(MySQL::LocalQuery& query,std::string type,std::string tab
   ncl_file->writeln("  do i=0,"+strutils::itos(cnt-1));
   ncl_file->writeln("    gsn_polymarker(wks,map,p(i,0),p(i,1),mres)");
   ncl_file->writeln("  end do");
+  ncl_file->writeln("  frame(wks)");
   ncl_file->writeln("end");
   ncl_file->close();
   auto tdir=new TempDir;
@@ -220,15 +219,14 @@ void generate_graphics(MySQL::LocalQuery& query,std::string type,std::string tab
   if (unixutils::mysystem2("/bin/mkdir -p "+tdir->name()+"/datasets/ds"+metautils::args.dsnum+"/metadata",oss,ess) < 0) {
     metautils::log_error("generate_graphics() can't create directory tree","gsi",user);
   }
-  if (std::regex_search(unixutils::host_name(),std::regex("^(cheyenne|geyser|caldera|pronghorn|yslogin)"))) {
-    unixutils::mysystem2("/bin/tcsh -c \"module delete intel; module load gnu ncl; ncl "+ncl_file->name()+"; ctrans -d sun -res 360x360 "+ncgm_file->name()+" |convert sun:- "+tiff_file->name()+"; mogrify -crop 360x180+0+90! "+tiff_file->name()+"; convert "+tiff_file->name()+" "+tdir->name()+"/datasets/ds"+metautils::args.dsnum+"/metadata/spatial_coverage.gif\"",oss,ess);
+  if (std::regex_search(unixutils::host_name(),std::regex("^(cheyenne|casper)"))) {
+    unixutils::mysystem2("/bin/tcsh -c \"module delete intel; module load gnu ncl; ncl "+ncl_file->name()+"; convert -trim +repage -resize 360x180 "+png_file->name()+" "+tdir->name()+"/datasets/ds"+metautils::args.dsnum+"/metadata/spatial_coverage.gif\"",oss,ess);
   }
   else {
-    unixutils::mysystem2("/bin/tcsh -c \"setenv NCARG_NCARG /usr/share/ncarg; /usr/bin/ncl "+ncl_file->name()+"; /usr/bin/ctrans -d sun -res 360x360 "+ncgm_file->name()+" |convert sun:- "+tiff_file->name()+"; mogrify -crop 360x180+0+90! "+tiff_file->name()+"; convert "+tiff_file->name()+" "+tdir->name()+"/datasets/ds"+metautils::args.dsnum+"/metadata/spatial_coverage.gif\"",oss,ess);
+    unixutils::mysystem2("/bin/tcsh -c \"setenv NCARG_NCARG /usr/share/ncarg; /usr/bin/ncl "+ncl_file->name()+"; convert -trim +repage -resize 360x180 "+png_file->name()+" "+tdir->name()+"/datasets/ds"+metautils::args.dsnum+"/metadata/spatial_coverage.gif\"",oss,ess);
   }
   delete ncl_file;
-  delete ncgm_file;
-  delete tiff_file;
+  delete png_file;
   std::string error;
   if (unixutils::rdadata_sync(tdir->name(),"datasets/ds"+metautils::args.dsnum+"/metadata/","/data/web",metautils::directives.rdadata_home,error) < 0) {
     metautils::log_warning("rdadata_sync errors: '"+error+"'","gsi",user);
