@@ -1698,20 +1698,25 @@ int main(int argc,char **argv)
   if (std::regex_search(metautils::args.dsnum,std::regex("^ds"))) {
     metautils::args.dsnum=metautils::args.dsnum.substr(2);
   }
+  if (metautils::args.dsnum >= "999.0") {
+    no_dset_waf=true;
+  }
   metautils::args.args_string=unixutils::unix_args_string(argc,argv);
   metautils::read_config("dsgen",USER);
   if (!temp_dir.create(metautils::directives.temp_path)) {
     metautils::log_error("unable to create temporary directory","dsgen",USER);
   }
   server.connect(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
-  MySQL::LocalQuery query("select type from search.datasets where dsid = '"+metautils::args.dsnum+"'");
-  MySQL::Row row;
-  if (query.submit(server) < 0 || !query.fetch_row(row)) {
-    metautils::log_error("unable to determine dataset type","dsgen",USER);
-  }
-  dataset_type=row[0];
-  if (dataset_type != "P" && dataset_type != "H") {
-    no_dset_waf=true;
+  if (!no_dset_waf) {
+    MySQL::LocalQuery query("select type from search.datasets where dsid = '"+metautils::args.dsnum+"'");
+    MySQL::Row row;
+    if (query.submit(server) < 0 || !query.fetch_row(row)) {
+	metautils::log_error("unable to determine dataset type","dsgen",USER);
+    }
+    dataset_type=row[0];
+    if (dataset_type != "P" && dataset_type != "H") {
+	no_dset_waf=true;
+    }
   }
   TempDir dataset_doc_dir;
   if (!dataset_doc_dir.create(metautils::directives.temp_path)) {
