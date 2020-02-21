@@ -344,21 +344,29 @@ bool removed(std::string file)
   std::string file_ID_code;
   bool is_version_controlled;
   if (std::regex_search(file,std::regex("^/FS/DECS/"))) {
-    if ( (removed_from_GrML=remove_from("GrML","_primaries","mssID","fmd",file,".GrML",file_ID_code,is_version_controlled))) {
+    auto was_removed=remove_from("GrML","_primaries","mssID","fmd",file,".GrML",file_ID_code,is_version_controlled);
+    if (was_removed) {
 	clear_tables_by_file_ID("GrML",file_ID_code,is_version_controlled);
 	file_removed=true;
+	removed_from_GrML=true;
     }
-    if ( (removed_from_ObML=remove_from("ObML","_primaries","mssID","fmd",file,".ObML",file_ID_code,is_version_controlled))) {
+    was_removed=remove_from("ObML","_primaries","mssID","fmd",file,".ObML",file_ID_code,is_version_controlled);
+    if (was_removed) {
 	clear_tables_by_file_ID("ObML",file_ID_code,is_version_controlled);
 	file_removed=true;
+	removed_from_ObML=true;
     }
-    if ( (removed_from_SatML=remove_from("SatML","_primaries","mssID","fmd",file,".SatML",file_ID_code,is_version_controlled))) {
+    was_removed=remove_from("SatML","_primaries","mssID","fmd",file,".SatML",file_ID_code,is_version_controlled);
+    if (was_removed) {
 	clear_tables_by_file_ID("SatML",file_ID_code,is_version_controlled);
 	file_removed=true;
+	removed_from_SatML=true;
     }
-    if ( (removed_from_FixML=remove_from("FixML","_primaries","mssID","fmd",file,".FixML",file_ID_code,is_version_controlled))) {
+    was_removed=remove_from("FixML","_primaries","mssID","fmd",file,".FixML",file_ID_code,is_version_controlled);
+    if (was_removed) {
 	clear_tables_by_file_ID("FixML",file_ID_code,is_version_controlled);
 	file_removed=true;
+	removed_from_FixML=true;
     }
     MySQL::LocalQuery query("gindex","mssfile","mssfile = '"+file+"'");
     MySQL::Row row;
@@ -380,17 +388,23 @@ bool removed(std::string file)
     server_d.disconnect();
   }
   else {
-    if ( (removed_from_WGrML=remove_from("WGrML","_webfiles","webID","wfmd",file,".GrML",file_ID_code,is_version_controlled))) {
+    auto was_removed=remove_from("WGrML","_webfiles","webID","wfmd",file,".GrML",file_ID_code,is_version_controlled);
+    if (was_removed) {
 	clear_tables_by_file_ID("WGrML",file_ID_code,is_version_controlled);
 	file_removed=true;
+	removed_from_WGrML=true;
     }
-    if ( (removed_from_WObML=remove_from("WObML","_webfiles","webID","wfmd",file,".ObML",file_ID_code,is_version_controlled))) {
+    was_removed=remove_from("WObML","_webfiles","webID","wfmd",file,".ObML",file_ID_code,is_version_controlled);
+    if (was_removed) {
 	clear_tables_by_file_ID("WObML",file_ID_code,is_version_controlled);
 	file_removed=true;
+	removed_from_WObML=true;
     }
-    if ( (removed_from_WFixML=remove_from("WFixML","_webfiles","webID","wfmd",file,".FixML",file_ID_code,is_version_controlled))) {
+    was_removed=remove_from("WFixML","_webfiles","webID","wfmd",file,".FixML",file_ID_code,is_version_controlled);
+    if (was_removed) {
 	clear_tables_by_file_ID("WFixML",file_ID_code,is_version_controlled);
 	file_removed=true;
+	removed_from_WFixML=true;
     }
     MySQL::LocalQuery query("gindex","wfile","wfile = '"+file+"'");
     MySQL::Row row;
