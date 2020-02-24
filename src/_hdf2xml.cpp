@@ -158,15 +158,15 @@ void extract_from_hdf5_variable_attribute(my::map<InputHDF5Stream::Attribute>& a
     InputHDF5Stream::Attribute attr;
     attributes.found(key,attr);
     if (attr.key == "long_name") {
-	nc_attribute_data.long_name.assign(reinterpret_cast<char *>(attr.value.value));
+	nc_attribute_data.long_name.assign(reinterpret_cast<char *>(attr.value.array));
 	strutils::trim(nc_attribute_data.long_name);
     }
     else if (attr.key == "units") {
-	nc_attribute_data.units.assign(reinterpret_cast<char *>(attr.value.value));
+	nc_attribute_data.units.assign(reinterpret_cast<char *>(attr.value.array));
 	strutils::trim(nc_attribute_data.units);
     }
     else if (attr.key == "standard_name") {
-	nc_attribute_data.cf_keyword.assign(reinterpret_cast<char *>(attr.value.value));
+	nc_attribute_data.cf_keyword.assign(reinterpret_cast<char *>(attr.value.array));
 	strutils::trim(nc_attribute_data.cf_keyword);
     }
     else if (attr.key == "_FillValue" || attr.key == "missing_value") {
@@ -175,50 +175,50 @@ void extract_from_hdf5_variable_attribute(my::map<InputHDF5Stream::Attribute>& a
   }
 }
 
-bool found_missing(const double& time,size_t time_type,const InputHDF5Stream::DataValue *time_missing_value,const double& var_value,size_t var_type,const InputHDF5Stream::DataValue& var_missing_value)
+bool found_missing(const double& time,HDF5::DataArray::Type time_type,const InputHDF5Stream::DataValue *time_missing_value,const double& var_value,HDF5::DataArray::Type var_type,const InputHDF5Stream::DataValue& var_missing_value)
 {
   static const std::string THIS_FUNC=__func__;
   bool missing=false;
   if (time_missing_value != nullptr && time_missing_value->_class_ != -1) {
     switch (time_type) {
-	case (HDF5::DataArray::byte_): {
-	  if (floatutils::myequalf(time,*(reinterpret_cast<unsigned char *>(time_missing_value->value)))) {
+	case (HDF5::DataArray::Type::BYTE): {
+	  if (floatutils::myequalf(time,*(reinterpret_cast<unsigned char *>(time_missing_value->array)))) {
 	    missing=true;
 	  }
 	  break;
 	}
-	case (HDF5::DataArray::short_): {
-	  if (floatutils::myequalf(time,*(reinterpret_cast<short *>(time_missing_value->value)))) {
+	case (HDF5::DataArray::Type::SHORT): {
+	  if (floatutils::myequalf(time,*(reinterpret_cast<short *>(time_missing_value->array)))) {
 	    missing=true;
 	  }
 	  break;
 	}
-	case (HDF5::DataArray::int_): {
-	  if (floatutils::myequalf(time,*(reinterpret_cast<int *>(time_missing_value->value)))) {
+	case (HDF5::DataArray::Type::INT): {
+	  if (floatutils::myequalf(time,*(reinterpret_cast<int *>(time_missing_value->array)))) {
 	    missing=true;
 	  }
 	  break;
 	}
-	case (HDF5::DataArray::long_long_): {
-	  if (floatutils::myequalf(time,*(reinterpret_cast<long long *>(time_missing_value->value)))) {
+	case (HDF5::DataArray::Type::LONG_LONG): {
+	  if (floatutils::myequalf(time,*(reinterpret_cast<long long *>(time_missing_value->array)))) {
 	    missing=true;
 	  }
 	  break;
 	}
-	case (HDF5::DataArray::float_): {
-	  if (floatutils::myequalf(time,*(reinterpret_cast<float *>(time_missing_value->value)))) {
+	case (HDF5::DataArray::Type::FLOAT): {
+	  if (floatutils::myequalf(time,*(reinterpret_cast<float *>(time_missing_value->array)))) {
 	    missing=true;
 	  }
 	  break;
 	}
-	case (HDF5::DataArray::double_): {
-	  if (floatutils::myequalf(time,*(reinterpret_cast<double *>(time_missing_value->value)))) {
+	case (HDF5::DataArray::Type::DOUBLE): {
+	  if (floatutils::myequalf(time,*(reinterpret_cast<double *>(time_missing_value->array)))) {
 	    missing=true;
 	  }
 	  break;
 	}
 	default: {
-	  metautils::log_error(THIS_FUNC+"() returned error: can't check times of type "+strutils::itos(time_type),"hdf2xml",USER);
+	  metautils::log_error(THIS_FUNC+"() returned error: can't check times of type "+strutils::itos(static_cast<int>(time_type)),"hdf2xml",USER);
 	}
     }
   }
@@ -227,44 +227,44 @@ bool found_missing(const double& time,size_t time_type,const InputHDF5Stream::Da
   }
   if (var_missing_value.size > 0) {
     switch (var_type) {
-	case (HDF5::DataArray::byte_): {
-	  if (floatutils::myequalf(var_value,static_cast<int>(*(reinterpret_cast<unsigned char *>(var_missing_value.value))))) {
+	case (HDF5::DataArray::Type::BYTE): {
+	  if (floatutils::myequalf(var_value,static_cast<int>(*(reinterpret_cast<unsigned char *>(var_missing_value.array))))) {
 	    missing=true;
 	  }
 	  break;
 	}
-	case (HDF5::DataArray::short_): {
-	  if (floatutils::myequalf(var_value,*(reinterpret_cast<short *>(var_missing_value.value)))) {
+	case (HDF5::DataArray::Type::SHORT): {
+	  if (floatutils::myequalf(var_value,*(reinterpret_cast<short *>(var_missing_value.array)))) {
 	    missing=true;
 	  }
 	  break;
 	}
-	case (HDF5::DataArray::int_): {
-	  if (floatutils::myequalf(var_value,*(reinterpret_cast<int *>(var_missing_value.value)))) {
+	case (HDF5::DataArray::Type::INT): {
+	  if (floatutils::myequalf(var_value,*(reinterpret_cast<int *>(var_missing_value.array)))) {
 	    missing=true;
 	  }
 	  break;
 	}
-	case (HDF5::DataArray::long_long_): {
-	  if (floatutils::myequalf(var_value,*(reinterpret_cast<long long *>(var_missing_value.value)))) {
+	case (HDF5::DataArray::Type::LONG_LONG): {
+	  if (floatutils::myequalf(var_value,*(reinterpret_cast<long long *>(var_missing_value.array)))) {
 	    missing=true;
 	  }
 	  break;
 	}
-	case (HDF5::DataArray::float_): {
-	  if (floatutils::myequalf(var_value,*(reinterpret_cast<float *>(var_missing_value.value)))) {
+	case (HDF5::DataArray::Type::FLOAT): {
+	  if (floatutils::myequalf(var_value,*(reinterpret_cast<float *>(var_missing_value.array)))) {
 	    missing=true;
 	  }
 	  break;
 	}
-	case (HDF5::DataArray::double_): {
-	  if (floatutils::myequalf(var_value,*(reinterpret_cast<double *>(var_missing_value.value)))) {
+	case (HDF5::DataArray::Type::DOUBLE): {
+	  if (floatutils::myequalf(var_value,*(reinterpret_cast<double *>(var_missing_value.array)))) {
 	    missing=true;
 	  }
 	  break;
 	}
 	default: {
-	  metautils::log_error(THIS_FUNC+"() returned error: can't check variables of type "+strutils::itos(var_type),"hdf2xml",USER);
+	  metautils::log_error(THIS_FUNC+"() returned error: can't check variables of type "+strutils::itos(static_cast<int>(var_type)),"hdf2xml",USER);
 	}
     }
   }
@@ -273,12 +273,12 @@ bool found_missing(const double& time,size_t time_type,const InputHDF5Stream::Da
 
 std::string ispd_hdf5_platform_type(const std::tuple<std::string,std::string,float,float,short,short,char,bool>& library_entry)
 {
-std::string id,ispd_id;
-float lat,lon;
-short plat_type,isrc;
-char csrc;
-bool already_counted;
-std::tie(id,ispd_id,lat,lon,plat_type,isrc,csrc,already_counted)=library_entry;
+  std::string id,ispd_id;
+  float lat,lon;
+  short plat_type,isrc;
+  char csrc;
+  bool already_counted;
+  std::tie(id,ispd_id,lat,lon,plat_type,isrc,csrc,already_counted)=library_entry;
   if (plat_type == -1) {
     return "land_station";
   }
@@ -585,15 +585,7 @@ std::string ispd_hdf5_id_entry(const std::tuple<std::string,std::string,float,fl
 void scan_ispd_hdf5_file(InputHDF5Stream& istream,ScanData& scan_data,gatherxml::markup::ObML::ObservationData& obs_data)
 {
   static const std::string THIS_FUNC=__func__;
-  InputHDF5Stream::CompoundDatatype cpd;
-  int m,l;
-  InputHDF5Stream::DataValue dv;
-  gatherxml::markup::ObML::IDEntry ientry;
-  std::string timestamp,sdum;
-  DateTime dt;
-  double v[3]={0.,0.,0.};
-  gatherxml::markup::ObML::DataTypeEntry de;
-
+  InputHDF5Stream::DataValue ts_val,uon_val,id_val,lat_val,lon_val;
 // load the station library
   auto ds=istream.dataset("/Data/SpatialTemporalLocation/SpatialTemporalLocation");
   if (ds == nullptr || ds->datatype.class_ != 6) {
@@ -601,22 +593,22 @@ void scan_ispd_hdf5_file(InputHDF5Stream& istream,ScanData& scan_data,gatherxml:
     exit(1);
   }
   std::unordered_map<std::string,std::tuple<std::string,std::string,float,float,short,short,char,bool>> stn_library;
+  InputHDF5Stream::CompoundDatatype cpd;
   HDF5::decode_compound_datatype(ds->datatype,cpd);
-std::cerr << "# library chunks: " << ds->data.chunks.size() << "... " << time(nullptr) << std::endl;
   for (const auto& chunk : ds->data.chunks) {
-    for (m=0,l=0; m < ds->data.sizes.front(); m++) {
-	dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[0].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[0].datatype,ds->dataspace);
-	std::string key=reinterpret_cast<char *>(dv.get());
-	dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[1].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[1].datatype,ds->dataspace);
-	key+=std::string(reinterpret_cast<char *>(dv.get()));
+    for (int m=0,l=0; m < ds->data.sizes.front(); m++) {
+	ts_val.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[0].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[0].datatype,ds->dataspace);
+	std::string key=reinterpret_cast<char *>(ts_val.get());
+	uon_val.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[1].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[1].datatype,ds->dataspace);
+	key+=std::string(reinterpret_cast<char *>(uon_val.get()));
 	if (!key.empty() && (stn_library.find(key) == stn_library.end())) {
-	  dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[2].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[2].datatype,ds->dataspace);
-	  std::string id=reinterpret_cast<char *>(dv.get());
+	  id_val.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[2].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[2].datatype,ds->dataspace);
+	  std::string id=reinterpret_cast<char *>(id_val.get());
 	  strutils::trim(id);
-	  dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[13].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[13].datatype,ds->dataspace);
-	  auto lat=*(reinterpret_cast<float *>(dv.get()));
-	  dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[14].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[14].datatype,ds->dataspace);
-	  auto lon=*(reinterpret_cast<float *>(dv.get()));
+	  lat_val.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[13].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[13].datatype,ds->dataspace);
+	  auto lat=*(reinterpret_cast<float *>(lat_val.get()));
+	  lon_val.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[14].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[14].datatype,ds->dataspace);
+	  auto lon=*(reinterpret_cast<float *>(lon_val.get()));
 	  if (lon > 180.) {
 	    lon-=360.;
 	  }
@@ -627,20 +619,21 @@ std::cerr << "# library chunks: " << ds->data.chunks.size() << "... " << time(nu
   }
 // load the ICOADS platform types
   if ( (ds=istream.dataset("/SupplementalData/Tracking/ICOADS/TrackingICOADS")) != NULL && ds->datatype.class_ == 6) {
+    InputHDF5Stream::DataValue plat_val;
     HDF5::decode_compound_datatype(ds->datatype,cpd);
     for (const auto& chunk : ds->data.chunks) {
-	for (m=0,l=0; m < ds->data.sizes.front(); ++m) {
-	  dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[0].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[0].datatype,ds->dataspace);
-	  std::string key=reinterpret_cast<char *>(dv.get());
+	for (int m=0,l=0; m < ds->data.sizes.front(); ++m) {
+	  ts_val.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[0].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[0].datatype,ds->dataspace);
+	  std::string key=reinterpret_cast<char *>(ts_val.get());
 	  if (!key.empty()) {
-	    dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[1].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[1].datatype,ds->dataspace);
-	    key+=std::string(reinterpret_cast<char *>(dv.get()));
+	    uon_val.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[1].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[1].datatype,ds->dataspace);
+	    key+=std::string(reinterpret_cast<char *>(uon_val.get()));
 	    auto entry=stn_library.find(key);
 	    if (entry != stn_library.end()) {
-		dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[2].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[2].datatype,ds->dataspace);
-		std::get<5>(entry->second)=*(reinterpret_cast<int *>(dv.get()));
-		dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[4].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[4].datatype,ds->dataspace);
-		std::get<4>(entry->second)=*(reinterpret_cast<int *>(dv.get()));
+		id_val.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[2].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[2].datatype,ds->dataspace);
+		std::get<5>(entry->second)=*(reinterpret_cast<int *>(id_val.get()));
+		plat_val.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[4].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[4].datatype,ds->dataspace);
+		std::get<4>(entry->second)=*(reinterpret_cast<int *>(plat_val.get()));
 	    }
 	    else {
 		metautils::log_error("no entry for '"+key+"' in station library","hdf2xml",USER);
@@ -652,22 +645,23 @@ std::cerr << "# library chunks: " << ds->data.chunks.size() << "... " << time(nu
   }
 // load observation types for IDs that don't already have a platform type
   if ( (ds=istream.dataset("/Data/Observations/ObservationTypes")) != NULL && ds->datatype.class_ == 6) {
+    InputHDF5Stream::DataValue coll_val;
     HDF5::decode_compound_datatype(ds->datatype,cpd);
     for (const auto& chunk : ds->data.chunks) {
-	for (m=0,l=0; m < ds->data.sizes.front(); ++m) {
-	  dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[0].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[0].datatype,ds->dataspace);
-	  std::string key=reinterpret_cast<char *>(dv.get());
+	for (int m=0,l=0; m < ds->data.sizes.front(); ++m) {
+	  ts_val.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[0].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[0].datatype,ds->dataspace);
+	  std::string key=reinterpret_cast<char *>(ts_val.get());
 	  if (!key.empty()) {
-	    dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[1].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[1].datatype,ds->dataspace);
-	    key+=std::string(reinterpret_cast<char *>(dv.get()));
+	    uon_val.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[1].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[1].datatype,ds->dataspace);
+	    key+=std::string(reinterpret_cast<char *>(uon_val.get()));
 	    auto entry=stn_library.find(key);
 	    if (entry != stn_library.end()) {
 		if (std::get<4>(entry->second) < 0) {
-		  dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[2].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[2].datatype,ds->dataspace);
-		  std::get<4>(entry->second)=1000+*(reinterpret_cast<int *>(dv.get()));
+		  id_val.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[2].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[2].datatype,ds->dataspace);
+		  std::get<4>(entry->second)=1000+*(reinterpret_cast<int *>(id_val.get()));
 		}
-		dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[4].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[4].datatype,ds->dataspace);
-		std::string ispd_id=reinterpret_cast<char *>(dv.get());
+		coll_val.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[4].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[4].datatype,ds->dataspace);
+		std::string ispd_id=reinterpret_cast<char *>(coll_val.get());
 		strutils::replace_all(ispd_id," ","0");
 		std::get<1>(entry->second)=ispd_id;
 	    }
@@ -680,75 +674,76 @@ std::cerr << "# library chunks: " << ds->data.chunks.size() << "... " << time(nu
     }
   }
   if ( (ds=istream.dataset("/SupplementalData/Tracking/Land/TrackingLand")) != NULL && ds->datatype.class_ == 6) {
+    InputHDF5Stream::DataValue src_flag_val,rpt_type_val;
     HDF5::decode_compound_datatype(ds->datatype,cpd);
     for (const auto& chunk : ds->data.chunks) {
-	for (m=0,l=0; m < ds->data.sizes.front(); ++m) {
-	  dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[0].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[0].datatype,ds->dataspace);
-	  std::string key=reinterpret_cast<char *>(dv.get());
+	for (int m=0,l=0; m < ds->data.sizes.front(); ++m) {
+	  ts_val.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[0].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[0].datatype,ds->dataspace);
+	  std::string key=reinterpret_cast<char *>(ts_val.get());
 	  if (!key.empty()) {
-	    dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[1].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[1].datatype,ds->dataspace);
-	    key+=std::string(reinterpret_cast<char *>(dv.get()));
+	    uon_val.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[1].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[1].datatype,ds->dataspace);
+	    key+=std::string(reinterpret_cast<char *>(uon_val.get()));
 	    auto entry=stn_library.find(key);
 	    if (entry != stn_library.end()) {
-		dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[2].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[2].datatype,ds->dataspace);
-		std::get<6>(entry->second)=(reinterpret_cast<char *>(dv.get()))[0];
-		dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[3].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[3].datatype,ds->dataspace);
-		sdum=reinterpret_cast<char *>(dv.get());
-		if (sdum == "FM-12") {
+		src_flag_val.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[2].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[2].datatype,ds->dataspace);
+		std::get<6>(entry->second)=(reinterpret_cast<char *>(src_flag_val.get()))[0];
+		rpt_type_val.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[3].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[3].datatype,ds->dataspace);
+		std::string rpt_type=reinterpret_cast<char *>(rpt_type_val.get());
+		if (rpt_type == "FM-12") {
 		  std::get<4>(entry->second)=2001;
 		}
-		else if (sdum == "FM-13") {
+		else if (rpt_type == "FM-13") {
 		  std::get<4>(entry->second)=2002;
 		}
-		else if (sdum == "FM-14") {
+		else if (rpt_type == "FM-14") {
 		  std::get<4>(entry->second)=2003;
 		}
-		else if (sdum == "FM-15") {
+		else if (rpt_type == "FM-15") {
 		  std::get<4>(entry->second)=2004;
 		}
-		else if (sdum == "FM-16") {
+		else if (rpt_type == "FM-16") {
 		  std::get<4>(entry->second)=2005;
 		}
-		else if (sdum == "FM-18") {
+		else if (rpt_type == "FM-18") {
 		  std::get<4>(entry->second)=2007;
 		}
-		else if (sdum == "  SAO") {
+		else if (rpt_type == "  SAO") {
 		  std::get<4>(entry->second)=2010;
 		}
-		else if (sdum == " AOSP") {
+		else if (rpt_type == " AOSP") {
 		  std::get<4>(entry->second)=2011;
 		}
-		else if (sdum == " AERO") {
+		else if (rpt_type == " AERO") {
 		  std::get<4>(entry->second)=2012;
 		}
-		else if (sdum == " AUTO") {
+		else if (rpt_type == " AUTO") {
 		  std::get<4>(entry->second)=2013;
 		}
-		else if (sdum == "SY-AE") {
+		else if (rpt_type == "SY-AE") {
 		  std::get<4>(entry->second)=2020;
 		}
-		else if (sdum == "SY-SA") {
+		else if (rpt_type == "SY-SA") {
 		  std::get<4>(entry->second)=2021;
 		}
-		else if (sdum == "SY-MT") {
+		else if (rpt_type == "SY-MT") {
 		  std::get<4>(entry->second)=2022;
 		}
-		else if (sdum == "SY-AU") {
+		else if (rpt_type == "SY-AU") {
 		  std::get<4>(entry->second)=2023;
 		}
-		else if (sdum == "SA-AU") {
+		else if (rpt_type == "SA-AU") {
 		  std::get<4>(entry->second)=2024;
 		}
-		else if (sdum == "S-S-A") {
+		else if (rpt_type == "S-S-A") {
 		  std::get<4>(entry->second)=2025;
 		}
-		else if (sdum == "BOGUS") {
+		else if (rpt_type == "BOGUS") {
 		  std::get<4>(entry->second)=2030;
 		}
-		else if (sdum == "SMARS") {
+		else if (rpt_type == "SMARS") {
 		  std::get<4>(entry->second)=2031;
 		}
-		else if (sdum == "  SOD") {
+		else if (rpt_type == "  SOD") {
 		  std::get<4>(entry->second)=2040;
 		}
 	    }
@@ -762,18 +757,19 @@ std::cerr << "# library chunks: " << ds->data.chunks.size() << "... " << time(nu
   }
 // load tropical storm IDs
   if ( (ds=istream.dataset("/SupplementalData/Misc/TropicalStorms/StormID")) != NULL && ds->datatype.class_ == 6) {
+    InputHDF5Stream::DataValue storm_id_val;
     HDF5::decode_compound_datatype(ds->datatype,cpd);
     for (const auto& chunk : ds->data.chunks) {
-	for (m=0,l=0; m < ds->data.sizes.front(); ++m) {
-	  dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[0].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[0].datatype,ds->dataspace);
-	  std::string key=reinterpret_cast<char *>(dv.get());
+	for (int m=0,l=0; m < ds->data.sizes.front(); ++m) {
+	  ts_val.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[0].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[0].datatype,ds->dataspace);
+	  std::string key=reinterpret_cast<char *>(ts_val.get());
 	  if (!key.empty()) {
-	    dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[1].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[1].datatype,ds->dataspace);
-	    key+=std::string(reinterpret_cast<char *>(dv.get()));
+	    uon_val.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[1].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[1].datatype,ds->dataspace);
+	    key+=std::string(reinterpret_cast<char *>(uon_val.get()));
 	    auto entry=stn_library.find(key);
 	    if (entry != stn_library.end()) {
-		dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[2].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[2].datatype,ds->dataspace);
-		std::string id=reinterpret_cast<char *>(dv.get());
+		storm_id_val.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[2].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[2].datatype,ds->dataspace);
+		std::string id=reinterpret_cast<char *>(storm_id_val.get());
 		strutils::trim(id);
 		std::get<0>(entry->second)=id;
 	    }
@@ -785,6 +781,7 @@ std::cerr << "# library chunks: " << ds->data.chunks.size() << "... " << time(nu
 	}
     }
   }
+  InputHDF5Stream::DataValue slp_val,stnp_val;
 // scan the observations
   if ( (ds=istream.dataset("/Data/Observations/Observations")) == NULL || ds->datatype.class_ != 6) {
     myerror="unable to locate observations";
@@ -792,77 +789,77 @@ std::cerr << "# library chunks: " << ds->data.chunks.size() << "... " << time(nu
   }
   HDF5::decode_compound_datatype(ds->datatype,cpd);
   for (const auto& chunk : ds->data.chunks) {
-    for (m=0,l=0; m < ds->data.sizes.front(); ++m) {
-	dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[0].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[0].datatype,ds->dataspace);
-	timestamp=reinterpret_cast<char *>(dv.get());
+    for (int m=0,l=0; m < ds->data.sizes.front(); ++m) {
+	ts_val.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[0].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[0].datatype,ds->dataspace);
+	std::string timestamp=reinterpret_cast<char *>(ts_val.get());
 	strutils::trim(timestamp);
 	if (!timestamp.empty()) {
 	  auto key=timestamp;
-	  dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[1].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[1].datatype,ds->dataspace);
-	  key+=std::string(reinterpret_cast<char *>(dv.get()));
+	  uon_val.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[1].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[1].datatype,ds->dataspace);
+	  key+=std::string(reinterpret_cast<char *>(uon_val.get()));
 	  auto entry=stn_library.find(key);
 	  if (entry != stn_library.end()) {
-	    if (!timestamp.empty()) {
-		if (std::regex_search(timestamp,std::regex("99$"))) {
-		  strutils::chop(timestamp,2);
+	    if (std::regex_search(timestamp,std::regex("99$"))) {
+		strutils::chop(timestamp,2);
 // patch for some bad timestamps
-		  if (std::regex_search(timestamp,std::regex(" $"))) {
-		    strutils::chop(timestamp);
-		    timestamp.insert(8,"0");
-		  }
-		  timestamp+="00";
+		if (std::regex_search(timestamp,std::regex(" $"))) {
+		  strutils::chop(timestamp);
+		  timestamp.insert(8,"0");
 		}
-		dt.set(std::stoll(timestamp)*100);
-		auto platform_type=ispd_hdf5_platform_type(entry->second);
-		if (!platform_type.empty()) {
-		  ientry.key=ispd_hdf5_id_entry(entry->second,platform_type,dt);
-		  if (!ientry.key.empty()) {
+		timestamp+="00";
+	    }
+	    DateTime dt(std::stoll(timestamp)*100);
+	    auto platform_type=ispd_hdf5_platform_type(entry->second);
+	    if (!platform_type.empty()) {
+		gatherxml::markup::ObML::IDEntry ientry;
+		std::vector<double> check_values;
+		ientry.key=ispd_hdf5_id_entry(entry->second,platform_type,dt);
+		if (!ientry.key.empty()) {
 // SLP
-		    dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[2].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[2].datatype,ds->dataspace);
-		    if (dv._class_ != 1) {
-			metautils::log_error("observed SLP is not a floating point number for '"+ientry.key+"'","hdf2xml",USER);
-		    }
-		    if (dv.precision_ == 32) {
-			v[0]=*(reinterpret_cast<float *>(dv.get()));
-		    }
-		    else if (dv.precision_ == 64) {
-			v[0]=*(reinterpret_cast<double *>(dv.get()));
-		    }
-		    else {
-			metautils::log_error("bad precision ("+strutils::itos(dv.precision_)+") for SLP","hdf2xml",USER);
-		    }
+		  slp_val.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[2].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[2].datatype,ds->dataspace);
+		  if (slp_val._class_ != 1) {
+		    metautils::log_error("observed SLP is not a floating point number for '"+ientry.key+"'","hdf2xml",USER);
+		  }
+		  if (slp_val.precision_ == 32) {
+		    check_values.emplace_back(*(reinterpret_cast<float *>(slp_val.get())));
+		  }
+		  else if (slp_val.precision_ == 64) {
+		    check_values.emplace_back(*(reinterpret_cast<double *>(slp_val.get())));
+		  }
+		  else {
+		    metautils::log_error("bad precision ("+strutils::itos(slp_val.precision_)+") for SLP","hdf2xml",USER);
+		  }
 // STN P
-		    dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[5].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[5].datatype,ds->dataspace);
-		    if (dv._class_ != 1) {
-			metautils::log_error("observed STN P is not a floating point number for '"+ientry.key+"'","hdf2xml",USER);
-		    }
-		    if (dv.precision_ == 32) {
-			v[1]=*(reinterpret_cast<float *>(dv.get()));
-		    }
-		    else if (dv.precision_ == 64) {
-			v[1]=*(reinterpret_cast<double *>(dv.get()));
-		    }
-		    else {
-			metautils::log_error("bad precision ("+strutils::itos(dv.precision_)+") for SLP","hdf2xml",USER);
-		    }
-		    if ((v[0] >= 860. && v[0] <= 1090.) || (v[1] >= 400. && v[1] <= 1090.)) {
-			if (v[0] < 9999.9) {
-			  if (!obs_data.added_to_ids("surface",ientry,"SLP","",std::get<2>(entry->second),std::get<3>(entry->second),std::stoll(timestamp),&dt)) {
-			    metautils::log_error(THIS_FUNC+"() returned error: '"+myerror+" when adding ID "+ientry.key,"hdf2xml",USER);
-			  }
-			  std::get<7>(entry->second)=true;
-			  ++scan_data.num_not_missing;
+		  stnp_val.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[5].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[5].datatype,ds->dataspace);
+		  if (stnp_val._class_ != 1) {
+		    metautils::log_error("observed STN P is not a floating point number for '"+ientry.key+"'","hdf2xml",USER);
+		  }
+		  if (stnp_val.precision_ == 32) {
+		    check_values.emplace_back(*(reinterpret_cast<float *>(stnp_val.get())));
+		  }
+		  else if (stnp_val.precision_ == 64) {
+		    check_values.emplace_back(*(reinterpret_cast<double *>(stnp_val.get())));
+		  }
+		  else {
+		    metautils::log_error("bad precision ("+strutils::itos(stnp_val.precision_)+") for SLP","hdf2xml",USER);
+		  }
+		  if ((check_values[0] >= 860. && check_values[0] <= 1090.) || (check_values[1] >= 400. && check_values[1] <= 1090.)) {
+		    if (check_values[0] < 9999.9) {
+			if (!obs_data.added_to_ids("surface",ientry,"SLP","",std::get<2>(entry->second),std::get<3>(entry->second),std::stoll(timestamp),&dt)) {
+			  metautils::log_error(THIS_FUNC+"() returned error: '"+myerror+" when adding ID "+ientry.key,"hdf2xml",USER);
 			}
-			if (v[1] < 9999.9) {
-			  if (!obs_data.added_to_ids("surface",ientry,"STNP","",std::get<2>(entry->second),std::get<3>(entry->second),std::stoll(timestamp),&dt)) {
-			    metautils::log_error(THIS_FUNC+"() returned error: '"+myerror+" when adding ID "+ientry.key,"hdf2xml",USER);
-			  }
-			  std::get<7>(entry->second)=true;
-			  ++scan_data.num_not_missing;
+			std::get<7>(entry->second)=true;
+			++scan_data.num_not_missing;
+		    }
+		    if (check_values[1] < 9999.9) {
+			if (!obs_data.added_to_ids("surface",ientry,"STNP","",std::get<2>(entry->second),std::get<3>(entry->second),std::stoll(timestamp),&dt)) {
+			  metautils::log_error(THIS_FUNC+"() returned error: '"+myerror+" when adding ID "+ientry.key,"hdf2xml",USER);
 			}
-			if (!obs_data.added_to_platforms("surface",platform_type,std::get<2>(entry->second),std::get<3>(entry->second))) {
-			    metautils::log_error(THIS_FUNC+"() returned error: '"+myerror+" when adding platform "+platform_type,"hdf2xml",USER);
-			}
+			std::get<7>(entry->second)=true;
+			++scan_data.num_not_missing;
+		    }
+		    if (!obs_data.added_to_platforms("surface",platform_type,std::get<2>(entry->second),std::get<3>(entry->second))) {
+			metautils::log_error(THIS_FUNC+"() returned error: '"+myerror+" when adding platform "+platform_type,"hdf2xml",USER);
 		    }
 		  }
 		}
@@ -881,16 +878,17 @@ std::cerr << "# library chunks: " << ds->data.chunks.size() << "... " << time(nu
     ds=istream.dataset("/Data/AssimilationFeedback/AssimilationFeedBack");
   }
   if (ds != nullptr && ds->datatype.class_ == 6) {
+    InputHDF5Stream::DataValue p_val,ens_fg_val,ens_p_val;
     HDF5::decode_compound_datatype(ds->datatype,cpd);
     for (const auto& chunk : ds->data.chunks) {
-	for (m=0,l=0; m < ds->data.sizes.front(); ++m) {
-	  dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[0].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[0].datatype,ds->dataspace);
-	  timestamp=reinterpret_cast<char *>(dv.get());
+	for (int m=0,l=0; m < ds->data.sizes.front(); ++m) {
+	  ts_val.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[0].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[0].datatype,ds->dataspace);
+	  std::string timestamp=reinterpret_cast<char *>(ts_val.get());
 	  strutils::trim(timestamp);
 	  if (!timestamp.empty()) {
 	    auto key=timestamp;
-	    dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[1].byte_offset],istream.size_of_offsets(),istream.size_of_offsets(),cpd.members[1].datatype,ds->dataspace);
-	    key+=std::string(reinterpret_cast<char *>(dv.get()));
+	    uon_val.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[1].byte_offset],istream.size_of_offsets(),istream.size_of_offsets(),cpd.members[1].datatype,ds->dataspace);
+	    key+=std::string(reinterpret_cast<char *>(uon_val.get()));
 	    auto entry=stn_library.find(key);
 	    if (entry != stn_library.end()) {
 		if (!timestamp.empty()) {
@@ -898,51 +896,53 @@ std::cerr << "# library chunks: " << ds->data.chunks.size() << "... " << time(nu
 		    strutils::chop(timestamp,2);
 		    timestamp+="00";
 		  }
-		  dt.set(std::stoll(timestamp)*100);
+		  DateTime dt(std::stoll(timestamp)*100);
 		  auto platform_type=ispd_hdf5_platform_type(entry->second);
 		  if (!platform_type.empty()) {
+		    gatherxml::markup::ObML::IDEntry ientry;
 		    ientry.key=ispd_hdf5_id_entry(entry->second,platform_type,dt);
 		    if (!ientry.key.empty()) {
-			dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[2].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[2].datatype,ds->dataspace);
-			if (dv._class_ != 1) {
+			std::vector<double> check_values;
+			p_val.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[2].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[2].datatype,ds->dataspace);
+			if (p_val._class_ != 1) {
 			  metautils::log_error("modified observed pressure is not a floating point number for '"+ientry.key+"'","hdf2xml",USER);
 			}
-			if (dv.precision_ == 32) {
-			  v[0]=*(reinterpret_cast<float *>(dv.get()));
+			if (p_val.precision_ == 32) {
+			  check_values.emplace_back(*(reinterpret_cast<float *>(p_val.get())));
 			}
-			else if (dv.precision_ == 64) {
-			  v[0]=*(reinterpret_cast<double *>(dv.get()));
+			else if (p_val.precision_ == 64) {
+			  check_values.emplace_back(*(reinterpret_cast<double *>(p_val.get())));
 			}
 			else {
-			  metautils::log_error("bad precision ("+strutils::itos(dv.precision_)+") for modified observed pressure","hdf2xml",USER);
+			  metautils::log_error("bad precision ("+strutils::itos(p_val.precision_)+") for modified observed pressure","hdf2xml",USER);
 			}
-			dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[11].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[11].datatype,ds->dataspace);
-			if (dv._class_ != 1) {
+			ens_fg_val.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[11].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[11].datatype,ds->dataspace);
+			if (ens_fg_val._class_ != 1) {
 			  metautils::log_error("ensemble first guess pressure is not a floating point number for '"+ientry.key+"'","hdf2xml",USER);
 			}
-			if (dv.precision_ == 32) {
-			  v[1]=*(reinterpret_cast<float *>(dv.get()));
+			if (ens_fg_val.precision_ == 32) {
+			  check_values.emplace_back(*(reinterpret_cast<float *>(ens_fg_val.get())));
 			}
-			else if (dv.precision_ == 64) {
-			  v[1]=*(reinterpret_cast<double *>(dv.get()));
+			else if (ens_fg_val.precision_ == 64) {
+			  check_values.emplace_back(*(reinterpret_cast<double *>(ens_fg_val.get())));
 			}
 			else {
-			  metautils::log_error("bad precision ("+strutils::itos(dv.precision_)+") for ensemble first guess pressure","hdf2xml",USER);
+			  metautils::log_error("bad precision ("+strutils::itos(ens_fg_val.precision_)+") for ensemble first guess pressure","hdf2xml",USER);
 			}
-			dv.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[14].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[14].datatype,ds->dataspace);
-			if (dv._class_ != 1) {
+			ens_p_val.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[14].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[14].datatype,ds->dataspace);
+			if (ens_p_val._class_ != 1) {
 			  metautils::log_error("ensemble analysis pressure is not a floating point number for '"+ientry.key+"'","hdf2xml",USER);
 			}
-			if (dv.precision_ == 32) {
-			  v[2]=*(reinterpret_cast<float *>(dv.get()));
+			if (ens_p_val.precision_ == 32) {
+			  check_values.emplace_back(*(reinterpret_cast<float *>(ens_p_val.get())));
 			}
-			else if (dv.precision_ == 64) {
-			  v[2]=*(reinterpret_cast<double *>(dv.get()));
+			else if (ens_p_val.precision_ == 64) {
+			  check_values.emplace_back(*(reinterpret_cast<double *>(ens_p_val.get())));
 			}
 			else {
-			  metautils::log_error("bad precision ("+strutils::itos(dv.precision_)+") for ensemble analysis pressure","hdf2xml",USER);
+			  metautils::log_error("bad precision ("+strutils::itos(ens_p_val.precision_)+") for ensemble analysis pressure","hdf2xml",USER);
 			}
-			if ((v[0] >= 400. && v[0] <= 1090.) || (v[1] >= 400. && v[1] <= 1090.) || (v[2] >= 400. && v[2] <= 1090.)) {
+			if ((check_values[0] >= 400. && check_values[0] <= 1090.) || (check_values[1] >= 400. && check_values[1] <= 1090.) || (check_values[2] >= 400. && check_values[2] <= 1090.)) {
 			  if (!obs_data.added_to_ids("surface",ientry,"Feedback","",std::get<2>(entry->second),std::get<3>(entry->second),std::stoll(timestamp),&dt)) {
 			    metautils::log_error(THIS_FUNC+"() returned error: '"+myerror+" when adding ID "+ientry.key,"hdf2xml",USER);
 			  }
@@ -962,7 +962,6 @@ std::cerr << "# library chunks: " << ds->data.chunks.size() << "... " << time(nu
     }
   }
   scan_data.write_type=ScanData::ObML_type;
-std::cerr << "done... " << time(NULL) << std::endl;
 }
 
 void scan_usarray_transportable_hdf5_file(InputHDF5Stream& istream,ScanData& scan_data,gatherxml::markup::ObML::ObservationData& obs_data)
@@ -976,16 +975,16 @@ void scan_usarray_transportable_hdf5_file(InputHDF5Stream& istream,ScanData& sca
   }
   HDF5::DataArray times,stnids,pres;
   times.fill(istream,*ds,0);
-  if (times.type != HDF5::DataArray::long_long_) {
-     metautils::log_error("expected the timestamps to be 'long long' but got "+strutils::itos(times.type),"hdf2xml",USER);
+  if (times.type != HDF5::DataArray::Type::LONG_LONG) {
+     metautils::log_error("expected the timestamps to be 'long long' but got "+strutils::itos(static_cast<int>(times.type)),"hdf2xml",USER);
   }
   stnids.fill(istream,*ds,1);
-  if (stnids.type != HDF5::DataArray::short_) {
-     metautils::log_error("expected the numeric station IDs to be 'short' but got "+strutils::itos(stnids.type),"hdf2xml",USER);
+  if (stnids.type != HDF5::DataArray::Type::SHORT) {
+     metautils::log_error("expected the numeric station IDs to be 'short' but got "+strutils::itos(static_cast<int>(stnids.type)),"hdf2xml",USER);
   }
   pres.fill(istream,*ds,2);
-  if (pres.type != HDF5::DataArray::float_) {
-     metautils::log_error("expected the pressures to be 'float' but got "+strutils::itos(pres.type),"hdf2xml",USER);
+  if (pres.type != HDF5::DataArray::Type::FLOAT) {
+     metautils::log_error("expected the pressures to be 'float' but got "+strutils::itos(static_cast<int>(pres.type)),"hdf2xml",USER);
   }
   int num_values=0;
   float pres_miss_val=3.e48;
@@ -998,18 +997,18 @@ void scan_usarray_transportable_hdf5_file(InputHDF5Stream& istream,ScanData& sca
     InputHDF5Stream::Attribute attr;
     ds->attributes.found(key,attr);
     if (key == "NROWS") {
-	num_values=*(reinterpret_cast<int *>(attr.value.value));
+	num_values=*(reinterpret_cast<int *>(attr.value.array));
     }
     else if (key == "LATITUDE_DDEG") {
-	lat=*(reinterpret_cast<float *>(attr.value.value));
+	lat=*(reinterpret_cast<float *>(attr.value.array));
     }
     else if (key == "LONGITUDE_DDEG") {
-	lon=*(reinterpret_cast<float *>(attr.value.value));
+	lon=*(reinterpret_cast<float *>(attr.value.array));
     }
     else if (key == "CHAR_STATION_ID") {
 	if (platform_type.empty()) {
 	  platform_type="land_station";
-	  ientry.key.assign(reinterpret_cast<char *>(attr.value.value));
+	  ientry.key.assign(reinterpret_cast<char *>(attr.value.array));
 	  ientry.key.insert(0,platform_type+"[!]USArray[!]TA.");
 	}
 	else {
@@ -1017,16 +1016,16 @@ void scan_usarray_transportable_hdf5_file(InputHDF5Stream& istream,ScanData& sca
 	}
     }
     else if (key == "NUMERIC_STATION_ID") {
-	numeric_id=*(reinterpret_cast<short *>(attr.value.value));
+	numeric_id=*(reinterpret_cast<short *>(attr.value.array));
     }
     else if (key == "FIELD_2_NAME") {
-	datatype.assign(reinterpret_cast<char *>(attr.value.value));
+	datatype.assign(reinterpret_cast<char *>(attr.value.array));
     }
     else if (key == "FIELD_2_FILL") {
-	pres_miss_val=*(reinterpret_cast<float *>(attr.value.value));
+	pres_miss_val=*(reinterpret_cast<float *>(attr.value.array));
     }
     else if (key == "FIELD_2_DESCRIPTION") {
-	se.key.assign(reinterpret_cast<char *>(attr.value.value));
+	se.key.assign(reinterpret_cast<char *>(attr.value.array));
     }
   }
   if (platform_type.empty()) {
@@ -1080,7 +1079,7 @@ std::string gridded_time_method(const std::shared_ptr<InputHDF5Stream::Dataset> 
   std::string time_method;
 
   if (ds->attributes.found("cell_methods",attr) && attr.value._class_ == 3) {
-    time_method=metautils::NcTime::time_method_from_cell_methods(reinterpret_cast<char *>(attr.value.value),gcoords.valid_time.id);
+    time_method=metautils::NcTime::time_method_from_cell_methods(reinterpret_cast<char *>(attr.value.array),gcoords.valid_time.id);
     if (time_method[0] == '!') {
 	metautils::log_error("cell method '"+time_method.substr(1)+"' is not valid CF","hdf2xml",USER);
     }
@@ -1241,21 +1240,21 @@ void add_gridded_netcdf_parameter(const InputHDF5Stream::DatasetEntry& var,ScanD
   description="";
   units="";
   if (var.dataset->attributes.found("units",attr) && attr.value._class_ == 3) {
-    units=reinterpret_cast<char *>(attr.value.value);
+    units=reinterpret_cast<char *>(attr.value.array);
   }
   if (description.empty()) {
     if ((var.dataset->attributes.found("description",attr) || var.dataset->attributes.found("Description",attr)) && attr.value._class_ == 3) {
-	description=reinterpret_cast<char *>(attr.value.value);
+	description=reinterpret_cast<char *>(attr.value.array);
     }
     else if ((var.dataset->attributes.found("comment",attr) || var.dataset->attributes.found("Comment",attr)) && attr.value._class_ == 3) {
-	description=reinterpret_cast<char *>(attr.value.value);
+	description=reinterpret_cast<char *>(attr.value.array);
     }
     else if (var.dataset->attributes.found("long_name",attr) && attr.value._class_ == 3) {
-	description=reinterpret_cast<char *>(attr.value.value);
+	description=reinterpret_cast<char *>(attr.value.array);
     }
   }
   if (var.dataset->attributes.found("standard_name",attr) && attr.value._class_ == 3) {
-    standard_name=reinterpret_cast<char *>(attr.value.value);
+    standard_name=reinterpret_cast<char *>(attr.value.array);
   }
   sdum=var.key;
   strutils::trim(sdum);
@@ -1780,10 +1779,10 @@ void scan_cf_point_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data,gat
 	  ds->attributes.found(key,attr);
 	  auto lkey=strutils::to_lower(key);
 	  if (lkey == "long_name" || (descr.empty() && (lkey == "description" || std::regex_search(lkey,std::regex("^comment"))))) {
-	    descr.assign(reinterpret_cast<char *>(attr.value.value));
+	    descr.assign(reinterpret_cast<char *>(attr.value.array));
 	  }
 	  else if (lkey == "units") {
-	    units.assign(reinterpret_cast<char *>(attr.value.value));
+	    units.assign(reinterpret_cast<char *>(attr.value.array));
 	  }
 	}
 	strutils::trim(descr);
@@ -1933,7 +1932,7 @@ id_types.emplace_back("unknown");
 	    metautils::log_error(THIS_FUNC+"() returned error: unable to get variable values for "+var.key,"hdf2xml",USER);
 	  }
 	  HDF5::DataArray var_vals(istream,*ds);
-	  if (var_vals.type != HDF5::DataArray::null_) {
+	  if (var_vals.type != HDF5::DataArray::Type::_NULL) {
 	    NetCDFVariableAttributeData nc_va_data;
 	    extract_from_hdf5_variable_attribute(var.dataset->attributes,nc_va_data);
 	    metautils::StringEntry se;
@@ -1966,10 +1965,10 @@ id_types.emplace_back("unknown");
 		  auto dt=compute_NcTime(time_vals,time_data,n);
 		  gatherxml::markup::ObML::IDEntry ientry;
 		  ientry.key=platform_types[n]+"[!]"+id_types[n]+"[!]";
-		  if (id_vals.type == HDF5::DataArray::int_ || id_vals.type == HDF5::DataArray::float_ || id_vals.type == HDF5::DataArray::double_) {
+		  if (id_vals.type == HDF5::DataArray::Type::INT || id_vals.type == HDF5::DataArray::Type::FLOAT || id_vals.type == HDF5::DataArray::Type::DOUBLE) {
 		    ientry.key+=strutils::ftos(id_vals.value(n));
 		  }
-		  else if (id_vals.type == HDF5::DataArray::string_) {
+		  else if (id_vals.type == HDF5::DataArray::Type::STRING) {
 		    ientry.key+=id_vals.string_value(n);
 		  }
 		  if (!obs_data.added_to_ids(obs_type,ientry,var.key,"",lat_vals.value(n),lon_vals.value(n),time_vals.value(n),&dt)) {
@@ -2110,7 +2109,7 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
     if (var.dataset->attributes.found("units",attr) && (attr.value._class_ == 3 || (attr.value._class_ == 9 && attr.value.vlen.class_ == 3))) {
 	std::string units_value;
 	if (attr.value._class_ == 3) {
-	  units_value=reinterpret_cast<char *>(attr.value.value);
+	  units_value=reinterpret_cast<char *>(attr.value.array);
 	}
 	else {
 	  int len=(attr.value.vlen.buffer[0] << 24)+(attr.value.vlen.buffer[1] << 16)+(attr.value.vlen.buffer[2] << 8)+attr.value.vlen.buffer[3];
@@ -2122,7 +2121,7 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
 	std::string standard_name_value;
 	if (var.dataset->attributes.found("standard_name",attr) && (attr.value._class_ == 3 || (attr.value._class_ == 9 && attr.value.vlen.class_ == 3))) {
 	  if (attr.value._class_ == 3) {
-	    standard_name_value=reinterpret_cast<char *>(attr.value.value);
+	    standard_name_value=reinterpret_cast<char *>(attr.value.array);
 	  }
 	  else {
 	    int len=(attr.value.vlen.buffer[0] << 24)+(attr.value.vlen.buffer[1] << 16)+(attr.value.vlen.buffer[2] << 8)+attr.value.vlen.buffer[3];
@@ -2137,11 +2136,11 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
 	    var.dataset->attributes.found(key,attr);
 	    if (attr.value._class_ == 3) {
 		if (key == "bounds") {
-		  gcoords.time_bounds.id=reinterpret_cast<char *>(attr.value.value);
+		  gcoords.time_bounds.id=reinterpret_cast<char *>(attr.value.array);
 		  break;
 		}
 		else if (key == "climatology") {
-		  climo_bounds_id=reinterpret_cast<char *>(attr.value.value);
+		  climo_bounds_id=reinterpret_cast<char *>(attr.value.array);
 		  break;
 		}
 	    }
@@ -2181,7 +2180,7 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
 	    if (!unique_level_id_table.found(var.key,se)) {
 		level_info.ID.emplace_back(var.key);
 		if (var.dataset->attributes.found("long_name",attr) && attr.value._class_ == 3) {
-		  level_info.description.emplace_back(reinterpret_cast<char *>(attr.value.value));
+		  level_info.description.emplace_back(reinterpret_cast<char *>(attr.value.array));
 		}
 		level_info.units.emplace_back(units_value);
 		level_info.write.emplace_back(0);
@@ -2194,7 +2193,7 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
     else if (var.dataset->attributes.found("positive",attr) && attr.value._class_ == 3 && !unique_level_id_table.found(var.key,se)) {
 	level_info.ID.emplace_back(var.key);
 	if (var.dataset->attributes.found("long_name",attr) && attr.value._class_ == 3) {
-	  level_info.description.emplace_back(reinterpret_cast<char *>(attr.value.value));
+	  level_info.description.emplace_back(reinterpret_cast<char *>(attr.value.array));
 	}
 	level_info.units.emplace_back("");
 	level_info.write.emplace_back(0);
@@ -2217,7 +2216,7 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
 	auto var=vars.front();
 	InputHDF5Stream::Attribute attr;
 	if (var.dataset->attributes.found("units",attr) && attr.value._class_ == 3) {
-	  std::string units_value=reinterpret_cast<char *>(attr.value.value);
+	  std::string units_value=reinterpret_cast<char *>(attr.value.array);
 	  if (std::regex_search(units_value,std::regex("since"))) {
 	    units_value=units_value.substr(0,units_value.find("since"));
 	    strutils::trim(units_value);
@@ -2292,13 +2291,13 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
 	    std::cout << "   ...found '" << v.key << "'" << std::endl;
 	  }
 	  if (v.dataset->attributes.found("description",attr) && attr.value._class_ == 3) {
-	    level_info.description.emplace_back(reinterpret_cast<char *>(attr.value.value));
+	    level_info.description.emplace_back(reinterpret_cast<char *>(attr.value.array));
 	  }
 	  else {
 	    level_info.description.emplace_back("");
 	  }
 	  if (v.dataset->attributes.found("units",attr) && attr.value._class_ == 3) {
-	    level_info.units.emplace_back(reinterpret_cast<char *>(attr.value.value));
+	    level_info.units.emplace_back(reinterpret_cast<char *>(attr.value.array));
 	  }
 	  else {
 	    level_info.units.emplace_back("");
@@ -2482,7 +2481,7 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
 	std::shared_ptr<InputHDF5Stream::Dataset> lat_bounds_ds(nullptr),lon_bounds_ds(nullptr);
 	HDF5::DataArray lat_bounds_array,lon_bounds_array;
 	if (gcoords.latitude.ds->attributes.found("bounds",lat_bounds) && lat_bounds.value._class_ == 3 && gcoords.longitude.ds->attributes.found("bounds",lon_bounds) && lon_bounds.value._class_ == 3) {
-	  if ( (lat_bounds_ds=istream.dataset("/"+std::string(reinterpret_cast<char *>(lat_bounds.value.value)))) != nullptr && (lon_bounds_ds=istream.dataset("/"+std::string(reinterpret_cast<char *>(lon_bounds.value.value)))) != nullptr) {
+	  if ( (lat_bounds_ds=istream.dataset("/"+std::string(reinterpret_cast<char *>(lat_bounds.value.array)))) != nullptr && (lon_bounds_ds=istream.dataset("/"+std::string(reinterpret_cast<char *>(lon_bounds.value.array)))) != nullptr) {
 	    lat_bounds_array.fill(istream,*lat_bounds_ds);
 	    lon_bounds_array.fill(istream,*lon_bounds_ds);
 	  }
@@ -2498,7 +2497,7 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
 		if (ds == nullptr || !ds->attributes.found("NAME",attr) || attr.value._class_ != 3) {
 		  metautils::log_error("(1)unable to determine grid definition from '"+lat_ids[n]+"' and '"+lon_ids[n]+"'","hdf2xml",USER);
 		}
-		auto attr_parts=strutils::split(std::string(reinterpret_cast<char *>(attr.value.value)));
+		auto attr_parts=strutils::split(std::string(reinterpret_cast<char *>(attr.value.array)));
 		if (attr_parts.size() == 11) {
 // netCDF dimension
 		  dim.y=std::stoi(attr_parts[10]);
@@ -2510,7 +2509,7 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
 		if (ds == nullptr || !ds->attributes.found("NAME",attr) || attr.value._class_ != 3) {
 		  metautils::log_error("(3)unable to determine grid definition from '"+lat_ids[n]+"' and '"+lon_ids[n]+"'","hdf2xml",USER);
 		}
-		attr_parts=strutils::split(std::string(reinterpret_cast<char *>(attr.value.value)));
+		attr_parts=strutils::split(std::string(reinterpret_cast<char *>(attr.value.array)));
 		if (attr_parts.size() == 11) {
 // netCDF dimension
 		  dim.x=std::stoi(attr_parts[10]);
@@ -2675,7 +2674,7 @@ std::cerr << floatutils::myequalf(data_array_value(gcoords.latitude.data_array,c
 	    num_levels=levels_array.num_values;
 	    InputHDF5Stream::Attribute attr;
 	    if (levels_ds->attributes.found("bounds",attr) && attr.value._class_ == 3) {
-		std::string attr_value=reinterpret_cast<char *>(attr.value.value);
+		std::string attr_value=reinterpret_cast<char *>(attr.value.array);
 		gcoords.time_bounds.ds=istream.dataset("/"+attr_value);
 		if (gcoords.time_bounds.ds == nullptr) {
 		  metautils::log_error("unable to get bounds for level '"+level_id+"'","hdf2xml",USER);
@@ -2817,7 +2816,7 @@ void scan_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data,gatherxml::m
   scan_data.platform_type="unknown";
   InputHDF5Stream::Attribute attr;
   if (ds->attributes.found("platform",attr)) {
-    std::string platform=reinterpret_cast<char *>(attr.value.value);
+    std::string platform=reinterpret_cast<char *>(attr.value.array);
     if (!platform.empty()) {
 	strutils::trim(platform);
 	MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
@@ -2833,11 +2832,11 @@ void scan_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data,gatherxml::m
     }
   }
   if (ds->attributes.found("featureType",attr)) {
-    std::string feature_type=reinterpret_cast<char *>(attr.value.value);
+    std::string feature_type=reinterpret_cast<char *>(attr.value.array);
     auto l_feature_type=strutils::to_lower(feature_type);
 // patch for ICOADS netCDF4 IDs, which may be a mix, so ignore case
     if (ds->attributes.found("product_version",attr)) {
-	std::string product_version=reinterpret_cast<char *>(attr.value.value);
+	std::string product_version=reinterpret_cast<char *>(attr.value.array);
 	if (std::regex_search(product_version,std::regex("ICOADS")) && std::regex_search(product_version,std::regex("netCDF4"))) {
 	  scan_data.convert_ids_to_upper_case=true;
 	}
@@ -2866,7 +2865,9 @@ void scan_hdf5_file(std::list<std::string>& filelist,ScanData& scan_data)
   gatherxml::markup::ObML::ObservationData obs_data;
   InputHDF5Stream istream;
   for (const auto& file : filelist) {
-std::cerr << file << std::endl;
+    if (gatherxml::verbose_operation) {
+	std::cout << "Scanning file: " << file << std::endl;
+    }
     if (!istream.open(file.c_str())) {
 	myerror+=" - file: '"+file+"'";
 	exit(1);
