@@ -1520,6 +1520,7 @@ void fill_time_bounds(const HDF5::DataArray& data_array,InputHDF5Stream::Dataset
   for (size_t n=2; n < data_array.num_values; n+=2) {
     if (!floatutils::myequalf((data_array_value(data_array,n+1,ds)-data_array_value(data_array,n,ds)),time_bounds.diff)) {
 	time_bounds.changed=true;
+	break;
     }
   }
   time_bounds.t2=data_array_value(data_array,data_array.num_values-1,ds);
@@ -3029,25 +3030,24 @@ int main(int argc,char **argv)
 	  std::cerr << ess.str() << std::endl;
 	}
     }
-  }
-  else if (metautils::args.dsnum == "999.9" && !xml_directory.empty()) {
-    std::cout << "Output is in:" << std::endl;
-    std::cout << "  " << xml_directory << "/" << metautils::args.filename << ".";
-    switch (scan_data.write_type) {
-	case ScanData::GrML_type: {
-	  std::cout << "Gr";
-	  break;
+    else if (metautils::args.dsnum == "999.9" && !xml_directory.empty()) {
+	std::cout << "Output is in:" << std::endl;
+	std::cout << "  " << xml_directory << "/" << metautils::args.filename << ".";
+	switch (scan_data.write_type) {
+	  case ScanData::GrML_type: {
+	    std::cout << "Gr";
+	    break;
+	  }
+	  case ScanData::ObML_type: {
+	    std::cout << "Ob";
+	    break;
+	  }
+	  default: {
+	    std::cout << "??";
+	  }
 	}
-	case ScanData::ObML_type: {
-	  std::cout << "Ob";
-	  break;
-	}
-	default:
-	{
-	  std::cout << "??";
-	}
+	std::cout << "ML" << std::endl;
     }
-    std::cout << "ML" << std::endl;
   }
   if (inv_stream.is_open()) {
     InvEntry ie;
