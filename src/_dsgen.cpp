@@ -1534,7 +1534,10 @@ void generate_description(std::string type,std::string tdir_name)
 	    size_t n=1;
 	    for (const auto& arow : aquery) {
 		if (citation.empty()) {
-		  citation+=htmlutils::unicode_escape_to_html(arow[0])+", "+arow[1].substr(0,1)+".";
+		  citation+=htmlutils::unicode_escape_to_html(arow[0]);
+		  if (!arow[1].empty()) {
+		    citation+=", "+arow[1].substr(0,1)+".";
+		  }
 		  if (!arow[2].empty()) {
 		    citation+=" "+arow[2].substr(0,1)+".";
 		  }
@@ -1544,7 +1547,9 @@ void generate_description(std::string type,std::string tdir_name)
 		  if (n == aquery.num_rows()) {
 		    citation+="and ";
 		  }
-		  citation+=arow[1].substr(0,1)+". ";
+		  if (!arow[1].empty()) {
+		    citation+=arow[1].substr(0,1)+". ";
+		  }
 		  if (!arow[2].empty()) {
 		    citation+=arow[2].substr(0,1)+". ";
 		  }
