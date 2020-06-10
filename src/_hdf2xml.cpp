@@ -591,9 +591,17 @@ std::string ispd_hdf5_id_entry(const std::tuple<std::string,std::string,float,fl
 void scan_ispd_hdf5_file(InputHDF5Stream& istream,ScanData& scan_data,gatherxml::markup::ObML::ObservationData& obs_data)
 {
   static const std::string THIS_FUNC=__func__;
+  auto ds=istream.dataset("/ISPD_Format_Version");
+  if (ds == nullptr || ds->datatype.class_ != 3) {
+    myerror="unable to determine format version";
+    exit(1);
+  }
+  HDF5::DataArray da;
+  da.fill(istream,*ds);
+  auto format_version=da.string_value(0);
   InputHDF5Stream::DataValue ts_val,uon_val,id_val,lat_val,lon_val;
 // load the station library
-  auto ds=istream.dataset("/Data/SpatialTemporalLocation/SpatialTemporalLocation");
+  ds=istream.dataset("/Data/SpatialTemporalLocation/SpatialTemporalLocation");
   if (ds == nullptr || ds->datatype.class_ != 6) {
     myerror="unable to locate spatial/temporal information";
     exit(1);
@@ -624,7 +632,8 @@ void scan_ispd_hdf5_file(InputHDF5Stream& istream,ScanData& scan_data,gatherxml:
     }
   }
 // load the ICOADS platform types
-  if ( (ds=istream.dataset("/SupplementalData/Tracking/ICOADS/TrackingICOADS")) != NULL && ds->datatype.class_ == 6) {
+  ds=istream.dataset("/SupplementalData/Tracking/ICOADS/TrackingICOADS");
+  if (ds != nullptr && ds->datatype.class_ == 6) {
     InputHDF5Stream::DataValue plat_val;
     HDF5::decode_compound_datatype(ds->datatype,cpd);
     for (const auto& chunk : ds->data.chunks) {
@@ -650,7 +659,8 @@ void scan_ispd_hdf5_file(InputHDF5Stream& istream,ScanData& scan_data,gatherxml:
     }
   }
 // load observation types for IDs that don't already have a platform type
-  if ( (ds=istream.dataset("/Data/Observations/ObservationTypes")) != NULL && ds->datatype.class_ == 6) {
+  ds=istream.dataset("/Data/Observations/ObservationTypes");
+  if (ds != nullptr && ds->datatype.class_ == 6) {
     InputHDF5Stream::DataValue coll_val;
     HDF5::decode_compound_datatype(ds->datatype,cpd);
     for (const auto& chunk : ds->data.chunks) {
@@ -679,7 +689,8 @@ void scan_ispd_hdf5_file(InputHDF5Stream& istream,ScanData& scan_data,gatherxml:
 	}
     }
   }
-  if ( (ds=istream.dataset("/SupplementalData/Tracking/Land/TrackingLand")) != NULL && ds->datatype.class_ == 6) {
+  ds=istream.dataset("/SupplementalData/Tracking/Land/TrackingLand");
+  if (ds != nullptr && ds->datatype.class_ == 6) {
     InputHDF5Stream::DataValue src_flag_val,rpt_type_val;
     HDF5::decode_compound_datatype(ds->datatype,cpd);
     for (const auto& chunk : ds->data.chunks) {
@@ -762,7 +773,8 @@ void scan_ispd_hdf5_file(InputHDF5Stream& istream,ScanData& scan_data,gatherxml:
     }
   }
 // load tropical storm IDs
-  if ( (ds=istream.dataset("/SupplementalData/Misc/TropicalStorms/StormID")) != NULL && ds->datatype.class_ == 6) {
+  ds=istream.dataset("/SupplementalData/Misc/TropicalStorms/StormID");
+  if (ds != nullptr && ds->datatype.class_ == 6) {
     InputHDF5Stream::DataValue storm_id_val;
     HDF5::decode_compound_datatype(ds->datatype,cpd);
     for (const auto& chunk : ds->data.chunks) {
@@ -789,7 +801,8 @@ void scan_ispd_hdf5_file(InputHDF5Stream& istream,ScanData& scan_data,gatherxml:
   }
   InputHDF5Stream::DataValue slp_val,stnp_val;
 // scan the observations
-  if ( (ds=istream.dataset("/Data/Observations/Observations")) == NULL || ds->datatype.class_ != 6) {
+  ds=istream.dataset("/Data/Observations/Observations");
+  if (ds == nullptr || ds->datatype.class_ != 6) {
     myerror="unable to locate observations";
     exit(1);
   }
@@ -879,12 +892,23 @@ void scan_ispd_hdf5_file(InputHDF5Stream& istream,ScanData& scan_data,gatherxml:
     }
   }
 // scan for feedback information
+  std::unordered_map<std::string,std::vector<size_t>> feedback_versions
+  {
+    {"10.11",{2,11,14}},
+    {"11.0",{2,14,16}}
+  };
+  if (feedback_versions.find(format_version) == feedback_versions.end()) {
+    myerror="unknown format version '"+format_version+"'";
+    exit(1);
+  }
   ds=istream.dataset("/Data/AssimilationFeedback/AssimilationFeedback");
   if (ds == nullptr) {
     ds=istream.dataset("/Data/AssimilationFeedback/AssimilationFeedBack");
   }
   if (ds != nullptr && ds->datatype.class_ == 6) {
-    InputHDF5Stream::DataValue p_val,ens_fg_val,ens_p_val;
+    auto ts_regex=std::regex("99$");
+//    InputHDF5Stream::DataValue p_val,ens_fg_val,ens_p_val;
+    std::vector<InputHDF5Stream::DataValue> dv(feedback_versions[format_version].size());
     HDF5::decode_compound_datatype(ds->datatype,cpd);
     for (const auto& chunk : ds->data.chunks) {
 	for (int m=0,l=0; m < ds->data.sizes.front(); ++m) {
@@ -898,7 +922,7 @@ void scan_ispd_hdf5_file(InputHDF5Stream& istream,ScanData& scan_data,gatherxml:
 	    auto entry=stn_library.find(key);
 	    if (entry != stn_library.end()) {
 		if (!timestamp.empty()) {
-		  if (std::regex_search(timestamp,std::regex("99$"))) {
+		  if (std::regex_search(timestamp,ts_regex)) {
 		    strutils::chop(timestamp,2);
 		    timestamp+="00";
 		  }
@@ -908,54 +932,36 @@ void scan_ispd_hdf5_file(InputHDF5Stream& istream,ScanData& scan_data,gatherxml:
 		    gatherxml::markup::ObML::IDEntry ientry;
 		    ientry.key=ispd_hdf5_id_entry(entry->second,platform_type,dt);
 		    if (!ientry.key.empty()) {
-			std::vector<double> check_values;
-			p_val.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[2].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[2].datatype,ds->dataspace);
-			if (p_val._class_ != 1) {
-			  metautils::log_error("modified observed pressure is not a floating point number for '"+ientry.key+"'","hdf2xml",USER);
-			}
-			if (p_val.precision_ == 32) {
-			  check_values.emplace_back(*(reinterpret_cast<float *>(p_val.get())));
-			}
-			else if (p_val.precision_ == 64) {
-			  check_values.emplace_back(*(reinterpret_cast<double *>(p_val.get())));
-			}
-			else {
-			  metautils::log_error("bad precision ("+strutils::itos(p_val.precision_)+") for modified observed pressure","hdf2xml",USER);
-			}
-			ens_fg_val.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[11].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[11].datatype,ds->dataspace);
-			if (ens_fg_val._class_ != 1) {
-			  metautils::log_error("ensemble first guess pressure is not a floating point number for '"+ientry.key+"'","hdf2xml",USER);
-			}
-			if (ens_fg_val.precision_ == 32) {
-			  check_values.emplace_back(*(reinterpret_cast<float *>(ens_fg_val.get())));
-			}
-			else if (ens_fg_val.precision_ == 64) {
-			  check_values.emplace_back(*(reinterpret_cast<double *>(ens_fg_val.get())));
-			}
-			else {
-			  metautils::log_error("bad precision ("+strutils::itos(ens_fg_val.precision_)+") for ensemble first guess pressure","hdf2xml",USER);
-			}
-			ens_p_val.set(*istream.file_stream(),&chunk.buffer[l+cpd.members[14].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[14].datatype,ds->dataspace);
-			if (ens_p_val._class_ != 1) {
-			  metautils::log_error("ensemble analysis pressure is not a floating point number for '"+ientry.key+"'","hdf2xml",USER);
-			}
-			if (ens_p_val.precision_ == 32) {
-			  check_values.emplace_back(*(reinterpret_cast<float *>(ens_p_val.get())));
-			}
-			else if (ens_p_val.precision_ == 64) {
-			  check_values.emplace_back(*(reinterpret_cast<double *>(ens_p_val.get())));
-			}
-			else {
-			  metautils::log_error("bad precision ("+strutils::itos(ens_p_val.precision_)+") for ensemble analysis pressure","hdf2xml",USER);
-			}
-			if ((check_values[0] >= 400. && check_values[0] <= 1090.) || (check_values[1] >= 400. && check_values[1] <= 1090.) || (check_values[2] >= 400. && check_values[2] <= 1090.)) {
-			  if (!obs_data.added_to_ids("surface",ientry,"Feedback","",std::get<2>(entry->second),std::get<3>(entry->second),std::stoll(timestamp),&dt)) {
-			    metautils::log_error(THIS_FUNC+"() returned error: '"+myerror+" when adding ID "+ientry.key,"hdf2xml",USER);
+			for (size_t ndv=0; ndv < dv.size(); ++ndv) {
+			  auto feedback_idx=feedback_versions[format_version][ndv];
+			  dv[ndv].set(*istream.file_stream(),&chunk.buffer[l+cpd.members[feedback_idx].byte_offset],istream.size_of_offsets(),istream.size_of_lengths(),cpd.members[feedback_idx].datatype,ds->dataspace);
+			  if (dv[ndv]._class_ != 1) {
+			    metautils::log_error("feedback field value "+strutils::itos(feedback_idx)+" is not a floating point number for '"+ientry.key+"'","hdf2xml",USER);
 			  }
-			  ++scan_data.num_not_missing;
-			  std::get<7>(entry->second)=true;
-			  if (!obs_data.added_to_platforms("surface",platform_type,std::get<2>(entry->second),std::get<3>(entry->second))) {
-			    metautils::log_error(THIS_FUNC+"() returned error: '"+myerror+" when adding platform "+platform_type,"hdf2xml",USER);
+			  double check_value=0.;
+			  switch (dv[ndv].precision_) {
+			    case 32: {
+				check_value=*(reinterpret_cast<float *>(dv[ndv].get()));
+				break;
+			    }
+			    case 64: {
+				check_value=*(reinterpret_cast<double *>(dv[ndv].get()));
+				break;
+			    }
+			    default: {
+				metautils::log_error("bad precision ("+strutils::itos(dv[ndv].precision_)+") for feedback field value "+strutils::itos(feedback_idx),"hdf2xml",USER);
+			    }
+			  }
+			  if (check_value >= 400. && check_value <= 1090.) {
+			    if (!obs_data.added_to_ids("surface",ientry,"Feedback","",std::get<2>(entry->second),std::get<3>(entry->second),std::stoll(timestamp),&dt)) {
+				metautils::log_error(THIS_FUNC+"() returned error: '"+myerror+" when adding ID "+ientry.key,"hdf2xml",USER);
+			    }
+			    ++scan_data.num_not_missing;
+			    std::get<7>(entry->second)=true;
+			    if (!obs_data.added_to_platforms("surface",platform_type,std::get<2>(entry->second),std::get<3>(entry->second))) {
+				metautils::log_error(THIS_FUNC+"() returned error: '"+myerror+" when adding platform "+platform_type,"hdf2xml",USER);
+			    }
+			    break;
 			  }
 			}
 		    }
