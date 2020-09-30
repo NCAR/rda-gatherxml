@@ -582,8 +582,12 @@ bool ObservationData::added_to_ids(std::string observation_type,IDEntry& ientry,
 
 bool ObservationData::added_to_platforms(std::string observation_type,std::string platform_type,float lat,float lon)
 {
-  if (lat < -90. || lat > 90. || lon < -180. || lon > 360.) {
-    myerror="latitude or longitude out of range";
+  if (lat < -90. || lat > 90.) {
+    myerror="latitude '"+strutils::ftos(lat)+"' out of range";
+    return false;
+  }
+  if (lon < -180. || lon > 360.) {
+    myerror="longitude '"+strutils::ftos(lat)+"' out of range";
     return false;
   }
   auto o=observation_indexes.find(observation_type);
