@@ -269,6 +269,8 @@ void process_ncep_prepbufr_observation(gatherxml::markup::ObML::ObservationData&
 	  break;
 	}
 	case 562:
+	case 563:
+	case 564:
 	{
 	  platform_type="drifting_buoy";
 	  break;
@@ -1023,7 +1025,7 @@ int main(int argc,char **argv)
     gatherxml::markup::ObML::write(obs_data,"bufr2xml",USER);
   }
   else {
-    std::cerr << "No data found - no content metadata will be generated" << std::endl;
+    std::cerr << "Terminating - no data found - no content metadata will be generated" << std::endl;
     exit(1);
   }
   if (metautils::args.update_db) {
