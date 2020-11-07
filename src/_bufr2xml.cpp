@@ -493,6 +493,9 @@ void process_ncep_adp_bufr_observation(gatherxml::markup::ObML::ObservationData&
     case 5064:
     case 5065:
     case 5066:
+    case 5067:
+    case 5068:
+    case 5069:
     case 5070:
     case 5071:
     case 5080:
