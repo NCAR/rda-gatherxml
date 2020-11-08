@@ -334,7 +334,10 @@ void process_ncep_adp_bufr_observation(gatherxml::markup::ObML::ObservationData&
     case 0:
     case 1:
     case 2:
-    case 7: {
+    case 7:
+    case 100:
+    case 101:
+    case 102: {
 	obs_type="surface";
 	platform_type="land_station";
 	break;
@@ -345,12 +348,14 @@ void process_ncep_adp_bufr_observation(gatherxml::markup::ObML::ObservationData&
 	platform_type="roving_ship";
 	break;
     }
-    case 1002: {
+    case 1002:
+    case 1102: {
 	obs_type="surface";
 	platform_type="drifting_buoy";
 	break;
     }
-    case 1003: {
+    case 1003:
+    case 1103: {
 	obs_type="surface";
 	platform_type="moored_buoy";
 	break;
@@ -595,12 +600,14 @@ void process_ncep_adp_bufr_observation(gatherxml::markup::ObML::ObservationData&
     switch (type) {
 	case 1002:
 	case 1003:
-	{
+	case 1102:
+	case 1103: {
 	  ientry.key=platform_type+"[!]WMO[!]"+ientry.key;
 	  break;
 	}
 	case 2:
 	case 7:
+	case 102:
 	case 1001:
 	case 1004:
 	case 1005:
@@ -619,13 +626,11 @@ void process_ncep_adp_bufr_observation(gatherxml::markup::ObML::ObservationData&
 	case 4008:
 	case 4009:
 	case 4010:
-	case 4011:
-	{
+	case 4011: {
 	  ientry.key=platform_type+"[!]callSign[!]"+ientry.key;
 	  break;
 	}
-	case 2002:
-	{
+	case 2002: {
 	  if ((adata[subset_number]->rpid == "PSPIU" || adata[subset_number]->rpid == "PSGAL")) {
 	    platform_type="wind_profiler";
 	    ientry.key=platform_type+"[!]callSign[!]"+ientry.key;
@@ -635,13 +640,11 @@ void process_ncep_adp_bufr_observation(gatherxml::markup::ObML::ObservationData&
 	  }
 	  break;
 	}
-	case 1006:
-	{
+	case 1006: {
 	  ientry.key=platform_type+"[!]other[!]"+ientry.key;
 	  break;
 	}
-	case 2008:
-	{
+	case 2008: {
 	  if (ientry.key.length() == 7 && strutils::is_numeric(ientry.key.substr(0,4)) && strutils::is_alpha(ientry.key.substr(4))) {
 	    ientry.key=platform_type+"[!]NEXRAD[!]"+ientry.key.substr(4);
 	  }
@@ -650,8 +653,7 @@ void process_ncep_adp_bufr_observation(gatherxml::markup::ObML::ObservationData&
 	  }
 	  break;
 	}
-	default:
-	{
+	default: {
 	  metautils::log_error(std::string("process_ncep_adp_bufr_observation() error: can't get report ID from RPID: "+adata[subset_number]->rpid+"  date: ")+adata[subset_number]->datetime.to_string()+"  data type: "+strutils::itos(rpt.data_type())+"-"+strutils::itos(rpt.data_subtype()),"bufr2xml",USER);
 	}
     }
