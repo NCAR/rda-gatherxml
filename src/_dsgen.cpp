@@ -1712,13 +1712,13 @@ int main(int argc,char **argv)
     metautils::log_error("unable to create temporary directory","dsgen",USER);
   }
   server.connect(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
+  MySQL::LocalQuery query("select type from search.datasets where dsid = '"+metautils::args.dsnum+"'");
+  MySQL::Row row;
+  if (query.submit(server) < 0 || !query.fetch_row(row)) {
+    metautils::log_error("unable to determine dataset type","dsgen",USER);
+  }
+  dataset_type=row[0];
   if (!no_dset_waf) {
-    MySQL::LocalQuery query("select type from search.datasets where dsid = '"+metautils::args.dsnum+"'");
-    MySQL::Row row;
-    if (query.submit(server) < 0 || !query.fetch_row(row)) {
-	metautils::log_error("unable to determine dataset type","dsgen",USER);
-    }
-    dataset_type=row[0];
     if (dataset_type != "P" && dataset_type != "H") {
 	no_dset_waf=true;
     }
