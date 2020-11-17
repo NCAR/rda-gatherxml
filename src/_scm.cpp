@@ -2777,8 +2777,7 @@ int main(int argc,char **argv)
 	  metautils::log_error("group check failed","scm",USER);
 	}
 	if (query.num_rows() == 0) {
-	  std::cerr << "Error: " << local_args.gindex_list.front() << " is not a top-level index for this dataset" << std::endl;
-	  exit(1);
+	  metautils::log_error(local_args.gindex_list.front()+" is not a top-level index for this dataset","scm",USER);
 	}
     }
     if (MySQL::table_exists(server,"GrML.ds"+local_args.dsnum2+"_agrids_cache")) {
