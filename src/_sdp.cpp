@@ -342,10 +342,10 @@ int main(int argc,char **argv)
   ofs.close();
   auto cvs_key=strutils::strand(15);
   std::stringstream oss,ess;
-  if (unixutils::mysystem2("/bin/sh -c \"curl -s --data 'authKey=qGNlKijgo9DJ7MN&cmd=identify' http://rda.ucar.edu/cgi-bin/dss/remoteRDAServerUtils\"",oss,ess) < 0) {
+  if (unixutils::mysystem2("/bin/tcsh -c \"curl -s --data 'authKey=qGNlKijgo9DJ7MN&cmd=identify' http://rda.ucar.edu/cgi-bin/dss/remoteRDAServerUtils\"",oss,ess) < 0) {
     metautils::log_error("unable to identify web server - error: '"+ess.str()+"'","sdp",user);
   }
-  if (unixutils::mysystem2("/bin/sh -c \""+strutils::token(oss.str(),".",0)+"-sync "+sync_dir->name()+"/dsOverview.xml /"+strutils::token(oss.str(),".",0)+"/web/ds"+metautils::args.dsnum+".xml."+cvs_key+"\"",oss,ess) < 0) {
+  if (unixutils::mysystem2("/bin/tcsh -c \""+strutils::token(oss.str(),".",0)+"-sync "+sync_dir->name()+"/dsOverview.xml /"+strutils::token(oss.str(),".",0)+"/web/ds"+metautils::args.dsnum+".xml."+cvs_key+"\"",oss,ess) < 0) {
     metautils::log_error("unable to web-sync file for CVS - error: '"+ess.str()+"'","sdp",user);
   }
   unixutils::mysystem2("/usr/bin/wget -q -O - --post-data=\"authKey=qGNlKijgo9DJ7MN&cmd=cvssdp&dsnum="+metautils::args.dsnum+"&key="+cvs_key+"\" http://rda.ucar.edu/cgi-bin/dss/remoteRDAServerUtils",oss,ess);
