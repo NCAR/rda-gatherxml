@@ -548,7 +548,7 @@ void generate_description(std::string type,std::string tdir_name)
   if (databases.size() == 0) {
     metautils::log_error("empty CMD database list","dsgen",USER);
   }
-  std::vector<std::string> formats,types;
+  std::vector<std::string> formats,data_types;
   auto found_content_metadata=false;
   for (const auto& db : databases) {
     std::string db_name,data_type;
