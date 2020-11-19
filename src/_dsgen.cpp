@@ -821,8 +821,8 @@ void generate_description(std::string type,std::string tdir_name)
   }
 // vertical levels
   if (found_content_metadata) {
-    for (const auto& type : types) {
-	if (type == "grid") {
+    for (const auto& data_type : data_types) {
+	if (data_type == "grid") {
 	  tdoc.add_if("__HAS_VERTICAL_LEVELS__");
 	  std::string vertical_levels="See the <a href=\"#metadata/detailed.html?_do=y&view=level\">detailed metadata</a> for level information";
 	  if (unixutils::exists_on_server(metautils::directives.web_server,"/data/web/datasets/ds"+metautils::args.dsnum+"/metadata/grib2_levels.html",metautils::directives.rdadata_home)) {
@@ -952,18 +952,18 @@ void generate_description(std::string type,std::string tdir_name)
   }
 // data types
   if (found_content_metadata) {
-    if (types.size() > 0) {
+    if (data_types.size() > 0) {
 	tdoc.add_if("__HAS_DATA_TYPES__");
-	std::string data_types;
+	std::string data_types_string;
 	auto n=0;
-	for (const auto& type : types) {
+	for (const auto& data_type : data_types) {
 	  if (n > 0) {
-	    data_types+=", ";
+	    data_types_string+=", ";
 	  }
-	  data_types+=strutils::to_capital(type);
+	  data_types_string+=strutils::to_capital(data_type);
 	  ++n;
 	}
-	tdoc.add_replacement("__DATA_TYPES__",data_types);
+	tdoc.add_replacement("__DATA_TYPES__",data_types_string);
     }
   }
   else {
@@ -989,8 +989,8 @@ void generate_description(std::string type,std::string tdir_name)
   std::unordered_map<std::string,std::shared_ptr<std::unordered_set<std::string>>> unique_grid_definitions_table;
   if (found_content_metadata) {
     std::unordered_map<size_t,std::tuple<std::string,std::string>> grid_definition_table;
-    for (const auto& type : types) {
-	if (type == "grid") {
+    for (const auto& data_type : data_types) {
+	if (data_type == "grid") {
 	  if (grouped_periods) {
 	    query.set("select gridDefinition_codes,mssID_code from GrML.ds"+dsnum2+"_grid_definitions");
 	  }
