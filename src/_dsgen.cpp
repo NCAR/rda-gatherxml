@@ -551,8 +551,10 @@ void generate_description(std::string type,std::string tdir_name)
   std::vector<std::string> formats,types;
   auto found_content_metadata=false;
   for (const auto& db : databases) {
-    if (db[0] != 'V' && table_exists(server,db+".ds"+dsnum2+"_primaries")) {
-	MySQL::LocalQuery query("select distinct format from "+db+".formats as f left join "+db+".ds"+dsnum2+"_primaries as d on d.format_code = f.code where !isnull(d.format_code)");
+    std::string db_name,data_type;
+    std::tie(db_name,data_type)=db;
+    if (db_name[0] != 'V' && table_exists(server,db_name+".ds"+dsnum2+"_primaries")) {
+	MySQL::LocalQuery query("select distinct format from "+db_name+".formats as f left join "+db_name+".ds"+dsnum2+"_primaries as d on d.format_code = f.code where !isnull(d.format_code)");
 	if (query.submit(server) < 0) {
 	  metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",USER);
 	}
