@@ -564,14 +564,8 @@ void generate_description(std::string type,std::string tdir_name)
 	}
 	if (formats.size() > 0) {
 	  found_content_metadata=true; 
-	  if (db == "GrML") {
-	    types.emplace_back("grid");
-	  }
-	  else if (db == "ObML") {
-	    types.emplace_back("platform_observation");
-	  }
-	  else if (db == "SatML") {
-	    types.emplace_back("satellite");
+	  if (!data_type.empty()) {
+	    data_types.emplace_back(data_type);
 	  }
 	}
     }
