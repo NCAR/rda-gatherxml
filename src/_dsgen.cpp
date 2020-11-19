@@ -970,19 +970,19 @@ void generate_description(std::string type,std::string tdir_name)
     elist=xdoc.element_list("dsOverview/contentMetadata/dataType");
     if (elist.size() > 0) {
 	tdoc.add_if("__HAS_DATA_TYPES__");
-	std::string data_types;
+	std::string data_types_string;
 	auto n=0;
 	std::unordered_map<std::string,char> unique_data_types;
 	for (const auto& ele : elist) {
 	  if (unique_data_types.find(ele.content()) == unique_data_types.end()) {
 	    if (n++ > 0) {
-		data_types+=", ";
+		data_types_string+=", ";
 	    }
-	    data_types+=strutils::to_capital(ele.content());
+	    data_types_string+=strutils::to_capital(ele.content());
 	    unique_data_types[ele.content()]='Y';
 	  }
 	}
-	tdoc.add_replacement("__DATA_TYPES__",data_types);
+	tdoc.add_replacement("__DATA_TYPES__",data_types_string);
     }
   }
 // spatial coverage
