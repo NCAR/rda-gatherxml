@@ -2635,8 +2635,6 @@ int main(int argc,char **argv)
   }
   signal(SIGSEGV,segv_handler);
   atexit(myexit);
-  local_args.summarized_hpss_file=false;
-  local_args.summarized_web_file=false;
   const char ARG_DELIMITER='`';
   metautils::args.args_string=unixutils::unix_args_string(argc,argv,ARG_DELIMITER);
   metautils::read_config("scm",USER);
