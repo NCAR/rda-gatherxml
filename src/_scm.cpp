@@ -98,9 +98,9 @@ struct StringEntry {
   std::string key;
 };
 
-void parse_args()
+void parse_args(const char ARG_DELIMITER)
 {
-  auto sp=strutils::split(metautils::args.args_string,"`");
+  auto sp=strutils::split(metautils::args.args_string,std::string(1,ARG_DELIMITER));
   for (size_t n=0; n < sp.size(); n++) {
     if (sp[n] == "-a") {
 	if (!local_args.file.empty()) {
@@ -2637,9 +2637,10 @@ int main(int argc,char **argv)
   atexit(myexit);
   local_args.summarized_hpss_file=false;
   local_args.summarized_web_file=false;
-  metautils::args.args_string=unixutils::unix_args_string(argc,argv,'`');
+  const char ARG_DELIMITER='`';
+  metautils::args.args_string=unixutils::unix_args_string(argc,argv,ARG_DELIMITER);
   metautils::read_config("scm",USER);
-  parse_args();
+  parse_args(ARG_DELIMITER);
   server.connect(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   if (!server) {
     metautils::log_error("unable to connect to MySQL server on startup","scm",USER);
