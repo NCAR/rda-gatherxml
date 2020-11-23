@@ -1,4 +1,4 @@
-OPTIONS = -Wall -Wold-style-cast -O3 -std=c++11 -Weffc++
+OPTIONS = -Wall -Wold-style-cast -O3 -std=c++14 -Weffc++
 C_OPTIONS = -c -fPIC $(OPTIONS)
 GLOBALINCLUDEDIR = /glade/u/home/dattore/cpp/lib/include
 INCLUDEDIR = ./include
@@ -78,11 +78,24 @@ $(BUILDDIR)/libgatherxml/%.o: $(SOURCEDIR)/libgatherxml/%.cpp $(INCLUDEDIR)/gath
 libgatherxml.so: builddir $(GATHERXMLOBJS) $(INCLUDEDIR)/gatherxml.hpp
 ifeq ($(OKAYTOMAKE),1)
 ifeq ($(strip $(LIBVERSION)),)
-	$(error libgatherxml.so: no version number given)
+	$(error $@: no version number given)
 else
-	sudo -u rdadata $(COMPILER) -shared -o $(LIBDIR)/libgatherxml.so.$(LIBVERSION) -Wl,-soname,libgatherxml.so.$(LIBVERSION) $(GATHERXMLOBJS)
-	sudo -u rdadata rm -f $(LIBDIR)/libgatherxml.so
-	sudo -u rdadata ln -s $(LIBDIR)/libgatherxml.so.$(LIBVERSION) $(LIBDIR)/libgatherxml.so
+ifeq ($(strip $(LIBVERSION)),BUG)
+	$(eval THISLIBVERSION = $(shell version=`ls -l $(LIBDIR)/$@ |awk '{print $$11}' |sed "s|$(LIBDIR)/$@.||"`; major=`echo $$version |awk -F. '{print $$1}'`; minor=`echo $$version |awk -F. '{print $$2}'`; bug=`echo $$version |awk -F. '{print $$3}'`; bug=$$(( $$bug + 1 )); echo "$$major.$$minor.$$bug"))
+else
+ifeq ($(strip $(LIBVERSION)),MINOR)
+	$(eval THISLIBVERSION = $(shell version=`ls -l $(LIBDIR)/$@ |awk '{print $$11}' |sed "s|$(LIBDIR)/$@.||"`; major=`echo $$version |awk -F. '{print $$1}'`; minor=`echo $$version |awk -F. '{print $$2}'`; minor=$$(( $$minor + 1 )); echo "$$major.$$minor.0"))
+else
+ifeq ($(strip $(LIBVERSION)),MAJOR)
+	$(eval THISLIBVERSION = $(shell version=`ls -l $(LIBDIR)/$@ |awk '{print $$11}' |sed "s|$(LIBDIR)/$@.||"`; major=`echo $$version |awk -F. '{print $$1}'`; major=$$(( $$major + 1 )); echo "$$major.0.0"))
+else
+	$(eval THISLIBVERSION = $(LIBVERSION))
+endif
+endif
+endif
+	sudo -u rdadata $(COMPILER) -shared -o $(LIBDIR)/$@.$(THISLIBVERSION) -Wl,-soname,$@.$(THISLIBVERSION) $(GATHERXMLOBJS)
+	sudo -u rdadata rm -f $(LIBDIR)/$@
+	sudo -u rdadata ln -s $(LIBDIR)/$@.$(THISLIBVERSION) $(LIBDIR)/$@
 endif
 endif
 #
@@ -158,7 +171,26 @@ ifeq ($(OKAYTOMAKE),1)
 ifeq ($(strip $(VERSION)),)
 	$(error no version number given)
 else
-	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(JASPERRUNPATH) $(ZRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(JASPERLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lgatherxml -lgrids -ljasper -lutils -lutilsthread -ldatetime -lbitmap -lio -lmetautils -lmetahelpers -lgridutils -lsearch -lxml -lerror -lpthread -lz -o $(BUILDDIR)/$@.$(VERSION)
+ifeq ($(strip $(VERSION)),BUG)
+	$(eval THISVERSION = $(shell version=`ls -l $(BINDIR)/$@ |awk '{print $$11}' |sed "s|$(BINDIR)/$@.||"`; major=`echo $$version |awk -F. '{print $$1}'`; minor=`echo $$version |awk -F. '{print $$2}'`; bug=`echo $$version |awk -F. '{print $$3}'`; bug=$$(( $$bug + 1 )); echo "$$major.$$minor.$$bug"))
+	$(eval OKAYTOBUILD=1)
+else
+ifeq ($(strip $(VERSION)),MINOR)
+	$(eval THISVERSION = $(shell version=`ls -l $(BINDIR)/$@ |awk '{print $$11}' |sed "s|$(BINDIR)/$@.||"`; major=`echo $$version |awk -F. '{print $$1}'`; minor=`echo $$version |awk -F. '{print $$2}'`; minor=$$(( $$minor + 1 )); echo "$$major.$$minor.0"))
+	$(eval OKAYTOBUILD=1)
+else
+ifeq ($(strip $(VERSION)),MAJOR)
+	$(eval THISVERSION = $(shell version=`ls -l $(BINDIR)/$@ |awk '{print $$11}' |sed "s|$(BINDIR)/$@.||"`; major=`echo $$version |awk -F. '{print $$1}'`; major=$$(( $$major + 1 )); echo "$$major.0.0"))
+	$(eval OKAYTOBUILD=1)
+else
+	$(eval OKAYTOBUILD=0)
+endif
+endif
+endif
+	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(JASPERRUNPATH) $(ZRUNPATH) $(SOURCEDIR)/$@.cpp -D__JASPER -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(JASPERLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lgatherxml -lgrids -ljasper -lutils -lutilsthread -ldatetime -lbitmap -lio -lmetautils -lmetahelpers -lgridutils -lsearch -lxml -lerror -lpthread -lz -o $(BUILDDIR)/$@.$(THISVERSION)
+	if [ $(OKAYTOBUILD) -eq 1 ]; then \
+	  make install VERSION=$(THISVERSION) EXECUTABLE=$@; \
+	fi;
 endif
 endif
 #
@@ -176,7 +208,26 @@ ifeq ($(OKAYTOMAKE),1)
 ifeq ($(strip $(VERSION)),)
 	$(error no version number given)
 else
-	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(ZRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lgatherxml -lio -lutils -lutilsthread -ldatetime -lbitmap -lhdf -lmetautils -lmetahelpers -lgridutils -lxml -lsearch -lpthread -lz -o $(BUILDDIR)/$@.$(VERSION)
+ifeq ($(strip $(VERSION)),BUG)
+	$(eval THISVERSION = $(shell version=`ls -l $(BINDIR)/$@ |awk '{print $$11}' |sed "s|$(BINDIR)/$@.||"`; major=`echo $$version |awk -F. '{print $$1}'`; minor=`echo $$version |awk -F. '{print $$2}'`; bug=`echo $$version |awk -F. '{print $$3}'`; bug=$$(( $$bug + 1 )); echo "$$major.$$minor.$$bug"))
+	$(eval OKAYTOBUILD=1)
+else
+ifeq ($(strip $(VERSION)),MINOR)
+	$(eval THISVERSION = $(shell version=`ls -l $(BINDIR)/$@ |awk '{print $$11}' |sed "s|$(BINDIR)/$@.||"`; major=`echo $$version |awk -F. '{print $$1}'`; minor=`echo $$version |awk -F. '{print $$2}'`; minor=$$(( $$minor + 1 )); echo "$$major.$$minor.0"))
+	$(eval OKAYTOBUILD=1)
+else
+ifeq ($(strip $(VERSION)),MAJOR)
+	$(eval THISVERSION = $(shell version=`ls -l $(BINDIR)/$@ |awk '{print $$11}' |sed "s|$(BINDIR)/$@.||"`; major=`echo $$version |awk -F. '{print $$1}'`; major=$$(( $$major + 1 )); echo "$$major.0.0"))
+	$(eval OKAYTOBUILD=1)
+else
+	$(eval OKAYTOBUILD=0)
+endif
+endif
+endif
+	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(ZRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lgatherxml -lio -lutils -lutilsthread -ldatetime -lbitmap -lhdf -lmetautils -lmetahelpers -lgridutils -lxml -lsearch -lpthread -lz -o $(BUILDDIR)/$@.$(THISVERSION)
+	if [ $(OKAYTOBUILD) -eq 1 ]; then \
+	  make install VERSION=$(THISVERSION) EXECUTABLE=$@; \
+	fi;
 endif
 endif
 #
@@ -194,7 +245,26 @@ ifeq ($(OKAYTOMAKE),1)
 ifeq ($(strip $(VERSION)),)
 	$(error no version number given)
 else
-	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(JASPERRUNPATH) $(ZRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(JASPERLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lgatherxml -lio -lutils -lutilsthread -ldatetime -lmetautils -lmetahelpers -lgridutils -lsearch -lxml -lbufr -lbitmap -lerror -lpthread -lz -o $(BUILDDIR)/$@.$(VERSION)
+ifeq ($(strip $(VERSION)),BUG)
+	$(eval THISVERSION = $(shell version=`ls -l $(BINDIR)/$@ |awk '{print $$11}' |sed "s|$(BINDIR)/$@.||"`; major=`echo $$version |awk -F. '{print $$1}'`; minor=`echo $$version |awk -F. '{print $$2}'`; bug=`echo $$version |awk -F. '{print $$3}'`; bug=$$(( $$bug + 1 )); echo "$$major.$$minor.$$bug"))
+	$(eval OKAYTOBUILD=1)
+else
+ifeq ($(strip $(VERSION)),MINOR)
+	$(eval THISVERSION = $(shell version=`ls -l $(BINDIR)/$@ |awk '{print $$11}' |sed "s|$(BINDIR)/$@.||"`; major=`echo $$version |awk -F. '{print $$1}'`; minor=`echo $$version |awk -F. '{print $$2}'`; minor=$$(( $$minor + 1 )); echo "$$major.$$minor.0"))
+	$(eval OKAYTOBUILD=1)
+else
+ifeq ($(strip $(VERSION)),MAJOR)
+	$(eval THISVERSION = $(shell version=`ls -l $(BINDIR)/$@ |awk '{print $$11}' |sed "s|$(BINDIR)/$@.||"`; major=`echo $$version |awk -F. '{print $$1}'`; major=$$(( $$major + 1 )); echo "$$major.0.0"))
+	$(eval OKAYTOBUILD=1)
+else
+	$(eval OKAYTOBUILD=0)
+endif
+endif
+endif
+	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(JASPERRUNPATH) $(ZRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(JASPERLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lgatherxml -lio -lutils -lutilsthread -ldatetime -lmetautils -lmetahelpers -lgridutils -lsearch -lxml -lbufr -lbitmap -lerror -lpthread -lz -o $(BUILDDIR)/$@.$(THISVERSION)
+	if [ $(OKAYTOBUILD) -eq 1 ]; then \
+	  make install VERSION=$(THISVERSION) EXECUTABLE=$@; \
+	fi;
 endif
 endif
 #
@@ -203,7 +273,26 @@ ifeq ($(OKAYTOMAKE),1)
 ifeq ($(strip $(VERSION)),)
 	$(error no version number given)
 else
-	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(JASPERRUNPATH) $(ZRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(JASPERLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lgatherxml -lio -lobs -lutils -lutilsthread -ldatetime -lbitmap -lmetautils -lmetahelpers -lsearch -lxml -lgridutils -lz -lpthread -o $(BUILDDIR)/$@.$(VERSION)
+ifeq ($(strip $(VERSION)),BUG)
+	$(eval THISVERSION = $(shell version=`ls -l $(BINDIR)/$@ |awk '{print $$11}' |sed "s|$(BINDIR)/$@.||"`; major=`echo $$version |awk -F. '{print $$1}'`; minor=`echo $$version |awk -F. '{print $$2}'`; bug=`echo $$version |awk -F. '{print $$3}'`; bug=$$(( $$bug + 1 )); echo "$$major.$$minor.$$bug"))
+	$(eval OKAYTOBUILD=1)
+else
+ifeq ($(strip $(VERSION)),MINOR)
+	$(eval THISVERSION = $(shell version=`ls -l $(BINDIR)/$@ |awk '{print $$11}' |sed "s|$(BINDIR)/$@.||"`; major=`echo $$version |awk -F. '{print $$1}'`; minor=`echo $$version |awk -F. '{print $$2}'`; minor=$$(( $$minor + 1 )); echo "$$major.$$minor.0"))
+	$(eval OKAYTOBUILD=1)
+else
+ifeq ($(strip $(VERSION)),MAJOR)
+	$(eval THISVERSION = $(shell version=`ls -l $(BINDIR)/$@ |awk '{print $$11}' |sed "s|$(BINDIR)/$@.||"`; major=`echo $$version |awk -F. '{print $$1}'`; major=$$(( $$major + 1 )); echo "$$major.0.0"))
+	$(eval OKAYTOBUILD=1)
+else
+	$(eval OKAYTOBUILD=0)
+endif
+endif
+endif
+	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(JASPERRUNPATH) $(ZRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(JASPERLIBDIR) -L$(ZLIBDIR) -lmysql -lmysqlclient -lgatherxml -lio -lobs -lutils -lutilsthread -ldatetime -lbitmap -lmetautils -lmetahelpers -lsearch -lxml -lgridutils -lz -lpthread -o $(BUILDDIR)/$@.$(THISVERSION)
+	if [ $(OKAYTOBUILD) -eq 1 ]; then \
+	  make install VERSION=$(THISVERSION) EXECUTABLE=$@; \
+	fi;
 endif
 endif
 #
@@ -239,7 +328,7 @@ ifeq ($(OKAYTOMAKE),1)
 ifeq ($(strip $(VERSION)),)
 	$(error no version number given)
 else
-	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -lmysql -lmysqlclient -lutils -lutilsthread -ldatetime -lgridutils -lbitmap -lmetadata -lmetahelpers -lsearch -lxml -lz -lpthread -o $(BUILDDIR)/$@.$(VERSION)
+	$(COMPILER) $(OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -lmysql -lmysqlclient -lutils -lutilsthread -ldatetime -lgridutils -lbitmap -lmetautils -lmetahelpers -lsearch -lxml -lz -lpthread -o $(BUILDDIR)/$@.$(VERSION)
 endif
 endif
 #
