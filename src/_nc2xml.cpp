@@ -3097,7 +3097,7 @@ else {
 			}
 			case netCDFStream::NcType::FLOAT:
 			case netCDFStream::NcType::DOUBLE: {
-			  lentry.key+=strutils::ftos(levels[n],3);
+			  lentry.key+=strutils::ftos(levels[n],floatutils::precision(levels[n])+2);
 			  break;
 			}
 			case netCDFStream::NcType::_NULL: {
@@ -3129,7 +3129,7 @@ else {
 			}
 			case netCDFStream::NcType::FLOAT:
 			case netCDFStream::NcType::DOUBLE: {
-			  lentry.key+=strutils::ftos(levels[n],3);
+			  lentry.key+=strutils::ftos(levels[n],floatutils::precision(levels[n])+2);
 			  break;
 			}
 			case netCDFStream::NcType::_NULL: {
