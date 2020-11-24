@@ -183,6 +183,7 @@ ifeq ($(strip $(VERSION)),MAJOR)
 	$(eval THISVERSION = $(shell version=`ls -l $(BINDIR)/$@ |awk '{print $$11}' |sed "s|$(BINDIR)/$@.||"`; major=`echo $$version |awk -F. '{print $$1}'`; major=$$(( $$major + 1 )); echo "$$major.0.0"))
 	$(eval OKAYTOBUILD=1)
 else
+	$(eval THISVERSION = $(VERSION))
 	$(eval OKAYTOBUILD=0)
 endif
 endif
@@ -220,6 +221,7 @@ ifeq ($(strip $(VERSION)),MAJOR)
 	$(eval THISVERSION = $(shell version=`ls -l $(BINDIR)/$@ |awk '{print $$11}' |sed "s|$(BINDIR)/$@.||"`; major=`echo $$version |awk -F. '{print $$1}'`; major=$$(( $$major + 1 )); echo "$$major.0.0"))
 	$(eval OKAYTOBUILD=1)
 else
+	$(eval THISVERSION = $(VERSION))
 	$(eval OKAYTOBUILD=0)
 endif
 endif
@@ -257,6 +259,7 @@ ifeq ($(strip $(VERSION)),MAJOR)
 	$(eval THISVERSION = $(shell version=`ls -l $(BINDIR)/$@ |awk '{print $$11}' |sed "s|$(BINDIR)/$@.||"`; major=`echo $$version |awk -F. '{print $$1}'`; major=$$(( $$major + 1 )); echo "$$major.0.0"))
 	$(eval OKAYTOBUILD=1)
 else
+	$(eval THISVERSION = $(VERSION))
 	$(eval OKAYTOBUILD=0)
 endif
 endif
@@ -285,6 +288,7 @@ ifeq ($(strip $(VERSION)),MAJOR)
 	$(eval THISVERSION = $(shell version=`ls -l $(BINDIR)/$@ |awk '{print $$11}' |sed "s|$(BINDIR)/$@.||"`; major=`echo $$version |awk -F. '{print $$1}'`; major=$$(( $$major + 1 )); echo "$$major.0.0"))
 	$(eval OKAYTOBUILD=1)
 else
+	$(eval THISVERSION = $(VERSION))
 	$(eval OKAYTOBUILD=0)
 endif
 endif
