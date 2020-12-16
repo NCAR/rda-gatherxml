@@ -1315,7 +1315,7 @@ bool parameter_matches_dimensions(InputHDF5Stream& istream,const InputHDF5Stream
   std::unordered_map<size_t,std::string>::iterator rtp_it[3];
   for (size_t n=first,rcnt=0; n < attribute_value.dim_sizes[0]; ++n,++rcnt) {
     rtp_it[rcnt]=istream.reference_table_pointer()->find(HDF5::value(&attribute_value.vlen.buffer[off],attribute_value.precision_));
-    if (rtp_it[rcnt] != istream.reference_table_pointer()->end()) {
+    if (rtp_it[rcnt] == istream.reference_table_pointer()->end()) {
 	metautils::log_error("unable to dereference dimension reference","hdf2xml",USER);
     }
     if (gatherxml::verbose_operation) {
