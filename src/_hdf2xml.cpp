@@ -2513,7 +2513,7 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
   }
   if (found_time && !lat_ids.empty() && !lon_ids.empty()) {
     if (gatherxml::verbose_operation) {
-	std::cout << "...found 'time', 'latitude', and 'longitude' coordinates..." << std::endl;
+	std::cout << "...found time ('" << gcoords.valid_time.id << "'), latitude ('" << lat_ids.front() << "'), and longitude ('" << lon_ids.front() << "') coordinates..." << std::endl;
     }
     my::map<metautils::NcTime::TimeRangeEntry> time_range_table;
     metautils::NcTime::TimeRangeEntry tre;
