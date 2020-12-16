@@ -77,13 +77,13 @@ struct ParameterData {
   std::unordered_set<std::string> set;
   ParameterMap map;
 };
-std::unique_ptr<my::map<gatherxml::markup::GrML::GridEntry>> grid_table;
-std::unique_ptr<gatherxml::markup::GrML::GridEntry> grid_entry;
-std::unique_ptr<gatherxml::markup::GrML::LevelEntry> lentry;
-std::unique_ptr<gatherxml::markup::GrML::ParameterEntry> param_entry;
-std::unordered_set<std::string> unique_observation_table,unique_data_type_observation_set;
+std::unique_ptr<my::map<gatherxml::markup::GrML::GridEntry>> grid_table_ptr;
+std::unique_ptr<gatherxml::markup::GrML::GridEntry> grid_entry_ptr;
+std::unique_ptr<gatherxml::markup::GrML::LevelEntry> level_entry_ptr;
+std::unique_ptr<gatherxml::markup::GrML::ParameterEntry> parameter_entry_ptr;
+std::unordered_set<std::string> unique_data_type_observation_set;
 gatherxml::markup::ObML::DataTypeEntry de;
-std::unordered_map<std::string,size_t> inv_U_table,inv_G_table,inv_L_table,inv_P_table,inv_R_table;
+std::unordered_map<std::string,size_t> inv_U_map,inv_G_map,inv_L_map,inv_P_map,inv_R_map;
 std::list<std::string> inv_lines;
 std::stringstream wss;
 std::string xml_directory;
@@ -113,11 +113,11 @@ extern "C" void int_handler(int)
 
 void grid_initialize()
 {
-  if (grid_table == nullptr) {
-    grid_table.reset(new my::map<gatherxml::markup::GrML::GridEntry>);
-    grid_entry.reset(new gatherxml::markup::GrML::GridEntry);
-    lentry.reset(new gatherxml::markup::GrML::LevelEntry);
-    param_entry.reset(new gatherxml::markup::GrML::ParameterEntry);
+  if (grid_table_ptr == nullptr) {
+    grid_table_ptr.reset(new my::map<gatherxml::markup::GrML::GridEntry>);
+    grid_entry_ptr.reset(new gatherxml::markup::GrML::GridEntry);
+    level_entry_ptr.reset(new gatherxml::markup::GrML::LevelEntry);
+    parameter_entry_ptr.reset(new gatherxml::markup::GrML::ParameterEntry);
   }
 }
 
@@ -148,9 +148,9 @@ void extract_from_hdf5_variable_attributes(std::unordered_map<std::string,InputH
   nc_attribute_data.units="";
   nc_attribute_data.cf_keyword="";
   nc_attribute_data.missing_value.clear();
-  for (const auto& entry : attributes) {
-    auto& attribute_name=entry.first;
-    auto& attribute_value=entry.second;
+  for (const auto& attribute : attributes) {
+    auto& attribute_name=attribute.first;
+    auto& attribute_value=attribute.second;
     if (attribute_name == "long_name") {
 	nc_attribute_data.long_name.assign(reinterpret_cast<char *>(attribute_value.array));
 	strutils::trim(nc_attribute_data.long_name);
@@ -1134,8 +1134,8 @@ void add_gridded_time_range(std::string key_start,std::unordered_set<std::string
 	grid_entry_set.emplace(grid_entry_key);
     }
   }
-  if (inv_stream.is_open() && inv_U_table.find(inv_key) == inv_U_table.end()) {
-    inv_U_table.emplace(inv_key,inv_U_table.size());
+  if (inv_stream.is_open() && inv_U_map.find(inv_key) == inv_U_map.end()) {
+    inv_U_map.emplace(inv_key,inv_U_map.size());
   }
 }
 
@@ -1179,8 +1179,8 @@ void add_gridded_lat_lon_keys(std::unordered_set<std::string>& grid_entry_set,Gr
   }
   auto key=strutils::substitute(key_start,"<!>",",");
   strutils::chop(key);
-  if (inv_stream.is_open() && inv_G_table.find(key) == inv_G_table.end()) {
-    inv_G_table.emplace(key,inv_G_table.size());
+  if (inv_stream.is_open() && inv_G_map.find(key) == inv_G_map.end()) {
+    inv_G_map.emplace(key,inv_G_map.size());
   }
 }
 
@@ -1291,10 +1291,10 @@ void add_gridded_netcdf_parameter(const InputHDF5Stream::DatasetEntry& var,ScanD
 	}
     }
   }
-  param_entry->start_date_time=time_range.first_valid_datetime;
-  param_entry->end_date_time=time_range.last_valid_datetime;
-  param_entry->num_time_steps=num_steps;
-  lentry->parameter_code_table.insert(*param_entry);
+  parameter_entry_ptr->start_date_time=time_range.first_valid_datetime;
+  parameter_entry_ptr->end_date_time=time_range.last_valid_datetime;
+  parameter_entry_ptr->num_time_steps=num_steps;
+  level_entry_ptr->parameter_code_table.insert(*parameter_entry_ptr);
 }
 
 bool parameter_matches_dimensions(InputHDF5Stream& istream,const InputHDF5Stream::Attribute& attr,const GridCoordinates& gcoords,std::string level_id)
@@ -1438,10 +1438,10 @@ void add_gridded_parameters_to_netcdf_level_entry(InputHDF5Stream& istream,std::
 	tr_description=strutils::capitalize(tr_description);
 	if (std::regex_search(grid_entry_key,std::regex(tr_description+"$"))) {
 //	  if (attr.value.dim_sizes[0] == 4 || attr.value.dim_sizes[0] == 3 || (attr.value.dim_sizes[0] == 2 && gcoords.valid_time.data_array.num_values == 1)) {
-	    param_entry->key="ds"+metautils::args.dsnum+":"+var.first;
+	    parameter_entry_ptr->key="ds"+metautils::args.dsnum+":"+var.first;
 	    add_gridded_netcdf_parameter(var,scan_data,time_range,parameter_data,tre.data->num_steps);
-	    if (inv_P_table.find(param_entry->key) == inv_P_table.end()) {
-		inv_P_table.emplace(param_entry->key,inv_P_table.size());
+	    if (inv_P_map.find(parameter_entry_ptr->key) == inv_P_map.end()) {
+		inv_P_map.emplace(parameter_entry_ptr->key,inv_P_map.size());
 	    }
 //	  }
 	}
@@ -1457,11 +1457,11 @@ void update_level_entry(InputHDF5Stream& istream,const metautils::NcTime::TimeRa
     auto attr_it=dset_ptr->attributes.find("DIMENSION_LIST");
     auto& attribute_value=attr_it->second;
     if (attribute_value._class_ == 9 && attribute_value.dim_sizes.size() == 1 && attribute_value.dim_sizes[0] > 2 && attribute_value.vlen.class_ == 7 && parameter_matches_dimensions(istream,*attr_it,gcoords,level_id)) {
-	param_entry->key="ds"+metautils::args.dsnum+":"+var.first;
+	parameter_entry_ptr->key="ds"+metautils::args.dsnum+":"+var.first;
 	auto time_method=gridded_time_method(dset_ptr,gcoords);
 	time_method=strutils::capitalize(time_method);
 	metautils::NcTime::TimeRange time_range;
-	if (!lentry->parameter_code_table.found(param_entry->key,*param_entry)) {
+	if (!level_entry_ptr->parameter_code_table.found(parameter_entry_ptr->key,*parameter_entry_ptr)) {
 	  if (time_method.empty() || (floatutils::myequalf(time_bounds.t1,0,0.0001) && floatutils::myequalf(time_bounds.t1,time_bounds.t2,0.0001))) {
 	    time_range.first_valid_datetime=tre.data->instantaneous.first_valid_datetime;
 	    time_range.last_valid_datetime=tre.data->instantaneous.last_valid_datetime;
@@ -1475,7 +1475,7 @@ void update_level_entry(InputHDF5Stream& istream,const metautils::NcTime::TimeRa
 	    time_range.last_valid_datetime=tre.data->bounded.last_valid_datetime;
 	    add_gridded_netcdf_parameter(var,scan_data,time_range,parameter_data,tre.data->num_steps);
 	  }
-	  grid_entry->level_table.replace(*lentry);
+	  grid_entry_ptr->level_table.replace(*level_entry_ptr);
 	}
 	else {
 	  std::string error;
@@ -1484,31 +1484,31 @@ void update_level_entry(InputHDF5Stream& istream,const metautils::NcTime::TimeRa
 	    metautils::log_error(error,"hdf2xml",USER);
 	  }
 	  tr_description=strutils::capitalize(tr_description);
-	  if (std::regex_search(grid_entry->key,std::regex(tr_description+"$"))) {
+	  if (std::regex_search(grid_entry_ptr->key,std::regex(tr_description+"$"))) {
 	    if (time_method.empty() || (floatutils::myequalf(time_bounds.t1,0,0.0001) && floatutils::myequalf(time_bounds.t1,time_bounds.t2,0.0001))) {
-		if (tre.data->instantaneous.first_valid_datetime < param_entry->start_date_time) {
-		  param_entry->start_date_time=tre.data->instantaneous.first_valid_datetime;
+		if (tre.data->instantaneous.first_valid_datetime < parameter_entry_ptr->start_date_time) {
+		  parameter_entry_ptr->start_date_time=tre.data->instantaneous.first_valid_datetime;
 		}
-		if (tre.data->instantaneous.last_valid_datetime > param_entry->end_date_time) {
-		  param_entry->end_date_time=tre.data->instantaneous.last_valid_datetime;
+		if (tre.data->instantaneous.last_valid_datetime > parameter_entry_ptr->end_date_time) {
+		  parameter_entry_ptr->end_date_time=tre.data->instantaneous.last_valid_datetime;
 		}
 	    }
 	    else {
-		if (tre.data->bounded.first_valid_datetime < param_entry->start_date_time) {
-		  param_entry->start_date_time=tre.data->bounded.first_valid_datetime;
+		if (tre.data->bounded.first_valid_datetime < parameter_entry_ptr->start_date_time) {
+		  parameter_entry_ptr->start_date_time=tre.data->bounded.first_valid_datetime;
 		}
-		if (tre.data->bounded.last_valid_datetime > param_entry->end_date_time) {
-		  param_entry->end_date_time=tre.data->bounded.last_valid_datetime;
+		if (tre.data->bounded.last_valid_datetime > parameter_entry_ptr->end_date_time) {
+		  parameter_entry_ptr->end_date_time=tre.data->bounded.last_valid_datetime;
 		}
 	    }
-	    param_entry->num_time_steps+=tre.data->num_steps;
-	    lentry->parameter_code_table.replace(*param_entry);
-	    grid_entry->level_table.replace(*lentry);
+	    parameter_entry_ptr->num_time_steps+=tre.data->num_steps;
+	    level_entry_ptr->parameter_code_table.replace(*parameter_entry_ptr);
+	    grid_entry_ptr->level_table.replace(*level_entry_ptr);
 	  }
 	}
 	level_write=1;
-	if (inv_P_table.find(param_entry->key) == inv_P_table.end()) {
-	  inv_P_table.emplace(param_entry->key,inv_P_table.size());
+	if (inv_P_map.find(parameter_entry_ptr->key) == inv_P_map.end()) {
+	  inv_P_map.emplace(parameter_entry_ptr->key,inv_P_map.size());
 	}
     }
   }
@@ -1567,14 +1567,14 @@ DateTime compute_nc_time(const HDF5::DataArray& times,const metautils::NcTime::T
 
 void update_inventory(int unum,int gnum,const GridCoordinates& gcoords,const metautils::NcTime::TimeData& time_data)
 {
-  if (inv_L_table.find(lentry->key) == inv_L_table.end()) {
-    inv_L_table.emplace(lentry->key,inv_L_table.size());
+  if (inv_L_map.find(level_entry_ptr->key) == inv_L_map.end()) {
+    inv_L_map.emplace(level_entry_ptr->key,inv_L_map.size());
   }
   for (size_t n=0; n < gcoords.valid_time.data_array.num_values; ++n) {
-    for (const auto& key : lentry->parameter_code_table.keys()) {
+    for (const auto& key : level_entry_ptr->parameter_code_table.keys()) {
 	std::stringstream inv_line;
 	std::string error;
-	inv_line << "0|0|" << metautils::NcTime::actual_date_time(data_array_value(gcoords.valid_time.data_array,n,gcoords.valid_time.ds.get()),time_data,error).to_string("%Y%m%d%H%MM") << "|" << unum << "|" << gnum << "|" << inv_L_table[lentry->key] << "|" << inv_P_table[key] << "|0";
+	inv_line << "0|0|" << metautils::NcTime::actual_date_time(data_array_value(gcoords.valid_time.data_array,n,gcoords.valid_time.ds.get()),time_data,error).to_string("%Y%m%d%H%MM") << "|" << unum << "|" << gnum << "|" << inv_L_map[level_entry_ptr->key] << "|" << inv_P_map[key] << "|0";
 	inv_lines.emplace_back(inv_line.str());
     }
   }
@@ -2888,12 +2888,12 @@ std::cerr << floatutils::myequalf(data_array_value(gcoords.latitude.data_array,c
 	    time_range_table.found(key,tre);
 	    metautils::NcTime::TimeData &tr_time_data= (gcoords.forecast_period.id.empty()) ? time_data : forecast_period_time_data;
 	    add_gridded_lat_lon_keys(grid_entry_set,dim,def,tre,tr_time_data,gcoords,istream);
-	    for (const auto& gentry : grid_entry_set) {
+	    for (const auto& grid_entry : grid_entry_set) {
 		if (gatherxml::verbose_operation) {
-		  std::cout << "  processing grid entry: " << gentry << std::endl;
+		  std::cout << "  processing grid entry: " << grid_entry << std::endl;
 		}
-		grid_entry->key=gentry;
-		auto key_parts=strutils::split(grid_entry->key,"<!>");
+		grid_entry_ptr->key=grid_entry;
+		auto key_parts=strutils::split(grid_entry_ptr->key,"<!>");
 		auto& product_key=key_parts.back();
 		std::string grid_key;
 		if (inv_stream.is_open()) {
@@ -2902,68 +2902,68 @@ std::cerr << floatutils::myequalf(data_array_value(gcoords.latitude.data_array,c
 		    grid_key+=","+key_parts[nn];
 		  }
 		}
-		if (!grid_table->found(grid_entry->key,*grid_entry)) {
+		if (!grid_table_ptr->found(grid_entry_ptr->key,*grid_entry_ptr)) {
 // new grid
-		  grid_entry->level_table.clear();
-		  lentry->parameter_code_table.clear();
-		  param_entry->num_time_steps=0;
-		  add_gridded_parameters_to_netcdf_level_entry(istream,grid_entry->key,gcoords,level_id,scan_data,tre,tr_time_data,time_bounds,parameter_data);
-		  if (!lentry->parameter_code_table.empty()) {
+		  grid_entry_ptr->level_table.clear();
+		  level_entry_ptr->parameter_code_table.clear();
+		  parameter_entry_ptr->num_time_steps=0;
+		  add_gridded_parameters_to_netcdf_level_entry(istream,grid_entry_ptr->key,gcoords,level_id,scan_data,tre,tr_time_data,time_bounds,parameter_data);
+		  if (!level_entry_ptr->parameter_code_table.empty()) {
 		    for (size_t l=0; l < num_levels; ++l) {
-			lentry->key="ds"+metautils::args.dsnum+","+level_id+":";
+			level_entry_ptr->key="ds"+metautils::args.dsnum+","+level_id+":";
 			if (gcoords.time_bounds.ds == nullptr) {
 			  auto level_value= (levels_ds == nullptr) ? 0. : data_array_value(levels_array,l,levels_ds.get());
 			  if (floatutils::myequalf(level_value,static_cast<int>(level_value),0.001)) {
-			    lentry->key+=strutils::itos(level_value);
+			    level_entry_ptr->key+=strutils::itos(level_value);
 			  }
 			  else {
-			    lentry->key+=strutils::ftos(level_value,3);
+			    level_entry_ptr->key+=strutils::ftos(level_value,3);
 			  }
 			}
 			else {
 			  auto level_value=data_array_value(gcoords.time_bounds.data_array,l*2,gcoords.time_bounds.ds.get());
 			  if (floatutils::myequalf(level_value,static_cast<int>(level_value),0.001)) {
-			    lentry->key+=strutils::itos(level_value);
+			    level_entry_ptr->key+=strutils::itos(level_value);
 			  }
 			  else {
-			    lentry->key+=strutils::ftos(level_value,3);
+			    level_entry_ptr->key+=strutils::ftos(level_value,3);
 			  }
 			  level_value=data_array_value(gcoords.time_bounds.data_array,l*2+1,gcoords.time_bounds.ds.get());
-			  lentry->key+=":";
+			  level_entry_ptr->key+=":";
 			  if (floatutils::myequalf(level_value,static_cast<int>(level_value),0.001)) {
-			    lentry->key+=strutils::itos(level_value);
+			    level_entry_ptr->key+=strutils::itos(level_value);
 			  }
 			  else {
-			    lentry->key+=strutils::ftos(level_value,3);
+			    level_entry_ptr->key+=strutils::ftos(level_value,3);
 			  }
 			}
-			grid_entry->level_table.insert(*lentry);
+			grid_entry_ptr->level_table.insert(*level_entry_ptr);
 			level_info.write[m]=1;
 			if (inv_stream.is_open()) {
-			  update_inventory(inv_U_table[product_key],inv_G_table[grid_key],gcoords,tr_time_data);
+			  update_inventory(inv_U_map[product_key],inv_G_map[grid_key],gcoords,tr_time_data);
 			}
 		    }
 		  }
-		  if (!grid_entry->level_table.empty()) {
-		    grid_table->insert(*grid_entry);
+		  if (!grid_entry_ptr->level_table.empty()) {
+		    grid_table_ptr->insert(*grid_entry_ptr);
 		  }
  		}
 		else {
 // existing grid - needs update
 		  for (size_t l=0; l < num_levels; ++l) {
-		    lentry->key="ds"+metautils::args.dsnum+","+level_id+":";
+		    level_entry_ptr->key="ds"+metautils::args.dsnum+","+level_id+":";
 		    auto level_value= (levels_ds == nullptr) ? 0. : data_array_value(levels_array,l,levels_ds.get());
 		    if (floatutils::myequalf(level_value,static_cast<int>(level_value),0.001)) {
-			lentry->key+=strutils::itos(level_value);
+			level_entry_ptr->key+=strutils::itos(level_value);
 		    }
 		    else {
-			lentry->key+=strutils::ftos(level_value,3);
+			level_entry_ptr->key+=strutils::ftos(level_value,3);
 		    }
-		    if (!grid_entry->level_table.found(lentry->key,*lentry)) {
-			lentry->parameter_code_table.clear();
-			add_gridded_parameters_to_netcdf_level_entry(istream,grid_entry->key,gcoords,level_id,scan_data,tre,tr_time_data,time_bounds,parameter_data);
-			if (!lentry->parameter_code_table.empty()) {
-			  grid_entry->level_table.insert(*lentry);
+		    if (!grid_entry_ptr->level_table.found(level_entry_ptr->key,*level_entry_ptr)) {
+			level_entry_ptr->parameter_code_table.clear();
+			add_gridded_parameters_to_netcdf_level_entry(istream,grid_entry_ptr->key,gcoords,level_id,scan_data,tre,tr_time_data,time_bounds,parameter_data);
+			if (!level_entry_ptr->parameter_code_table.empty()) {
+			  grid_entry_ptr->level_table.insert(*level_entry_ptr);
 			  level_info.write[m]=1;
 			}
 		    }
@@ -2971,10 +2971,10 @@ std::cerr << floatutils::myequalf(data_array_value(gcoords.latitude.data_array,c
  			update_level_entry(istream,tre,tr_time_data,time_bounds,gcoords,level_id,scan_data,parameter_data,level_info.write[m]);
 		    }
 		    if (level_info.write[m] == 1 && inv_stream.is_open()) {
-			update_inventory(inv_U_table[product_key],inv_G_table[grid_key],gcoords,tr_time_data);
+			update_inventory(inv_U_map[product_key],inv_G_map[grid_key],gcoords,tr_time_data);
 		    }
 		  }
-		  grid_table->replace(*grid_entry);
+		  grid_table_ptr->replace(*grid_entry_ptr);
 		}
 	    }
 	  }
@@ -2986,7 +2986,7 @@ std::cerr << floatutils::myequalf(data_array_value(gcoords.latitude.data_array,c
     }
   }
   scan_data.write_type=ScanData::GrML_type;
-  if (grid_table->size() == 0) {
+  if (grid_table_ptr->size() == 0) {
     if (found_time) {
 	std::cerr << "Terminating - no grids found and no content metadata will be generated" << std::endl;
     }
@@ -2996,7 +2996,7 @@ std::cerr << floatutils::myequalf(data_array_value(gcoords.latitude.data_array,c
     exit(1);
   }
 if (inv_stream.is_open()) {
-inv_R_table.emplace("x",0);
+inv_R_map.emplace("x",0);
 }
   if (gatherxml::verbose_operation) {
     std::cout << "...function scan_gridded_hdf5nc4_file() done." << std::endl;
@@ -3092,7 +3092,7 @@ void scan_hdf5_file(std::list<std::string>& filelist,ScanData& scan_data)
   if (scan_data.write_type == ScanData::GrML_type) {
     scan_data.cmd_type="GrML";
     if (!metautils::args.inventory_only) {
-	xml_directory=gatherxml::markup::GrML::write(*grid_table,"hdf2xml",USER);
+	xml_directory=gatherxml::markup::GrML::write(*grid_table_ptr,"hdf2xml",USER);
     }
   }
   else if (scan_data.write_type == ScanData::ObML_type) {
@@ -3251,19 +3251,19 @@ int main(int argc,char **argv)
     }
   }
   if (inv_stream.is_open()) {
-    for (const auto& entry : inv_U_table) {
+    for (const auto& entry : inv_U_map) {
 	inv_stream << "U<!>" << entry.second << "<!>" << entry.first << std::endl;
     }
-    for (const auto& entry : inv_G_table) {
+    for (const auto& entry : inv_G_map) {
 	inv_stream << "G<!>" << entry.second << "<!>" << entry.first << std::endl;
     }
-    for (const auto& entry : inv_L_table) {
+    for (const auto& entry : inv_L_map) {
 	inv_stream << "L<!>" << entry.second << "<!>" << entry.first << std::endl;
     }
-    for (const auto& entry : inv_P_table) {
+    for (const auto& entry : inv_P_map) {
 	inv_stream << "P<!>" << entry.second << "<!>" << entry.first << std::endl;
     }
-    for (const auto& entry : inv_R_table) {
+    for (const auto& entry : inv_R_map) {
 	inv_stream << "R<!>" << entry.second << "<!>" << entry.first << std::endl;
     }
     inv_stream << "-----" << std::endl;
