@@ -72,9 +72,9 @@ struct NetCDFVariableAttributeData {
   InputHDF5Stream::DataValue missing_value;
 };
 struct ParameterData {
-  ParameterData() : table(),map() {}
+  ParameterData() : set(),map() {}
 
-  my::map<metautils::StringEntry> table;
+  std::unordered_set<std::string> set;
   ParameterMap map;
 };
 struct InvEntry {
@@ -1288,14 +1288,14 @@ void add_gridded_netcdf_parameter(const InputHDF5Stream::DatasetEntry& var,ScanD
   strutils::trim(standard_name);
   metautils::StringEntry se;
   se.key=var_name+"<!>"+description+"<!>"+units+"<!>"+standard_name;
-  if (!parameter_data.table.found(se.key,se)) {
+  if (parameter_data.set.find(se.key) == parameter_data.set.end()) {
     auto short_name=parameter_data.map.short_name(var.first);
     if (!scan_data.found_map || short_name.empty()) {
-	parameter_data.table.insert(se);
+	parameter_data.set.emplace(se.key);
 	scan_data.varlist.emplace_back(se.key);
     }
     else {
-	parameter_data.table.insert(se);
+	parameter_data.set.emplace(se.key);
 	scan_data.varlist.emplace_back(se.key);
 	if (!scan_data.var_changes_table.found(var.first,se)) {
 	  se.key=var.first;
@@ -2297,7 +2297,7 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
   metautils::NcTime::TimeData time_data,forecast_period_time_data;
   metautils::NcLevel::LevelInfo level_info;
   std::vector<std::string> lat_ids,lon_ids;
-  my::map<metautils::StringEntry> unique_level_id_table;
+  std::unordered_set<std::string> unique_level_id_set;
   for (const auto& var : dim_vars) {
     auto& var_name=var.first;
     auto& dset_ptr=var.second;
@@ -2379,7 +2379,7 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
 	    }
 	  }
 	  else {
-	    if (!unique_level_id_table.found(var_name,se)) {
+	    if (unique_level_id_set.find(var_name) == unique_level_id_set.end()) {
 		level_info.ID.emplace_back(var_name);
 		attr_it=dset_ptr->attributes.find("long_name");
 		if (attr_it != dset_ptr->attributes.end() && attr_it->second._class_ == 3) {
@@ -2387,15 +2387,14 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
 		}
 		level_info.units.emplace_back(units_value);
 		level_info.write.emplace_back(0);
-		se.key=var_name;
-		unique_level_id_table.insert(se);
+		unique_level_id_set.emplace(var_name);
 	    }
 	  }
 	}
     }
     else {
 	attr_it=dset_ptr->attributes.find("positive");
-	if (attr_it != dset_ptr->attributes.end() && attr_it->second._class_ == 3 && !unique_level_id_table.found(var_name,se)) {
+	if (attr_it != dset_ptr->attributes.end() && attr_it->second._class_ == 3 && unique_level_id_set.find(var_name) == unique_level_id_set.end()) {
 	  level_info.ID.emplace_back(var_name);
 	  attr_it=dset_ptr->attributes.find("long_name");
 	  if (attr_it != dset_ptr->attributes.end() && attr_it->second._class_ == 3) {
@@ -2403,8 +2402,7 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
 	  }
 	  level_info.units.emplace_back("");
 	  level_info.write.emplace_back(0);
-	  se.key=var_name;
-	  unique_level_id_table.insert(se);
+	  unique_level_id_set.emplace(var_name);
 	}
     }
   }
