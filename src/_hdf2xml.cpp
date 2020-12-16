@@ -78,7 +78,7 @@ struct ParameterData {
   ParameterMap map;
 };
 std::unique_ptr<my::map<gatherxml::markup::GrML::GridEntry>> grid_table;
-std::unique_ptr<gatherxml::markup::GrML::GridEntry> gentry;
+std::unique_ptr<gatherxml::markup::GrML::GridEntry> grid_entry;
 std::unique_ptr<gatherxml::markup::GrML::LevelEntry> lentry;
 std::unique_ptr<gatherxml::markup::GrML::ParameterEntry> param_entry;
 std::unordered_set<std::string> unique_observation_table,unique_data_type_observation_set;
@@ -115,7 +115,7 @@ void grid_initialize()
 {
   if (grid_table == nullptr) {
     grid_table.reset(new my::map<gatherxml::markup::GrML::GridEntry>);
-    gentry.reset(new gatherxml::markup::GrML::GridEntry);
+    grid_entry.reset(new gatherxml::markup::GrML::GridEntry);
     lentry.reset(new gatherxml::markup::GrML::LevelEntry);
     param_entry.reset(new gatherxml::markup::GrML::ParameterEntry);
   }
@@ -1094,9 +1094,9 @@ std::string gridded_time_method(const std::shared_ptr<InputHDF5Stream::Dataset> 
   return "";
 }
 
-void add_gridded_time_range(std::string key_start,my::map<metautils::StringEntry>& gentry_table,const metautils::NcTime::TimeRangeEntry& tre,const metautils::NcTime::TimeData& time_data,const GridCoordinates& gcoords,InputHDF5Stream& istream)
+void add_gridded_time_range(std::string key_start,std::unordered_set<std::string>& grid_entry_set,const metautils::NcTime::TimeRangeEntry& tre,const metautils::NcTime::TimeData& time_data,const GridCoordinates& gcoords,InputHDF5Stream& istream)
 {
-  std::string gentry_key,inv_key;
+  std::string grid_entry_key,inv_key;
   bool found_no_method=false;
   auto vars=istream.datasets_with_attribute("DIMENSION_LIST");
   for (const auto& var : vars) {
@@ -1114,11 +1114,10 @@ void add_gridded_time_range(std::string key_start,my::map<metautils::StringEntry
 	  if (!error.empty()) {
 	    metautils::log_error(error,"hdf2xml",USER);
 	  }
-	  gentry_key=key_start+inv_key;
+	  grid_entry_key=key_start+inv_key;
 	  metautils::StringEntry se;
-	  if (!gentry_table.found(gentry_key,se)) {
-	    se.key=gentry_key;
-	    gentry_table.insert(se);
+	  if (grid_entry_set.find(grid_entry_key) == grid_entry_set.end()) {
+	    grid_entry_set.emplace(grid_entry_key);
 	  }
 	}
     }
@@ -1129,11 +1128,10 @@ void add_gridded_time_range(std::string key_start,my::map<metautils::StringEntry
     if (!error.empty()) {
 	metautils::log_error(error,"hdf2xml",USER);
     }
-    gentry_key=key_start+inv_key;
+    grid_entry_key=key_start+inv_key;
     metautils::StringEntry se;
-    if (!gentry_table.found(gentry_key,se)) {
-	se.key=gentry_key;
-	gentry_table.insert(se);
+    if (grid_entry_set.find(grid_entry_key) == grid_entry_set.end()) {
+	grid_entry_set.emplace(grid_entry_key);
     }
   }
   if (inv_stream.is_open() && inv_U_table.find(inv_key) == inv_U_table.end()) {
@@ -1141,7 +1139,7 @@ void add_gridded_time_range(std::string key_start,my::map<metautils::StringEntry
   }
 }
 
-void add_gridded_lat_lon_keys(my::map<metautils::StringEntry>& gentry_table,Grid::GridDimensions dim,Grid::GridDefinition def,const metautils::NcTime::TimeRangeEntry& tre,const metautils::NcTime::TimeData& time_data,const GridCoordinates& gcoords,InputHDF5Stream& istream)
+void add_gridded_lat_lon_keys(std::unordered_set<std::string>& grid_entry_set,Grid::GridDimensions dim,Grid::GridDefinition def,const metautils::NcTime::TimeRangeEntry& tre,const metautils::NcTime::TimeData& time_data,const GridCoordinates& gcoords,InputHDF5Stream& istream)
 {
   std::string key_start;
   switch (def.type) {
@@ -1151,7 +1149,7 @@ void add_gridded_lat_lon_keys(my::map<metautils::StringEntry>& gentry_table,Grid
 	  key_start.push_back('C');
 	}
 	key_start+="<!>"+strutils::itos(dim.x)+"<!>"+strutils::itos(dim.y)+"<!>"+strutils::ftos(def.slatitude,3)+"<!>"+strutils::ftos(def.slongitude,3)+"<!>"+strutils::ftos(def.elatitude,3)+"<!>"+strutils::ftos(def.elongitude,3)+"<!>"+strutils::ftos(def.loincrement,3)+"<!>"+strutils::ftos(def.laincrement,3)+"<!>";
-	add_gridded_time_range(key_start,gentry_table,tre,time_data,gcoords,istream);
+	add_gridded_time_range(key_start,grid_entry_set,tre,time_data,gcoords,istream);
 	break;
     }
     case Grid::polarStereographicType: {
@@ -1163,7 +1161,7 @@ void add_gridded_lat_lon_keys(my::map<metautils::StringEntry>& gentry_table,Grid
 	  key_start+="S";
 	}
 	key_start+="<!>";
-	add_gridded_time_range(key_start,gentry_table,tre,time_data,gcoords,istream);
+	add_gridded_time_range(key_start,grid_entry_set,tre,time_data,gcoords,istream);
 	break;
     }
     case Grid::lambertConformalType: {
@@ -1175,7 +1173,7 @@ void add_gridded_lat_lon_keys(my::map<metautils::StringEntry>& gentry_table,Grid
 	  key_start+="S";
 	}
 	key_start+="<!>"+strutils::ftos(def.stdparallel1,3)+"<!>"+strutils::ftos(def.stdparallel2,3)+"<!>";
-	add_gridded_time_range(key_start,gentry_table,tre,time_data,gcoords,istream);
+	add_gridded_time_range(key_start,grid_entry_set,tre,time_data,gcoords,istream);
 	break;
     }
   }
@@ -1401,7 +1399,7 @@ bool parameter_matches_dimensions(InputHDF5Stream& istream,const InputHDF5Stream
   return parameter_matches;
 }
 
-void add_gridded_parameters_to_netcdf_level_entry(InputHDF5Stream& istream,std::string& gentry_key,const GridCoordinates& gcoords,std::string level_id,ScanData& scan_data,const metautils::NcTime::TimeRangeEntry& tre,const metautils::NcTime::TimeData& time_data,const metautils::NcTime::TimeBounds& time_bounds,ParameterData& parameter_data)
+void add_gridded_parameters_to_netcdf_level_entry(InputHDF5Stream& istream,std::string& grid_entry_key,const GridCoordinates& gcoords,std::string level_id,ScanData& scan_data,const metautils::NcTime::TimeRangeEntry& tre,const metautils::NcTime::TimeData& time_data,const metautils::NcTime::TimeBounds& time_bounds,ParameterData& parameter_data)
 {
 // find all of the variables
   auto vars=istream.datasets_with_attribute("DIMENSION_LIST");
@@ -1438,7 +1436,7 @@ void add_gridded_parameters_to_netcdf_level_entry(InputHDF5Stream& istream,std::
 	  metautils::log_error(error,"hdf2xml",USER);
 	}
 	tr_description=strutils::capitalize(tr_description);
-	if (std::regex_search(gentry_key,std::regex(tr_description+"$"))) {
+	if (std::regex_search(grid_entry_key,std::regex(tr_description+"$"))) {
 //	  if (attr.value.dim_sizes[0] == 4 || attr.value.dim_sizes[0] == 3 || (attr.value.dim_sizes[0] == 2 && gcoords.valid_time.data_array.num_values == 1)) {
 	    param_entry->key="ds"+metautils::args.dsnum+":"+var.first;
 	    add_gridded_netcdf_parameter(var,scan_data,time_range,parameter_data,tre.data->num_steps);
@@ -1477,7 +1475,7 @@ void update_level_entry(InputHDF5Stream& istream,const metautils::NcTime::TimeRa
 	    time_range.last_valid_datetime=tre.data->bounded.last_valid_datetime;
 	    add_gridded_netcdf_parameter(var,scan_data,time_range,parameter_data,tre.data->num_steps);
 	  }
-	  gentry->level_table.replace(*lentry);
+	  grid_entry->level_table.replace(*lentry);
 	}
 	else {
 	  std::string error;
@@ -1486,7 +1484,7 @@ void update_level_entry(InputHDF5Stream& istream,const metautils::NcTime::TimeRa
 	    metautils::log_error(error,"hdf2xml",USER);
 	  }
 	  tr_description=strutils::capitalize(tr_description);
-	  if (std::regex_search(gentry->key,std::regex(tr_description+"$"))) {
+	  if (std::regex_search(grid_entry->key,std::regex(tr_description+"$"))) {
 	    if (time_method.empty() || (floatutils::myequalf(time_bounds.t1,0,0.0001) && floatutils::myequalf(time_bounds.t1,time_bounds.t2,0.0001))) {
 		if (tre.data->instantaneous.first_valid_datetime < param_entry->start_date_time) {
 		  param_entry->start_date_time=tre.data->instantaneous.first_valid_datetime;
@@ -1505,7 +1503,7 @@ void update_level_entry(InputHDF5Stream& istream,const metautils::NcTime::TimeRa
 	    }
 	    param_entry->num_time_steps+=tre.data->num_steps;
 	    lentry->parameter_code_table.replace(*param_entry);
-	    gentry->level_table.replace(*lentry);
+	    grid_entry->level_table.replace(*lentry);
 	  }
 	}
 	level_write=1;
@@ -2860,7 +2858,7 @@ std::cerr << floatutils::myequalf(data_array_value(gcoords.latitude.data_array,c
 	  std::cout << "...grid was identified as type " << static_cast<int>(def.type) << "..." << std::endl;
 	}
 	for (size_t m=0; m < level_info.ID.size(); ++m) {
-	  my::map<metautils::StringEntry> gentry_table;
+	  std::unordered_set<std::string> grid_entry_set;
 	  auto level_id=level_info.ID[m];
 	  std::shared_ptr<InputHDF5Stream::Dataset> levels_ds;
 	  HDF5::DataArray levels_array;
@@ -2889,13 +2887,13 @@ std::cerr << floatutils::myequalf(data_array_value(gcoords.latitude.data_array,c
 	    metautils::NcTime::TimeRangeEntry tre;
 	    time_range_table.found(key,tre);
 	    metautils::NcTime::TimeData &tr_time_data= (gcoords.forecast_period.id.empty()) ? time_data : forecast_period_time_data;
-	    add_gridded_lat_lon_keys(gentry_table,dim,def,tre,tr_time_data,gcoords,istream);
-	    for (const auto& key2 : gentry_table.keys()) {
+	    add_gridded_lat_lon_keys(grid_entry_set,dim,def,tre,tr_time_data,gcoords,istream);
+	    for (const auto& gentry : grid_entry_set) {
 		if (gatherxml::verbose_operation) {
-		  std::cout << "  processing grid entry: " << key2 << std::endl;
+		  std::cout << "  processing grid entry: " << gentry << std::endl;
 		}
-		gentry->key=key2;
-		auto key_parts=strutils::split(gentry->key,"<!>");
+		grid_entry->key=gentry;
+		auto key_parts=strutils::split(grid_entry->key,"<!>");
 		auto& product_key=key_parts.back();
 		std::string grid_key;
 		if (inv_stream.is_open()) {
@@ -2904,12 +2902,12 @@ std::cerr << floatutils::myequalf(data_array_value(gcoords.latitude.data_array,c
 		    grid_key+=","+key_parts[nn];
 		  }
 		}
-		if (!grid_table->found(gentry->key,*gentry)) {
+		if (!grid_table->found(grid_entry->key,*grid_entry)) {
 // new grid
-		  gentry->level_table.clear();
+		  grid_entry->level_table.clear();
 		  lentry->parameter_code_table.clear();
 		  param_entry->num_time_steps=0;
-		  add_gridded_parameters_to_netcdf_level_entry(istream,gentry->key,gcoords,level_id,scan_data,tre,tr_time_data,time_bounds,parameter_data);
+		  add_gridded_parameters_to_netcdf_level_entry(istream,grid_entry->key,gcoords,level_id,scan_data,tre,tr_time_data,time_bounds,parameter_data);
 		  if (!lentry->parameter_code_table.empty()) {
 		    for (size_t l=0; l < num_levels; ++l) {
 			lentry->key="ds"+metautils::args.dsnum+","+level_id+":";
@@ -2939,15 +2937,15 @@ std::cerr << floatutils::myequalf(data_array_value(gcoords.latitude.data_array,c
 			    lentry->key+=strutils::ftos(level_value,3);
 			  }
 			}
-			gentry->level_table.insert(*lentry);
+			grid_entry->level_table.insert(*lentry);
 			level_info.write[m]=1;
 			if (inv_stream.is_open()) {
 			  update_inventory(inv_U_table[product_key],inv_G_table[grid_key],gcoords,tr_time_data);
 			}
 		    }
 		  }
-		  if (!gentry->level_table.empty()) {
-		    grid_table->insert(*gentry);
+		  if (!grid_entry->level_table.empty()) {
+		    grid_table->insert(*grid_entry);
 		  }
  		}
 		else {
@@ -2961,11 +2959,11 @@ std::cerr << floatutils::myequalf(data_array_value(gcoords.latitude.data_array,c
 		    else {
 			lentry->key+=strutils::ftos(level_value,3);
 		    }
-		    if (!gentry->level_table.found(lentry->key,*lentry)) {
+		    if (!grid_entry->level_table.found(lentry->key,*lentry)) {
 			lentry->parameter_code_table.clear();
-			add_gridded_parameters_to_netcdf_level_entry(istream,gentry->key,gcoords,level_id,scan_data,tre,tr_time_data,time_bounds,parameter_data);
+			add_gridded_parameters_to_netcdf_level_entry(istream,grid_entry->key,gcoords,level_id,scan_data,tre,tr_time_data,time_bounds,parameter_data);
 			if (!lentry->parameter_code_table.empty()) {
-			  gentry->level_table.insert(*lentry);
+			  grid_entry->level_table.insert(*lentry);
 			  level_info.write[m]=1;
 			}
 		    }
@@ -2976,7 +2974,7 @@ std::cerr << floatutils::myequalf(data_array_value(gcoords.latitude.data_array,c
 			update_inventory(inv_U_table[product_key],inv_G_table[grid_key],gcoords,tr_time_data);
 		    }
 		  }
-		  grid_table->replace(*gentry);
+		  grid_table->replace(*grid_entry);
 		}
 	    }
 	  }
