@@ -77,19 +77,13 @@ struct ParameterData {
   std::unordered_set<std::string> set;
   ParameterMap map;
 };
-struct InvEntry {
-  InvEntry() : key(),num(0) {}
-
-  std::string key;
-  int num;
-};
 std::unique_ptr<my::map<gatherxml::markup::GrML::GridEntry>> grid_table;
 std::unique_ptr<gatherxml::markup::GrML::GridEntry> gentry;
 std::unique_ptr<gatherxml::markup::GrML::LevelEntry> lentry;
 std::unique_ptr<gatherxml::markup::GrML::ParameterEntry> param_entry;
 std::unordered_set<std::string> unique_observation_table,unique_data_type_observation_set;
 gatherxml::markup::ObML::DataTypeEntry de;
-my::map<InvEntry> inv_U_table,inv_G_table,inv_L_table,inv_P_table,inv_R_table;
+std::unordered_map<std::string,size_t> inv_U_table,inv_G_table,inv_L_table,inv_P_table,inv_R_table;
 std::list<std::string> inv_lines;
 std::stringstream wss;
 std::string xml_directory;
@@ -1102,8 +1096,7 @@ std::string gridded_time_method(const std::shared_ptr<InputHDF5Stream::Dataset> 
 
 void add_gridded_time_range(std::string key_start,my::map<metautils::StringEntry>& gentry_table,const metautils::NcTime::TimeRangeEntry& tre,const metautils::NcTime::TimeData& time_data,const GridCoordinates& gcoords,InputHDF5Stream& istream)
 {
-  InvEntry ie;
-  std::string gentry_key;
+  std::string gentry_key,inv_key;
   bool found_no_method=false;
   auto vars=istream.datasets_with_attribute("DIMENSION_LIST");
   for (const auto& var : vars) {
@@ -1117,11 +1110,11 @@ void add_gridded_time_range(std::string key_start,my::map<metautils::StringEntry
 	}
 	else {
 	  std::string error;
-	  ie.key=metautils::NcTime::gridded_netcdf_time_range_description(tre,time_data,strutils::capitalize(time_method),error);
+	  inv_key=metautils::NcTime::gridded_netcdf_time_range_description(tre,time_data,strutils::capitalize(time_method),error);
 	  if (!error.empty()) {
 	    metautils::log_error(error,"hdf2xml",USER);
 	  }
-	  gentry_key=key_start+ie.key;
+	  gentry_key=key_start+inv_key;
 	  metautils::StringEntry se;
 	  if (!gentry_table.found(gentry_key,se)) {
 	    se.key=gentry_key;
@@ -1132,20 +1125,19 @@ void add_gridded_time_range(std::string key_start,my::map<metautils::StringEntry
   }
   if (found_no_method) {
     std::string error;
-    ie.key=metautils::NcTime::gridded_netcdf_time_range_description(tre,time_data,"",error);
+    inv_key=metautils::NcTime::gridded_netcdf_time_range_description(tre,time_data,"",error);
     if (!error.empty()) {
 	metautils::log_error(error,"hdf2xml",USER);
     }
-    gentry_key=key_start+ie.key;
+    gentry_key=key_start+inv_key;
     metautils::StringEntry se;
     if (!gentry_table.found(gentry_key,se)) {
 	se.key=gentry_key;
 	gentry_table.insert(se);
     }
   }
-  if (inv_stream.is_open() && !inv_U_table.found(ie.key,ie)) {
-    ie.num=inv_U_table.size();
-    inv_U_table.insert(ie);
+  if (inv_stream.is_open() && inv_U_table.find(inv_key) == inv_U_table.end()) {
+    inv_U_table.emplace(inv_key,inv_U_table.size());
   }
 }
 
@@ -1187,12 +1179,10 @@ void add_gridded_lat_lon_keys(my::map<metautils::StringEntry>& gentry_table,Grid
 	break;
     }
   }
-  InvEntry ie;
-  ie.key=strutils::substitute(key_start,"<!>",",");
-  strutils::chop(ie.key);
-  if (inv_stream.is_open() && !inv_G_table.found(ie.key,ie)) {
-    ie.num=inv_G_table.size();
-    inv_G_table.insert(ie);
+  auto key=strutils::substitute(key_start,"<!>",",");
+  strutils::chop(key);
+  if (inv_stream.is_open() && inv_G_table.find(key) == inv_G_table.end()) {
+    inv_G_table.emplace(key,inv_G_table.size());
   }
 }
 
@@ -1452,11 +1442,8 @@ void add_gridded_parameters_to_netcdf_level_entry(InputHDF5Stream& istream,std::
 //	  if (attr.value.dim_sizes[0] == 4 || attr.value.dim_sizes[0] == 3 || (attr.value.dim_sizes[0] == 2 && gcoords.valid_time.data_array.num_values == 1)) {
 	    param_entry->key="ds"+metautils::args.dsnum+":"+var.first;
 	    add_gridded_netcdf_parameter(var,scan_data,time_range,parameter_data,tre.data->num_steps);
-	    InvEntry ie;
-	    if (!inv_P_table.found(param_entry->key,ie)) {
-		ie.key=param_entry->key;
-		ie.num=inv_P_table.size();
-		inv_P_table.insert(ie);
+	    if (inv_P_table.find(param_entry->key) == inv_P_table.end()) {
+		inv_P_table.emplace(param_entry->key,inv_P_table.size());
 	    }
 //	  }
 	}
@@ -1522,11 +1509,8 @@ void update_level_entry(InputHDF5Stream& istream,const metautils::NcTime::TimeRa
 	  }
 	}
 	level_write=1;
-	InvEntry ie;
-	if (!inv_P_table.found(param_entry->key,ie)) {
-	  ie.key=param_entry->key;
-	  ie.num=inv_P_table.size();
-	  inv_P_table.insert(ie);
+	if (inv_P_table.find(param_entry->key) == inv_P_table.end()) {
+	  inv_P_table.emplace(param_entry->key,inv_P_table.size());
 	}
     }
   }
@@ -1585,19 +1569,14 @@ DateTime compute_nc_time(const HDF5::DataArray& times,const metautils::NcTime::T
 
 void update_inventory(int unum,int gnum,const GridCoordinates& gcoords,const metautils::NcTime::TimeData& time_data)
 {
-  InvEntry ie;
-  if (!inv_L_table.found(lentry->key,ie)) {
-    ie.key=lentry->key;
-    ie.num=inv_L_table.size();
-    inv_L_table.insert(ie);
+  if (inv_L_table.find(lentry->key) == inv_L_table.end()) {
+    inv_L_table.emplace(lentry->key,inv_L_table.size());
   }
   for (size_t n=0; n < gcoords.valid_time.data_array.num_values; ++n) {
     for (const auto& key : lentry->parameter_code_table.keys()) {
-	InvEntry pie;
-	inv_P_table.found(key,pie);
 	std::stringstream inv_line;
 	std::string error;
-	inv_line << "0|0|" << metautils::NcTime::actual_date_time(data_array_value(gcoords.valid_time.data_array,n,gcoords.valid_time.ds.get()),time_data,error).to_string("%Y%m%d%H%MM") << "|" << unum << "|" << gnum << "|" << ie.num << "|" << pie.num << "|0";
+	inv_line << "0|0|" << metautils::NcTime::actual_date_time(data_array_value(gcoords.valid_time.data_array,n,gcoords.valid_time.ds.get()),time_data,error).to_string("%Y%m%d%H%MM") << "|" << unum << "|" << gnum << "|" << inv_L_table[lentry->key] << "|" << inv_P_table[key] << "|0";
 	inv_lines.emplace_back(inv_line.str());
     }
   }
@@ -2917,14 +2896,13 @@ std::cerr << floatutils::myequalf(data_array_value(gcoords.latitude.data_array,c
 		}
 		gentry->key=key2;
 		auto key_parts=strutils::split(gentry->key,"<!>");
-		InvEntry uie,gie;
+		auto& product_key=key_parts.back();
+		std::string grid_key;
 		if (inv_stream.is_open()) {
-		  inv_U_table.found(key_parts.back(),uie);
-		  gie.key=key_parts[0];
+		  grid_key=key_parts[0];
 		  for (size_t nn=1; nn < key_parts.size()-1; ++nn) {
-		    gie.key+=","+key_parts[nn];
+		    grid_key+=","+key_parts[nn];
 		  }
-		  inv_G_table.found(gie.key,gie);
 		}
 		if (!grid_table->found(gentry->key,*gentry)) {
 // new grid
@@ -2964,7 +2942,7 @@ std::cerr << floatutils::myequalf(data_array_value(gcoords.latitude.data_array,c
 			gentry->level_table.insert(*lentry);
 			level_info.write[m]=1;
 			if (inv_stream.is_open()) {
-			  update_inventory(uie.num,gie.num,gcoords,tr_time_data);
+			  update_inventory(inv_U_table[product_key],inv_G_table[grid_key],gcoords,tr_time_data);
 			}
 		    }
 		  }
@@ -2995,7 +2973,7 @@ std::cerr << floatutils::myequalf(data_array_value(gcoords.latitude.data_array,c
  			update_level_entry(istream,tre,tr_time_data,time_bounds,gcoords,level_id,scan_data,parameter_data,level_info.write[m]);
 		    }
 		    if (level_info.write[m] == 1 && inv_stream.is_open()) {
-			update_inventory(uie.num,gie.num,gcoords,tr_time_data);
+			update_inventory(inv_U_table[product_key],inv_G_table[grid_key],gcoords,tr_time_data);
 		    }
 		  }
 		  grid_table->replace(*gentry);
@@ -3020,10 +2998,7 @@ std::cerr << floatutils::myequalf(data_array_value(gcoords.latitude.data_array,c
     exit(1);
   }
 if (inv_stream.is_open()) {
-InvEntry ie;
-ie.key="x";
-ie.num=0;
-inv_R_table.insert(ie);
+inv_R_table.emplace("x",0);
 }
   if (gatherxml::verbose_operation) {
     std::cout << "...function scan_gridded_hdf5nc4_file() done." << std::endl;
@@ -3278,26 +3253,20 @@ int main(int argc,char **argv)
     }
   }
   if (inv_stream.is_open()) {
-    InvEntry ie;
-    for (const auto& key : inv_U_table.keys()) {
-	inv_U_table.found(key,ie);
-	inv_stream << "U<!>" << ie.num << "<!>" << key << std::endl;
+    for (const auto& entry : inv_U_table) {
+	inv_stream << "U<!>" << entry.second << "<!>" << entry.first << std::endl;
     }
-    for (const auto& key : inv_G_table.keys()) {
-	inv_G_table.found(key,ie);
-	inv_stream << "G<!>" << ie.num << "<!>" << key << std::endl;
+    for (const auto& entry : inv_G_table) {
+	inv_stream << "G<!>" << entry.second << "<!>" << entry.first << std::endl;
     }
-    for (const auto& key : inv_L_table.keys()) {
-	inv_L_table.found(key,ie);
-	inv_stream << "L<!>" << ie.num << "<!>" << key << std::endl;
+    for (const auto& entry : inv_L_table) {
+	inv_stream << "L<!>" << entry.second << "<!>" << entry.first << std::endl;
     }
-    for (const auto& key : inv_P_table.keys()) {
-	inv_P_table.found(key,ie);
-	inv_stream << "P<!>" << ie.num << "<!>" << key << std::endl;
+    for (const auto& entry : inv_P_table) {
+	inv_stream << "P<!>" << entry.second << "<!>" << entry.first << std::endl;
     }
-    for (const auto& key : inv_R_table.keys()) {
-	inv_R_table.found(key,ie);
-	inv_stream << "R<!>" << ie.num << "<!>" << key << std::endl;
+    for (const auto& entry : inv_R_table) {
+	inv_stream << "R<!>" << entry.second << "<!>" << entry.first << std::endl;
     }
     inv_stream << "-----" << std::endl;
     for (const auto& line : inv_lines) {
