@@ -2549,7 +2549,8 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
 	metautils::log_error("unable to access the /"+gcoords.valid_time.id+" dataset for the data temporal range","hdf2xml",USER);
     }
     if (!gcoords.valid_time.data_array.fill(istream,*gcoords.valid_time.ds)) {
-	metautils::log_error(THIS_FUNC+"() returned error: unable to fill time array","hdf2xml",USER);
+	auto error=std::move(myerror);
+	metautils::log_error(THIS_FUNC+"() returned error: unable to fill time array - error: '"+error+"'","hdf2xml",USER);
     }
     metautils::NcTime::Time nctime;
     nctime.t1=data_array_value(gcoords.valid_time.data_array,0,gcoords.valid_time.ds.get());
