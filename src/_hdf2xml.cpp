@@ -2679,16 +2679,18 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
 	}
 	Grid::GridDimensions dim;
 	auto lat_attr_it=gcoords.latitude.ds->attributes.find("DIMENSION_LIST");
-	auto& lat_value=lat_attr_it->second;
+	auto& lat_dim_list=lat_attr_it->second;
 	auto lon_attr_it=gcoords.longitude.ds->attributes.find("DIMENSION_LIST");
-	auto& lon_value=lon_attr_it->second;
-	if (lat_attr_it != gcoords.latitude.ds->attributes.end() && lon_attr_it != gcoords.longitude.ds->attributes.end() && lat_value.dim_sizes.size() == 1 && lat_value.dim_sizes[0] == 2 && lat_value._class_ == 9 && lon_value.dim_sizes.size() == 1 && lon_value.dim_sizes[0] == 2 && lon_value._class_ == 9) {
-	  if (lat_value.vlen.class_ == 7 && lon_value.vlen.class_ == 7) {
+	auto& lon_dim_list=lon_attr_it->second;
+	if (lat_attr_it != gcoords.latitude.ds->attributes.end() && lon_attr_it != gcoords.longitude.ds->attributes.end() && lat_dim_list.dim_sizes.size() == 1 && lat_dim_list.dim_sizes[0] == 2 && lat_dim_list._class_ == 9 && lon_dim_list.dim_sizes.size() == 1 && lon_dim_list.dim_sizes[0] == 2 && lon_dim_list._class_ == 9) {
+// latitude and longitude variables have one dimension of size 2
+	  if (lat_dim_list.vlen.class_ == 7 && lon_dim_list.vlen.class_ == 7) {
+// dimensions are variable length values of references to netCDF dimensions
 	    std::unordered_map<size_t,std::string>::iterator rtp_it[4];
-	    rtp_it[0]=istream.reference_table_pointer()->find(HDF5::value(&lat_value.vlen.buffer[4],lat_value.precision_));
-	    rtp_it[1]=istream.reference_table_pointer()->find(HDF5::value(&lon_value.vlen.buffer[4],lon_value.precision_));
-	    rtp_it[2]=istream.reference_table_pointer()->find(HDF5::value(&lat_value.vlen.buffer[8+lat_value.precision_],lat_value.precision_));
-	    rtp_it[3]=istream.reference_table_pointer()->find(HDF5::value(&lon_value.vlen.buffer[8+lon_value.precision_],lon_value.precision_));
+	    rtp_it[0]=istream.reference_table_pointer()->find(HDF5::value(&lat_dim_list.vlen.buffer[4],lat_dim_list.precision_));
+	    rtp_it[1]=istream.reference_table_pointer()->find(HDF5::value(&lon_dim_list.vlen.buffer[4],lon_dim_list.precision_));
+	    rtp_it[2]=istream.reference_table_pointer()->find(HDF5::value(&lat_dim_list.vlen.buffer[8+lat_dim_list.precision_],lat_dim_list.precision_));
+	    rtp_it[3]=istream.reference_table_pointer()->find(HDF5::value(&lon_dim_list.vlen.buffer[8+lon_dim_list.precision_],lon_dim_list.precision_));
 	    const auto& rtp_end=istream.reference_table_pointer()->end();
 	    if (rtp_it[0] != rtp_end && rtp_it[1] != rtp_end && rtp_it[0]->second == rtp_it[1]->second && rtp_it[2] != rtp_end && rtp_it[3] != rtp_end && rtp_it[2]->second == rtp_it[3]->second) {
 		auto ds=istream.dataset("/"+rtp_it[0]->second);
@@ -2699,7 +2701,9 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
 		}
 		auto attr_parts=strutils::split(std::string(reinterpret_cast<char *>(attribute_value.array)));
 		if (attr_parts.size() == 11) {
-// netCDF dimension
+// netCDF dimension - the convention is:
+// "This is a netCDF dimension but not a netCDF variable.xxxxxxxxxx"
+//   where xxxxxxxxxx is a right-justified integer of width 10
 		  dim.y=std::stoi(attr_parts[10]);
 		}
 		else {
@@ -2713,6 +2717,8 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
 		attr_parts=strutils::split(std::string(reinterpret_cast<char *>(attribute_value.array)));
 		if (attr_parts.size() == 11) {
 // netCDF dimension
+// "This is a netCDF dimension but not a netCDF variable.xxxxxxxxxx"
+//   where xxxxxxxxxx is a right-justified integer of width 10
 		  dim.x=std::stoi(attr_parts[10]);
 		}
 		else {
