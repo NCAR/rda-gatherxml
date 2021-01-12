@@ -40,7 +40,7 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile,TempDir& tdir,std::list<
 	MySQL::Row row;
 	auto fetched_row=query.fetch_row(row);
 	if (query.num_rows() == 0 || row[0] != "ds"+args.dsnum || row[1] != "P") {
-	  error=args.path+"/"+args.filename+" is not a primary for this dataset";
+	  error="Terminating - "+args.path+"/"+args.filename+" is not a primary for this dataset";
 	  return false;
 	}
 	if (fetched_row) {
@@ -226,8 +226,8 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile,TempDir& tdir,std::list<
     auto fetched_row=query.fetch_row(row);
     if (!args.override_primary_check) {
 	if (query.num_rows() == 0 || row[0] != "A") {
-	  error=args.path+"/"+args.filename+" is not active for this dataset";
-	  return false;
+	  std::cerr << "Terminating - " << args.path << "/" << args.filename << " is not active for this dataset" << std::endl;
+	  exit(1);
 	}
     }
     if (fetched_row) {
