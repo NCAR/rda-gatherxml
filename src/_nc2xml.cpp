@@ -4907,7 +4907,13 @@ void scan_file(gatherxml::markup::ObML::ObservationData& obs_data)
   std::list<std::string> filelist;
   std::string file_format,error;
   if (!metautils::primaryMetadata::prepare_file_for_metadata_scanning(*tfile,*tdir,&filelist,file_format,error)) {
-    metautils::log_error(THIS_FUNC+"() returned '"+error+"'","nc2xml",USER);
+    if (std::regex_search(error,std::regex("^Terminating"))) {
+	std::cerr << error << std::endl;
+	exit(1);
+    }
+    else {
+	metautils::log_error(THIS_FUNC+"() returned '"+error+"'","nc2xml",USER);
+    }
   }
   if (filelist.size() == 0) {
     filelist.emplace_back(tfile->name());
