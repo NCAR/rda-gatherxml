@@ -247,7 +247,7 @@ bool summarize_obs_data(std::string caller,std::string user)
   std::string dsnum2=strutils::substitute(metautils::args.dsnum,".","");
   bool update_bitmap=false;
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
-  MySQL::Query query("code,format_code","ObML.ds"+dsnum2+"_primaries");
+  MySQL::Query query("code,format_code","ObML.ds"+dsnum2+"_primaries2");
   if (query.submit(server) < 0) {
     std::cerr << query.error() << std::endl;
     exit(1);
@@ -283,7 +283,7 @@ bool summarize_obs_data(std::string caller,std::string user)
   for (const auto& res : query) {
     CodeEntry ce;
     if (!mss_table.found(res[0],ce)) {
-	metautils::log_error("summarize_obs_data() found an mssID ("+res[0]+") in ObML.ds"+dsnum2+"_locations that doesn't exist in ObML.ds"+dsnum2+"_primaries",caller,user);
+	metautils::log_error("summarize_obs_data() found an mssID ("+res[0]+") in ObML.ds"+dsnum2+"_locations that doesn't exist in ObML.ds"+dsnum2+"_primaries2",caller,user);
     }
     SummaryEntry se;
     se.key=ce.code+"<!>"+res[1]+"<!>"+res[2]+"<!>"+res[5];

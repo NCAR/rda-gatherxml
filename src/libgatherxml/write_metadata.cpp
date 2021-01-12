@@ -22,10 +22,10 @@ void close(std::string filename,TempDir **tdir,std::ofstream& ofs,std::string cm
   ofs.clear();
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   if (std::regex_search(metautils::args.path,std::regex("^/FS/DECS/"))) {
-    server.update(cmd_type+".ds"+strutils::substitute(metautils::args.dsnum,".","")+"_primaries","inv = 'Y'","mssID = '"+strutils::substitute(filename,"%","/")+"'");
+    server.update(cmd_type+".ds"+strutils::substitute(metautils::args.dsnum,".","")+"_primaries2","inv = 'Y'","mssID = '"+strutils::substitute(filename,"%","/")+"'");
   }
   else {
-    server.update("W"+cmd_type+".ds"+strutils::substitute(metautils::args.dsnum,".","")+"_webfiles","inv = 'Y'","webID = '"+strutils::substitute(filename,"%","/")+"'");
+    server.update("W"+cmd_type+".ds"+strutils::substitute(metautils::args.dsnum,".","")+"_webfiles2","inv = 'Y'","webID = '"+strutils::substitute(filename,"%","/")+"'");
   }
   if (metautils::args.inventory_only) {
     metautils::args.filename=filename;

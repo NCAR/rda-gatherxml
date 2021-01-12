@@ -27,11 +27,11 @@ void summarize_grid_levels(std::string database,std::string caller,std::string u
   std::string dsnum2=strutils::substitute(metautils::args.dsnum,".","");
   std::string filetable,file_ID;
   if (database == "GrML") {
-    filetable="_primaries";
+    filetable="_primaries2";
     file_ID="mssID";
   }
   else if (database == "WGrML") {
-    filetable="_webfiles";
+    filetable="_webfiles2";
     file_ID="webID";
   }
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
@@ -87,11 +87,11 @@ void summarize_grids(std::string database,std::string caller,std::string user,st
   std::string dsnum2=strutils::substitute(metautils::args.dsnum,".","");
   std::string bitmap,filetable,fileID;
   if (database == "GrML") {
-    filetable="_primaries";
+    filetable="_primaries2";
     fileID="mssID";
   }
   else if (database == "WGrML") {
-    filetable="_webfiles";
+    filetable="_webfiles2";
     fileID="webID";
   }
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");

@@ -40,12 +40,12 @@ void fill_files_with_metadata(std::string filename = "")
   for (size_t n=0; n < NUM_DATABASES; ++n) {
     if (dbs[n][0] == 'W') {
 	IDType="web";
-	listType="_webfiles";
+	listType="_webfiles2";
 	meta_link.assign(&dbs[n][1],2);
     }
     else {
 	IDType="mss";
-	listType="_primaries";
+	listType="_primaries2";
 	meta_link.assign(&dbs[n][0],2);
     }
     if (table_exists(server_m,std::string(dbs[n])+".ds"+dsnum2+listType)) {

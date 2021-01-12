@@ -370,7 +370,7 @@ bool renamed_cmd()
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   MySQL::Server server_d(metautils::directives.database_server,metautils::directives.rdadb_username,metautils::directives.rdadb_password,"dssdb");
   if (std::regex_search(old_name,std::regex("^(/FS){0,1}/(DSS|DECS)"))) {
-    filetable="_primaries";
+    filetable="_primaries2";
     column="mssID";
     dcolumn="mssfile";
     oname=old_name;
@@ -379,7 +379,7 @@ bool renamed_cmd()
     scm_flag="-f";
   }
   else if (std::regex_search(old_name,std::regex("^http(s){0,1}://(rda|dss)\\.ucar\\.edu/"))) {
-    filetable="_webfiles";
+    filetable="_webfiles2";
     column="webID";
     dcolumn="wfile";
     if (!old_web_home.empty()) {
@@ -472,7 +472,7 @@ server.update(db+"."+table+"2",column+" = '"+nname+"..m.."+sp[1]+"'","code = "+r
 		if (!std::regex_search(nname,std::regex("^/FS/(DSS|DECS)")) && db == "WGrML") {
 // insert the inventory into the new dataset tables
 		  unixutils::mysystem2(metautils::directives.local_root+"/bin/iinv -d "+new_dsnum+" -f "+strutils::substitute(nname,"/","%")+".GrML_inv",oss,ess);
-		  server.update("WGrML.ds"+strutils::substitute(new_dsnum,".","")+"_webfiles","inv = 'Y'","webID = '"+nname+"'");
+		  server.update("WGrML.ds"+strutils::substitute(new_dsnum,".","")+"_webfiles2","inv = 'Y'","webID = '"+nname+"'");
 		}
 	    }
 	    else {

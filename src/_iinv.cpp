@@ -256,7 +256,7 @@ void build_wms_capabilities()
 	    auto pcode=param.attribute_value("map")+":"+param.attribute_value("value");
 	    ofs << "          <Layer>" << std::endl;
 	    ofs << "            <Title>" << pmapper.description(data_format,pcode) << "</Title>" << std::endl;
-	    query.set("select distinct valid_date from IGrML.`ds"+local_args.dsnum2+"_inventory_"+data_format_code+"!"+pcode+"` as i left join WGrML.ds"+local_args.dsnum2+"_webfiles as w on w.code = i.webID_code where timeRange_code = "+time_range_code+" and gridDefinition_code = "+grid_definition_code+" and level_code = "+level_code+" and webID = '"+data_file+"' order by valid_date");
+	    query.set("select distinct valid_date from IGrML.`ds"+local_args.dsnum2+"_inventory_"+data_format_code+"!"+pcode+"` as i left join WGrML.ds"+local_args.dsnum2+"_webfiles2 as w on w.code = i.webID_code where timeRange_code = "+time_range_code+" and gridDefinition_code = "+grid_definition_code+" and level_code = "+level_code+" and webID = '"+data_file+"' order by valid_date");
 	    if (query.submit(server) == 0) {
 		while (query.fetch_row(row)) {
 		  ofs << "            <Layer queryable=\"0\">" << std::endl;
@@ -313,7 +313,7 @@ void build_wms_capabilities()
 	    auto pcode=param.attribute_value("map")+":"+param.attribute_value("value");
 	    ofs << "          <Layer>" << std::endl;
 	    ofs << "            <Title>" << pmapper.description(data_format,pcode) << "</Title>" << std::endl;
-	    query.set("select distinct valid_date from IGrML.`ds"+local_args.dsnum2+"_inventory_"+data_format_code+"!"+pcode+"` as i left join WGrML.ds"+local_args.dsnum2+"_webfiles as w on w.code = i.webID_code where timeRange_code = "+time_range_code+" and gridDefinition_code = "+grid_definition_code+" and level_code = "+layer_code+" and webID = '"+data_file+"' order by valid_date");
+	    query.set("select distinct valid_date from IGrML.`ds"+local_args.dsnum2+"_inventory_"+data_format_code+"!"+pcode+"` as i left join WGrML.ds"+local_args.dsnum2+"_webfiles2 as w on w.code = i.webID_code where timeRange_code = "+time_range_code+" and gridDefinition_code = "+grid_definition_code+" and level_code = "+layer_code+" and webID = '"+data_file+"' order by valid_date");
 	    if (query.submit(server) == 0) {
 		while (query.fetch_row(row)) {
 		  ofs << "            <Layer queryable=\"0\">" << std::endl;
@@ -359,12 +359,12 @@ void insert_grml_inventory()
   }
   auto web_id=strutils::substitute(metautils::args.filename,".GrML_inv","");
   strutils::replace_all(web_id,"%","/");
-  MySQL::LocalQuery query("select code,format_code,tindex from WGrML.ds"+local_args.dsnum2+"_webfiles as w left join dssdb.wfile as x on (x.dsid = 'ds"+metautils::args.dsnum+"' and x.type = 'D' and x.wfile = w.webID) where webID = '"+web_id+"'");
+  MySQL::LocalQuery query("select code,format_code,tindex from WGrML.ds"+local_args.dsnum2+"_webfiles2 as w left join dssdb.wfile as x on (x.dsid = 'ds"+metautils::args.dsnum+"' and x.type = 'D' and x.wfile = w.webID) where webID = '"+web_id+"'");
   if (query.submit(server) < 0) {
     metautils::log_error("insert_grml_inventory() returned error: "+query.error()+" while looking for code from webfiles","iinv",USER);
   }
   if (query.num_rows() == 0) {
-    metautils::log_error("insert_grml_inventory() did not find "+web_id+" in WGrML.ds"+local_args.dsnum2+"_webfiles","iinv",USER);
+    metautils::log_error("insert_grml_inventory() did not find "+web_id+" in WGrML.ds"+local_args.dsnum2+"_webfiles2","iinv",USER);
   }
   MySQL::Row row;
   query.fetch_row(row);
@@ -1526,7 +1526,7 @@ void insert_obml_inventory()
   sdum=strutils::substitute(metautils::args.filename,".ObML_inv","");
   strutils::replace_all(sdum,"%","/");
   MySQL::LocalQuery query;
-  query.set("select code,format_code,tindex from WObML.ds"+local_args.dsnum2+"_webfiles as w left join dssdb.wfile as x on (x.dsid = 'ds"+metautils::args.dsnum+"' and x.type = 'D' and x.wfile = w.webID) where webID = '"+sdum+"'");
+  query.set("select code,format_code,tindex from WObML.ds"+local_args.dsnum2+"_webfiles2 as w left join dssdb.wfile as x on (x.dsid = 'ds"+metautils::args.dsnum+"' and x.type = 'D' and x.wfile = w.webID) where webID = '"+sdum+"'");
   if (query.submit(server) < 0) {
     metautils::log_error("insert_obml_inventory() returned error: "+query.error()+" while looking for code from webfiles","iinv",USER);
   }

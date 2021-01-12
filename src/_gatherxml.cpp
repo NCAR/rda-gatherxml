@@ -59,16 +59,16 @@ void inventory_all()
   std::string dsnum=strutils::substitute(metautils::args.dsnum,".","");
   MySQL::LocalQuery query;
   if (MySQL::table_exists(server,"IGrML.ds"+dsnum+"_inventory_summary")) {
-    query.set("select w.webID,f.format from WGrML.ds"+dsnum+"_webfiles as w left join IGrML.ds"+dsnum+"_inventory_summary as i on i.webID_code = w.code left join WGrML.formats as f on f.code = w.format_code where isnull(i.webID_code) or isnull(inv)");
+    query.set("select w.webID,f.format from WGrML.ds"+dsnum+"_webfiles2 as w left join IGrML.ds"+dsnum+"_inventory_summary as i on i.webID_code = w.code left join WGrML.formats as f on f.code = w.format_code where isnull(i.webID_code) or isnull(inv)");
   }
-  else if (MySQL::table_exists(server,"WGrML.ds"+dsnum+"_webfiles")) {
-    query.set("select w.webID,f.format from WGrML.ds"+dsnum+"_webfiles as w left join WGrML.formats as f on f.code = w.format_code");
+  else if (MySQL::table_exists(server,"WGrML.ds"+dsnum+"_webfiles2")) {
+    query.set("select w.webID,f.format from WGrML.ds"+dsnum+"_webfiles2 as w left join WGrML.formats as f on f.code = w.format_code");
   }
   else if (MySQL::table_exists(server,"IObML.ds"+dsnum+"_inventory_summary")) {
-    query.set("select w.webID,f.format from WObML.ds"+dsnum+"_webfiles as w left join IObML.ds"+dsnum+"_inventory_summary as i on i.webID_code = w.code left join WObML.formats as f on f.code = w.format_code where isnull(i.webID_code) or isnull(inv)");
+    query.set("select w.webID,f.format from WObML.ds"+dsnum+"_webfiles2 as w left join IObML.ds"+dsnum+"_inventory_summary as i on i.webID_code = w.code left join WObML.formats as f on f.code = w.format_code where isnull(i.webID_code) or isnull(inv)");
   }
-  else if (MySQL::table_exists(server,"WObML.ds"+dsnum+"_webfiles")) {
-    query.set("select w.webID,f.format from WObML.ds"+dsnum+"_webfiles as w left join WObML.formats as f on f.code = w.format_code");
+  else if (MySQL::table_exists(server,"WObML.ds"+dsnum+"_webfiles2")) {
+    query.set("select w.webID,f.format from WObML.ds"+dsnum+"_webfiles2 as w left join WObML.formats as f on f.code = w.format_code");
   }
   if (query.submit(server) < 0) {
     metautils::log_error("inventory_all() returned error: '"+query.error()+"'","gatherxml",USER);
