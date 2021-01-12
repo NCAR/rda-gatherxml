@@ -553,8 +553,8 @@ void generate_description(std::string type,std::string tdir_name)
   for (const auto& db : databases) {
     std::string db_name,data_type;
     std::tie(db_name,data_type)=db;
-    if (db_name[0] != 'V' && table_exists(server,db_name+".ds"+dsnum2+"_primaries")) {
-	MySQL::LocalQuery query("select distinct format from "+db_name+".formats as f left join "+db_name+".ds"+dsnum2+"_primaries as d on d.format_code = f.code where !isnull(d.format_code)");
+    if (db_name[0] != 'V' && table_exists(server,db_name+".ds"+dsnum2+"_primaries2")) {
+	MySQL::LocalQuery query("select distinct format from "+db_name+".formats as f left join "+db_name+".ds"+dsnum2+"_primaries2 as d on d.format_code = f.code where !isnull(d.format_code)");
 	if (query.submit(server) < 0) {
 	  metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",USER);
 	}
@@ -625,7 +625,7 @@ void generate_description(std::string type,std::string tdir_name)
 	  while (query2.fetch_row(row2)) {
 	    rda_files_table.emplace(row2[0],row2[1]);
 	  }
-	  query2.set("select code,mssID from GrML.ds"+dsnum2+"_primaries");
+	  query2.set("select code,mssID from GrML.ds"+dsnum2+"_primaries2");
 	  if (query2.submit(server) == 0) {
 	    while (query2.fetch_row(row2)) {
 		metadata_files_table.emplace(row2[0],row2[1]);

@@ -441,34 +441,24 @@ void summarize_grml()
 	entry.key=fname.name;
 	if (!file_table.found(entry.key,entry)) {
 	  if (database == "GrML") {
-	    files_table_name="GrML.ds"+local_args.dsnum2+"_primaries";
-	    files_template_name="GrML.template_primaries";
 	    files_table2_name="GrML.ds"+local_args.dsnum2+"_primaries2";
 	    files_template2_name="GrML.template_primaries2";
 	    file_id_type="mss";
 	  }
 	  else if (database == "WGrML") {
-	    files_table_name="WGrML.ds"+local_args.dsnum2+"_webfiles";
-	    files_template_name="WGrML.template_webfiles";
 	    files_table2_name="WGrML.ds"+local_args.dsnum2+"_webfiles2";
 	    files_template2_name="WGrML.template_webfiles2";
 	    file_id_type="web";
 	  }
-	  query.set("code",files_table_name,file_id_type+"ID = '"+entry.key+"'");
+	  query.set("code",files_table2_name,file_id_type+"ID = '"+entry.key+"'");
 	  if (query.submit(server) < 0) {
 	    error=query.error();
 	    if (strutils::contains(error,"doesn't exist")) {
 		std::string result;
-		if (server.command("create table "+files_table_name+" like "+files_template_name,result) < 0) {
-		  metautils::log_error("summarize_grml() returned error: "+server.error()+" while creating table "+files_table_name,"scm",USER);
-		}
 		if (server.command("create table "+files_table2_name+" like "+files_template2_name,result) < 0) {
 		  metautils::log_error("summarize_grml() returned error: "+server.error()+" while creating table "+files_table2_name,"scm",USER);
 		}
 		if (file_id_type == "web") {
-		  if (server.command("alter table "+files_table_name+" add type char(1) not null default 'D' after webID, add dsid varchar(9) not null default 'ds"+metautils::args.dsnum+"' after type, add primary key (webID,type,dsid)",result) < 0) {
-		    metautils::log_error("summarize_grml() returned error: "+server.error()+" while modifying "+files_table_name,"scm",USER);
-		  }
 		  if (server.command("alter table "+files_table2_name+" add type char(1) not null default 'D' after webID, add dsid varchar(9) not null default 'ds"+metautils::args.dsnum+"' after type, add primary key (webID,type,dsid)",result) < 0) {
 		    metautils::log_error("summarize_grml() returned error: "+server.error()+" while modifying "+files_table2_name,"scm",USER);
 		  }
@@ -489,31 +479,22 @@ void summarize_grml()
 	  }
 	  if (query.num_rows() == 0) {
 	    if (database == "GrML") {
-		if (server.insert(files_table_name,"mssID,format_code,num_grids,start_date,end_date","'"+entry.key+"',"+format_code+",0,0,0","") < 0) {
-		  metautils::log_error("summarize_grml() returned error: "+server.error()+" while inserting into "+files_table_name,"scm",USER);
-		}
 		if (server.insert(files_table2_name,"mssID,format_code,num_grids,start_date,end_date,uflag","'"+entry.key+"',"+format_code+",0,0,0,'"+strutils::strand(5)+"'","") < 0) {
 		  metautils::log_error("summarize_grml() returned error: "+server.error()+" while inserting into "+files_table2_name,"scm",USER);
 		}
 	    }
 	    else if (database == "WGrML") {
-		if (server.insert(files_table_name,"webID,format_code,num_grids,start_date,end_date","'"+entry.key+"',"+format_code+",0,0,0","") < 0) {
-		  metautils::log_error("summarize_grml() returned error: "+server.error()+" while inserting into "+files_table_name,"scm",USER);
-		}
 		if (server.insert(files_table2_name,"webID,format_code,num_grids,start_date,end_date,uflag","'"+entry.key+"',"+format_code+",0,0,0,'"+strutils::strand(5)+"'","") < 0) {
 		  metautils::log_error("summarize_grml() returned error: "+server.error()+" while inserting into "+files_table2_name,"scm",USER);
 		}
 	    }
 	    query.submit(server);
 	    if (query.num_rows() == 0) {
-		metautils::log_error("summarize_grml() returned error: unable to retrieve code from "+files_table_name+" for value "+entry.key,"scm",USER);
+		metautils::log_error("summarize_grml() returned error: unable to retrieve code from "+files_table2_name+" for value "+entry.key,"scm",USER);
 	    }
 	  }
 	  else {
 	    query.fetch_row(row);
-	    if (server.update(files_table_name,"format_code = "+format_code,"code = "+row[0]) < 0) {
-		metautils::log_error("summarize_grml() returned error: "+server.error()+" while updating "+files_table_name+" with format_code and code","scm",USER);
-	    }
 	    if (server.update(files_table2_name,"format_code = "+format_code,"code = "+row[0]) < 0) {
 		metautils::log_error("summarize_grml() returned error: "+server.error()+" while updating "+files_table2_name+" with format_code and code","scm",USER);
 	    }
@@ -794,9 +775,6 @@ if (MySQL::table_exists(server,database+".ds"+local_args.dsnum2+"_grids2")) {
 	strutils::replace_all(end,":","");
 	strutils::replace_all(end,"+0000","");
 	update_string="num_grids="+strutils::itos(num_grids)+",start_date="+start+",end_date="+end;
-	if (server.update(files_table_name,update_string,"code = "+file_id_code) < 0) {
-	  metautils::log_error("summarize_grml() returned error: "+server.error()+" while updating "+files_table_name,"scm",USER);
-	}
 	if (server.update(files_table2_name,update_string+",uflag='"+strutils::strand(5)+"'","code = "+file_id_code) < 0) {
 	  metautils::log_error("summarize_grml() returned error: "+server.error()+" while updating "+files_table2_name,"scm",USER);
 	}
@@ -1702,27 +1680,20 @@ void summarize_obml(std::list<KMLData>& kml_list)
 	entry.key=fname.name;
 	if (!file_table.found(entry.key,entry)) {
 	  if (database == "ObML") {
-	    files_table_name="ObML.ds"+local_args.dsnum2+"_primaries";
-	    files_template_name="ObML.template_primaries";
 	    files_table2_name="ObML.ds"+local_args.dsnum2+"_primaries2";
 	    files_template2_name="ObML.template_primaries2";
 	    file_id_type="mss";
 	  }
 	  else if (database == "WObML") {
-	    files_table_name="WObML.ds"+local_args.dsnum2+"_webfiles";
-	    files_template_name="WObML.template_webfiles";
 	    files_table2_name="WObML.ds"+local_args.dsnum2+"_webfiles2";
 	    files_template2_name="WObML.template_webfiles2";
 	    file_id_type="web";
 	  }
-	  query.set("code",files_table_name,file_id_type+"ID = '"+entry.key+"'");
+	  query.set("code",files_table2_name,file_id_type+"ID = '"+entry.key+"'");
 	  if (query.submit(server) < 0) {
 	    error=query.error();
 	    if (strutils::contains(error,"doesn't exist")) {
 		std::string result;
-		if (server.command("create table "+files_table_name+" like "+files_template_name,result) < 0) {
-		  metautils::log_error("summarize_obml() returned error: "+server.error()+" while creating table "+files_table_name,"scm",USER);
-		}
 		if (server.command("create table "+files_table2_name+" like "+files_template2_name,result) < 0) {
 		  metautils::log_error("summarize_obml() returned error: "+server.error()+" while creating table "+files_table2_name,"scm",USER);
 		}
@@ -1766,31 +1737,22 @@ void summarize_obml(std::list<KMLData>& kml_list)
 	  }
 	  if (query.num_rows() == 0) {
 	    if (database == "ObML") {
-		if (server.insert(files_table_name,"mssID,format_code,num_observations,start_date,end_date","'"+entry.key+"',"+format_code+",0,0,0","") < 0) {
-		  metautils::log_error("summarize_obml() returned error: "+server.error()+" while inserting into "+files_table_name,"scm",USER);
-		}
 		if (server.insert(files_table2_name,"mssID,format_code,num_observations,start_date,end_date,uflag","'"+entry.key+"',"+format_code+",0,0,0,'"+strutils::strand(5)+"'","") < 0) {
 		  metautils::log_error("summarize_obml() returned error: "+server.error()+" while inserting into "+files_table2_name,"scm",USER);
 		}
 	    }
 	    else if (database == "WObML") {
-		if (server.insert(files_table_name,"webID,format_code,num_observations,start_date,end_date","'"+entry.key+"',"+format_code+",0,0,0","") < 0) {
-		  metautils::log_error("summarize_obml() returned error: "+server.error()+" while inserting into "+files_table_name,"scm",USER);
-		}
 		if (server.insert(files_table2_name,"webID,format_code,num_observations,start_date,end_date,uflag","'"+entry.key+"',"+format_code+",0,0,0,'"+strutils::strand(5)+"'","") < 0) {
 		  metautils::log_error("summarize_obml() returned error: "+server.error()+" while inserting into "+files_table2_name,"scm",USER);
 		}
 	    }
 	    query.submit(server);
 	    if (query.num_rows() == 0) {
-		metautils::log_error("summarize_obml() returned error: unable to retrieve code from "+files_table_name+" for value "+entry.key,"scm",USER);
+		metautils::log_error("summarize_obml() returned error: unable to retrieve code from "+files_table2_name+" for value "+entry.key,"scm",USER);
 	    }
 	  }
 	  else {
 	    query.fetch_row(row);
-	    if (server.update(files_table_name,"format_code = "+format_code,"code = "+row[0]) < 0) {
-		metautils::log_error("summarize_obml() returned error: "+server.error()+" while updating "+files_table_name+" with format_code and code","scm",USER);
-	    }
 	    if (server.update(files_table2_name,"format_code = "+format_code,"code = "+row[0]) < 0) {
 		metautils::log_error("summarize_obml() returned error: "+server.error()+" while updating "+files_table2_name+" with format_code and code","scm",USER);
 	    }
@@ -1946,9 +1908,6 @@ void summarize_obml(std::list<KMLData>& kml_list)
 	}
 	server._delete(database+".ds"+local_args.dsnum2+"_frequencies",file_id_type+"ID_code = "+file_id_code+" and uflag != '"+uflag+"'");
 	update_string="num_observations="+strutils::itos(num_obs)+",start_date="+start+",end_date="+end;
-	if (server.update(files_table_name,update_string,"code = "+file_id_code) < 0) {
-	  metautils::log_error("summarize_obml() returned error: "+server.error()+" while updating "+files_table_name+" with '"+update_string+"'","scm",USER);
-	}
 	if (server.update(files_table2_name,update_string+",uflag='"+strutils::strand(5)+"'","code = "+file_id_code) < 0) {
 	  metautils::log_error("summarize_obml() returned error: "+server.error()+" while updating "+files_table2_name+" with '"+update_string+"'","scm",USER);
 	}
@@ -2027,18 +1986,13 @@ void summarize_satml()
 	end="1000-01-01 00:00:00 +0000";
 	entry.key=fname.name;
 	if (!file_table.found(entry.key,entry)) {
-	  files_table_name="SatML.ds"+local_args.dsnum2+"_primaries";
-	  files_template_name="SatML.template_primaries";
 	  files_table2_name="SatML.ds"+local_args.dsnum2+"_primaries2";
 	  files_template2_name="SatML.template_primaries2";
-	  query.set("code",files_table_name,"mssID = '"+entry.key+"'");
+	  query.set("code",files_table2_name,"mssID = '"+entry.key+"'");
 	  if (query.submit(server) < 0) {
 	    error=query.error();
 	    if (strutils::contains(error,"doesn't exist")) {
 		std::string result;
-		if (server.command("create table "+files_table_name+" like "+files_template_name,result) < 0) {
-		  metautils::log_error("summarize_satml() returned error: "+server.error()+" while creating table "+files_table_name,"scm",USER);
-		}
 		if (server.command("create table "+files_table2_name+" like "+files_template_name,result) < 0) {
 		  metautils::log_error("summarize_satml() returned error: "+server.error()+" while creating table "+files_table2_name,"scm",USER);
 		}
@@ -2048,22 +2002,16 @@ void summarize_satml()
 	    }
 	  }
 	  if (query.num_rows() == 0) {
-	    if (server.insert(files_table_name,"mssID,format_code,num_products,start_date,end_date,product","'"+entry.key+"',"+format_code+",0,0,0,''","") < 0) {
-		metautils::log_error("summarize_satml() returned error: "+server.error()+" when trying to insert '"+entry.key+"',"+format_code+",0,0,0,'' into "+files_table_name,"scm",USER);
-	    }
 	    if (server.insert(files_table2_name,"mssID,format_code,num_products,start_date,end_date,product,uflag","'"+entry.key+"',"+format_code+",0,0,0,'','"+strutils::strand(5)+"'","") < 0) {
 		metautils::log_error("summarize_satml() returned error: "+server.error()+" when trying to insert '"+entry.key+"',"+format_code+",0,0,0,'' into "+files_table2_name,"scm",USER);
 	    }
 	    query.submit(server);
 	    if (query.num_rows() == 0) {
-		metautils::log_error("summarize_satml() returned error: unable to retrieve code from "+files_table_name+" for value "+entry.key,"scm",USER);
+		metautils::log_error("summarize_satml() returned error: unable to retrieve code from "+files_table2_name+" for value "+entry.key,"scm",USER);
 	    }
 	  }
 	  else {
 	    query.fetch_row(row);
-	    if (server.update(files_table_name,"format_code = "+format_code,"code = "+row[0]) < 0) {
-		metautils::log_error("summarize_satml() returned error: "+server.error()+" while updating "+files_table_name+" with format_code and code","scm",USER);
-	    }
 	    if (server.update(files_table2_name,"format_code = "+format_code,"code = "+row[0]) < 0) {
 		metautils::log_error("summarize_satml() returned error: "+server.error()+" while updating "+files_table2_name+" with format_code and code","scm",USER);
 	    }
@@ -2112,9 +2060,6 @@ void summarize_satml()
 	strutils::replace_all(end,":","");
 	strutils::replace_all(end,"+0000","");
 	update_string="num_products="+strutils::itos(num_products)+",start_date="+start+",end_date="+end+",product='"+prod_type+"'";
-	if (server.update(files_table_name,update_string,"code = "+file_id_code) < 0) {
-	  metautils::log_error("summarize_satml() returned error: "+server.error()+" while updating "+files_table_name+" with '"+update_string+"'","scm",USER);
-	}
 	if (server.update(files_table2_name,update_string+",uflag='"+strutils::strand(5)+"'","code = "+file_id_code) < 0) {
 	  metautils::log_error("summarize_satml() returned error: "+server.error()+" while updating "+files_table2_name+" with '"+update_string+"'","scm",USER);
 	}
@@ -2249,27 +2194,20 @@ void summarize_fixml()
 	entry.key=fname.name;
 	if (!file_table.found(entry.key,entry)) {
 	  if (database == "FixML") {
-	    files_table_name="FixML.ds"+local_args.dsnum2+"_primaries";
-	    files_template_name="FixML.template_primaries";
 	    files_table2_name="FixML.ds"+local_args.dsnum2+"_primaries2";
 	    files_template2_name="FixML.template_primaries2";
 	    file_id_type="mss";
 	  }
 	  else if (database == "WFixML") {
-	    files_table_name="WFixML.ds"+local_args.dsnum2+"_webfiles";
-	    files_template_name="WFixML.template_webfiles";
 	    files_table2_name="WFixML.ds"+local_args.dsnum2+"_webfiles2";
 	    files_template2_name="WFixML.template_webfiles2";
 	    file_id_type="web";
 	  }
-	  query.set("code",files_table_name,file_id_type+"ID = '"+entry.key+"'");
+	  query.set("code",files_table2_name,file_id_type+"ID = '"+entry.key+"'");
 	  if (query.submit(server) < 0) {
 	    error=query.error();
 	    if (strutils::contains(error,"doesn't exist")) {
 		std::string result;
-		if (server.command("create table "+files_table_name+" like "+files_template_name,result) < 0) {
-		  metautils::log_error("summarize_fixml() returned error: "+server.error()+" while creating table "+files_table_name,"scm",USER);
-		}
 		if (server.command("create table "+files_table2_name+" like "+files_template_name,result) < 0) {
 		  metautils::log_error("summarize_fixml() returned error: "+server.error()+" while creating table "+files_table2_name,"scm",USER);
 		}
@@ -2291,31 +2229,22 @@ void summarize_fixml()
 	  }
 	  if (query.num_rows() == 0) {
 	    if (database == "FixML") {
-		if (server.insert(files_table_name,"mssID,format_code,num_fixes,start_date,end_date","'"+entry.key+"',"+format_code+",0,0,0","") < 0) {
-		  metautils::log_error("summarize_fixml() returned error: "+server.error()+" when trying to insert '"+entry.key+"',"+format_code+",0,0,0 into "+files_table_name,"scm",USER);
-		}
 		if (server.insert(files_table2_name,"mssID,format_code,num_fixes,start_date,end_date,uflag","'"+entry.key+"',"+format_code+",0,0,0,'"+strutils::strand(5)+"'","") < 0) {
 		  metautils::log_error("summarize_fixml() returned error: "+server.error()+" when trying to insert '"+entry.key+"',"+format_code+",0,0,0 into "+files_table2_name,"scm",USER);
 		}
 	    }
 	    else if (database == "WFixML") {
-		if (server.insert(files_table_name,"webID,format_code,num_fixes,start_date,end_date","'"+entry.key+"',"+format_code+",0,0,0","") < 0) {
-		  metautils::log_error("summarize_fixml() returned error: "+server.error()+" when trying to insert '"+entry.key+"',"+format_code+",0,0,0 into "+files_table_name,"scm",USER);
-		}
 		if (server.insert(files_table2_name,"webID,format_code,num_fixes,start_date,end_date,uflag","'"+entry.key+"',"+format_code+",0,0,0,'"+strutils::strand(5)+"'","") < 0) {
 		  metautils::log_error("summarize_fixml() returned error: "+server.error()+" when trying to insert '"+entry.key+"',"+format_code+",0,0,0 into "+files_table2_name,"scm",USER);
 		}
 	    }
 	    query.submit(server);
 	    if (query.num_rows() == 0) {
-		metautils::log_error("summarize_fixml() returned error: unable to retrieve code from "+files_table_name+" for value "+entry.key,"scm",USER);
+		metautils::log_error("summarize_fixml() returned error: unable to retrieve code from "+files_table2_name+" for value "+entry.key,"scm",USER);
 	    }
 	  }
 	  else {
 	    query.fetch_row(row);
-	    if (server.update(files_table_name,"format_code = "+format_code,"code = "+row[0]) < 0) {
-		metautils::log_error("summarize_fixml() returned error: "+server.error()+" while updating "+files_table_name+" with format_code and code","scm",USER);
-	    }
 	    if (server.update(files_table2_name,"format_code = "+format_code,"code = "+row[0]) < 0) {
 		metautils::log_error("summarize_fixml() returned error: "+server.error()+" while updating "+files_table2_name+" with format_code and code","scm",USER);
 	    }
@@ -2413,9 +2342,6 @@ std::cerr << n << " " << cstart.to_string() << " " << cend.to_string() << std::e
 	  }
 	}
 	update_string="num_fixes="+strutils::itos(num_fixes)+",start_date="+start+",end_date="+end;
-	if (server.update(files_table_name,update_string,"code = "+file_id_code) < 0) {
-	  metautils::log_error("summarize_fixml() returned error: "+server.error()+" while updating "+files_table_name+" with '"+update_string+"'","scm",USER);
-	}
 	if (server.update(files_table2_name,update_string+",uflag='"+strutils::strand(5)+"'","code = "+file_id_code) < 0) {
 	  metautils::log_error("summarize_fixml() returned error: "+server.error()+" while updating "+files_table2_name+" with '"+update_string+"'","scm",USER);
 	}
@@ -2633,21 +2559,36 @@ int main(int argc,char **argv)
     std::cerr << "-V          verbose mode" << std::endl;
     exit(1);
   }
+
+// set exit handlers
   signal(SIGSEGV,segv_handler);
   atexit(myexit);
+
+// read the metadata configuration
+  metautils::read_config("scm",USER);
+
+// parse the arguments to scm
   const char ARG_DELIMITER='`';
   metautils::args.args_string=unixutils::unix_args_string(argc,argv,ARG_DELIMITER);
-  metautils::read_config("scm",USER);
   parse_args(ARG_DELIMITER);
+
+// connect to the metadata database
   server.connect(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   if (!server) {
     metautils::log_error("unable to connect to MySQL server on startup","scm",USER);
   }
+
+// create a temporary working directory
   if (!temp_dir.create(metautils::directives.temp_path)) {
     metautils::log_error("unable to create temporary directory","scm",USER);
   }
+
+// container to hold thread IDs
   std::vector<pthread_t> tid_list;
-  auto t1=std::time(nullptr);
+
+// record the program start time
+  auto exec_start_time=std::time(nullptr);
+
   if (local_args.summarize_all) {
     std::stringstream output,error;
     if (unixutils::mysystem2("/bin/tcsh -c \"wget -q -O - --post-data='authKey=qGNlKijgo9DJ7MN&cmd=listfiles&value=/SERVER_ROOT/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+local_args.cmd_directory+"' https://rda.ucar.edu/cgi-bin/dss/remoteRDAServerUtils\"",output,error) < 0) {
@@ -2809,6 +2750,8 @@ int main(int argc,char **argv)
     pthread_create(&ts.tid,NULL,thread_index_variables,NULL);
     tid_list.emplace_back(ts.tid);
   }
+
+// make necessary updates to the metadata databases
   if (local_args.update_db) {
     if (local_args.summarized_hpss_file || local_args.refresh_hpss) {
 	if (local_args.refresh_hpss && local_args.gindex_list.size() == 1) {
@@ -2911,6 +2854,7 @@ query.set("select distinct tindex from dssdb.wfile where dsid = 'ds"+metautils::
 	gatherxml::summarizeMetadata::create_file_list_cache("inv","scm",USER);
     }
   }
+
   ThreadStruct *tkml=nullptr;
   if (kml_list.size() > 0) {
     tkml=new ThreadStruct[kml_list.size()];
@@ -2930,16 +2874,23 @@ query.set("select distinct tindex from dssdb.wfile where dsid = 'ds"+metautils::
 	++n;
     }
   }
+
+// wait for any still-running threads to complete
   for (const auto& tid : tid_list) {
     pthread_join(tid,NULL);
   }
+
   if (kml_list.size() > 0) {
     delete[] tkml;
   }
+
+// update the dataset description, if necessary
   if (metautils::args.regenerate && (local_args.summarized_hpss_file || !local_args.summarized_web_file)) {
     std::stringstream output,error;
     unixutils::mysystem2(metautils::directives.local_root+"/bin/dsgen "+metautils::args.dsnum,output,error);
   }
+
+// if this is not a test run (ds999.9), then clean up the temporary directory
   if (metautils::args.dsnum != "999.9" && !local_args.temp_directory.empty()) {
     std::stringstream output,error;
     unixutils::mysystem2("/bin/rm -rf "+local_args.temp_directory,output,error);
@@ -2947,9 +2898,11 @@ query.set("select distinct tindex from dssdb.wfile where dsid = 'ds"+metautils::
 	local_args.temp_directory="";
     }
   }
+
   if (local_args.notify) {
     std::cout << "scm has completed successfully" << std::endl;
   }
-  auto t2=std::time(nullptr);
-  metautils::log_warning("execution time: "+strutils::ftos(t2-t1)+" seconds","scm.time",USER);
+
+// record the execution time
+  metautils::log_warning("execution time: "+strutils::ftos(std::time(nullptr)-exec_start_time)+" seconds","scm.time",USER);
 }

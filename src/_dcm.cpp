@@ -77,7 +77,7 @@ void parse_args(MySQL::Server& server)
 	cmd_set.emplace(cmd);
 	if (std::regex_search(strutils::to_lower(*arg),std::regex("\\.htar$"))) {
 	  if (cmd == "fmd") {
-	    MySQL::LocalQuery query("mssID","GrML.ds"+dsnum2+"_primaries","mssID like '"+*arg+"..m..%'");
+	    MySQL::LocalQuery query("mssID","GrML.ds"+dsnum2+"_primaries2","mssID like '"+*arg+"..m..%'");
 	    if (query.submit(server) == 0) {
 		MySQL::Row row;
 		while (query.fetch_row(row)) {
@@ -214,9 +214,6 @@ bool remove_from(std::string database,std::string table_ext,std::string file_fie
 	  local_server.command("insert into V"+file_table+" select * from "+file_table+" where code = "+file_ID_code,result);
 	}
 	if (local_server._delete(file_table,"code = "+file_ID_code) < 0) {
-	  metautils::log_error("remove_from() returned error: "+local_server.error(),"dcm",USER);
-	}
-	if (local_server._delete(file_table+"2","code = "+file_ID_code) < 0) {
 	  metautils::log_error("remove_from() returned error: "+local_server.error(),"dcm",USER);
 	}
 	if (database == "WGrML" || database == "WObML") {
@@ -358,25 +355,25 @@ extern "C" void *t_removed(void *ts)
   std::string file_ID_code;
   bool is_version_controlled;
   if (std::regex_search(file,std::regex("^/FS/DECS/"))) {
-    auto was_removed=remove_from("GrML","_primaries","mssID","fmd",file,".GrML",file_ID_code,is_version_controlled);
+    auto was_removed=remove_from("GrML","_primaries2","mssID","fmd",file,".GrML",file_ID_code,is_version_controlled);
     if (was_removed) {
 	clear_tables_by_file_ID("GrML",file_ID_code,is_version_controlled);
 	file_removed=true;
 	removed_from_GrML=true;
     }
-    was_removed=remove_from("ObML","_primaries","mssID","fmd",file,".ObML",file_ID_code,is_version_controlled);
+    was_removed=remove_from("ObML","_primaries2","mssID","fmd",file,".ObML",file_ID_code,is_version_controlled);
     if (was_removed) {
 	clear_tables_by_file_ID("ObML",file_ID_code,is_version_controlled);
 	file_removed=true;
 	removed_from_ObML=true;
     }
-    was_removed=remove_from("SatML","_primaries","mssID","fmd",file,".SatML",file_ID_code,is_version_controlled);
+    was_removed=remove_from("SatML","_primaries2","mssID","fmd",file,".SatML",file_ID_code,is_version_controlled);
     if (was_removed) {
 	clear_tables_by_file_ID("SatML",file_ID_code,is_version_controlled);
 	file_removed=true;
 	removed_from_SatML=true;
     }
-    was_removed=remove_from("FixML","_primaries","mssID","fmd",file,".FixML",file_ID_code,is_version_controlled);
+    was_removed=remove_from("FixML","_primaries2","mssID","fmd",file,".FixML",file_ID_code,is_version_controlled);
     if (was_removed) {
 	clear_tables_by_file_ID("FixML",file_ID_code,is_version_controlled);
 	file_removed=true;
@@ -404,19 +401,19 @@ extern "C" void *t_removed(void *ts)
     server_d.disconnect();
   }
   else {
-    auto was_removed=remove_from("WGrML","_webfiles","webID","wfmd",file,".GrML",file_ID_code,is_version_controlled);
+    auto was_removed=remove_from("WGrML","_webfiles2","webID","wfmd",file,".GrML",file_ID_code,is_version_controlled);
     if (was_removed) {
 	clear_tables_by_file_ID("WGrML",file_ID_code,is_version_controlled);
 	file_removed=true;
 	removed_from_WGrML=true;
     }
-    was_removed=remove_from("WObML","_webfiles","webID","wfmd",file,".ObML",file_ID_code,is_version_controlled);
+    was_removed=remove_from("WObML","_webfiles2","webID","wfmd",file,".ObML",file_ID_code,is_version_controlled);
     if (was_removed) {
 	clear_tables_by_file_ID("WObML",file_ID_code,is_version_controlled);
 	file_removed=true;
 	removed_from_WObML=true;
     }
-    was_removed=remove_from("WFixML","_webfiles","webID","wfmd",file,".FixML",file_ID_code,is_version_controlled);
+    was_removed=remove_from("WFixML","_webfiles2","webID","wfmd",file,".FixML",file_ID_code,is_version_controlled);
     if (was_removed) {
 	clear_tables_by_file_ID("WFixML",file_ID_code,is_version_controlled);
 	file_removed=true;

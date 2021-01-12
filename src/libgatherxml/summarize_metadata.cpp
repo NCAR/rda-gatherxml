@@ -55,9 +55,9 @@ void cmd_dates(std::string database,size_t date_left_padding,std::list<CMDDateRa
     std::cerr << "Error: unable to connect to metadata server" << std::endl;
     exit(1);
   }
-  std::string table=database+".ds"+strutils::substitute(metautils::args.dsnum,".","")+"_primaries";
+  std::string table=database+".ds"+strutils::substitute(metautils::args.dsnum,".","")+"_primaries2";
   if (table_exists(server,table)) {
-    MySQL::LocalQuery query("select min(p.start_date) as md,max(p.end_date),m.gindex from "+table+" as p left join dssdb.mssfile as m on m.mssfile = p.mssID where m.dsid = 'ds"+metautils::args.dsnum+"' and m.type = 'P' and m.status = 'P' group by m.gindex having md > 0 union select min(p.start_date) as md,max(p.end_date),h.gindex from "+table+" as p left join (select concat(m.mssfile,\"..m..\",h.hfile) as member,m.gindex as gindex from dssdb.htarfile as h left join dssdb.mssfile as m on m.mssid = h.mssid where h.dsid = 'ds"+metautils::args.dsnum+"' and m.type = 'P' and m.status = 'P') as h on h.member = p.mssID where !isnull(h.member) group by h.gindex having md > 0");
+    MySQL::LocalQuery query("select min(p.start_date) as md,max(p.end_date),m.gindex from "+table+" as p left join dssdb.mssfile as m on m.mssfile = p.mssID where m.dsid = 'ds"+metautils::args.dsnum+"' and m.type = 'P' and m.status = 'P' and p.start_date > 0 group by m.gindex union select min(p.start_date) as md,max(p.end_date),h.gindex from "+table+" as p left join (select concat(m.mssfile,\"..m..\",h.hfile) as member,m.gindex as gindex from dssdb.htarfile as h left join dssdb.mssfile as m on m.mssid = h.mssid where h.dsid = 'ds"+metautils::args.dsnum+"' and m.type = 'P' and m.status = 'P') as h on h.member = p.mssID where !isnull(h.member) and p.start_date > 0 group by h.gindex");
     if (query.submit(server) < 0) {
 	std::cerr << "Error (A): " << query.error() << std::endl;
 	exit(1);
@@ -578,13 +578,14 @@ void summarize_frequencies(std::string caller,std::string user,std::string mssID
 void summarize_data_formats(std::string caller,std::string user)
 {
   std::string dsnum2=strutils::substitute(metautils::args.dsnum,".","");
-  std::list<std::string> db_names=metautils::cmd_databases(caller,user);
-  if (db_names.size() == 0) {
+  auto cmd_databases=metautils::cmd_databases(caller,user);
+  if (cmd_databases.size() == 0) {
     metautils::log_error("summarize_data_formats():  empty CMD database list",caller,user);
   }
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
-  for (const auto& db_name : db_names) {
-    auto table_name=db_name+".ds"+dsnum2+"_primaries";
+  for (const auto& db : cmd_databases) {
+    auto db_name=std::get<0>(db);
+    auto table_name=db_name+".ds"+dsnum2+"_primaries2";
     if (table_name[0] != 'V' && table_exists(server,table_name)) {
 	MySQL::LocalQuery query("select distinct f.format from "+table_name+" as p left join "+db_name+".formats as f on f.code = p.format_code");
 	if (query.submit(server) < 0) {
@@ -934,10 +935,10 @@ void grml_file_data(std::string file_type,my::map<XEntry>& gindex_table,my::map<
   }
   fill_data_formats_table(file_type,"GrML",server,data_formats,caller,user);
   if (file_type == "MSS") {
-    query.set("select mssID,format_code,num_grids,start_date,end_date from GrML.ds"+dsnum2+"_primaries where num_grids > 0");
+    query.set("select mssID,format_code,num_grids,start_date,end_date from GrML.ds"+dsnum2+"_primaries2 where num_grids > 0");
   }
   else {
-    query.set("select webID,format_code,num_grids,start_date,end_date from WGrML.ds"+dsnum2+"_webfiles where num_grids > 0");
+    query.set("select webID,format_code,num_grids,start_date,end_date from WGrML.ds"+dsnum2+"_webfiles2 where num_grids > 0");
   }
   if (query.submit(server) < 0) {
     metautils::log_error("grml_file_data(): "+query.error()+" while trying to get metadata file data",caller,user);
@@ -954,10 +955,10 @@ void obml_file_data(std::string file_type,my::map<XEntry>& gindex_table,my::map<
   MySQL::Query query;
   auto dsnum2=strutils::substitute(metautils::args.dsnum,".","");
   if (file_type == "MSS") {
-    query.set("select mssID,format_code,num_observations,start_date,end_date from ObML.ds"+dsnum2+"_primaries where num_observations > 0");
+    query.set("select mssID,format_code,num_observations,start_date,end_date from ObML.ds"+dsnum2+"_primaries2 where num_observations > 0");
   }
   else {
-    query.set("select webID,format_code,num_observations,start_date,end_date from WObML.ds"+dsnum2+"_webfiles where num_observations > 0");
+    query.set("select webID,format_code,num_observations,start_date,end_date from WObML.ds"+dsnum2+"_webfiles2 where num_observations > 0");
   }
   if (query.submit(server) < 0) {
     metautils::log_error("obml_file_data(): "+query.error()+" while trying to get metadata file data",caller,user);
@@ -980,10 +981,10 @@ void fixml_file_data(std::string file_type,my::map<XEntry>& gindex_table,my::map
   }
   fill_data_formats_table(file_type,"FixML",server,data_formats,caller,user);
   if (file_type == "MSS") {
-    query.set("select mssID,format_code,num_fixes,start_date,end_date from FixML.ds"+dsnum2+"_primaries where num_fixes > 0");
+    query.set("select mssID,format_code,num_fixes,start_date,end_date from FixML.ds"+dsnum2+"_primaries2 where num_fixes > 0");
   }
   else {
-    query.set("select webID,format_code,num_fixes,start_date,end_date from WFixML.ds"+dsnum2+"_webfiles where num_fixes > 0");
+    query.set("select webID,format_code,num_fixes,start_date,end_date from WFixML.ds"+dsnum2+"_webfiles2 where num_fixes > 0");
   }
   if (query.submit(server) < 0) {
     metautils::log_error("fixml_file_data(): "+query.error()+" while trying to get metadata file data",caller,user);
@@ -1010,14 +1011,14 @@ void write_grml_parameters(std::string& file_type,std::string& tindex,std::ofstr
   if (file_type == "MSS") {
     db_prefix="";
     dssdb_filetable="mssfile";
-    metadata_filetable="_primaries";
+    metadata_filetable="_primaries2";
     where_conditions="type = 'P' and status = 'P'";
     id_type="mss";
   }
   else if (file_type == "Web" || file_type == "inv") {
     db_prefix="W";
     dssdb_filetable="wfile";
-    metadata_filetable="_webfiles";
+    metadata_filetable="_webfiles2";
     where_conditions="type = 'D' and status = 'P'";
     id_type="web";
   }
@@ -1148,7 +1149,7 @@ void write_groups(std::string& file_type,std::string db,std::ofstream& ofs,std::
     if (file_type == "MSS") {
 	metadata_db_prefix="";
 	ID_type="mss";
-	metadata_filetable="_primaries";
+	metadata_filetable="_primaries2";
 	dssdb_filetable="mssfile";
 	dssdb_typedescr="property";
 	dssdb_filetype="P";
@@ -1156,7 +1157,7 @@ void write_groups(std::string& file_type,std::string db,std::ofstream& ofs,std::
     else if (file_type == "Web" || file_type == "inv") {
 	metadata_db_prefix="W";
 	ID_type="web";
-	metadata_filetable="_webfiles";
+	metadata_filetable="_webfiles2";
 	dssdb_filetable="wfile";
 	dssdb_typedescr="type";
 	dssdb_filetype="D";
@@ -1252,30 +1253,30 @@ void create_file_list_cache(std::string file_type,std::string caller,std::string
   my::map<XEntry> rda_files_table(99999);
   fill_rdadb_files_table(file_type,server,rda_files_table,caller,user);
   if (file_type == "MSS") {
-    if (table_exists(server,"GrML.ds"+dsnum2+"_primaries")) {
+    if (table_exists(server,"GrML.ds"+dsnum2+"_primaries2")) {
 	grml_file_data(file_type,gindex_table,rda_files_table,grml_file_data_table,caller,user);
 	can_customize_GrML=true;
     }
-    if (table_exists(server,"ObML.ds"+dsnum2+"_primaries")) {
+    if (table_exists(server,"ObML.ds"+dsnum2+"_primaries2")) {
 	obml_file_data(file_type,gindex_table,rda_files_table,obml_file_data_table,caller,user);
 	if (tindex.empty()) {
-	  ocustom.set("select min(start_date),max(end_date) from ObML.ds"+dsnum2+"_primaries where start_date > 0");
+	  ocustom.set("select min(start_date),max(end_date) from ObML.ds"+dsnum2+"_primaries2 where start_date > 0");
 	}
 	else {
-	  ocustom.set("select min(start_date),max(end_date) from ObML.ds"+dsnum2+"_primaries as p left join dssdb.mssfile as m on m.mssfile = p.mssID where m.tindex = "+tindex+" and m.dsid = 'ds"+metautils::args.dsnum+"' and start_date > 0");
+	  ocustom.set("select min(start_date),max(end_date) from ObML.ds"+dsnum2+"_primaries2 as p left join dssdb.mssfile as m on m.mssfile = p.mssID where m.tindex = "+tindex+" and m.dsid = 'ds"+metautils::args.dsnum+"' and start_date > 0");
 	}
     }
-    if (table_exists(server,"SatML.ds"+dsnum2+"_primaries")) {
-	satellite_query.set("select p.mssID,f.format,p.num_products,p.start_date,p.end_date,m.file_format,m.data_size,g.grpid,g.gindex,p.product from SatML.ds"+dsnum2+"_primaries as p left join SatML.formats as f on f.code = p.format_code left join dssdb.mssfile as m on m.mssfile = p.mssID left join dssdb.dsgroup as g on m.gindex = g.gindex where g.dsid = 'ds"+metautils::args.dsnum+"' or m.gindex = 0");
+    if (table_exists(server,"SatML.ds"+dsnum2+"_primaries2")) {
+	satellite_query.set("select p.mssID,f.format,p.num_products,p.start_date,p.end_date,m.file_format,m.data_size,g.grpid,g.gindex,p.product from SatML.ds"+dsnum2+"_primaries2 as p left join SatML.formats as f on f.code = p.format_code left join dssdb.mssfile as m on m.mssfile = p.mssID left join dssdb.dsgroup as g on m.gindex = g.gindex where g.dsid = 'ds"+metautils::args.dsnum+"' or m.gindex = 0");
 	if (satellite_query.submit(server) < 0)
 	  metautils::log_error(THIS_FUNC+"(): "+satellite_query.error()+" from query: "+satellite_query.show(),caller,user);
     }
-    if (table_exists(server,"FixML.ds"+dsnum2+"_primaries")) {
+    if (table_exists(server,"FixML.ds"+dsnum2+"_primaries2")) {
 	fixml_file_data(file_type,gindex_table,rda_files_table,fixml_file_data_table,caller,user);
     }
   }
   else if (file_type == "Web" || file_type == "inv") {
-    if (table_exists(server,"WGrML.ds"+dsnum2+"_webfiles")) {
+    if (table_exists(server,"WGrML.ds"+dsnum2+"_webfiles2")) {
 	if (file_type == "inv" && !table_exists(server,"IGrML.ds"+dsnum2+"_inventory_summary")) {
 	  return;
 	}
@@ -1284,26 +1285,26 @@ void create_file_list_cache(std::string file_type,std::string caller,std::string
 	}
 	can_customize_GrML=true;
     }
-    if (table_exists(server,"WObML.ds"+dsnum2+"_webfiles")) {
+    if (table_exists(server,"WObML.ds"+dsnum2+"_webfiles2")) {
 	if (file_type == "Web" && tindex.empty()) {
 	  obml_file_data(file_type,gindex_table,rda_files_table,obml_file_data_table,caller,user);
 	}
 	if (file_type == "Web") {
-	  ocustom.set("select min(start_date),max(end_date) from WObML.ds"+dsnum2+"_webfiles where start_date > 0");
+	  ocustom.set("select min(start_date),max(end_date) from WObML.ds"+dsnum2+"_webfiles2 where start_date > 0");
 	}
 	else if (file_type == "inv") {
 	  if (table_exists(server,"IObML.ds"+dsnum2+"_dataTypes")) {
-	    ocustom.set("select min(start_date),max(end_date) from WObML.ds"+dsnum2+"_webfiles as w left join (select distinct webID_code from IObML.ds"+dsnum2+"_dataTypes) as d on d.webID_code = w.code where !isnull(d.webID_code) and start_date > 0");
+	    ocustom.set("select min(start_date),max(end_date) from WObML.ds"+dsnum2+"_webfiles2 as w left join (select distinct webID_code from IObML.ds"+dsnum2+"_dataTypes) as d on d.webID_code = w.code where !isnull(d.webID_code) and start_date > 0");
 	  }
 	  else if (table_exists(server,"IObML.ds"+dsnum2+"_inventory_summary")) {
-	    ocustom.set("select min(start_date),max(end_date) from WObML.ds"+dsnum2+"_webfiles as w left join IObML.ds"+dsnum2+"_inventory_summary as i on i.webID_code = w.code where !isnull(i.webID_code) and start_date > 0");
+	    ocustom.set("select min(start_date),max(end_date) from WObML.ds"+dsnum2+"_webfiles2 as w left join IObML.ds"+dsnum2+"_inventory_summary as i on i.webID_code = w.code where !isnull(i.webID_code) and start_date > 0");
 	  }
 	  else {
 	    return;
 	  }
 	}
     }
-    if (table_exists(server,"WFixML.ds"+dsnum2+"_webfiles")) {
+    if (table_exists(server,"WFixML.ds"+dsnum2+"_webfiles2")) {
 	if (tindex.empty()) {
 	  fixml_file_data(file_type,gindex_table,rda_files_table,fixml_file_data_table,caller,user);
 	}
@@ -1428,7 +1429,7 @@ void create_file_list_cache(std::string file_type,std::string caller,std::string
 	}
 // data types and formats
 	if (file_type == "MSS") {
-	  fquery.set("select distinct f.format from ObML.ds"+dsnum2+"_primaries as p left join ObML.formats as f on f.code = p.format_code");
+	  fquery.set("select distinct f.format from ObML.ds"+dsnum2+"_primaries2 as p left join ObML.formats as f on f.code = p.format_code");
 	  if (MySQL::table_exists(server,"ObML.ds"+dsnum2+"_dataTypes2")) {
 	    ocustom.set("select distinct l.dataType from ObML.ds"+dsnum2+"_dataTypes2 as d left join ObML.ds"+dsnum2+"_dataTypesList as l on l.code = d.dataType_code");
 	  }
@@ -1437,7 +1438,7 @@ void create_file_list_cache(std::string file_type,std::string caller,std::string
 	  }
 	}
 	else if (file_type == "Web" || file_type == "inv") {
-	  fquery.set("select distinct f.format from WObML.ds"+dsnum2+"_webfiles as w left join WObML.formats as f on f.code = w.format_code");
+	  fquery.set("select distinct f.format from WObML.ds"+dsnum2+"_webfiles2 as w left join WObML.formats as f on f.code = w.format_code");
 	  ocustom.set("select distinct l.dataType from WObML.ds"+dsnum2+"_dataTypes2 as d left join WObML.ds"+dsnum2+"_dataTypesList as l on l.code = d.dataType_code");
 	}
 	if (fquery.submit(server) < 0) {
@@ -1496,14 +1497,14 @@ void create_file_list_cache(std::string file_type,std::string caller,std::string
 // groups
 	if (tindex.empty()) {
 	  if (file_type == "MSS") {
-	    ocustom.set("select distinct g.gindex,g.title,g.grpid from (select m.gindex from ObML.ds"+dsnum2+"_primaries as p left join dssdb.mssfile as m on (m.dsid = 'ds"+metautils::args.dsnum+"' and m.mssfile = p.mssID)) as m left join dssdb.dsgroup as g on (g.dsid = 'ds"+metautils::args.dsnum+"' and g.gindex = m.gindex) where !isnull(g.gindex) order by g.gindex");
+	    ocustom.set("select distinct g.gindex,g.title,g.grpid from (select m.gindex from ObML.ds"+dsnum2+"_primaries2 as p left join dssdb.mssfile as m on (m.dsid = 'ds"+metautils::args.dsnum+"' and m.mssfile = p.mssID)) as m left join dssdb.dsgroup as g on (g.dsid = 'ds"+metautils::args.dsnum+"' and g.gindex = m.gindex) where !isnull(g.gindex) order by g.gindex");
 	  }
 	  else {
-	    if (field_exists(server,"WObML.ds"+dsnum2+"_webfiles","dsid")) {
-		ocustom.set("select distinct g.gindex,g.title,g.grpid from WObML.ds"+dsnum2+"_webfiles as p left join dssdb.wfile as w on (w.wfile = p.webID and w.type = p.type and w.dsid = p.dsid) left join dssdb.dsgroup as g on (g.dsid = 'ds"+metautils::args.dsnum+"' and g.gindex = w.gindex) where !isnull(w.wfile) order by g.gindex");
+	    if (field_exists(server,"WObML.ds"+dsnum2+"_webfiles2","dsid")) {
+		ocustom.set("select distinct g.gindex,g.title,g.grpid from WObML.ds"+dsnum2+"_webfiles2 as p left join dssdb.wfile as w on (w.wfile = p.webID and w.type = p.type and w.dsid = p.dsid) left join dssdb.dsgroup as g on (g.dsid = 'ds"+metautils::args.dsnum+"' and g.gindex = w.gindex) where !isnull(w.wfile) order by g.gindex");
 	    }
 	    else {
-		ocustom.set("select distinct g.gindex,g.title,g.grpid from WObML.ds"+dsnum2+"_webfiles as p left join dssdb.wfile as w on w.wfile = p.webID left join dssdb.dsgroup as g on (g.dsid = 'ds"+metautils::args.dsnum+"' and g.gindex = w.gindex) where !isnull(w.wfile) order by g.gindex");
+		ocustom.set("select distinct g.gindex,g.title,g.grpid from WObML.ds"+dsnum2+"_webfiles2 as p left join dssdb.wfile as w on w.wfile = p.webID left join dssdb.dsgroup as g on (g.dsid = 'ds"+metautils::args.dsnum+"' and g.gindex = w.gindex) where !isnull(w.wfile) order by g.gindex");
 	    }
 	  }
 	  if (ocustom.submit(server) < 0) {

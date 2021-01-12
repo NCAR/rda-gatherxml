@@ -15,7 +15,7 @@ void summarize_fix_data(std::string caller,std::string user)
 {
   std::string dsnum2=strutils::substitute(metautils::args.dsnum,".","");
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
-  MySQL::Query query("code,format_code","FixML.ds"+dsnum2+"_primaries");
+  MySQL::Query query("code,format_code","FixML.ds"+dsnum2+"_primaries2");
   if (query.submit(server) < 0) {
     metautils::log_error("summarize_fix_data(): "+query.error(),caller,user);
   }

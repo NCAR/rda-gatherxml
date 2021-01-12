@@ -174,11 +174,11 @@ void generate_graphics(MySQL::LocalQuery& query,std::string type,std::string tab
     }
     else {
 	if (type == "obs") {
-	  tnc[nn].query.set("select distinct box1d_row,box1d_bitmap from ObML.ds"+dsnum2+"_primaries as p left join dssdb.mssfile as x on (x.dsid = 'ds"+metautils::args.dsnum+"' and x.mssfile = p.mssID) left join "+table+" as t on t.mssID_code = p.code where x.gindex = "+gindex+" and observationType_code = "+row[0]+" and platformType_code = "+row[1]+" and p.format_code = "+row[4]+" order by box1d_row");
+	  tnc[nn].query.set("select distinct box1d_row,box1d_bitmap from ObML.ds"+dsnum2+"_primaries2 as p left join dssdb.mssfile as x on (x.dsid = 'ds"+metautils::args.dsnum+"' and x.mssfile = p.mssID) left join "+table+" as t on t.mssID_code = p.code where x.gindex = "+gindex+" and observationType_code = "+row[0]+" and platformType_code = "+row[1]+" and p.format_code = "+row[4]+" order by box1d_row");
 	  tnc[nn].imagetag=strutils::substitute(row[5]," ","_")+"_mss_gindex_"+gindex+"_"+row[2]+"."+row[3];
 	}
 	else if (type == "fix") {
-	  tnc[nn].query.set("select box1d_row,box1d_bitmap from FixML.ds"+dsnum2+"_primaries as p left join dssdb.mssfile as x on x.mssfile = p.mssID left join "+table+" as t on t.mssID_code = p.code where x.gindex = "+gindex+" and classification_code = "+row[0]+" and p.format_code = "+row[2]+" order by box1d_row");
+	  tnc[nn].query.set("select box1d_row,box1d_bitmap from FixML.ds"+dsnum2+"_primaries2 as p left join dssdb.mssfile as x on x.mssfile = p.mssID left join "+table+" as t on t.mssID_code = p.code where x.gindex = "+gindex+" and classification_code = "+row[0]+" and p.format_code = "+row[2]+" order by box1d_row");
 	  tnc[nn].imagetag=strutils::substitute(row[3]," ","_")+"_mss_gindex_"+gindex+"_"+row[1];
 	}
     }
@@ -268,22 +268,22 @@ int main(int argc,char **argv)
   }
   if (table_exists(server,"ObML.ds"+dsnum2+"_dataTypes2")) {
     if (gindex.empty()) {
-	query.set("select distinct l.observationType_code,l.platformType_code,o.obsType,pf.platformType,p.format_code,f.format from ObML.ds"+dsnum2+"_primaries as p left join ObML.ds"+dsnum2+"_dataTypes2 as d on d.mssID_code = p.code left join ObML.ds"+dsnum2+"_dataTypesList as l on l.code = d.dataType_code left join ObML.obsTypes as o on l.observationType_code = o.code left join ObML.platformTypes as pf on l.platformType_code = pf.code left join ObML.formats as f on f.code = p.format_code");
+	query.set("select distinct l.observationType_code,l.platformType_code,o.obsType,pf.platformType,p.format_code,f.format from ObML.ds"+dsnum2+"_primaries2 as p left join ObML.ds"+dsnum2+"_dataTypes2 as d on d.mssID_code = p.code left join ObML.ds"+dsnum2+"_dataTypesList as l on l.code = d.dataType_code left join ObML.obsTypes as o on l.observationType_code = o.code left join ObML.platformTypes as pf on l.platformType_code = pf.code left join ObML.formats as f on f.code = p.format_code");
 	table="search.obs_data";
     }
     else {
-	query.set("select distinct l.observationType_code,l.platformType_code,o.obsType,pf.platformType,p.format_code,f.format from ObML.ds"+dsnum2+"_primaries as p left join dssdb.mssfile as x on x.mssfile = p.mssID left join ObML.ds"+dsnum2+"_dataTypes2 as d on d.mssID_code = p.code left join ObML.ds"+dsnum2+"_dataTypesList as l on l.code = d.dataType_code left join ObML.obsTypes as o on l.observationType_code = o.code left join ObML.platformTypes as pf on l.platformType_code = pf.code left join ObML.formats as f on f.code = p.format_code where x.gindex = "+gindex);
+	query.set("select distinct l.observationType_code,l.platformType_code,o.obsType,pf.platformType,p.format_code,f.format from ObML.ds"+dsnum2+"_primaries2 as p left join dssdb.mssfile as x on x.mssfile = p.mssID left join ObML.ds"+dsnum2+"_dataTypes2 as d on d.mssID_code = p.code left join ObML.ds"+dsnum2+"_dataTypesList as l on l.code = d.dataType_code left join ObML.obsTypes as o on l.observationType_code = o.code left join ObML.platformTypes as pf on l.platformType_code = pf.code left join ObML.formats as f on f.code = p.format_code where x.gindex = "+gindex);
 	table="ObML.ds"+dsnum2+"_locations";
     }
     generate_graphics(query,"obs",table,gindex);
   }
   if (table_exists(server,"FixML.ds"+dsnum2+"_locations")) {
     if (gindex.empty()) {
-	query.set("select distinct d.classification_code,c.classification,p.format_code,f.format from FixML.ds"+dsnum2+"_primaries as p left join FixML.ds"+dsnum2+"_locations as d on d.mssID_code = p.code left join FixML.classifications as c on d.classification_code = c.code left join FixML.formats as f on f.format = p.format_code");
+	query.set("select distinct d.classification_code,c.classification,p.format_code,f.format from FixML.ds"+dsnum2+"_primaries2 as p left join FixML.ds"+dsnum2+"_locations as d on d.mssID_code = p.code left join FixML.classifications as c on d.classification_code = c.code left join FixML.formats as f on f.format = p.format_code");
 	table="search.fix_data";
     }
     else {
-	query.set("select distinct d.classification_code,c.classification,p.format_code,f.format from FixML.ds"+dsnum2+"_primaries as p left join dssdb.mssfile as x on x.mssfile = p.mssID left join FixML.ds"+dsnum2+"_locations as d on d.mssID_code = p.code left join FixML.classifications as c on d.classification_code = c.code left join FixML.formats as f on f.format = p.format_code where x.gindex = "+gindex);
+	query.set("select distinct d.classification_code,c.classification,p.format_code,f.format from FixML.ds"+dsnum2+"_primaries2 as p left join dssdb.mssfile as x on x.mssfile = p.mssID left join FixML.ds"+dsnum2+"_locations as d on d.mssID_code = p.code left join FixML.classifications as c on d.classification_code = c.code left join FixML.formats as f on f.format = p.format_code where x.gindex = "+gindex);
 	table="FixML.ds"+dsnum2+"_locations";
     }
     generate_graphics(query,"fix",table,gindex);

@@ -1083,14 +1083,14 @@ std::string output,error;
   }
   if (file_type == "MSS") {
     db="GrML";
-    table="_primaries";
+    table="_primaries2";
     dtable="mssfile";
     ID_type="mss";
     query.set("code,map,type,value","GrML.levels");
   }
   else if (file_type == "Web") {
     db="WGrML";
-    table="_webfiles";
+    table="_webfiles2";
     dtable="wfile";
     ID_type="web";
     query.set("code,map,type,value","WGrML.levels");
@@ -1551,7 +1551,7 @@ std::string output,error;
 	  }
 	}
 	if (group_index.empty()) {
-	  query.set("select a.timeRange_codes,a.gridDefinition_codes,min(a.start_date),max(a.end_date) from "+db+".ds"+dsnum2+"_agrids as a left join "+db+".ds"+dsnum2+"_primaries as p on p.code = a."+ID_type+"ID_code where p.format_code = "+format_res[1]+" group by a.timeRange_codes,a.gridDefinition_codes");
+	  query.set("select a.timeRange_codes,a.gridDefinition_codes,min(a.start_date),max(a.end_date) from "+db+".ds"+dsnum2+"_agrids as a left join "+db+".ds"+dsnum2+"_primaries2 as p on p.code = a."+ID_type+"ID_code where p.format_code = "+format_res[1]+" group by a.timeRange_codes,a.gridDefinition_codes");
 	}
 	ofs_p << "<div id=\""+format_res[0]+"_anchor\"></div>";
 	if (format_list.size() > 1) {
@@ -1762,13 +1762,13 @@ void generate_detailed_observation_summary(MySQL::LocalQuery& format_query,std::
   std::string db,table,dtable,ID_type;
   if (file_type == "MSS") {
     db="ObML";
-    table="_primaries";
+    table="_primaries2";
     dtable="mssfile";
     ID_type="mss";
   }
   else if (file_type == "Web") {
     db="WObML";
-    table="_webfiles";
+    table="_webfiles2";
     dtable="wfile";
     ID_type="web";
   }
@@ -1937,13 +1937,13 @@ void generate_detailed_fix_summary(MySQL::LocalQuery& format_query,std::string f
   std::string db,table,dtable,ID_type;
   if (file_type == "MSS") {
     db="FixML";
-    table="_primaries";
+    table="_primaries2";
     dtable="mssfile";
     ID_type="mss";
   }
   else if (file_type == "Web") {
     db="WFixML";
-    table="_webfiles";
+    table="_webfiles2";
     dtable="wfile";
     ID_type="web";
   }
@@ -2049,10 +2049,10 @@ void generate_detailed_metadata_view(std::string caller,std::string user)
   std::list<std::string> format_list;
   auto found_CMD_in_database=false;
   MySQL::LocalQuery grml_query;
-  if (table_exists(server_m,"GrML.ds"+dsnum2+"_primaries")) {
+  if (table_exists(server_m,"GrML.ds"+dsnum2+"_primaries2")) {
     found_CMD_in_database=true;
     data_types+="<li>Grids</li>";
-    grml_query.set("select distinct f.format,f.code from GrML.formats as f left join GrML.ds"+dsnum2+"_primaries as p on f.code = p.format_code where !isnull(p.format_code)");
+    grml_query.set("select distinct f.format,f.code from GrML.formats as f left join GrML.ds"+dsnum2+"_primaries2 as p on f.code = p.format_code where !isnull(p.format_code)");
     if (grml_query.submit(server_m) < 0) {
 	std::cerr << grml_query.error() << std::endl;
 	exit(1);
@@ -2063,7 +2063,7 @@ void generate_detailed_metadata_view(std::string caller,std::string user)
   if (table_exists(server_m,"ObML.ds"+dsnum2+"_locations")) {
     found_CMD_in_database=true;
     data_types+="<li>Platform Observations</li>";
-    obml_query.set("select distinct f.format,f.code from ObML.formats as f left join ObML.ds"+dsnum2+"_primaries as p on f.code = p.format_code where !isnull(p.format_code)");
+    obml_query.set("select distinct f.format,f.code from ObML.formats as f left join ObML.ds"+dsnum2+"_primaries2 as p on f.code = p.format_code where !isnull(p.format_code)");
     if (obml_query.submit(server_m) < 0) {
 	std::cerr << obml_query.error() << std::endl;
 	exit(1);
@@ -2071,10 +2071,10 @@ void generate_detailed_metadata_view(std::string caller,std::string user)
     add_to_formats(xdoc,obml_query,format_list,formats);
   }
   MySQL::LocalQuery fixml_query;
-  if (table_exists(server_m,"FixML.ds"+dsnum2+"_primaries")) {
+  if (table_exists(server_m,"FixML.ds"+dsnum2+"_primaries2")) {
     found_CMD_in_database=true;
     data_types+="<li>Cyclone Fix</li>";
-    fixml_query.set("select distinct f.format,f.code from FixML.formats as f left join FixML.ds"+dsnum2+"_primaries as p on f.code = p.format_code where !isnull(p.format_code)");
+    fixml_query.set("select distinct f.format,f.code from FixML.formats as f left join FixML.ds"+dsnum2+"_primaries2 as p on f.code = p.format_code where !isnull(p.format_code)");
     if (fixml_query.submit(server_m) < 0) {
 	std::cerr << fixml_query.error() << std::endl;
 	exit(1);
@@ -2306,47 +2306,56 @@ group_index="0";
 /*
   if (file_type == "MSS") {
     query.set("title,mnote","dsgroup","dsid = 'ds"+dsnum+"' and gindex = "+group_index);
-    if (table_exists(server_m,"GrML.ds"+dsnum2+"_primaries")) {
-	grml_query.set("select distinct f.format,f.code from GrML.formats as f left join GrML.ds"+dsnum2+"_primaries as p on f.code = p.format_code left join dssdb.mssfile as m on m.mssfile = p.mssID where !isnull(p.format_code) and m.gindex = "+group_index);
+    if (table_exists(server_m,"GrML.ds"+dsnum2+"_primaries2")) {
+	grml_query.set("select distinct f.format,f.code from GrML.formats as f left join GrML.ds"+dsnum2+"_primaries2 as p on f.code = p.format_code left join dssdb.mssfile as m on m.mssfile = p.mssID where !isnull(p.format_code) and m.gindex = "+group_index);
 	if (grml_query.submit(server_m) < 0)
 	  metautils::log_error("generate_group_detailed_metadata_view(): "+grml_query.error(),caller,user,args);
     }
-    if (table_exists(server_m,"ObML.ds"+dsnum2+"_primaries")) {
-	obml_query.set("select distinct f.format,f.code from ObML.formats as f left join ObML.ds"+dsnum2+"_primaries as p on f.code = p.format_code left join dssdb.mssfile as m on m.mssfile = p.mssID where !isnull(p.format_code) and m.gindex = "+group_index);
+    if (table_exists(server_m,"ObML.ds"+dsnum2+"_primaries2")) {
+	obml_query.set("select distinct f.format,f.code from ObML.formats as f left join ObML.ds"+dsnum2+"_primaries2 as p on f.code = p.format_code left join dssdb.mssfile as m on m.mssfile = p.mssID where !isnull(p.format_code) and m.gindex = "+group_index);
 	if (obml_query.submit(server_m) < 0)
 	  metautils::log_error("generate_group_detailed_metadata_view(): "+obml_query.error(),caller,user,args);
     }
-    if (table_exists(server_m,"FixML.ds"+dsnum2+"_primaries")) {
-	fixml_query.set("select distinct f.format,f.code from FixML.formats as f left join FixML.ds"+dsnum2+"_primaries as p on f.code = p.format_code left join dssdb.mssfile as m on m.mssfile = p.mssID where !isnull(p.format_code) and m.gindex = "+group_index);
+    if (table_exists(server_m,"FixML.ds"+dsnum2+"_primaries2")) {
+	fixml_query.set("select distinct f.format,f.code from FixML.formats as f left join FixML.ds"+dsnum2+"_primaries2 as p on f.code = p.format_code left join dssdb.mssfile as m on m.mssfile = p.mssID where !isnull(p.format_code) and m.gindex = "+group_index);
 	if (fixml_query.submit(server_m) < 0)
 	  metautils::log_error("generate_group_detailed_metadata_view(): "+fixml_query.error(),caller,user,args);
     }
   }
   else if (file_type == "Web") {
     query.set("title,wnote","dsgroup","dsid = 'ds"+dsnum+"' and gindex = "+group_index);
-    if (table_exists(server_m,"WGrML.ds"+dsnum2+"_webfiles")) {
-	if (field_exists(server_m,"WGrML.ds"+dsnum2+"_webfiles","dsid"))
-	  grml_query.set("select distinct f.format,f.code from WGrML.formats as f left join WGrML.ds"+dsnum2+"_webfiles as w on f.code = w.format_code left join dssdb.wfile as x on (x.wfile = w.webID and x.type = w.type and x.dsid = w.dsid) where !isnull(w.format_code) and x.gindex = "+group_index);
-	else
-	  grml_query.set("select distinct f.format,f.code from WGrML.formats as f left join WGrML.ds"+dsnum2+"_webfiles as w on f.code = w.format_code left join dssdb.wfile as x on x.wfile = w.webID where !isnull(w.format_code) and x.gindex = "+group_index);
-	if (grml_query.submit(server_m) < 0)
+    if (table_exists(server_m,"WGrML.ds"+dsnum2+"_webfiles2")) {
+	if (field_exists(server_m,"WGrML.ds"+dsnum2+"_webfiles2","dsid")) {
+	  grml_query.set("select distinct f.format,f.code from WGrML.formats as f left join WGrML.ds"+dsnum2+"_webfiles2 as w on f.code = w.format_code left join dssdb.wfile as x on (x.wfile = w.webID and x.type = w.type and x.dsid = w.dsid) where !isnull(w.format_code) and x.gindex = "+group_index);
+	}
+	else {
+	  grml_query.set("select distinct f.format,f.code from WGrML.formats as f left join WGrML.ds"+dsnum2+"_webfiles2 as w on f.code = w.format_code left join dssdb.wfile as x on x.wfile = w.webID where !isnull(w.format_code) and x.gindex = "+group_index);
+	}
+	if (grml_query.submit(server_m) < 0) {
 	  metautils::log_error("generate_group_detailed_metadata_view(): "+grml_query.error(),caller,user,args);
+	}
     }
-    if (table_exists(server_m,"WObML.ds"+dsnum2+"_webfiles")) {
-	if (field_exists(server_m,"WObML.ds"+dsnum2+"_webfiles","dsid"))
-	  obml_query.set("select distinct f.format,f.code from WObML.formats as f left join WObML.ds"+dsnum2+"_webfiles as w on f.code = w.format_code left join dssdb.wfile as x on (x.wfile = w.webID and x.type = w.type and x.dsid = w.dsid) where !isnull(w.format_code) and x.gindex = "+group_index);
-	else
-	  obml_query.set("select distinct f.format,f.code from WObML.formats as f left join WObML.ds"+dsnum2+"_webfiles as w on f.code = w.format_code left join dssdb.wfile as x on x.wfile = w.webID where !isnull(w.format_code) and x.gindex = "+group_index);
-	if (obml_query.submit(server_m) < 0)
+    if (table_exists(server_m,"WObML.ds"+dsnum2+"_webfiles2")) {
+	if (field_exists(server_m,"WObML.ds"+dsnum2+"_webfiles2","dsid")) {
+	  obml_query.set("select distinct f.format,f.code from WObML.formats as f left join WObML.ds"+dsnum2+"_webfiles2 as w on f.code = w.format_code left join dssdb.wfile as x on (x.wfile = w.webID and x.type = w.type and x.dsid = w.dsid) where !isnull(w.format_code) and x.gindex = "+group_index);
+	}
+	else {
+	  obml_query.set("select distinct f.format,f.code from WObML.formats as f left join WObML.ds"+dsnum2+"_webfiles2 as w on f.code = w.format_code left join dssdb.wfile as x on x.wfile = w.webID where !isnull(w.format_code) and x.gindex = "+group_index);
+	}
+	if (obml_query.submit(server_m) < 0) {
 	  metautils::log_error("generate_group_detailed_metadata_view(): "+obml_query.error(),caller,user,args);
+	}
     }
-    if (table_exists(server_m,"WFixML.ds"+dsnum2+"_webfiles")) {
-	if (field_exists(server_m,"WObML.ds"+dsnum2+"_webfiles","dsid"))
-	  fixml_query.set("select distinct f.format,f.code from WFixML.formats as f left join WFixML.ds"+dsnum2+"_webfiles as w on f.code = w.format_code left join dssdb.wfile as x on (x.wfile = w.webID and x.type = w.type and x.dsid = w.dsid) where !isnull(w.format_code) and x.gindex = "+group_index);
-	else
-	  fixml_query.set("select distinct f.format,f.code from WFixML.formats as f left join WFixML.ds"+dsnum2+"_webfiles as w on f.code = w.format_code left join dssdb.wfile as x on x.wfile = w.webID where !isnull(w.format_code) and x.gindex = "+group_index);
-	if (fixml_query.submit(server_m) < 0)
+    if (table_exists(server_m,"WFixML.ds"+dsnum2+"_webfiles2")) {
+	if (field_exists(server_m,"WObML.ds"+dsnum2+"_webfiles2","dsid")) {
+	  fixml_query.set("select distinct f.format,f.code from WFixML.formats as f left join WFixML.ds"+dsnum2+"_webfiles2 as w on f.code = w.format_code left join dssdb.wfile as x on (x.wfile = w.webID and x.type = w.type and x.dsid = w.dsid) where !isnull(w.format_code) and x.gindex = "+group_index);
+	}
+	else {
+	  fixml_query.set("select distinct f.format,f.code from WFixML.formats as f left join WFixML.ds"+dsnum2+"_webfiles2 as w on f.code = w.format_code left join dssdb.wfile as x on x.wfile = w.webID where !isnull(w.format_code) and x.gindex = "+group_index);
+	}
+	if (fixml_query.submit(server_m) < 0) {
 	  metautils::log_error("generate_group_detailed_metadata_view(): "+fixml_query.error(),caller,user,args);
+	}
     }
   }
   if (query.submit(server_d) < 0)
