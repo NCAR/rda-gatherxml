@@ -1621,11 +1621,18 @@ void generate_description(std::string type,std::string tdir_name)
 		    break;
 		  }
 		  case 'P': {
-		    citation+=". <em>Proc. ";
+		    citation+=". <em>";
 		    MySQL::LocalQuery pquery("select pub_name,pages from citation.proceedings_works where DOI = '"+doi+"'");
 		    MySQL::Row prow;
 		    if (pquery.submit(server) == 0 && pquery.fetch_row(prow)) {
-			citation+=htmlutils::unicode_escape_to_html(prow[0])+"</em>, "+wrow[3]+", "+prow[1]+", <a href=\"https://doi.org/"+doi+"\" target=\"_doi\">https://doi.org/"+doi+"</a>";
+			auto pub_data=htmlutils::unicode_escape_to_html(prow[0])+"</em>";
+			if (!wrow[3].empty()) {
+			  pub_data+=", "+wrow[3];
+			}
+			if (!prow[1].empty()) {
+			  pub_data+=", "+prow[1];
+			}
+			citation+=pub_data+", <a href=\"https://doi.org/"+doi+"\" target=\"_doi\">https://doi.org/"+doi+"</a>";
 		    }
 		    else {
 			citation="";
