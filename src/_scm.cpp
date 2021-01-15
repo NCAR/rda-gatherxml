@@ -2779,11 +2779,6 @@ int main(int argc,char **argv)
 	det.strings.emplace_back("MSS");
 	pthread_create(&det.tid,NULL,thread_generate_detailed_metadata_view,&det);
 	tid_list.emplace_back(det.tid);
-	ThreadStruct ts;
-	pthread_create(&ts.tid,NULL,thread_summarize_dates,NULL);
-	tid_list.emplace_back(ts.tid);
-	pthread_create(&ts.tid,NULL,thread_summarize_data_formats,NULL);
-	tid_list.emplace_back(ts.tid);
 	flist.strings.emplace_back("MSS");
 	flist.strings.emplace_back("");
 	pthread_create(&flist.tid,NULL,thread_create_file_list_cache,&flist);
@@ -2823,6 +2818,11 @@ int main(int argc,char **argv)
 	det.strings.emplace_back("Web");
 	pthread_create(&det.tid,NULL,thread_generate_detailed_metadata_view,&det);
 	tid_list.emplace_back(det.tid);
+	ThreadStruct ts;
+	pthread_create(&ts.tid,NULL,thread_summarize_dates,NULL);
+	tid_list.emplace_back(ts.tid);
+	pthread_create(&ts.tid,NULL,thread_summarize_data_formats,NULL);
+	tid_list.emplace_back(ts.tid);
 	flist.strings.emplace_back("Web");
 	flist.strings.emplace_back("");
 	pthread_create(&flist.tid,NULL,thread_create_file_list_cache,&flist);
