@@ -55,9 +55,9 @@ void cmd_dates(std::string database,size_t date_left_padding,std::list<CMDDateRa
     std::cerr << "Error: unable to connect to metadata server" << std::endl;
     exit(1);
   }
-  std::string table=database+".ds"+strutils::substitute(metautils::args.dsnum,".","")+"_primaries2";
+  std::string table=database+".ds"+strutils::substitute(metautils::args.dsnum,".","")+"_webfiles2";
   if (table_exists(server,table)) {
-    MySQL::LocalQuery query("select min(p.start_date) as md,max(p.end_date),m.gindex from "+table+" as p left join dssdb.mssfile as m on m.mssfile = p.mssID where m.dsid = 'ds"+metautils::args.dsnum+"' and m.type = 'P' and m.status = 'P' and p.start_date > 0 group by m.gindex union select min(p.start_date) as md,max(p.end_date),h.gindex from "+table+" as p left join (select concat(m.mssfile,\"..m..\",h.hfile) as member,m.gindex as gindex from dssdb.htarfile as h left join dssdb.mssfile as m on m.mssid = h.mssid where h.dsid = 'ds"+metautils::args.dsnum+"' and m.type = 'P' and m.status = 'P') as h on h.member = p.mssID where !isnull(h.member) and p.start_date > 0 group by h.gindex");
+    MySQL::LocalQuery query("select min(w.start_date),max(w.end_date),wf.gindex from "+table+" as w left join dssdb.wfile as wf on wf.wfile = w.webID where wf.dsid = 'ds"+metautils::args.dsnum+"' and wf.type = 'D' and wf.status = 'P' and w.start_date > 0 group by wf.gindex");
     if (query.submit(server) < 0) {
 	std::cerr << "Error (A): " << query.error() << std::endl;
 	exit(1);
@@ -585,7 +585,7 @@ void summarize_data_formats(std::string caller,std::string user)
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   for (const auto& db : cmd_databases) {
     auto db_name=std::get<0>(db);
-    auto table_name=db_name+".ds"+dsnum2+"_primaries2";
+    auto table_name=db_name+".ds"+dsnum2+"_webfiles2";
     if (table_name[0] != 'V' && table_exists(server,table_name)) {
 	MySQL::LocalQuery query("select distinct f.format from "+table_name+" as p left join "+db_name+".formats as f on f.code = p.format_code");
 	if (query.submit(server) < 0) {
