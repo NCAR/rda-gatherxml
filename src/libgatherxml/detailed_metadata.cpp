@@ -152,10 +152,10 @@ struct LevelCodeEntry {
   size_t key;
   std::shared_ptr<Data> data;
 };
-void fill_level_code_table(my::map<LevelCodeEntry>& level_code_table)
+void fill_level_code_table(std::string db,my::map<LevelCodeEntry>& level_code_table)
 {
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
-  MySQL::LocalQuery query("code,map,type,value","GrML.levels");
+  MySQL::LocalQuery query("code,map,type,value",db+".levels");
   if (query.submit(server) < 0) {
     std::cerr << query.error() << std::endl;
     exit(1);
@@ -325,7 +325,7 @@ void generate_parameter_cross_reference(std::string format,std::string title,std
 void generate_level_cross_reference(std::string format,std::string title,std::string html_file,std::string caller,std::string user)
 {
   my::map<LevelCodeEntry> level_code_table;
-  fill_level_code_table(level_code_table);
+  fill_level_code_table("GrML",level_code_table);
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   MySQL::LocalQuery query("select distinct levelType_codes from GrML.summary as s left join GrML.formats as f on f.code = s.format_code where s.dsid = '"+metautils::args.dsnum+"' and f.format = '"+format+"'");
   if (query.submit(server) < 0) {
@@ -1095,7 +1095,7 @@ std::string output,error;
     ID_type="web";
     query.set("code,map,type,value","WGrML.levels");
   }
-  fill_level_code_table(level_code_table);
+  fill_level_code_table(db,level_code_table);
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   format_query.rewind();
   for (const auto& format_res : format_query) {
@@ -2048,38 +2048,28 @@ void generate_detailed_metadata_view(std::string caller,std::string user)
   std::string formats,data_types;
   std::list<std::string> format_list;
   auto found_CMD_in_database=false;
-  MySQL::LocalQuery grml_query;
-  if (table_exists(server_m,"GrML.ds"+dsnum2+"_primaries2")) {
-    found_CMD_in_database=true;
-    data_types+="<li>Grids</li>";
-    grml_query.set("select distinct f.format,f.code from GrML.formats as f left join GrML.ds"+dsnum2+"_primaries2 as p on f.code = p.format_code where !isnull(p.format_code)");
-    if (grml_query.submit(server_m) < 0) {
-	std::cerr << grml_query.error() << std::endl;
-	exit(1);
+  auto primaries_name="webfiles2";
+
+// db_data contains the database, the data type description, a data format
+//   query, and a function that generates an appropriate summary
+  std::vector<std::tuple<std::string,std::string,MySQL::LocalQuery,void(*)(MySQL::LocalQuery&,std::string,std::string,std::ofstream&,std::list<std::string>&,std::string,std::string)>> db_data{
+    {"WGrML","Grids",MySQL::LocalQuery(),generate_detailed_grid_summary},
+    {"WObML","Platform Observations",MySQL::LocalQuery(),generate_detailed_observation_summary},
+    {"WFixML","Cyclone Fix",MySQL::LocalQuery(),generate_detailed_fix_summary}
+  };
+  for (auto& entry : db_data) {
+    auto primaries_table=std::get<0>(entry)+".ds"+dsnum2+"_"+primaries_name;
+    if (table_exists(server_m,primaries_table)) {
+	found_CMD_in_database=true;
+	data_types+="<li>"+std::get<1>(entry)+"</li>";
+	auto& format_query=std::get<2>(entry);
+	format_query.set("select distinct f.format,f.code from "+std::get<0>(entry)+".formats as f left join "+primaries_table+" as p on p.format_code = f.code where !isnull(p.format_code)");
+	if (format_query.submit(server_m) < 0) {
+	  std::cerr << format_query.error() << std::endl;
+	  exit(1);
+	}
+	add_to_formats(xdoc,format_query,format_list,formats);
     }
-    add_to_formats(xdoc,grml_query,format_list,formats);
-  }
-  MySQL::LocalQuery obml_query;
-  if (table_exists(server_m,"ObML.ds"+dsnum2+"_locations")) {
-    found_CMD_in_database=true;
-    data_types+="<li>Platform Observations</li>";
-    obml_query.set("select distinct f.format,f.code from ObML.formats as f left join ObML.ds"+dsnum2+"_primaries2 as p on f.code = p.format_code where !isnull(p.format_code)");
-    if (obml_query.submit(server_m) < 0) {
-	std::cerr << obml_query.error() << std::endl;
-	exit(1);
-    }
-    add_to_formats(xdoc,obml_query,format_list,formats);
-  }
-  MySQL::LocalQuery fixml_query;
-  if (table_exists(server_m,"FixML.ds"+dsnum2+"_primaries2")) {
-    found_CMD_in_database=true;
-    data_types+="<li>Cyclone Fix</li>";
-    fixml_query.set("select distinct f.format,f.code from FixML.formats as f left join FixML.ds"+dsnum2+"_primaries2 as p on f.code = p.format_code where !isnull(p.format_code)");
-    if (fixml_query.submit(server_m) < 0) {
-	std::cerr << fixml_query.error() << std::endl;
-	exit(1);
-    }
-    add_to_formats(xdoc,fixml_query,format_list,formats);
   }
   xdoc.close();
   if (stat((metautils::directives.server_root+"/web/datasets/ds"+metautils::args.dsnum+"/metadata/dsOverview.xml").c_str(),&buf) == 0) {
@@ -2248,14 +2238,12 @@ void generate_detailed_metadata_view(std::string caller,std::string user)
 	ofs << "</tr>" << std::endl;
     }
     ofs << "</table></center>" << std::endl;
-    if (grml_query.num_rows() > 0) {
-	generate_detailed_grid_summary(grml_query,"MSS","",ofs,format_list,caller,user);
-    }
-    if (obml_query.num_rows() > 0) {
-	generate_detailed_observation_summary(obml_query,"MSS","",ofs,format_list,caller,user);
-    }
-    if (fixml_query.num_rows() > 0) {
-	generate_detailed_fix_summary(fixml_query,"MSS","",ofs,format_list,caller,user);
+    for (auto& entry : db_data) {
+	auto& format_query=std::get<2>(entry);
+	if (format_query.num_rows() > 0) {
+	  auto& generate_summary=std::get<3>(entry);
+	  generate_summary(format_query,"Web","",ofs,format_list,caller,user);
+	}
     }
     ofs.close();
     std::string error;
