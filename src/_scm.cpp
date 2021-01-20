@@ -2424,7 +2424,7 @@ extern "C" void *thread_generate_detailed_metadata_view(void *ts)
 	gatherxml::detailedMetadata::generate_group_detailed_metadata_view(gindex,t->strings[0],"scm",USER);
     }
   }
-  if (local_args.summarized_hpss_file || local_args.refresh_hpss) {
+  if (local_args.summarized_web_file || local_args.refresh_web) {
     gatherxml::detailedMetadata::generate_detailed_metadata_view("scm",USER);
   }
   return NULL;
