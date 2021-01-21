@@ -130,10 +130,10 @@ void summarize_dates(std::string caller,std::string user)
 
   std::list<CMDDateRange> range_list;
   size_t precision=0;
-  cmd_dates("GrML",12,range_list,precision);
-  cmd_dates("ObML",8,range_list,precision);
-  cmd_dates("FixML",12,range_list,precision);
-  cmd_dates("SatML",14,range_list,precision);
+  cmd_dates("WGrML",12,range_list,precision);
+  cmd_dates("WObML",8,range_list,precision);
+  cmd_dates("WFixML",12,range_list,precision);
+//  cmd_dates("SatML",14,range_list,precision);
   MySQL::Server dssdb_server(metautils::directives.database_server,metautils::directives.rdadb_username,metautils::directives.rdadb_password,"dssdb");;
   if (range_list.size() > 0) {
     precision=(precision-2)/2;
