@@ -2053,9 +2053,9 @@ void generate_detailed_metadata_view(std::string caller,std::string user)
 // db_data contains the database, the data type description, a data format
 //   query, and a function that generates an appropriate summary
   std::vector<std::tuple<std::string,std::string,MySQL::LocalQuery,void(*)(MySQL::LocalQuery&,std::string,std::string,std::ofstream&,std::list<std::string>&,std::string,std::string)>> db_data{
-    {"WGrML","Grids",MySQL::LocalQuery(),generate_detailed_grid_summary},
-    {"WObML","Platform Observations",MySQL::LocalQuery(),generate_detailed_observation_summary},
-    {"WFixML","Cyclone Fix",MySQL::LocalQuery(),generate_detailed_fix_summary}
+    std::make_tuple("WGrML","Grids",MySQL::LocalQuery(),generate_detailed_grid_summary),
+    std::make_tuple("WObML","Platform Observations",MySQL::LocalQuery(),generate_detailed_observation_summary),
+    std::make_tuple("WFixML","Cyclone Fix",MySQL::LocalQuery(),generate_detailed_fix_summary)
   };
   for (auto& entry : db_data) {
     auto primaries_table=std::get<0>(entry)+".ds"+dsnum2+"_"+primaries_name;
