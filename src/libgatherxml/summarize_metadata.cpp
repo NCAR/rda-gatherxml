@@ -125,9 +125,6 @@ void cmd_dates(std::string database,size_t date_left_padding,std::list<CMDDateRa
 
 void summarize_dates(std::string caller,std::string user)
 {
-  std::string error;
-  bool foundGroups=false;
-
   std::list<CMDDateRange> range_list;
   size_t precision=0;
   cmd_dates("WGrML",12,range_list,precision);
@@ -140,14 +137,15 @@ void summarize_dates(std::string caller,std::string user)
     std::vector<CMDDateRange> darray;
     darray.reserve(range_list.size());
     auto n=0;
+    auto found_groups=false;
     for (const auto& item : range_list) {
 	darray.emplace_back(item);
 	if (darray[n].gindex != "0") {
-	  foundGroups=true;
+	  found_groups=true;
 	}
 	++n;
     }
-    if (!foundGroups) {
+    if (!found_groups) {
 	auto m=1;
 	dssdb_server._delete("dsperiod","dsid = 'ds"+metautils::args.dsnum+"'");
 	for (n=range_list.size()-1; n >= 0; n--,m++) {
@@ -155,7 +153,7 @@ void summarize_dates(std::string caller,std::string user)
 	  DateTime edt(std::stoll(darray[n].end));
 	  std::string insert_string="'ds"+metautils::args.dsnum+"',0,"+strutils::itos(m)+",'"+sdt.to_string("%Y-%m-%d")+"','"+sdt.to_string("%T")+"',"+strutils::itos(precision)+",'"+edt.to_string("%Y-%m-%d")+"','"+edt.to_string("%T")+"',"+strutils::itos(precision)+",'"+sdt.to_string("%Z")+"'";
 	  if (dssdb_server.insert("dsperiod",insert_string) < 0) {
-	    error=dssdb_server.error();
+	    auto error=dssdb_server.error();
 	    if (!std::regex_search(error,std::regex("^Duplicate entry"))) {
 		metautils::log_error("summarize_dates(): "+error+" when trying to insert into dsperiod(1) ("+insert_string+")",caller,user);
 	    }
@@ -187,7 +185,7 @@ void summarize_dates(std::string caller,std::string user)
 	  DateTime edt(std::stoll(darray[n].end));
 	  std::string insert_string="'ds"+metautils::args.dsnum+"',"+darray[n].gindex+","+strutils::itos(n)+",'"+sdt.to_string("%Y-%m-%d")+"','"+sdt.to_string("%T")+"',"+strutils::itos(precision)+",'"+edt.to_string("%Y-%m-%d")+"','"+edt.to_string("%T")+"',"+strutils::itos(precision)+",'"+sdt.to_string("%Z")+"'";
 	  if (dssdb_server.insert("dsperiod",insert_string) < 0) {
-	    error=dssdb_server.error();
+	    auto error=dssdb_server.error();
 	    auto num_retries=0;
 	    while (num_retries < 3 && strutils::has_beginning(error,"Deadlock")) {
 		error="";

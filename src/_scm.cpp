@@ -195,7 +195,6 @@ else if (sp[n] == "-WA") {
     }
     else if (sp[n] == "-rw") {
 	local_args.refresh_web=true;
-	metautils::args.regenerate=false;
 	if ( (n+1) < sp.size() && sp[n+1][0] != '-') {
 	  local_args.gindex_list.emplace_back(sp[++n]);
 	}
@@ -311,9 +310,10 @@ std::string grid_definition_parameters(const XMLElement& e)
 void open_xml_file(XMLDocument& xdoc,std::string filename)
 {
   if (local_args.temp_directory.empty()) {
-    filename=unixutils::remote_web_file("https://rda.ucar.edu"+filename+".gz",temp_dir.name());
+    auto remote_name=filename;
+    filename=unixutils::remote_web_file("https://rda.ucar.edu"+remote_name,temp_dir.name());
     if (filename.empty()) {
-	filename=unixutils::remote_web_file("https://rda.ucar.edu"+filename,temp_dir.name());
+	filename=unixutils::remote_web_file("https://rda.ucar.edu"+remote_name+".gz",temp_dir.name());
     }
   }
   if (!xdoc.open(filename)) {
@@ -2710,7 +2710,7 @@ int main(int argc,char **argv)
 	metautils::log_error("file extension of '"+local_args.file+"' not recognized","scm",USER);
     }
   }
-  else if (local_args.refresh_hpss) {
+  else if (local_args.refresh_web) {
     if (local_args.gindex_list.size() > 0 && local_args.gindex_list.front() != "all") {
 	query.set("gidx","dssdb.dsgroup","dsid = 'ds"+metautils::args.dsnum+"' and gindex = "+local_args.gindex_list.front()+" and pindex = 0");
 	if (query.submit(server) < 0) {
@@ -2720,9 +2720,9 @@ int main(int argc,char **argv)
 	  metautils::log_error(local_args.gindex_list.front()+" is not a top-level index for this dataset","scm",USER);
 	}
     }
-    if (MySQL::table_exists(server,"GrML.ds"+local_args.dsnum2+"_agrids_cache")) {
-        gatherxml::summarizeMetadata::summarize_grids("GrML","scm",USER);
-	agg.strings.emplace_back("GrML");
+    if (MySQL::table_exists(server,"WGrML.ds"+local_args.dsnum2+"_agrids_cache")) {
+        gatherxml::summarizeMetadata::summarize_grids("WGrML","scm",USER);
+	agg.strings.emplace_back("WGrML");
 	pthread_create(&agg.tid,nullptr,thread_aggregate_grids,&agg);
 	tid_list.emplace_back(agg.tid);
     }
@@ -2776,9 +2776,6 @@ int main(int argc,char **argv)
 	for (const auto& gindex : local_args.gindex_list) {
 	  gatherxml::summarizeMetadata::create_file_list_cache("MSS","scm",USER,gindex);
 	}
-	det.strings.emplace_back("MSS");
-	pthread_create(&det.tid,NULL,thread_generate_detailed_metadata_view,&det);
-	tid_list.emplace_back(det.tid);
 	flist.strings.emplace_back("MSS");
 	flist.strings.emplace_back("");
 	pthread_create(&flist.tid,NULL,thread_create_file_list_cache,&flist);
@@ -2885,7 +2882,7 @@ query.set("select distinct tindex from dssdb.wfile where dsid = 'ds"+metautils::
   }
 
 // update the dataset description, if necessary
-  if (metautils::args.regenerate && (local_args.summarized_hpss_file || !local_args.summarized_web_file)) {
+  if (metautils::args.regenerate) {
     std::stringstream output,error;
     unixutils::mysystem2(metautils::directives.local_root+"/bin/dsgen "+metautils::args.dsnum,output,error);
   }
