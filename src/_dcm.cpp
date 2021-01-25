@@ -689,15 +689,29 @@ int main(int argc,char **argv)
   }
   if (removed_from_WGrML) {
     clear_grid_cache(server,"WGrML");
-    gatherxml::summarizeMetadata::summarize_grids("WGrML","dcm",USER);
-    gatherxml::summarizeMetadata::aggregate_grids("WGrML","dcm",USER);
-    gatherxml::summarizeMetadata::summarize_grid_levels("WGrML","dcm",USER);
+    threads.clear();
+    threads.resize(7);
+    pthread_create(&threads[0].tid,nullptr,t_index_variables,nullptr);
+    threads[1].strings.emplace_back("WGrML");
+    pthread_create(&threads[1].tid,nullptr,t_summarize_frequencies,&threads[1]);
+    threads[2].strings.emplace_back("WGrML");
+    pthread_create(&threads[2].tid,nullptr,t_summarize_grids,&threads[2]);
+    threads[3].strings.emplace_back("WGrML");
+    pthread_create(&threads[3].tid,nullptr,t_aggregate_grids,&threads[3]);
+    threads[4].strings.emplace_back("WGrML");
+    pthread_create(&threads[4].tid,nullptr,t_summarize_grid_levels,&threads[4]);
+    pthread_create(&threads[5].tid,nullptr,t_summarize_grid_resolutions,nullptr);
+    pthread_create(&threads[6].tid,nullptr,t_generate_detailed_metadata_view,nullptr);
+    for (const auto& t : threads) {
+	pthread_join(t.tid,nullptr);
+    }
     if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" -rw",oss,ess) < 0) {
 	std::cerr << ess.str() << std::endl;
     }
     if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" -ri",oss,ess) < 0) {
 	std::cerr << ess.str() << std::endl;
     }
+    generate_dataset_home_page();
   }
   if (removed_from_ObML) {
     gatherxml::summarizeMetadata::summarize_frequencies("dcm",USER);
@@ -710,6 +724,7 @@ int main(int argc,char **argv)
     generate_dataset_home_page();
   }
   if (removed_from_WObML) {
+    gatherxml::summarizeMetadata::summarize_frequencies("dcm",USER);
     if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" -rw",oss,ess) < 0) {
 	std::cerr << ess.str() << std::endl;
     }

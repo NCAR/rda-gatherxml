@@ -2754,41 +2754,15 @@ int main(int argc,char **argv)
 	}
     }
   }
-  if (local_args.summarized_hpss_file && local_args.added_variable) {
+  if (local_args.summarized_web_file && local_args.added_variable) {
     ThreadStruct ts;
-    pthread_create(&ts.tid,NULL,thread_index_variables,NULL);
+    pthread_create(&ts.tid,nullptr,thread_index_variables,nullptr);
     tid_list.emplace_back(ts.tid);
   }
 
 // make necessary updates to the metadata databases
   if (local_args.update_db) {
     if (local_args.summarized_hpss_file || local_args.refresh_hpss) {
-	if (local_args.refresh_hpss && local_args.gindex_list.size() == 1) {
-	  if (local_args.gindex_list.front() == "all") {
-	    local_args.gindex_list.clear();
-	    query.set("select distinct tindex from dssdb.mssfile where dsid = 'ds"+metautils::args.dsnum+"' and type = 'P' and status = 'P'");
-	    if (query.submit(server) < 0) {
-		metautils::log_error("error getting group indexes: "+query.error(),"scm",USER);
-	    }
-	    while (query.fetch_row(row)) {
-		local_args.gindex_list.emplace_back(row[0]);
-	    }
-	  }
-	}
-	if (local_args.update_graphics) {
-	  std::stringstream output,error;
-	  for (const auto& gindex : local_args.gindex_list) {
-	    unixutils::mysystem2(metautils::directives.local_root+"/bin/gsi -g "+gindex+" "+metautils::args.dsnum,output,error);
-	  }
-	  unixutils::mysystem2(metautils::directives.local_root+"/bin/gsi "+metautils::args.dsnum,output,error);
-	}
-	for (const auto& gindex : local_args.gindex_list) {
-	  gatherxml::summarizeMetadata::create_file_list_cache("MSS","scm",USER,gindex);
-	}
-	flist.strings.emplace_back("MSS");
-	flist.strings.emplace_back("");
-	pthread_create(&flist.tid,NULL,thread_create_file_list_cache,&flist);
-	tid_list.emplace_back(flist.tid);
     }
     else if (local_args.summarized_web_file || local_args.refresh_web) {
 	if (local_args.refresh_web && MySQL::table_exists(server,"WGrML.ds"+local_args.dsnum2+"_agrids_cache")) {
@@ -2810,10 +2784,11 @@ int main(int argc,char **argv)
 	  }
 	}
 	if (local_args.update_graphics) {
+	  std::stringstream output,error;
 	  for (const auto& gindex : local_args.gindex_list) {
-	    std::stringstream output,error;
-	    unixutils::mysystem2(metautils::directives.local_root+"/bin/wgsi -g "+gindex+" "+metautils::args.dsnum,output,error);
+	    unixutils::mysystem2(metautils::directives.local_root+"/bin/gsi -g "+gindex+" "+metautils::args.dsnum,output,error);
 	  }
+	  unixutils::mysystem2(metautils::directives.local_root+"/bin/gsi "+metautils::args.dsnum,output,error);
 	}
 	for (const auto& gindex : local_args.gindex_list) {
 	  gatherxml::summarizeMetadata::create_file_list_cache("Web","scm",USER,gindex);
