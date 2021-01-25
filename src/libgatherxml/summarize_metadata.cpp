@@ -281,295 +281,350 @@ void grids_per(size_t nsteps,DateTime start,DateTime end,double& gridsper,std::s
   }
 }
 
-void summarize_frequencies(std::string caller,std::string user,std::string mssID_code)
+std::pair<std::string,std::string> gridded_frequency_data(std::string time_range)
 {
-  MySQL::LocalQuery query;
-  std::string dsnum2=strutils::substitute(metautils::args.dsnum,".","");
-  MySQL::Row row;
-  std::string keyword,timeRange,sdum;
-  std::string start,end,unit,error;
-  double gridsper;
-  std::string min_start="30001231235959",max_end="10000101000000";
-  size_t nsteps,single_nsteps=0;
-  int num;
-  DateTime d1,d2;
-  my::map<CodeEntry> tr_table,sn_table(999999);
-  std::unordered_set<std::string> tr_keyword_set,frequencies_set;
+  std::pair<std::string,std::string> frequency_data;
+  if (std::regex_search(time_range,std::regex("^Pentad"))) {
+    frequency_data.first=searchutils::time_resolution_keyword("regular",5,"day","");
+    frequency_data.second="regular<!>5<!>day";
+  }
+  else if (std::regex_search(time_range,std::regex("^Weekly"))) {
+    frequency_data.first=searchutils::time_resolution_keyword("regular",1,"week","");
+    frequency_data.second="regular<!>1<!>week";
+  }
+  else if (std::regex_search(time_range,std::regex("^Monthly"))) {
+    frequency_data.first=searchutils::time_resolution_keyword("regular",1,"month","");
+    frequency_data.second="regular<!>1<!>month";
+  }
+  else if (std::regex_search(time_range,std::regex("^30-year Climatology"))) {
+    frequency_data.first=searchutils::time_resolution_keyword("climatology",1,"30-year","");
+    frequency_data.second="climatology<!>1<!>30-year";
+  }
+  else if (std::regex_search(time_range,std::regex("-year Climatology"))) {
+    auto num_years=time_range.substr(0,time_range.find("-"));
+    if (std::regex_search(time_range,std::regex("of Monthly"))) {
+	frequency_data.first=searchutils::time_resolution_keyword("climatology",1,"month","");
+	frequency_data.second="climatology<!>1<!>"+num_years+"-year";
+    }
+    else {
+	frequency_data.second="<!>1<!>"+num_years+"-year";
+    }
+  }
+  return std::move(frequency_data);
+}
 
-  MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
-// summarize from GrML
-  if (!mssID_code.empty()) {
-    query.set("code,timeRange","GrML.timeRanges");
-    if (query.submit(server) < 0) {
-	metautils::log_error("summarize_frequencies(): "+query.error()+" while querying GrML.timeRanges",caller,user);
+std::unordered_set<std::string> summarize_frequencies_from_wgrml_by_dataset(MySQL::Server& server,std::string caller,std::string user)
+{
+  const std::string THIS_FUNC=__func__;
+  std::unordered_set<std::string> tr_keyword_set;
+  std::string dsnum2=strutils::substitute(metautils::args.dsnum,".","");
+
+  MySQL::LocalQuery query("select distinct frequency_type,nsteps_per,unit from WGrML.ds"+dsnum2+"_frequencies where nsteps_per > 0");
+  if (query.submit(server) < 0) {
+    metautils::log_error(THIS_FUNC+"(): "+query.error()+" for '"+query.show()+"'",caller,user);
+  }
+  server._delete("WGrML.frequencies","dsid =  '"+metautils::args.dsnum+"'");
+  for (const auto& row : query) {
+    if (server.insert("WGrML.frequencies","'"+metautils::args.dsnum+"',"+row[1]+",'"+row[2]+"'") < 0) {
+	auto error=server.error();
+	if (!strutils::contains(error,"Duplicate entry")) {
+	  metautils::log_error(THIS_FUNC+"(): "+error+" while trying to insert '"+metautils::args.dsnum+"',"+row[1]+",'"+row[2]+"'",caller,user);
+	}
     }
-    while (query.fetch_row(row)) {
-	CodeEntry e;
-	e.key=row[0];
-	e.code=row[1];
-	tr_table.insert(e);
+    auto keyword=searchutils::time_resolution_keyword(row[0],std::stoi(row[1]),row[2],"");
+    if (!keyword.empty() && tr_keyword_set.find(keyword) == tr_keyword_set.end()) {
+	tr_keyword_set.emplace(keyword);
     }
-    query.set("select timeRange_code,min(start_date),max(end_date),sum(min_nsteps),sum(max_nsteps) from GrML.ds"+dsnum2+"_grids where mssID_code = "+mssID_code+" group by timeRange_code,parameter");
-    if (query.submit(server) == 0) {
-	while (query.fetch_row(row)) {
-	  if (row[3] != "1" || row[4] != "1") {
-	    CodeEntry e;
-	    tr_table.found(row[0],e);
-	    timeRange=e.code;
-	    keyword="";
-	    if (strutils::has_beginning(timeRange,"Pentad")) {
-		keyword=searchutils::time_resolution_keyword("regular",5,"day","");
-		e.key="regular<!>5<!>day";
-	    }
-	    else if (strutils::has_beginning(timeRange,"Weekly")) {
-		keyword=searchutils::time_resolution_keyword("regular",1,"week","");
-		e.key="regular<!>1<!>week";
-	    }
-	    else if (strutils::has_beginning(timeRange,"Monthly")) {
-		keyword=searchutils::time_resolution_keyword("regular",1,"month","");
-		e.key="regular<!>1<!>month";
-	    }
-	    else if (strutils::has_beginning(timeRange,"30-year Climatology")) {
-		keyword=searchutils::time_resolution_keyword("climatology",1,"30-year","");
-		e.key="climatology<!>1<!>30-year";
-	    }
-	    else if (strutils::contains(timeRange,"-year Climatology")) {
-		num=std::stoi(timeRange.substr(0,timeRange.find("-")));
-		sdum=strutils::itos(num);
-		if (strutils::contains(timeRange,"of Monthly")) {
-		  keyword=searchutils::time_resolution_keyword("climatology",1,"month","");
-		  e.key="climatology<!>1<!>"+sdum+"-year";
-		}
-		else {
-		  e.key="<!>1<!>"+sdum+"-year";
-		}
-	    }
-	    if (!keyword.empty()) {
-		if (tr_keyword_set.find(keyword) == tr_keyword_set.end()) {
-		  tr_keyword_set.emplace(keyword);
-		}
-		if (frequencies_set.find(e.key) == frequencies_set.end()) {
-		  frequencies_set.emplace(e.key);
-		}
-	    }
-	    else {
-		start=row[1];
-		while (start.length() < 14) {
-		  start+="00";
-		}
-		end=row[2];
-		while (end.length() < 14) {
-		  end+="00";
-		}
-		d1.set(std::stoll(start));
-		d2.set(std::stoll(end));
-		if (strutils::has_ending(timeRange,"Average") || strutils::has_ending(timeRange,"Product")) {
-		  unit=timeRange;
-		  if (strutils::contains(unit,"of")) {
-		    unit=unit.substr(unit.rfind("of")+3);
-		  }
-		  unit=unit.substr(0,unit.find(" "));
-		  num=std::stoi(unit.substr(0,unit.find("-")));
-		  unit=unit.substr(unit.find("-"));
-		  if (unit == "hour") {
-		    d2.subtract_hours(num);
-		  }
-		  else if (unit == "day") {
-		    d2.subtract_days(num);
-		  }
-		}
-		else if (std::regex_search(timeRange,std::regex(" (Accumulation|Average|Product) \\(initial\\+"))) {
-		  unit=timeRange.substr(0,timeRange.find(" "));
-		  auto idx=unit.find("-");
-		  num=std::stoi(unit.substr(0,idx));
-		  unit=unit.substr(idx+1);
-		  if (unit == "hour") {
-		    d2.subtract_hours(num);
-		  }
-		}
-		if (row[3] != row[4]) {
-		  nsteps=std::stoi(row[3]);
-		  grids_per(nsteps,d1,d2,gridsper,unit);
-		  if (gridsper > 0.) {
-		    if (unit != "singletimestep") {
-			auto freq_s="irregular<!>"+strutils::itos(lround(gridsper))+"<!>"+unit;
-			if (frequencies_set.find(freq_s) == frequencies_set.end()) {
-			  frequencies_set.emplace(freq_s);
-			}
-			keyword=searchutils::time_resolution_keyword("irregular",lround(gridsper),unit,"");
-			if (!keyword.empty()) {
-			  if (tr_keyword_set.find(keyword) == tr_keyword_set.end()) {
-			    tr_keyword_set.emplace(keyword);
-			  }
-			}
-		    }
-		  }
-		}
-		nsteps=std::stoi(row[4]);
-		grids_per(nsteps,d1,d2,gridsper,unit);
-		if (gridsper > 0.) {
-		  if (unit != "singletimestep") {
-		    auto freq_s="irregular<!>"+strutils::itos(lround(gridsper))+"<!>"+unit;
-		    if (frequencies_set.find(freq_s) == frequencies_set.end()) {
-			frequencies_set.emplace(freq_s);
-		    }
-		    keyword=searchutils::time_resolution_keyword("irregular",lround(gridsper),unit,"");
-		    if (!keyword.empty()) {
-			if (tr_keyword_set.find(keyword) == tr_keyword_set.end()) {
-			  tr_keyword_set.emplace(keyword);
-			}
-		    }
-		  }
-		  else if (nsteps > 0) {
-		    e.key=start;
-		    if (!sn_table.found(e.key,e)) {
-			if (start < min_start) {
-			  min_start=start;
-			}
-			if (start > max_end) {
-			  max_end=start;
-			}
-			single_nsteps+=nsteps;
-			sn_table.insert(e);
-		    }
-		  }
-		}
+  }
+  query.set("select min(distinct frequency_type),max(distinct frequency_type),count(distinct frequency_type) from WGrML.ds"+dsnum2+"_frequencies where nsteps_per = 0");
+  if (query.submit(server) < 0) {
+    metautils::log_error(THIS_FUNC+"(): "+query.error()+" for '"+query.show()+"'",caller,user);
+  }
+  for (const auto& row : query) {
+    if (row[2] != "0") {
+	double gridsper;
+	std::string frequency_unit;
+	grids_per(std::stoi(row[2]),DateTime(std::stoll(row[0])),DateTime(std::stoll(row[1])),gridsper,frequency_unit);
+	if (frequency_unit != "singletimestep") {
+	  auto nsteps_per=lround(gridsper);
+	  if (server.insert("WGrML.frequencies","'"+metautils::args.dsnum+"',"+strutils::itos(nsteps_per)+",'"+frequency_unit+"'") < 0) {
+	    auto error=server.error();
+	    if (!strutils::contains(error,"Duplicate entry")) {
+		metautils::log_error(THIS_FUNC+"(): "+error+" while trying to insert '"+metautils::args.dsnum+"',"+strutils::itos(nsteps_per)+",'"+frequency_unit+"'",caller,user);
 	    }
 	  }
 	  else {
-	    CodeEntry e;
-	    e.key=row[1];
-	    if (!sn_table.found(e.key,e)) {
-		sdum=row[1];
-		while (sdum.length() < 14) {
-		  sdum+="00";
-		}
-		if (sdum < min_start) {
-		  min_start=sdum;
-		}
-		if (sdum > max_end) {
-		  max_end=sdum;
-		}
-		single_nsteps++;
-		sn_table.insert(e);
-	    }
-	  }
-	}
-	if (single_nsteps > 0) {
-	  grids_per(single_nsteps,DateTime(std::stoll(min_start)),DateTime(std::stoll(max_end)),gridsper,unit);
-	  if (gridsper > 0.) {
-	    if (!unit.empty() && unit != "singletimestep") {
-		auto freq_s="irregular<!>"+strutils::itos(lround(gridsper))+"<!>"+unit;
-		if (frequencies_set.find(freq_s) == frequencies_set.end()) {
-		  frequencies_set.emplace(freq_s);
-		}
-		keyword=searchutils::time_resolution_keyword("irregular",lround(gridsper),unit,"");
-		if (!keyword.empty()) {
-		  if (tr_keyword_set.find(keyword) == tr_keyword_set.end()) {
-		    tr_keyword_set.emplace(keyword);
-		  }
-		}
-	    }
-	  }
-	}
-	if (!table_exists(server,"GrML.ds"+dsnum2+"_frequencies")) {
-	  std::string error;
-	  if (server.command("create table GrML.ds"+dsnum2+"_frequencies like GrML.template_frequencies",error) < 0) {
-	    metautils::log_error("summarize_frequencies(): "+server.error()+" while creating table GrML.ds"+dsnum2+"_frequencies",caller,user);
-	  }
-	}
-	else {
-	  server._delete("GrML.ds"+dsnum2+"_frequencies","mssID_code = "+mssID_code);
-	}
-	for (const auto& freq_s : frequencies_set) {
-	  auto sp=strutils::split(freq_s,"<!>");
-	  if (server.insert("GrML.frequencies","'"+metautils::args.dsnum+"',"+sp[1]+",'"+sp[2]+"'") < 0) {
-	    error=server.error();
-	    if (!strutils::contains(error,"Duplicate entry")) {
-		metautils::log_error("summarize_frequencies(): "+error+" while trying to insert '"+metautils::args.dsnum+"',"+sp[1]+",'"+sp[2]+"'",caller,user);
-	    }
-	  }
-	  if (server.insert("GrML.ds"+dsnum2+"_frequencies",mssID_code+",'"+sp[0]+"',"+sp[1]+",'"+sp[2]+"'") < 0) {
-	    metautils::log_error("summarize_frequencies(): "+server.error()+" while trying to insert '"+mssID_code+",'"+sp[0]+"',"+sp[1]+",'"+sp[2]+"''",caller,user);
-	  }
-	}
-    }
-  }
-  else {
-    query.set("select distinct frequency_type,nsteps_per,unit from GrML.ds"+dsnum2+"_frequencies");
-    if (query.submit(server) == 0) {
-	server._delete("GrML.frequencies","dsid =  '"+metautils::args.dsnum+"'");
-	while (query.fetch_row(row)) {
-	  if (server.insert("GrML.frequencies","'"+metautils::args.dsnum+"',"+row[1]+",'"+row[2]+"'") < 0) {
-	    error=server.error();
-	    if (!strutils::contains(error,"Duplicate entry")) {
-		metautils::log_error("summarize_frequencies(): "+error+" while trying to insert '"+metautils::args.dsnum+"',"+row[1]+",'"+row[2]+"'",caller,user);
-	    }
-	  }
-	  keyword=searchutils::time_resolution_keyword(row[0],std::stoi(row[1]),row[2],"");
-	  if (!keyword.empty()) {
-	    if (tr_keyword_set.find(keyword) == tr_keyword_set.end()) {
+	    auto keyword=searchutils::time_resolution_keyword("irregular",nsteps_per,frequency_unit,"");
+	    if (!keyword.empty() && tr_keyword_set.find(keyword) == tr_keyword_set.end()) {
 		tr_keyword_set.emplace(keyword);
 	    }
 	  }
 	}
     }
-    server._delete("search.time_resolutions","dsid = '"+metautils::args.dsnum+"' and origin = 'GrML'");
   }
-  for (const auto& keyword : tr_keyword_set) {
+  server._delete("search.time_resolutions","dsid = '"+metautils::args.dsnum+"' and origin = 'WGrML'");
+
+  return std::move(tr_keyword_set);
+}
+
+std::unordered_set<std::string> summarize_frequencies_from_wgrml_by_data_file(MySQL::Server& server,std::string file_id_code,std::string caller,std::string user)
+{
+  const std::string THIS_FUNC=__func__;
+  std::unordered_set<std::string> tr_keyword_set;
+  std::string dsnum2=strutils::substitute(metautils::args.dsnum,".","");
+
+// get all of the time ranges for the given file ID
+  MySQL::LocalQuery time_ranges_query("select timeRange_code,min(start_date),max(end_date),sum(min_nsteps),sum(max_nsteps) from WGrML.ds"+dsnum2+"_grids where webID_code = "+file_id_code+" group by timeRange_code,parameter");
+  if (time_ranges_query.submit(server) < 0) {
+    return std::move(tr_keyword_set);
+  }
+
+// create a map of time range codes and their descriptions
+  MySQL::LocalQuery hash_query("code,timeRange","WGrML.timeRanges");
+  if (hash_query.submit(server) < 0) {
+    metautils::log_error(THIS_FUNC+"(): "+hash_query.error()+" while querying WGrML.timeRanges",caller,user);
+  }
+  std::unordered_map<std::string,std::string> time_range_map;
+  for (const auto& row : hash_query) {
+    time_range_map.emplace(row[0],row[1]);
+  }
+
+  std::unordered_set<std::string> frequencies_set,single_nsteps_set,unique_products_set;
+  size_t single_nsteps=0;
+  std::string min_start="30001231235959",max_end="10000101000000";
+  for (const auto& row : time_ranges_query) {
+    if (row[3] != "1" || row[4] != "1") {
+	auto time_range=time_range_map[row[0]];
+	std::string keyword,frequency;
+	std::tie(keyword,frequency)=gridded_frequency_data(time_range);
+	if (keyword.empty()) {
+	  auto start=row[1];
+	  while (start.length() < 14) {
+	    start+="00";
+	  }
+	  auto end=row[2];
+	  while (end.length() < 14) {
+	    end+="00";
+	  }
+	  DateTime d1(std::stoll(start));
+	  DateTime d2(std::stoll(end));
+	  if (std::regex_search(time_range,std::regex("Average$")) || std::regex_search(time_range,std::regex("Product$"))) {
+	    auto time_range_unit=time_range;
+	    if (strutils::contains(time_range_unit,"of")) {
+		time_range_unit=time_range_unit.substr(time_range_unit.rfind("of")+3);
+	    }
+	    time_range_unit=time_range_unit.substr(0,time_range_unit.find(" "));
+	    auto num=std::stoi(time_range_unit.substr(0,time_range_unit.find("-")));
+	    time_range_unit=time_range_unit.substr(time_range_unit.find("-"));
+	    if (time_range_unit == "hour") {
+		d2.subtract_hours(num);
+	    }
+	    else if (time_range_unit == "day") {
+		d2.subtract_days(num);
+	    }
+	  }
+	  else if (std::regex_search(time_range,std::regex(" (Accumulation|Average|Product) \\(initial\\+"))) {
+	    auto time_range_unit=time_range.substr(0,time_range.find(" "));
+	    auto idx=time_range_unit.find("-");
+	    auto num=std::stoi(time_range_unit.substr(0,idx));
+	    time_range_unit=time_range_unit.substr(idx+1);
+	    if (time_range_unit == "hour") {
+		d2.subtract_hours(num);
+	    }
+	  }
+	  std::string frequency_unit;
+	  size_t nsteps;
+	  double gridsper;
+	  if (row[3] != row[4]) {
+	    nsteps=std::stoi(row[3]);
+	    grids_per(nsteps,d1,d2,gridsper,frequency_unit);
+	    if (gridsper > 0.) {
+		if (frequency_unit != "singletimestep") {
+		  keyword=searchutils::time_resolution_keyword("irregular",lround(gridsper),frequency_unit,"");
+		  frequency="irregular<!>"+strutils::itos(lround(gridsper))+"<!>"+frequency_unit;
+		}
+	    }
+	  }
+	  nsteps=std::stoi(row[4]);
+	  grids_per(nsteps,d1,d2,gridsper,frequency_unit);
+	  if (gridsper > 0.) {
+	    if (frequency_unit != "singletimestep") {
+		keyword=searchutils::time_resolution_keyword("irregular",lround(gridsper),frequency_unit,"");
+		frequency="irregular<!>"+strutils::itos(lround(gridsper))+"<!>"+frequency_unit;
+	    }
+	    else if (nsteps > 0) {
+		if (single_nsteps_set.find(start) == single_nsteps_set.end()) {
+		  if (start < min_start) {
+		    min_start=start;
+		  }
+		  if (start > max_end) {
+		    max_end=start;
+		  }
+		  single_nsteps+=nsteps;
+		  single_nsteps_set.emplace(start);
+		}
+	    }
+	  }
+	}
+	if (!keyword.empty() && tr_keyword_set.find(keyword) == tr_keyword_set.end()) {
+	  tr_keyword_set.emplace(keyword);
+	}
+	if (!frequency.empty() && frequencies_set.find(frequency) == frequencies_set.end()) {
+	  frequencies_set.emplace(frequency);
+	}
+    }
+    else {
+	auto key=row[0]+"-"+row[1];
+	if (single_nsteps_set.find(key) == single_nsteps_set.end()) {
+	  auto date=row[1];
+	  if (date.length() < 14) {
+	    date.append(14-date.length(),'0');
+	  }
+	  if (date < min_start) {
+	    min_start=date;
+	  }
+	  if (date > max_end) {
+	    max_end=date;
+	  }
+	  ++single_nsteps;
+	  single_nsteps_set.emplace(key);
+	  if (unique_products_set.find(row[0]) == unique_products_set.end()) {
+	    unique_products_set.emplace(row[0]);
+	  }
+	}
+    }
+  }
+  if (single_nsteps > 0) {
+    if (unique_products_set.size() > 1) {
+	single_nsteps/=unique_products_set.size();
+    }
+    double gridsper;
+    std::string frequency_unit;
+    grids_per(single_nsteps,DateTime(std::stoll(min_start)),DateTime(std::stoll(max_end)),gridsper,frequency_unit);
+    if (gridsper > 0. && !frequency_unit.empty() && frequency_unit != "singletimestep") {
+	auto keyword=searchutils::time_resolution_keyword("irregular",lround(gridsper),frequency_unit,"");
+	if (!keyword.empty() && tr_keyword_set.find(keyword) == tr_keyword_set.end()) {
+	  tr_keyword_set.emplace(keyword);
+	}
+	auto frequency="irregular<!>"+strutils::itos(lround(gridsper))+"<!>"+frequency_unit;
+	if (!frequency.empty() && frequencies_set.find(frequency) == frequencies_set.end()) {
+	  frequencies_set.emplace(frequency);
+	}
+    }
+  }
+  if (!table_exists(server,"WGrML.ds"+dsnum2+"_frequencies")) {
     std::string error;
-    if (!inserted_time_resolution_keyword(server,"GrML",keyword,error)) {
-	metautils::log_error("summarize_frequencies(): "+error,caller,user);
+    if (server.command("create table WGrML.ds"+dsnum2+"_frequencies like WGrML.template_frequencies",error) < 0) {
+	metautils::log_error(THIS_FUNC+"(): "+server.error()+" while creating table WGrML.ds"+dsnum2+"_frequencies",caller,user);
     }
   }
-// summarize from ObML
-  tr_keyword_set.clear();
-  query.set("select min(min_obs_per),max(max_obs_per),unit from ObML.ds"+dsnum2+"_frequencies group by unit");
-  if (query.submit(server) == 0) {
-    if (mssID_code.empty())
-	server._delete("search.time_resolutions","dsid = '"+metautils::args.dsnum+"' and origin = 'ObML'");
-    while (query.fetch_row(row)) {
-	num=std::stoi(row[0]);
-	unit=row[2];
-	if (num < 0) {
-	  timeRange="climatology";
-	  if (num == -30) {
-	    unit="30-year";
+  else {
+    server._delete("WGrML.ds"+dsnum2+"_frequencies","webID_code = "+file_id_code);
+  }
+  if (frequencies_set.size() > 0) {
+    for (const auto& frequency : frequencies_set) {
+	auto frequency_parts=strutils::split(frequency,"<!>");
+	if (server.insert("WGrML.frequencies","'"+metautils::args.dsnum+"',"+frequency_parts[1]+",'"+frequency_parts[2]+"'") < 0) {
+	  auto error=server.error();
+	  if (!strutils::contains(error,"Duplicate entry")) {
+	    metautils::log_error(THIS_FUNC+"(): "+error+" while trying to insert '"+metautils::args.dsnum+"',"+frequency_parts[1]+",'"+frequency_parts[2]+"'",caller,user);
 	  }
 	}
-	else {
-	  timeRange="irregular";
-	}
-	auto keyword=searchutils::time_resolution_keyword(timeRange,num,unit,"");
-	if (tr_keyword_set.find(keyword) == tr_keyword_set.end()) {
-	  tr_keyword_set.emplace(keyword);
-	}
-	num=std::stoi(row[1]);
-	unit=row[2];
-	if (num < 0) {
-	  timeRange="climatology";
-	  if (num == -30) {
-	    unit="30-year";
-	  }
-	}
-	else {
-	  timeRange="irregular";
-	}
-	keyword=searchutils::time_resolution_keyword(timeRange,num,unit,"");
-	if (tr_keyword_set.find(keyword) == tr_keyword_set.end()) {
-	  tr_keyword_set.emplace(keyword);
+	if (server.insert("WGrML.ds"+dsnum2+"_frequencies",file_id_code+",'"+frequency_parts[0]+"',"+frequency_parts[1]+",'"+frequency_parts[2]+"'") < 0) {
+	  metautils::log_error(THIS_FUNC+"(): "+server.error()+" while trying to insert '"+file_id_code+",'"+frequency_parts[0]+"',"+frequency_parts[1]+",'"+frequency_parts[2]+"''",caller,user);
 	}
     }
+  }
+  else {
+    if (server.insert("WGrML.ds"+dsnum2+"_frequencies",file_id_code+",'"+min_start+"',0,''") < 0) {
+	metautils::log_error(THIS_FUNC+"(): "+server.error()+" while trying to insert '"+file_id_code+",'"+min_start+"',0,''",caller,user);
+    }
+  }
+
+  return std::move(tr_keyword_set);
+}
+
+std::unordered_set<std::string> summarize_frequencies_from_wgrml(MySQL::Server& server,std::string file_id_code,std::string caller,std::string user)
+{
+  if (file_id_code.empty()) {
+// no file ID provided, summarize for full dataset
+    auto tr_keyword_set=summarize_frequencies_from_wgrml_by_dataset(server,caller,user);
+    return std::move(tr_keyword_set);
+  }
+  else {
+// adding information from a given file ID
+    auto tr_keyword_set=summarize_frequencies_from_wgrml_by_data_file(server,file_id_code,caller,user);
+    return std::move(tr_keyword_set);
+  }
+}
+
+std::unordered_set<std::string> summarize_frequencies_from_wobml(MySQL::Server& server,std::string file_id_code,std::string caller,std::string user)
+{
+  std::unordered_set<std::string> tr_keyword_set;
+  std::string dsnum2=strutils::substitute(metautils::args.dsnum,".","");
+  MySQL::LocalQuery query("select min(min_obs_per),max(max_obs_per),unit from ObML.ds"+dsnum2+"_frequencies group by unit");
+  if (query.submit(server) < 0) {
+    return std::move(tr_keyword_set);
+  }
+  if (file_id_code.empty()) {
+    server._delete("search.time_resolutions","dsid = '"+metautils::args.dsnum+"' and origin = 'ObML'");
+  }
+  for (const auto& row : query) {
+    auto num=std::stoi(row[0]);
+    auto frequency_unit=row[2];
+    std::string time_range;
+    if (num < 0) {
+	time_range="climatology";
+	if (num == -30) {
+	  frequency_unit="30-year";
+	}
+    }
+    else {
+	time_range="irregular";
+    }
+    auto keyword=searchutils::time_resolution_keyword(time_range,num,frequency_unit,"");
+    if (tr_keyword_set.find(keyword) == tr_keyword_set.end()) {
+	tr_keyword_set.emplace(keyword);
+    }
+    num=std::stoi(row[1]);
+    frequency_unit=row[2];
+    if (num < 0) {
+	time_range="climatology";
+	if (num == -30) {
+	  frequency_unit="30-year";
+	}
+    }
+    else {
+	time_range="irregular";
+    }
+    keyword=searchutils::time_resolution_keyword(time_range,num,frequency_unit,"");
+    if (tr_keyword_set.find(keyword) == tr_keyword_set.end()) {
+	tr_keyword_set.emplace(keyword);
+    }
+  }
+
+  return std::move(tr_keyword_set);
+}
+
+void summarize_frequencies(std::string caller,std::string user,std::string file_id_code)
+{
+  std::vector<std::pair<std::string,std::unordered_set<std::string>(*)(MySQL::Server&,std::string,std::string,std::string)>> summarizations{
+    std::make_pair("WGrML",summarize_frequencies_from_wgrml),
+    std::make_pair("WObML",summarize_frequencies_from_wobml)
+  };
+
+  MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
+  for (const auto& summary : summarizations) {
+    auto tr_keyword_set=summary.second(server,file_id_code,caller,user);
+// update searchable time resolution keywords
     for (const auto& keyword : tr_keyword_set) {
 	std::string error;
-	if (!inserted_time_resolution_keyword(server,"GrML",keyword,error)) {
+	if (!inserted_time_resolution_keyword(server,summary.first,keyword,error)) {
 	  metautils::log_error("summarize_frequencies(): "+error,caller,user);
-      }
+	}
     }
   }
-// summarize from SatML
 
-// summarize from FixML
   server.disconnect();
 }
 
