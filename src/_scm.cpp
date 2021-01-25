@@ -805,7 +805,7 @@ if (MySQL::table_exists(server,database+".ds"+local_args.dsnum2+"_grids2")) {
 	gatherxml::summarizeMetadata::aggregate_grids(database,"scm",USER,file_id_code);
     }
     xdoc.close();
-    if (database == "GrML") {
+    if (database == "WGrML") {
 	gatherxml::summarizeMetadata::summarize_frequencies("scm",USER,file_id_code);
 	gatherxml::summarizeMetadata::summarize_grid_resolutions("scm",USER,file_id_code);
     }
@@ -1916,7 +1916,7 @@ void summarize_obml(std::list<KMLData>& kml_list)
 	metautils::log_error("summarize_obml() returned error: not an HPSS file","scm",USER);
     }
     xdoc.close();
-    if (database == "ObML") {
+    if (database == "WObML") {
 	gatherxml::summarizeMetadata::summarize_frequencies("scm",USER,file_id_code);
     }
     server_d.disconnect();
@@ -2374,7 +2374,7 @@ std::cerr << n << " " << cstart.to_string() << " " << cend.to_string() << std::e
 	thread_locations.strings.emplace_back(database);
 	summarize_file_ID_locations(reinterpret_cast<void *>(&thread_locations));
     }
-    if (database == "FixML") {
+    if (database == "WFixML") {
 	gatherxml::summarizeMetadata::summarize_frequencies("scm",USER,file_id_code);
     }
     server_d.disconnect();
@@ -2384,7 +2384,7 @@ std::cerr << n << " " << cstart.to_string() << " " << cend.to_string() << std::e
     }
   }
   server._delete("search.data_types","dsid = '"+metautils::args.dsnum+"' and vocabulary = 'dssmm'");
-  if (server.insert("search.data_types","'cyclone_fix','','FixML','"+metautils::args.dsnum+"'") < 0) {
+  if (server.insert("search.data_types","'cyclone_fix','','WFixML','"+metautils::args.dsnum+"'") < 0) {
     error=server.error();
     if (!strutils::contains(error,"Duplicate entry")) {
 	metautils::log_error("summarize_fixml() returned error: "+error+" while inserting into search.data_types","scm",USER);
@@ -2489,6 +2489,12 @@ extern "C" void *thread_summarize_frequencies(void *)
 {
   gatherxml::summarizeMetadata::summarize_frequencies("scm",USER);
   return NULL;
+}
+
+extern "C" void *thread_summarize_grid_resolutions(void *)
+{
+  gatherxml::summarizeMetadata::summarize_grid_resolutions("scm",USER);
+  return nullptr;
 }
 
 extern "C" void *thread_summarize_data_formats(void *)
@@ -2725,6 +2731,9 @@ int main(int argc,char **argv)
 	agg.strings.emplace_back("WGrML");
 	pthread_create(&agg.tid,nullptr,thread_aggregate_grids,&agg);
 	tid_list.emplace_back(agg.tid);
+	ThreadStruct ts;
+	pthread_create(&ts.tid,nullptr,thread_summarize_grid_resolutions,nullptr);
+	tid_list.emplace_back(ts.tid);
     }
     ThreadStruct ts;
     pthread_create(&ts.tid,NULL,thread_summarize_frequencies,NULL);

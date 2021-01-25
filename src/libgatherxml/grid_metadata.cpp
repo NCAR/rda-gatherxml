@@ -269,41 +269,40 @@ struct GridDefinitionEntry {
   std::string key;
   std::string definition,def_params;
 };
-void summarize_grid_resolutions(std::string caller,std::string user,std::string mssID_code)
+void summarize_grid_resolutions(std::string caller,std::string user,std::string file_id_code)
 {
+  const std::string THIS_FUNC=__func__;
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
-  MySQL::LocalQuery query("code,definition,defParams","GrML.gridDefinitions");
+  MySQL::LocalQuery query("code,definition,defParams","WGrML.gridDefinitions");
   if (query.submit(server) < 0) {
-    metautils::log_error("summarize_grid_resolutions(): "+query.error(),caller,user);
+    metautils::log_error(THIS_FUNC+"(): "+query.error(),caller,user);
   }
-  my::map<GridDefinitionEntry> grid_definition_table;
-  MySQL::Row row;
-  while (query.fetch_row(row)) {
-    GridDefinitionEntry gde;
-    gde.key=row[0];
-    gde.definition=row[1];
-    gde.def_params=row[2];
-    grid_definition_table.insert(gde);
+
+  std::unordered_map<std::string,std::pair<std::string,std::string>> grid_definition_map;
+  for (const auto& row : query) {
+    grid_definition_map.emplace(row[0],std::make_pair(row[1],row[2]));
   }
-  if (!mssID_code.empty())
-    query.set("select distinct gridDefinition_codes from GrML.ds"+strutils::substitute(metautils::args.dsnum,".","")+"_agrids where mssID_code = "+mssID_code);
+
+  if (!file_id_code.empty())
+    query.set("select distinct gridDefinition_codes from WGrML.ds"+strutils::substitute(metautils::args.dsnum,".","")+"_agrids where webID_code = "+file_id_code);
   else {
     server._delete("search.grid_resolutions","dsid = '"+metautils::args.dsnum+"'");
-    query.set("select distinct gridDefinition_codes from GrML.ds"+strutils::substitute(metautils::args.dsnum,".","")+"_agrids");
+    query.set("select distinct gridDefinition_codes from WGrML.ds"+strutils::substitute(metautils::args.dsnum,".","")+"_agrids");
   }
   if (query.submit(server) < 0) {
-    metautils::log_error("summarize_grid_resolutions() REturned error: "+query.error(),caller,user);
+    metautils::log_error(THIS_FUNC+"() returned error: "+query.error()+" for '"+query.show()+"'",caller,user);
   }
-  while (query.fetch_row(row)) {
+
+  for (const auto& row : query) {
     std::vector<size_t> grid_definition_codes;
     bitmap::uncompress_values(row[0],grid_definition_codes);
     for (const auto& grid_definition_code : grid_definition_codes) {
-	GridDefinitionEntry gde;
-	grid_definition_table.found(strutils::itos(grid_definition_code),gde);
+	std::string grid_definition,grid_definition_parameters;
+	std::tie(grid_definition,grid_definition_parameters)=grid_definition_map[strutils::itos(grid_definition_code)];
 	short res_type=0;
 	double xres=0.,yres=0.,lat1,lat2;
-	auto params=strutils::split(gde.def_params,":");
-	if (gde.definition == "gaussLatLon") {
+	auto params=strutils::split(grid_definition_parameters,":");
+	if (grid_definition == "gaussLatLon") {
 	  xres=std::stof(params[6]);
 	  lat1=std::stof(params[2]);
 	  lat2=std::stof(params[4]);
@@ -311,22 +310,22 @@ void summarize_grid_resolutions(std::string caller,std::string user,std::string 
 	  yres=fabs(lat2-lat1)/yres;
 	  res_type=0;
 	}
-	else if (gde.definition == "lambertConformal" || gde.definition == "polarStereographic") {
+	else if (grid_definition == "lambertConformal" || grid_definition == "polarStereographic") {
 	  xres=std::stof(params[7]);
 	  yres=std::stof(params[8]);
 	  res_type=1;
 	}
-	else if (std::regex_search(gde.definition,std::regex("^(latLon|mercator)(Cell){0,1}$"))) {
+	else if (std::regex_search(grid_definition,std::regex("^(latLon|mercator)(Cell){0,1}$"))) {
 	  xres=std::stof(params[6]);
 	  yres=std::stof(params[7]);
-	  if (std::regex_search(gde.definition,std::regex("^latLon"))) {
+	  if (std::regex_search(grid_definition,std::regex("^latLon"))) {
 	    res_type=0;
 	  }
-	  else if (std::regex_search(gde.definition,std::regex("^mercator"))) {
+	  else if (std::regex_search(grid_definition,std::regex("^mercator"))) {
 	    res_type=1;
 	  }
 	}
-	else if (gde.definition == "sphericalHarmonics") {
+	else if (grid_definition == "sphericalHarmonics") {
 	  res_type=0;
 	  auto trunc=params[0];
 	  if (trunc == "42") {
@@ -352,21 +351,21 @@ void summarize_grid_resolutions(std::string caller,std::string user,std::string 
 	  }
 	}
 	if (floatutils::myequalf(xres,0.) && floatutils::myequalf(yres,0.)) {
-	  metautils::log_error("summarize_grid_resolutions(): unknown grid definition '"+gde.definition+"'",caller,user);
+	  metautils::log_error(THIS_FUNC+"(): unknown grid definition '"+grid_definition+"'",caller,user);
 	}
 	if (yres > xres) {
 	  xres=yres;
 	}
 	auto hres_keyword=searchutils::horizontal_resolution_keyword(xres,res_type);
 	if (!hres_keyword.empty()) {
-	  if (server.insert("search.grid_resolutions","'"+hres_keyword+"','GCMD','"+metautils::args.dsnum+"','GrML'") < 0) {
+	  if (server.insert("search.grid_resolutions","'"+hres_keyword+"','GCMD','"+metautils::args.dsnum+"','WGrML'") < 0) {
 	    if (!strutils::contains(server.error(),"Duplicate entry")) {
-		metautils::log_error("summarize_grid_resolutions(): "+server.error(),caller,user);
+		metautils::log_error(THIS_FUNC+"(): "+server.error(),caller,user);
 	    }
 	  }
 	}
 	else {
-	  metautils::log_warning("summarize_grid_resolutions() issued warning: no grid resolution for "+gde.definition+", "+gde.def_params,caller,user);
+	  metautils::log_warning(THIS_FUNC+"() issued warning: no grid resolution for "+grid_definition+", "+grid_definition_parameters,caller,user);
 	}
     }
   }
