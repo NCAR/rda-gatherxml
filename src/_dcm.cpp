@@ -345,7 +345,7 @@ extern "C" void *t_removed(void *ts)
   if (std::regex_search(file,std::regex("^/FS/DECS/"))) {
 std::cerr << "Terminating - dcm no longer works on HPSS files" << std::endl;
 exit(1);
-    was_removed=remove_from("SatML","_primaries2","mssID","fmd",file,".SatML",file_ID_code,is_version_controlled);
+    auto was_removed=remove_from("SatML","_primaries2","mssID","fmd",file,".SatML",file_ID_code,is_version_controlled);
     if (was_removed) {
 	clear_tables_by_file_id("SatML",file_ID_code,is_version_controlled);
 	file_removed=true;
@@ -496,9 +496,8 @@ int main(int argc,char **argv)
     std::cerr << "-N          notify with a message when dcm completes" << std::endl;
     std::cerr << std::endl;
     std::cerr << "NOTES:" << std::endl;
-    std::cerr << "  1) each file in <files...> must begin with \"/FS/DECS/\" or" << std::endl;
-    std::cerr << "       \"https://rda.ucar.edu\", or be specified as for the -WF option of" << std::endl;
-    std::cerr << "       dsarch" << std::endl;
+    std::cerr << "  1) each file in <files...> must begin with \"https://rda.ucar.edu\", or be" << std::endl;
+    std::cerr << "       specified as for the -WF option of \"dsarch\"" << std::endl;
     std::cerr << "  2) for files that support individual members, you can either specify the" << std::endl;
     std::cerr << "       name of the parent file and metadata for all members will be deleted," << std::endl;
     std::cerr << "       or you can specify the name of an individual member as" << std::endl;
