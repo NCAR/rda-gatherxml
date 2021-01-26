@@ -662,30 +662,6 @@ int main(int argc,char **argv)
   }
   std::stringstream oss,ess;
   if (removed_from_GrML) {
-    clear_grid_cache(server,"GrML");
-    threads.clear();
-    threads.resize(8);
-    pthread_create(&threads[0].tid,NULL,t_index_variables,NULL);
-    threads[1].strings.emplace_back("GrML");
-    pthread_create(&threads[1].tid,NULL,t_summarize_frequencies,&threads[1]);
-    threads[2].strings.emplace_back("GrML");
-    pthread_create(&threads[2].tid,NULL,t_summarize_grids,&threads[2]);
-    threads[3].strings.emplace_back("GrML");
-    pthread_create(&threads[3].tid,NULL,t_aggregate_grids,&threads[3]);
-    threads[4].strings.emplace_back("GrML");
-    pthread_create(&threads[4].tid,NULL,t_summarize_grid_levels,&threads[4]);
-    pthread_create(&threads[5].tid,NULL,t_summarize_grid_resolutions,NULL);
-    pthread_create(&threads[6].tid,NULL,t_generate_detailed_metadata_view,NULL);
-    if (create_MSS_filelist_cache) {
-	pthread_create(&threads[7].tid,NULL,t_create_file_list_cache,NULL);
-    }
-    for (const auto& t : threads) {
-	pthread_join(t.tid,NULL);
-    }
-    if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" -rm",oss,ess) < 0) {
-	std::cerr << ess.str() << std::endl;
-    }
-    generate_dataset_home_page();
   }
   if (removed_from_WGrML) {
     clear_grid_cache(server,"WGrML");
@@ -714,23 +690,17 @@ int main(int argc,char **argv)
     generate_dataset_home_page();
   }
   if (removed_from_ObML) {
-    gatherxml::summarizeMetadata::summarize_frequencies("dcm",USER);
-    gatherxml::summarizeMetadata::summarize_obs_data("dcm",USER);
-    if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" -rm",oss,ess) < 0)
-	std::cerr << ess.str() << std::endl;
-    if (metautils::args.update_graphics) {
-	generate_graphics("mss");
-    }
-    generate_dataset_home_page();
   }
   if (removed_from_WObML) {
     gatherxml::summarizeMetadata::summarize_frequencies("dcm",USER);
+    gatherxml::summarizeMetadata::summarize_obs_data("dcm",USER);
     if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" -rw",oss,ess) < 0) {
 	std::cerr << ess.str() << std::endl;
     }
     if (metautils::args.update_graphics) {
 	generate_graphics("web");
     }
+    generate_dataset_home_page();
   }
   if (removed_from_SatML) {
     if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" -rm",oss,ess) < 0)
