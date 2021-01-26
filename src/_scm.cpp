@@ -40,7 +40,7 @@ std::list<FileEntry> obml_file_list;
 std::list<FileEntry> satml_file_list;
 std::list<FileEntry> fixml_file_list;
 struct LocalArgs {
-  LocalArgs() : dsnum2(),summ_type(),file(),temp_directory(),cmd_directory(),data_format(),gindex_list(),summarize_all(false),refresh_only(false),added_variable(false),verbose(false),notify(false),create_kml(true),update_graphics(true),update_db(true),refresh_hpss(false),refresh_web(false),refresh_inv(false),is_hpss_file(false),is_web_file(false),summarized_hpss_file(false),summarized_web_file(false) {}
+  LocalArgs() : dsnum2(),summ_type(),file(),temp_directory(),cmd_directory(),data_format(),gindex_list(),summarize_all(false),refresh_only(false),added_variable(false),verbose(false),notify(false),create_kml(true),update_graphics(true),update_db(true),refresh_web(false),refresh_inv(false),is_hpss_file(false),is_web_file(false),summarized_hpss_file(false),summarized_web_file(false) {}
 
   std::string dsnum2;
   std::string summ_type;
@@ -49,7 +49,7 @@ struct LocalArgs {
   bool summarize_all,refresh_only;
   bool added_variable,verbose,notify,create_kml;
   bool update_graphics,update_db;
-  bool refresh_hpss,refresh_web,refresh_inv,is_hpss_file,is_web_file;
+  bool refresh_web,refresh_inv,is_hpss_file,is_web_file;
   bool summarized_hpss_file,summarized_web_file;
 } local_args;
 MySQL::Server server;
@@ -100,67 +100,37 @@ struct StringEntry {
 
 void parse_args(const char ARG_DELIMITER)
 {
-  auto sp=strutils::split(metautils::args.args_string,std::string(1,ARG_DELIMITER));
-  for (size_t n=0; n < sp.size(); n++) {
-    if (sp[n] == "-a") {
+  auto args=strutils::split(metautils::args.args_string,std::string(1,ARG_DELIMITER));
+  for (size_t n=0; n < args.size(); n++) {
+    args[n]=strutils::to_lower(args[n]);
+    if (args[n] == "-wa") {
 	if (!local_args.file.empty()) {
 	  std::cerr << "Error: specify only one of -a or -wa or -f or -wf" << std::endl;
 	  exit(1);
 	}
 	else {
 	  local_args.summarize_all=true;
-	  if ((n+1) < sp.size() && sp[n+1][0] != '-') {
-	    local_args.summ_type=sp[++n];
-	  }
-	  local_args.cmd_directory="fmd";
-	}
-    }
-//    else if (sp[n] == "-wa") {
-// patch because dsarch calls with -wa way too often
-else if (sp[n] == "-WA") {
-	if (!local_args.file.empty()) {
-	  std::cerr << "Error: specify only one of -a or -wa or -f or -wf" << std::endl;
-	  exit(1);
-	}
-	else {
-	  local_args.summarize_all=true;
-	  if ((n+1) < sp.size() && sp[n+1][0] != '-') {
-	    local_args.summ_type=sp[++n];
+	  if ((n+1) < args.size() && args[n+1][0] != '-') {
+	    local_args.summ_type=args[++n];
 	  }
 	  local_args.cmd_directory="wfmd";
 	}
     }
-    else if (sp[n] == "-d") {
-	metautils::args.dsnum=sp[++n];
+    else if (args[n] == "-d") {
+	metautils::args.dsnum=args[++n];
 	if (std::regex_search(metautils::args.dsnum,std::regex("^ds"))) {
 	  metautils::args.dsnum=metautils::args.dsnum.substr(2);
-	 }
+	}
 	local_args.dsnum2=strutils::substitute(metautils::args.dsnum,".","");
     }
-    else if (sp[n] == "-f") {
+    else if (args[n] == "-wf") {
 	if (local_args.summarize_all) {
 	  std::cerr << "Error: specify only one of -a or -wa or -f or -wf" << std::endl;
 	  exit(1);
 	}
 	else {
-	  if ( (n+1) < sp.size()) {
-	    local_args.file=sp[++n];
-	    local_args.is_hpss_file=true;
-	  }
-	  else {
-	    std::cerr << "Error: the -f flag requires a file name" << std::endl;
-	    exit(1);
-	  }
-	}
-    }
-    else if (sp[n] == "-wf") {
-	if (local_args.summarize_all) {
-	  std::cerr << "Error: specify only one of -a or -wa or -f or -wf" << std::endl;
-	  exit(1);
-	}
-	else {
-	  if ( (n+1) < sp.size()) {
-	    local_args.file=sp[++n];
+	  if ( (n+1) < args.size()) {
+	    local_args.file=args[++n];
 	    local_args.is_web_file=true;
 	  }
 	  else {
@@ -169,7 +139,7 @@ else if (sp[n] == "-WA") {
 	  }
 	}
     }
-    else if (sp[n] == "-F") {
+    else if (args[n] == "-F") {
 	if (USER == "dattore") {
 	  local_args.refresh_only=true;
 	  local_args.update_graphics=false;
@@ -178,47 +148,41 @@ else if (sp[n] == "-WA") {
 	  metautils::args.regenerate=false;
 	}
     }
-    else if (sp[n] == "-G") {
+    else if (args[n] == "-G") {
 	local_args.update_graphics=false;
     }
-    else if (sp[n] == "-K") {
+    else if (args[n] == "-K") {
 	local_args.create_kml=false;
     }
-    else if (sp[n] == "-N") {
+    else if (args[n] == "-N") {
 	local_args.notify=true;
     }
-    else if (sp[n] == "-rm") {
-	local_args.refresh_hpss=true;
-	if ( (n+1) < sp.size() && sp[n+1][0] != '-') {
-	  local_args.gindex_list.emplace_back(sp[++n]);
-	}
-    }
-    else if (sp[n] == "-rw") {
+    else if (args[n] == "-rw") {
 	local_args.refresh_web=true;
-	if ( (n+1) < sp.size() && sp[n+1][0] != '-') {
-	  local_args.gindex_list.emplace_back(sp[++n]);
+	if ( (n+1) < args.size() && args[n+1][0] != '-') {
+	  local_args.gindex_list.emplace_back(args[++n]);
 	}
     }
-    else if (sp[n] == "-ri") {
+    else if (args[n] == "-ri") {
 	local_args.refresh_inv=true;
-	if ( (n+1) < sp.size() && sp[n+1][0] != '-') {
-	  local_args.gindex_list.emplace_back(sp[++n]);
+	if ( (n+1) < args.size() && args[n+1][0] != '-') {
+	  local_args.gindex_list.emplace_back(args[++n]);
 	}
     }
-    else if (sp[n] == "-S") {
+    else if (args[n] == "-S") {
 	local_args.update_db=false;
     }
-    else if (sp[n] == "-R") {
+    else if (args[n] == "-R") {
 	metautils::args.regenerate=false;
     }
-    else if (sp[n] == "-t") {
-	local_args.temp_directory=sp[++n];
+    else if (args[n] == "-t") {
+	local_args.temp_directory=args[++n];
     }
-    else if (sp[n] == "-V") {
+    else if (args[n] == "-V") {
 	local_args.verbose=true;
     }
     else {
-	std::cerr << "Error: don't understand argument " << sp[n] << std::endl;
+	std::cerr << "Error: don't understand argument " << args[n] << std::endl;
 	exit(1);
     }
   }
@@ -226,12 +190,21 @@ else if (sp[n] == "-WA") {
     std::cerr << "Error: no dataset number specified" << std::endl;
     exit(1);
   }
-  if (!local_args.summarize_all && !local_args.is_hpss_file && !local_args.is_web_file && !local_args.refresh_hpss && !local_args.refresh_web && !local_args.refresh_inv) {
+  if (!local_args.summarize_all && !local_args.is_hpss_file && !local_args.is_web_file && !local_args.refresh_web && !local_args.refresh_inv) {
     std::cerr << "Exiting - nothing to do" << std::endl;
     exit(1);
   }
   if (local_args.update_graphics && !local_args.file.empty() && !std::regex_search(local_args.file,std::regex("(Ob|Fix)ML$"))) {
     local_args.update_graphics=false;
+  }
+}
+
+void delete_temporary_directory()
+{
+  std::stringstream output,error;
+  unixutils::mysystem2("/bin/rm -rf "+local_args.temp_directory,output,error);
+  if (error.str().empty()) {
+    local_args.temp_directory="";
   }
 }
 
@@ -2475,15 +2448,6 @@ extern "C" void segv_handler(int)
   metautils::log_error("segmentation fault","scm",USER);
 }
 
-void delete_temporary_directory()
-{
-  std::stringstream output,error;
-  unixutils::mysystem2("/bin/rm -rf "+local_args.temp_directory,output,error);
-  if (error.str().empty()) {
-    local_args.temp_directory="";
-  }
-}
-
 int main(int argc,char **argv)
 {
   ThreadStruct agg,det,flist,flist_i;
@@ -2496,9 +2460,7 @@ int main(int argc,char **argv)
     std::cerr << "\nrequired:" << std::endl;
     std::cerr << "-d nnn.n   specifies the dataset number" << std::endl;
     std::cerr << "\nrequired (choose one):" << std::endl;
-    std::cerr << "-a <type>  summarize all HPSS metadata (can restrict to optional <type>)" << std::endl;
     std::cerr << "-wa <type> summarize all Web metadata (can restrict to optional <type>)" << std::endl;
-    std::cerr << "-f file    summarize metadata only for HPSS file <file>" << std::endl;
     std::cerr << "-wf file   summarize metadata only for Web file <file>" << std::endl;
     std::cerr << "-rm [tindex | all]  refresh the HPSS database (e.g. for dsarch changes)" << std::endl;
     std::cerr << "                    additionally, if you specify a topmost group index or \"all\"," << std::endl;
@@ -2723,9 +2685,7 @@ int main(int argc,char **argv)
 
 // make necessary updates to the metadata databases
   if (local_args.update_db) {
-    if (local_args.summarized_hpss_file || local_args.refresh_hpss) {
-    }
-    else if (local_args.summarized_web_file || local_args.refresh_web) {
+    if (local_args.summarized_web_file || local_args.refresh_web) {
 	if (local_args.refresh_web) {
 	  if (MySQL::table_exists(server,"WGrML.ds"+local_args.dsnum2+"_agrids_cache")) {
 	    gatherxml::summarizeMetadata::summarize_grids("WGrML","scm",USER);
@@ -2839,7 +2799,7 @@ query.set("select distinct tindex from dssdb.wfile where dsid = 'ds"+metautils::
 
 // if this is not a test run (ds999.9), then clean up the temporary directory
   if (metautils::args.dsnum != "999.9" && !local_args.temp_directory.empty()) {
-    delete_temporary_diretory();
+    delete_temporary_directory();
   }
 
   if (local_args.notify) {
