@@ -218,7 +218,13 @@ void scan_file()
   tdir->create(metautils::args.temp_loc);
   std::string file_format,error;
   if (!metautils::primaryMetadata::prepare_file_for_metadata_scanning(*tfile,*tdir,NULL,file_format,error)) {
-    metautils::log_error("prepare_file_for_metadata_scanning() returned '"+error+"'","grid2xml",USER);
+    if (std::regex_search(error,std::regex("^Terminating"))) {
+	std::cerr << error << std::endl;
+	exit(1);
+    }
+    else {
+	metautils::log_error("prepare_file_for_metadata_scanning() returned '"+error+"'","grid2xml",USER);
+    }
   }
   if (!open_file(istream.get(),tfile_name)) {
     metautils::log_error("scan_file(): unable to open file for input","grid2xml",USER);
