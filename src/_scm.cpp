@@ -102,8 +102,8 @@ void parse_args(const char ARG_DELIMITER)
 {
   auto args=strutils::split(metautils::args.args_string,std::string(1,ARG_DELIMITER));
   for (size_t n=0; n < args.size(); n++) {
-    args[n]=strutils::to_lower(args[n]);
-    if (args[n] == "-wa") {
+    if (strutils::to_lower(args[n]) == "-wa") {
+// need strutils::to_lower() because dsarch often uses -WA
 	if (!local_args.file.empty()) {
 	  std::cerr << "Error: specify only one of -a or -wa or -f or -wf" << std::endl;
 	  exit(1);
