@@ -615,12 +615,15 @@ void summarize_frequencies(std::string caller,std::string user,std::string file_
 
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   for (const auto& summary : summarizations) {
-    auto tr_keyword_set=summary.second(server,file_id_code,caller,user);
+    auto frequency_table=summary.first+".ds"+strutils::substitute(metautils::args.dsnum,".","")+"_frequencies";
+    if (MySQL::table_exists(server,frequency_table)) {
+	auto tr_keyword_set=summary.second(server,file_id_code,caller,user);
 // update searchable time resolution keywords
-    for (const auto& keyword : tr_keyword_set) {
-	std::string error;
-	if (!inserted_time_resolution_keyword(server,summary.first,keyword,error)) {
-	  metautils::log_error("summarize_frequencies(): "+error,caller,user);
+	for (const auto& keyword : tr_keyword_set) {
+	  std::string error;
+	  if (!inserted_time_resolution_keyword(server,summary.first,keyword,error)) {
+	    metautils::log_error("summarize_frequencies(): "+error,caller,user);
+	  }
 	}
     }
   }
