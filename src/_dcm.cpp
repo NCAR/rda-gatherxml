@@ -40,10 +40,10 @@ struct ThreadStruct {
 std::string dsnum2;
 std::unordered_set<std::string> cmd_set;
 std::vector<std::string> files;
-std::unordered_set<std::string> mss_tindex_set,web_tindex_set,inv_tindex_set;
-std::unordered_set<std::string> mss_gindex_set,web_gindex_set;
-bool removed_from_GrML,removed_from_WGrML,removed_from_ObML,removed_from_WObML,removed_from_SatML,removed_from_FixML,removed_from_WFixML;
-bool create_MSS_filelist_cache=false,create_Web_filelist_cache=false,create_inv_filelist_cache=false;
+std::unordered_set<std::string> web_tindex_set,inv_tindex_set;
+std::unordered_set<std::string> web_gindex_set;
+bool removed_from_WGrML,removed_from_WObML,removed_from_SatML,removed_from_WFixML;
+bool create_Web_filelist_cache=false,create_inv_filelist_cache=false;
 
 void parse_args(MySQL::Server& server)
 {
@@ -75,20 +75,7 @@ void parse_args(MySQL::Server& server)
 	  cmd="wfmd";
 	}
 	cmd_set.emplace(cmd);
-	if (std::regex_search(strutils::to_lower(*arg),std::regex("\\.htar$"))) {
-	  if (cmd == "fmd") {
-	    MySQL::LocalQuery query("mssID","GrML.ds"+dsnum2+"_primaries2","mssID like '"+*arg+"..m..%'");
-	    if (query.submit(server) == 0) {
-		MySQL::Row row;
-		while (query.fetch_row(row)) {
-		  files.emplace_back(row[0]);
-		}
-	    }
-	  }
-	}
-	else {
-	  files.emplace_back(*arg);
-	}
+	files.emplace_back(*arg);
     }
   }
   if (metautils::args.dsnum.empty()) {
@@ -127,11 +114,12 @@ void copy_version_controlled_data(MySQL::Server& server,std::string db,std::stri
   }
 }
 
-void clear_tables_by_file_ID(std::string db,std::string file_ID_code,bool is_version_controlled)
+void clear_tables_by_file_id(std::string db,std::string file_ID_code,bool is_version_controlled)
 {
+  const std::string THIS_FUNC=__func__;
   MySQL::Server local_server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   if (!local_server) {
-    metautils::log_error("clear_tables_by_file_ID() unable to connect to MySQL server while clearing fileID code "+file_ID_code+" from "+db,"dcm",USER);
+    metautils::log_error(THIS_FUNC+"(): unable to connect to MySQL server while clearing fileID code "+file_ID_code+" from "+db,"dcm",USER);
   }
   if (is_version_controlled) {
     copy_version_controlled_data(local_server,db,file_ID_code);
@@ -149,7 +137,7 @@ void clear_tables_by_file_ID(std::string db,std::string file_ID_code,bool is_ver
     t=db+"."+t;
     if (field_exists(local_server,t,code_name)) {
 	if (local_server._delete(t,code_name+" = "+file_ID_code) < 0) {
-	  metautils::log_error("clear_tables_by_file_ID() returned error: "+local_server.error()+" while clearing "+t,"dcm",USER);
+	  metautils::log_error(THIS_FUNC+"() returned error: "+local_server.error()+" while clearing "+t,"dcm",USER);
 	}
     }
   }
@@ -355,67 +343,31 @@ extern "C" void *t_removed(void *ts)
   std::string file_ID_code;
   bool is_version_controlled;
   if (std::regex_search(file,std::regex("^/FS/DECS/"))) {
-    auto was_removed=remove_from("GrML","_primaries2","mssID","fmd",file,".GrML",file_ID_code,is_version_controlled);
-    if (was_removed) {
-	clear_tables_by_file_ID("GrML",file_ID_code,is_version_controlled);
-	file_removed=true;
-	removed_from_GrML=true;
-    }
-    was_removed=remove_from("ObML","_primaries2","mssID","fmd",file,".ObML",file_ID_code,is_version_controlled);
-    if (was_removed) {
-	clear_tables_by_file_ID("ObML",file_ID_code,is_version_controlled);
-	file_removed=true;
-	removed_from_ObML=true;
-    }
+std::cerr << "Terminating - dcm no longer works on HPSS files" << std::endl;
+exit(1);
     was_removed=remove_from("SatML","_primaries2","mssID","fmd",file,".SatML",file_ID_code,is_version_controlled);
     if (was_removed) {
-	clear_tables_by_file_ID("SatML",file_ID_code,is_version_controlled);
+	clear_tables_by_file_id("SatML",file_ID_code,is_version_controlled);
 	file_removed=true;
 	removed_from_SatML=true;
     }
-    was_removed=remove_from("FixML","_primaries2","mssID","fmd",file,".FixML",file_ID_code,is_version_controlled);
-    if (was_removed) {
-	clear_tables_by_file_ID("FixML",file_ID_code,is_version_controlled);
-	file_removed=true;
-	removed_from_FixML=true;
-    }
-    MySQL::Server server_m(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
-    MySQL::LocalQuery query("gindex","mssfile","mssfile = '"+file+"'");
-    MySQL::Row row;
-    if (query.submit(server_m) == 0 && query.fetch_row(row)) {
-	mss_gindex_set.emplace(row[0]);
-    }
-    server_m.disconnect();
-    MySQL::Server server_d(metautils::directives.database_server,metautils::directives.rdadb_username,metautils::directives.rdadb_password,"");
-    if (file_removed) {
-	query.set("tindex","mssfile","mssfile = '"+file+"'");
-	if (query.submit(server_d) == 0 && query.num_rows() == 1) {
-	  query.fetch_row(row);
-	  if (!row[0].empty() && row[0] != "0") {
-	    mss_tindex_set.emplace(row[0]);
-	  }
-	}
-	create_MSS_filelist_cache=true;
-    }
-    server_d.update("mssfile","meta_link = NULL","dsid = 'ds"+metautils::args.dsnum+"' and mssfile = '"+file+"'");
-    server_d.disconnect();
   }
   else {
     auto was_removed=remove_from("WGrML","_webfiles2","webID","wfmd",file,".GrML",file_ID_code,is_version_controlled);
     if (was_removed) {
-	clear_tables_by_file_ID("WGrML",file_ID_code,is_version_controlled);
+	clear_tables_by_file_id("WGrML",file_ID_code,is_version_controlled);
 	file_removed=true;
 	removed_from_WGrML=true;
     }
     was_removed=remove_from("WObML","_webfiles2","webID","wfmd",file,".ObML",file_ID_code,is_version_controlled);
     if (was_removed) {
-	clear_tables_by_file_ID("WObML",file_ID_code,is_version_controlled);
+	clear_tables_by_file_id("WObML",file_ID_code,is_version_controlled);
 	file_removed=true;
 	removed_from_WObML=true;
     }
     was_removed=remove_from("WFixML","_webfiles2","webID","wfmd",file,".FixML",file_ID_code,is_version_controlled);
     if (was_removed) {
-	clear_tables_by_file_ID("WFixML",file_ID_code,is_version_controlled);
+	clear_tables_by_file_id("WFixML",file_ID_code,is_version_controlled);
 	file_removed=true;
 	removed_from_WFixML=true;
     }
@@ -454,11 +406,11 @@ extern "C" void *t_removed(void *ts)
 
 void generate_graphics(std::string type)
 {
-  if (type == "mss") {
+  if (type == "web") {
     type="gsi";
   }
-  else if (type == "web") {
-    type="wgsi";
+  else {
+    return;
   }
   std::stringstream oss,ess;
   unixutils::mysystem2(metautils::directives.local_root+"/bin/"+type+" "+metautils::args.dsnum,oss,ess);
@@ -577,12 +529,9 @@ int main(int argc,char **argv)
   if (cmd_set.size() == 0) {
     exit(0);
   }
-  removed_from_GrML=false;
   removed_from_WGrML=false;
-  removed_from_ObML=false;
   removed_from_WObML=false;
   removed_from_SatML=false;
-  removed_from_FixML=false;
   removed_from_WFixML=false;
   const size_t MAX_NUM_THREADS=6;
   std::vector<ThreadStruct> threads(MAX_NUM_THREADS);
@@ -654,15 +603,10 @@ int main(int argc,char **argv)
 	}
     }
   }
-  for (const auto& gindex : mss_gindex_set) {
-    gatherxml::detailedMetadata::generate_group_detailed_metadata_view(gindex,"MSS","dcm",USER);
-  }
   for (const auto& gindex : web_gindex_set) {
     gatherxml::detailedMetadata::generate_group_detailed_metadata_view(gindex,"Web","dcm",USER);
   }
   std::stringstream oss,ess;
-  if (removed_from_GrML) {
-  }
   if (removed_from_WGrML) {
     clear_grid_cache(server,"WGrML");
     threads.clear();
@@ -689,8 +633,6 @@ int main(int argc,char **argv)
     }
     generate_dataset_home_page();
   }
-  if (removed_from_ObML) {
-  }
   if (removed_from_WObML) {
     gatherxml::summarizeMetadata::summarize_frequencies("dcm",USER);
     gatherxml::summarizeMetadata::summarize_obs_data("dcm",USER);
@@ -706,27 +648,16 @@ int main(int argc,char **argv)
     if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" -rm",oss,ess) < 0)
 	std::cerr << ess.str() << std::endl;
   }
-  if (removed_from_FixML) {
+  if (removed_from_WFixML) {
     gatherxml::summarizeMetadata::summarize_frequencies("dcm",USER);
     gatherxml::summarizeMetadata::summarize_fix_data("dcm",USER);
-    if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" -rm",oss,ess) < 0) {
-	std::cerr << ess.str() << std::endl;
-    }
-    if (metautils::args.update_graphics) {
-	generate_graphics("mss");
-    }
-    generate_dataset_home_page();
-  }
-  if (removed_from_WFixML) {
     if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" -rw",oss,ess) < 0) {
 	std::cerr << ess.str() << std::endl;
     }
     if (metautils::args.update_graphics) {
 	generate_graphics("web");
     }
-  }
-  for (const auto& tindex : mss_tindex_set) {
-    gatherxml::summarizeMetadata::create_file_list_cache("MSS","dcm",USER,tindex);
+    generate_dataset_home_page();
   }
   if (create_Web_filelist_cache) {
     gatherxml::summarizeMetadata::create_file_list_cache("Web","dcm",USER);
