@@ -367,6 +367,7 @@ void summarize_grml()
     e=xdoc.element("GrML");
     fname.name=e.attribute_value("uri");
     if (std::regex_search(fname.name,std::regex("^file://MSS:/FS/DECS"))) {
+delete_temporary_directory();
 std::cerr << "Terminating - scm no longer works on HPSS files" << std::endl;
 exit(1);
     }
@@ -1578,6 +1579,7 @@ void summarize_obml(std::list<KMLData>& kml_list)
     e=xdoc.element("ObML");
     fname.name=e.attribute_value("uri");
     if (std::regex_search(fname.name,std::regex("^file://MSS:/FS/DECS"))) {
+delete_temporary_directory();
 std::cerr << "Terminating - scm no longer works on HPSS files" << std::endl;
 exit(1);
     }
@@ -2093,6 +2095,7 @@ void summarize_fixml()
     e=xdoc.element("FixML");
     fname.name=e.attribute_value("uri");
     if (std::regex_search(fname.name,std::regex("^file://MSS:/FS/DECS"))) {
+delete_temporary_directory();
 std::cerr << "Terminating - scm no longer works on HPSS files" << std::endl;
 exit(1);
     }
@@ -2472,6 +2475,15 @@ extern "C" void segv_handler(int)
   metautils::log_error("segmentation fault","scm",USER);
 }
 
+void delete_temporary_directory()
+{
+  std::stringstream output,error;
+  unixutils::mysystem2("/bin/rm -rf "+local_args.temp_directory,output,error);
+  if (error.str().empty()) {
+    local_args.temp_directory="";
+  }
+}
+
 int main(int argc,char **argv)
 {
   ThreadStruct agg,det,flist,flist_i;
@@ -2827,11 +2839,7 @@ query.set("select distinct tindex from dssdb.wfile where dsid = 'ds"+metautils::
 
 // if this is not a test run (ds999.9), then clean up the temporary directory
   if (metautils::args.dsnum != "999.9" && !local_args.temp_directory.empty()) {
-    std::stringstream output,error;
-    unixutils::mysystem2("/bin/rm -rf "+local_args.temp_directory,output,error);
-    if (error.str().empty()) {
-	local_args.temp_directory="";
-    }
+    delete_temporary_diretory();
   }
 
   if (local_args.notify) {
