@@ -367,25 +367,8 @@ void summarize_grml()
     e=xdoc.element("GrML");
     fname.name=e.attribute_value("uri");
     if (std::regex_search(fname.name,std::regex("^file://MSS:/FS/DECS"))) {
-	strutils::replace_all(fname.name,"file://MSS:","");
-	query2.set("tindex","dssdb.mssfile","mssfile = '"+fname.name+"'");
-	if (query2.submit(server) < 0) {
-	  error=query2.error();
-	}
-	fname.is_mss_file=true;
-	database="GrML";
-	local_args.summarized_hpss_file=true;
-	sp=strutils::split(fname.name,"..m..");
-	if (sp.size() > 1) {
-	  if (server_d.update("htarfile","meta_link = 'Gr'","dsid = 'ds"+metautils::args.dsnum+"' and hfile = '"+sp[1]+"'") < 0) {
-	    metautils::log_error("summarize_grml() returned error: "+server_d.error()+" while trying to update 'dssdb.htarfile'","scm",USER);
-	  }
-	}
-	else {
-	  if (server_d.update("mssfile","meta_link = 'Gr'","dsid = 'ds"+metautils::args.dsnum+"' and mssfile = '"+fname.name+"'") < 0) {
-	    metautils::log_error("summarize_grml() returned error: "+server_d.error()+" while trying to update 'dssdb.mssfile'","scm",USER);
-	  }
-	}
+std::cerr << "Terminating - scm no longer works on HPSS files" << std::endl;
+exit(1);
     }
     else if (std::regex_search(fname.name,std::regex("^http(s){0,1}://rda\\.ucar\\.edu")) || std::regex_search(fname.name,std::regex("^http://dss\\.ucar\\.edu"))) {
 	fname.name=metautils::relative_web_filename(fname.name);
@@ -1595,25 +1578,8 @@ void summarize_obml(std::list<KMLData>& kml_list)
     e=xdoc.element("ObML");
     fname.name=e.attribute_value("uri");
     if (std::regex_search(fname.name,std::regex("^file://MSS:/FS/DECS"))) {
-	strutils::replace_all(fname.name,"file://MSS:","");
-	query2.set("gindex","dssdb.mssfile","mssfile = '"+fname.name+"'");
-	if (query2.submit(server) < 0) {
-	  error=query2.error();
-	}
-	fname.is_mss_file=true;
-	database="ObML";
-	local_args.summarized_hpss_file=true;
-	auto sp=strutils::split(fname.name,"..m..");
-	if (sp.size() > 1) {
-	  if (server_d.update("htarfile","meta_link = 'Ob'","dsid = 'ds"+metautils::args.dsnum+"' and hfile = '"+sp[1]+"'") < 0) {
-	    metautils::log_error("summarize_obml() returned error: '"+server.error()+"' while trying to update htarfile","scm",USER);
-	  }
-	}
-	else {
-	  if (server_d.update("mssfile","meta_link = 'Ob'","dsid = 'ds"+metautils::args.dsnum+"' and mssfile = '"+fname.name+"'") < 0) {
-	    metautils::log_error("summarize_obml() returned error: '"+server.error()+"' while trying to update mssfile","scm",USER);
-	  }
-	}
+std::cerr << "Terminating - scm no longer works on HPSS files" << std::endl;
+exit(1);
     }
     else if (std::regex_search(fname.name,std::regex("^http(s){0,1}://rda\\.ucar\\.edu"))) {
 	fname.name=metautils::relative_web_filename(fname.name);
@@ -2127,25 +2093,8 @@ void summarize_fixml()
     e=xdoc.element("FixML");
     fname.name=e.attribute_value("uri");
     if (std::regex_search(fname.name,std::regex("^file://MSS:/FS/DECS"))) {
-	strutils::replace_all(fname.name,"file://MSS:","");
-	query2.set("gindex","dssdb.mssfile","mssfile = '"+fname.name+"'");
-	if (query2.submit(server) < 0) {
-	  error=query2.error();
-	}
-	fname.is_mss_file=true;
-	database="FixML";
-	local_args.summarized_hpss_file=true;
-	sp=strutils::split(fname.name,"..m..");
-	if (sp.size() > 1) {
-	  if (server_d.update("htarfile","meta_link = 'Fix'","dsid = 'ds"+metautils::args.dsnum+"' and hfile = '"+sp[1]+"'") < 0) {
-	    metautils::log_error("summarize_fixml() returned error: "+server.error(),"scm",USER);
-	  }
-	}
-	else {
-	  if (server_d.update("mssfile","meta_link = 'Fix'","dsid = 'ds"+metautils::args.dsnum+"' and mssfile = '"+fname.name+"'") < 0) {
-	    metautils::log_error("summarize_fixml() returned error: "+server.error(),"scm",USER);
-	  }
-	}
+std::cerr << "Terminating - scm no longer works on HPSS files" << std::endl;
+exit(1);
     }
     else if (std::regex_search(fname.name,std::regex("^http(s){0,1}://rda\\.ucar\\.edu"))) {
 	fname.name=metautils::relative_web_filename(fname.name);
@@ -2396,19 +2345,19 @@ std::cerr << n << " " << cstart.to_string() << " " << cend.to_string() << std::e
     if (server.insert(database+".ds"+local_args.dsnum2+"_frequencies",file_id_code+","+sp[1]+","+strutils::itos(fe.data->min)+","+strutils::itos(fe.data->max)+",'"+sp[0]+"'") < 0) {
 	metautils::log_error(server.error()+" while trying to insert into "+database+".ds"+local_args.dsnum2+"_frequencies '"+file_id_code+","+sp[1]+","+strutils::itos(fe.data->min)+","+strutils::itos(fe.data->max)+",'"+sp[0]+"''","scm",USER);
     }
-    if (database == "FixML") {
+    if (database == "WFixML") {
 	sdum=searchutils::time_resolution_keyword("irregular",fe.data->min,sp[0],"");
-	if (server.insert("search.time_resolutions","'"+sdum+"','GCMD','"+metautils::args.dsnum+"','FixML'") < 0) {
+	if (server.insert("search.time_resolutions","'"+sdum+"','GCMD','"+metautils::args.dsnum+"','WFixML'") < 0) {
 	  error=server.error();
 	  if (!strutils::contains(error,"Duplicate entry")) {
-	    metautils::log_error(error+" while trying to insert into search.time_resolutions ''"+sdum+"','GCMD','"+metautils::args.dsnum+"','FixML''","scm",USER);
+	    metautils::log_error(error+" while trying to insert into search.time_resolutions ''"+sdum+"','GCMD','"+metautils::args.dsnum+"','WFixML''","scm",USER);
 	  }
 	}
 	sdum=searchutils::time_resolution_keyword("irregular",fe.data->max,sp[0],"");
-	if (server.insert("search.time_resolutions","'"+sdum+"','GCMD','"+metautils::args.dsnum+"','FixML'") < 0) {
+	if (server.insert("search.time_resolutions","'"+sdum+"','GCMD','"+metautils::args.dsnum+"','WFixML'") < 0) {
 	  error=server.error();
 	  if (!strutils::contains(error,"Duplicate entry"))
-	    metautils::log_error(error+" while trying to insert into search.time_resolutions ''"+sdum+"','GCMD','"+metautils::args.dsnum+"','FixML''","scm",USER);
+	    metautils::log_error(error+" while trying to insert into search.time_resolutions ''"+sdum+"','GCMD','"+metautils::args.dsnum+"','WFixML''","scm",USER);
 	}
     }
     fe.data=nullptr;
