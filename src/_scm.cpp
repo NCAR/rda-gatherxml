@@ -2637,7 +2637,7 @@ int main(int argc,char **argv)
     if ((local_args.summ_type.empty() || local_args.summ_type == "ObML") && obml_file_list.size() > 0) {
 	summarize_obml(kml_list);
 	obml_file_list.clear();
-	if (local_args.summarized_hpss_file && local_args.update_db) {
+	if (local_args.summarized_web_file && local_args.update_db) {
 	  ThreadStruct ts;
 	  pthread_create(&ts.tid,NULL,thread_summarize_obs_data,NULL);
 	  tid_list.emplace_back(ts.tid);
@@ -2687,7 +2687,7 @@ int main(int argc,char **argv)
 	obml_file_list.emplace_back(f);
 	summarize_obml(kml_list);
 	obml_file_list.clear();
-	if (local_args.summarized_hpss_file && local_args.update_db) {
+	if (local_args.summarized_web_file && local_args.update_db) {
 	  ThreadStruct ts;
 	  pthread_create(&ts.tid,NULL,thread_summarize_obs_data,NULL);
 	  tid_list.emplace_back(ts.tid);
@@ -2765,21 +2765,26 @@ int main(int argc,char **argv)
     if (local_args.summarized_hpss_file || local_args.refresh_hpss) {
     }
     else if (local_args.summarized_web_file || local_args.refresh_web) {
-	if (local_args.refresh_web && MySQL::table_exists(server,"WGrML.ds"+local_args.dsnum2+"_agrids_cache")) {
-	  gatherxml::summarizeMetadata::summarize_grids("WGrML","scm",USER);
-	  agg.strings.emplace_back("WGrML");
-	  pthread_create(&agg.tid,nullptr,thread_aggregate_grids,&agg);
-	  tid_list.emplace_back(agg.tid);
-	}
-	if (local_args.refresh_web && local_args.gindex_list.size() == 1) {
-	  if (local_args.gindex_list.front() == "all") {
-	    local_args.gindex_list.clear();
-	    query.set("select distinct tindex from dssdb.wfile where dsid = 'ds"+metautils::args.dsnum+"' and type = 'D' and status = 'P'");
-	    if (query.submit(server) < 0) {
-		metautils::log_error("error getting group indexes: "+query.error(),"scm",USER);
-	    }
-	    while (query.fetch_row(row)) {
-		local_args.gindex_list.emplace_back(row[0]);
+	if (local_args.refresh_web) {
+	  if (MySQL::table_exists(server,"WGrML.ds"+local_args.dsnum2+"_agrids_cache")) {
+	    gatherxml::summarizeMetadata::summarize_grids("WGrML","scm",USER);
+	    agg.strings.emplace_back("WGrML");
+	    pthread_create(&agg.tid,nullptr,thread_aggregate_grids,&agg);
+	    tid_list.emplace_back(agg.tid);
+	  }
+	  if (MySQL::table_exists(server,"WObML.ds"+local_args.dsnum2+"_locations")) {
+	    gatherxml::summarizeMetadata::summarize_obs_data("scm",USER);
+	  }
+	  if (local_args.gindex_list.size() == 1) {
+	    if (local_args.gindex_list.front() == "all") {
+		local_args.gindex_list.clear();
+		query.set("select distinct tindex from dssdb.wfile where dsid = 'ds"+metautils::args.dsnum+"' and type = 'D' and status = 'P'");
+		if (query.submit(server) < 0) {
+		  metautils::log_error("error getting group indexes: "+query.error(),"scm",USER);
+		}
+		while (query.fetch_row(row)) {
+		  local_args.gindex_list.emplace_back(row[0]);
+		}
 	    }
 	  }
 	}

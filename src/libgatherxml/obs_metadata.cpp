@@ -247,61 +247,57 @@ bool summarize_obs_data(std::string caller,std::string user)
   std::string dsnum2=strutils::substitute(metautils::args.dsnum,".","");
   bool update_bitmap=false;
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
-  MySQL::Query query("code,format_code","ObML.ds"+dsnum2+"_primaries2");
-  if (query.submit(server) < 0) {
-    std::cerr << query.error() << std::endl;
+  MySQL::Query formats_query("code,format_code","WObML.ds"+dsnum2+"_webfiles2");
+  if (formats_query.submit(server) < 0) {
+    std::cerr << formats_query.error() << std::endl;
     exit(1);
   }
-  my::map<CodeEntry> mss_table;
-  for (const auto& res : query) {
-    CodeEntry ce;
-    ce.key=res[0];
-    ce.code=res[1];
-    mss_table.insert(ce);
+  std::unordered_map<std::string,std::string> data_file_formats_map;
+  for (const auto& format_row : formats_query) {
+    data_file_formats_map.emplace(format_row[0],format_row[1]);
   }
-  query.set("format_code,observationType_code,platformType_code,box1d_row,box1d_bitmap","search.obs_data","dsid = '"+metautils::args.dsnum+"'");
-  if (query.submit(server) < 0) {
-    metautils::log_error("summarize_obs_data() returned '"+query.error()+"' while querying search.obs_data",caller,user);
+  MySQL::LocalQuery obs_search_query("format_code,observationType_code,platformType_code,box1d_row,box1d_bitmap","search.obs_data","dsid = '"+metautils::args.dsnum+"'");
+  if (obs_search_query.submit(server) < 0) {
+    metautils::log_error("summarize_obs_data() returned '"+obs_search_query.error()+"' while querying search.obs_data",caller,user);
   }
   my::map<SummaryEntry> current_obsdata_table;
-  for (const auto& res : query) {
+  for (const auto& obs_search_row : obs_search_query) {
     SummaryEntry se;
-    se.key=res[0]+"<!>"+res[1]+"<!>"+res[2]+"<!>"+res[3];
-    se.box1d_bitmap=res[4];
+    se.key=obs_search_row[0]+"<!>"+obs_search_row[1]+"<!>"+obs_search_row[2]+"<!>"+obs_search_row[3];
+    se.box1d_bitmap=obs_search_row[4];
     current_obsdata_table.insert(se);
   }
   std::string error;
-  if (server.command("lock tables ObML.ds"+dsnum2+"_locations write",error) < 0) {
+  if (server.command("lock tables WObML.ds"+dsnum2+"_locations write",error) < 0) {
     std::cerr << server.error() << std::endl;
     exit(1);
   }
-  query.set("mssID_code,observationType_code,platformType_code,start_date,end_date,box1d_row,box1d_bitmap","ObML.ds"+dsnum2+"_locations");
-  if (query.submit(server) < 0) {
-    metautils::log_error("summarize_obs_data() returned '"+query.error()+"' while querying ObML.ds"+dsnum2+"_locations",caller,user);
+  MySQL::LocalQuery locations_query("webID_code,observationType_code,platformType_code,start_date,end_date,box1d_row,box1d_bitmap","WObML.ds"+dsnum2+"_locations");
+  if (locations_query.submit(server) < 0) {
+    metautils::log_error("summarize_obs_data() returned '"+locations_query.error()+"' while querying WObML.ds"+dsnum2+"_locations",caller,user);
   }
   my::map<SummaryEntry> summary_table;
-  for (const auto& res : query) {
-    CodeEntry ce;
-    if (!mss_table.found(res[0],ce)) {
-	metautils::log_error("summarize_obs_data() found an mssID ("+res[0]+") in ObML.ds"+dsnum2+"_locations that doesn't exist in ObML.ds"+dsnum2+"_primaries2",caller,user);
+  for (const auto& location_row : locations_query) {
+    if (data_file_formats_map.find(location_row[0]) == data_file_formats_map.end()) {
+	metautils::log_error("summarize_obs_data() found an webID ("+location_row[0]+") in WObML.ds"+dsnum2+"_locations that doesn't exist in WObML.ds"+dsnum2+"_webfiles2",caller,user);
     }
     SummaryEntry se;
-    se.key=ce.code+"<!>"+res[1]+"<!>"+res[2]+"<!>"+res[5];
+    se.key=data_file_formats_map[location_row[0]]+"<!>"+location_row[1]+"<!>"+location_row[2]+"<!>"+location_row[5];
     if (!summary_table.found(se.key,se)) {
-	se.start_date=res[3];
-	se.end_date=res[4];
-	se.box1d_bitmap=res[6];
+	se.start_date=location_row[3];
+	se.end_date=location_row[4];
+	se.box1d_bitmap=location_row[6];
 	summary_table.insert(se);
     }
     else {
-	if (res[3] < se.start_date) {
-	  se.start_date=res[3];
+	if (location_row[3] < se.start_date) {
+	  se.start_date=location_row[3];
 	}
-	if (res[4] > se.end_date) {
-	  se.end_date=res[4];
+	if (location_row[4] > se.end_date) {
+	  se.end_date=location_row[4];
 	}
-	if (res[6] != se.box1d_bitmap) {
-	  se.box1d_bitmap=bitmap::add_box1d_bitmaps(se.box1d_bitmap,res[6]);
+	if (location_row[6] != se.box1d_bitmap) {
+	  se.box1d_bitmap=bitmap::add_box1d_bitmaps(se.box1d_bitmap,location_row[6]);
 	}
 	summary_table.replace(se);
     }
@@ -344,7 +340,7 @@ bool summarize_obs_data(std::string caller,std::string user)
     std::cerr << server.error() << std::endl;
     exit(1);
   }
-  error=summarize_locations("ObML");
+  error=summarize_locations("WObML");
   if (error.length() > 0) {
     metautils::log_error("summarize_obs_data() returned '"+error+"'",caller,user);
   }
