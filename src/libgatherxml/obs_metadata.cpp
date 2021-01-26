@@ -244,6 +244,7 @@ void compress_locations(std::list<std::string>& location_list,my::map<ParentLoca
 
 bool summarize_obs_data(std::string caller,std::string user)
 {
+  const std::string THIS_FUNC=__func__;
   std::string dsnum2=strutils::substitute(metautils::args.dsnum,".","");
   bool update_bitmap=false;
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
@@ -258,7 +259,7 @@ bool summarize_obs_data(std::string caller,std::string user)
   }
   MySQL::LocalQuery obs_search_query("format_code,observationType_code,platformType_code,box1d_row,box1d_bitmap","search.obs_data","dsid = '"+metautils::args.dsnum+"'");
   if (obs_search_query.submit(server) < 0) {
-    metautils::log_error("summarize_obs_data() returned '"+obs_search_query.error()+"' while querying search.obs_data",caller,user);
+    metautils::log_error(THIS_FUNC+"() returned '"+obs_search_query.error()+"' while querying search.obs_data",caller,user);
   }
   my::map<SummaryEntry> current_obsdata_table;
   for (const auto& obs_search_row : obs_search_query) {
@@ -269,17 +270,16 @@ bool summarize_obs_data(std::string caller,std::string user)
   }
   std::string error;
   if (server.command("lock tables WObML.ds"+dsnum2+"_locations write",error) < 0) {
-    std::cerr << server.error() << std::endl;
-    exit(1);
+    metautils::log_error(THIS_FUNC+"(): "+server.error(),caller,user);
   }
   MySQL::LocalQuery locations_query("webID_code,observationType_code,platformType_code,start_date,end_date,box1d_row,box1d_bitmap","WObML.ds"+dsnum2+"_locations");
   if (locations_query.submit(server) < 0) {
-    metautils::log_error("summarize_obs_data() returned '"+locations_query.error()+"' while querying WObML.ds"+dsnum2+"_locations",caller,user);
+    metautils::log_error(THIS_FUNC+"() returned '"+locations_query.error()+"' while querying WObML.ds"+dsnum2+"_locations",caller,user);
   }
   my::map<SummaryEntry> summary_table;
   for (const auto& location_row : locations_query) {
     if (data_file_formats_map.find(location_row[0]) == data_file_formats_map.end()) {
-	metautils::log_error("summarize_obs_data() found an webID ("+location_row[0]+") in WObML.ds"+dsnum2+"_locations that doesn't exist in WObML.ds"+dsnum2+"_webfiles2",caller,user);
+	metautils::log_error(THIS_FUNC+"() found a webID ("+location_row[0]+") in WObML.ds"+dsnum2+"_locations that doesn't exist in WObML.ds"+dsnum2+"_webfiles2",caller,user);
     }
     SummaryEntry se;
     se.key=data_file_formats_map[location_row[0]]+"<!>"+location_row[1]+"<!>"+location_row[2]+"<!>"+location_row[5];
@@ -303,8 +303,7 @@ bool summarize_obs_data(std::string caller,std::string user)
     }
   }
   if (server.command("unlock tables",error) < 0) {
-    std::cerr << server.error() << std::endl;
-    exit(1);
+    metautils::log_error(THIS_FUNC+"(): "+server.error(),caller,user);
   }
   for (const auto& key : summary_table.keys()) {
     SummaryEntry se,se2;
@@ -320,8 +319,7 @@ bool summarize_obs_data(std::string caller,std::string user)
     }
   }
   if (server.command("lock tables search.obs_data write",error) < 0) {
-    std::cerr << server.error() << std::endl;
-    exit(1);
+    metautils::log_error(THIS_FUNC+"(): "+server.error(),caller,user);
   }
   server._delete("search.obs_data","dsid = '"+metautils::args.dsnum+"'");
   for (const auto& key : summary_table.keys()) {
@@ -331,18 +329,16 @@ bool summarize_obs_data(std::string caller,std::string user)
     if (server.insert("search.obs_data","'"+metautils::args.dsnum+"',"+sp[0]+","+sp[1]+","+sp[2]+","+se.start_date+","+se.end_date+","+sp[3]+",'"+se.box1d_bitmap+"'") < 0) {
 	error=server.error();
 	if (!strutils::has_beginning(error,"Duplicate entry")) {
-	  std::cerr << error << std::endl;
-	  exit(1);
+	  metautils::log_error(THIS_FUNC+"(): "+error,caller,user);
 	}
     }
   }
   if (server.command("unlock tables",error) < 0) {
-    std::cerr << server.error() << std::endl;
-    exit(1);
+    metautils::log_error(THIS_FUNC+"(): "+server.error(),caller,user);
   }
   error=summarize_locations("WObML");
   if (error.length() > 0) {
-    metautils::log_error("summarize_obs_data() returned '"+error+"'",caller,user);
+    metautils::log_error(THIS_FUNC+"(): summarize_locations() returned '"+error+"'",caller,user);
   }
   server.disconnect();
   return update_bitmap;
