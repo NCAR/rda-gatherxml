@@ -10,7 +10,6 @@ extern bool verbose_operation;
 void parse_args(char arg_delimiter)
 {
   verbose_operation=false;
-  bool infer_local_name=false;
   metautils::args.temp_loc=metautils::directives.temp_path;
   auto args=strutils::split(metautils::args.args_string,std::string(1,arg_delimiter));
   for (size_t n=0; n < args.size()-1; ++n) {
@@ -29,12 +28,6 @@ void parse_args(char arg_delimiter)
     else if (args[n] == "-I") {
 	metautils::args.inventory_only=true;
 	metautils::args.update_db=false;
-    }
-    else if (args[n] == "-l") {
-	metautils::args.local_name=args[++n];
-    }
-    else if (args[n] == "-L") {
-	infer_local_name=true;
     }
     else if (args[n] == "-m") {
 	metautils::args.member_name=args[++n];
@@ -90,12 +83,6 @@ void parse_args(char arg_delimiter)
   auto idx=args.back().rfind("/");
   metautils::args.path=args.back().substr(0,idx);
   metautils::args.filename=args.back().substr(idx+1);
-  if (infer_local_name) {
-    auto idx=args.back().find(metautils::args.dsnum+"/");
-    if (idx != std::string::npos) {
-	metautils::args.local_name=metautils::directives.data_root+"/ds"+args.back().substr(idx);
-    }
-  }
 }
 
 } // end namespace gatherxml
