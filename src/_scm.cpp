@@ -184,7 +184,7 @@ void parse_args(const char ARG_DELIMITER)
 	local_args.verbose=true;
     }
     else {
-	std::cerr << THIS_UTILITY << ": don't understand argument " << args[n] << std::endl;
+	myerror="Terminating - "+THIS_UTILITY+": don't understand argument "+args[n];
 	exit(1);
     }
   }
@@ -193,7 +193,7 @@ void parse_args(const char ARG_DELIMITER)
     exit(1);
   }
   if (!local_args.summarize_all && !local_args.is_hpss_file && !local_args.is_web_file && !local_args.refresh_web && !local_args.refresh_inv) {
-    myerror="Terminating "+THIS_UTILITY+" - nothing to do";
+    myerror="Terminating - "+THIS_UTILITY+" - nothing to do";
     exit(1);
   }
   if (local_args.update_graphics && !local_args.file.empty() && !std::regex_search(local_args.file,std::regex("(Ob|Fix)ML$"))) {
