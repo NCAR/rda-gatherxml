@@ -5,6 +5,7 @@
 #include <regex>
 #include <unordered_set>
 #include <sstream>
+#include <numeric>
 #include <stdlib.h>
 #include <unistd.h>
 #include <signal.h>
@@ -149,22 +150,20 @@ void extract_from_hdf5_variable_attributes(std::unordered_map<std::string,InputH
   nc_attribute_data.cf_keyword="";
   nc_attribute_data.missing_value.clear();
   for (const auto& attribute : attributes) {
-    auto& attribute_name=attribute.first;
-    auto& attribute_value=attribute.second;
-    if (attribute_name == "long_name") {
-	nc_attribute_data.long_name.assign(reinterpret_cast<char *>(attribute_value.array));
+    if (attribute.first == "long_name") {
+	nc_attribute_data.long_name.assign(reinterpret_cast<char *>(attribute.second.array));
 	strutils::trim(nc_attribute_data.long_name);
     }
-    else if (attribute_name == "units") {
-	nc_attribute_data.units.assign(reinterpret_cast<char *>(attribute_value.array));
+    else if (attribute.first == "units") {
+	nc_attribute_data.units.assign(reinterpret_cast<char *>(attribute.second.array));
 	strutils::trim(nc_attribute_data.units);
     }
-    else if (attribute_name == "standard_name") {
-	nc_attribute_data.cf_keyword.assign(reinterpret_cast<char *>(attribute_value.array));
+    else if (attribute.first == "standard_name") {
+	nc_attribute_data.cf_keyword.assign(reinterpret_cast<char *>(attribute.second.array));
 	strutils::trim(nc_attribute_data.cf_keyword);
     }
-    else if (attribute_name == "_FillValue" || attribute_name == "missing_value") {
-	nc_attribute_data.missing_value=attribute_value;
+    else if (attribute.first == "_FillValue" || attribute.first == "missing_value") {
+	nc_attribute_data.missing_value=attribute.second;
     }
   }
 }
@@ -1000,38 +999,36 @@ void scan_usarray_transportable_hdf5_file(InputHDF5Stream& istream,ScanData& sca
   std::string platform_type,datatype;
   float lat=-1.e38,lon=-1.e38;
   for (const auto& attr_entry : ds->attributes) {
-    auto& attribute_name=attr_entry.first;
-    auto& attribute_value=attr_entry.second;
-    if (attribute_name == "NROWS") {
-	num_values=*(reinterpret_cast<int *>(attribute_value.array));
+    if (attr_entry.first == "NROWS") {
+	num_values=*(reinterpret_cast<int *>(attr_entry.second.array));
     }
-    else if (attribute_name == "LATITUDE_DDEG") {
-	lat=*(reinterpret_cast<float *>(attribute_value.array));
+    else if (attr_entry.first == "LATITUDE_DDEG") {
+	lat=*(reinterpret_cast<float *>(attr_entry.second.array));
     }
-    else if (attribute_name == "LONGITUDE_DDEG") {
-	lon=*(reinterpret_cast<float *>(attribute_value.array));
+    else if (attr_entry.first == "LONGITUDE_DDEG") {
+	lon=*(reinterpret_cast<float *>(attr_entry.second.array));
     }
-    else if (attribute_name == "CHAR_STATION_ID") {
+    else if (attr_entry.first == "CHAR_STATION_ID") {
 	if (platform_type.empty()) {
 	  platform_type="land_station";
-	  ientry.key.assign(reinterpret_cast<char *>(attribute_value.array));
+	  ientry.key.assign(reinterpret_cast<char *>(attr_entry.second.array));
 	  ientry.key.insert(0,platform_type+"[!]USArray[!]TA.");
 	}
 	else {
 	  metautils::log_error("multiple station IDs not expected","hdf2xml",USER);
 	}
     }
-    else if (attribute_name == "NUMERIC_STATION_ID") {
-	numeric_id=*(reinterpret_cast<short *>(attribute_value.array));
+    else if (attr_entry.first == "NUMERIC_STATION_ID") {
+	numeric_id=*(reinterpret_cast<short *>(attr_entry.second.array));
     }
-    else if (attribute_name == "FIELD_2_NAME") {
-	datatype.assign(reinterpret_cast<char *>(attribute_value.array));
+    else if (attr_entry.first == "FIELD_2_NAME") {
+	datatype.assign(reinterpret_cast<char *>(attr_entry.second.array));
     }
-    else if (attribute_name == "FIELD_2_FILL") {
-	pres_miss_val=*(reinterpret_cast<float *>(attribute_value.array));
+    else if (attr_entry.first == "FIELD_2_FILL") {
+	pres_miss_val=*(reinterpret_cast<float *>(attr_entry.second.array));
     }
-    else if (attribute_name == "FIELD_2_DESCRIPTION") {
-	se.key.assign(reinterpret_cast<char *>(attribute_value.array));
+    else if (attr_entry.first == "FIELD_2_DESCRIPTION") {
+	se.key.assign(reinterpret_cast<char *>(attr_entry.second.array));
     }
   }
   if (platform_type.empty()) {
@@ -1102,8 +1099,7 @@ void add_gridded_time_range(std::string key_start,std::unordered_set<std::string
   for (const auto& var : vars) {
     auto& dset_ptr=var.second;
     auto attr_it=dset_ptr->attributes.find("DIMENSION_LIST");
-    auto& attribute_value=attr_it->second;
-    if (attr_it != dset_ptr->attributes.end() && attribute_value.dim_sizes.size() == 1 && (attribute_value.dim_sizes[0] > 2 || (attribute_value.dim_sizes[0] == 2 && gcoords.valid_time.data_array.num_values == 1))) {
+    if (attr_it != dset_ptr->attributes.end() && attr_it->second.dim_sizes.size() == 1 && (attr_it->second.dim_sizes[0] > 2 || (attr_it->second.dim_sizes[0] == 2 && gcoords.valid_time.data_array.num_values == 1))) {
 	auto time_method=gridded_time_method(dset_ptr,gcoords);
 	if (time_method.empty()) {
 	  found_no_method=true;
@@ -1236,38 +1232,37 @@ void add_gridded_netcdf_parameter(const InputHDF5Stream::DatasetEntry& var,ScanD
   std::string units;
   auto& attributes=var.second->attributes;
   auto attr_it=attributes.find("units");
-  auto& attribute_value=attr_it->second;
-  if (attr_it != attributes.end() && attribute_value._class_ == 3) {
-    units=reinterpret_cast<char *>(attribute_value.array);
+  if (attr_it != attributes.end() && attr_it->second._class_ == 3) {
+    units=reinterpret_cast<char *>(attr_it->second.array);
   }
   if (description.empty()) {
     attr_it=attributes.find("description");
     if (attr_it == attributes.end()) {
 	attr_it=attributes.find("Description");
     }
-    if (attr_it != attributes.end() && attribute_value._class_ == 3) {
-	description=reinterpret_cast<char *>(attribute_value.array);
+    if (attr_it != attributes.end() && attr_it->second._class_ == 3) {
+	description=reinterpret_cast<char *>(attr_it->second.array);
     }
     if (description.empty()) {
 	attr_it=attributes.find("comment");
 	if (attr_it == attributes.end()) {
 	  attr_it=attributes.find("Comment");
 	}
-	if (attr_it != attributes.end() && attribute_value._class_ == 3) {
-	  description=reinterpret_cast<char *>(attribute_value.array);
+	if (attr_it != attributes.end() && attr_it->second._class_ == 3) {
+	  description=reinterpret_cast<char *>(attr_it->second.array);
 	}
     }
     if (description.empty()) {
 	attr_it=attributes.find("long_name");
-	if (attr_it != attributes.end() && attribute_value._class_ == 3) {
-	  description=reinterpret_cast<char *>(attribute_value.array);
+	if (attr_it != attributes.end() && attr_it->second._class_ == 3) {
+	  description=reinterpret_cast<char *>(attr_it->second.array);
 	}
     }
   }
   std::string standard_name;
   attr_it=attributes.find("standard_name");
-  if (attr_it != attributes.end() && attribute_value._class_ == 3) {
-    standard_name=reinterpret_cast<char *>(attribute_value.array);
+  if (attr_it != attributes.end() && attr_it->second._class_ == 3) {
+    standard_name=reinterpret_cast<char *>(attr_it->second.array);
   }
   auto var_name=var.first;
   strutils::trim(var_name);
@@ -1302,7 +1297,7 @@ bool parameter_matches_dimensions(InputHDF5Stream& istream,const InputHDF5Stream
   bool parameter_matches=false;
   auto off=4;
   size_t first=1;
-  auto attribute_value=attr.second;
+  auto& attribute_value=attr.second;
   if (attribute_value.dim_sizes[0] == 2 && gcoords.valid_time.data_array.num_values == 1) {
     first=0;
   }
@@ -1406,13 +1401,12 @@ void add_gridded_parameters_to_netcdf_level_entry(InputHDF5Stream& istream,std::
   for (const auto& var : vars) {
     auto& dset_ptr=var.second;
     auto attr_it=dset_ptr->attributes.find("DIMENSION_LIST");
-    auto& attribute_value=attr_it->second;
     if (gatherxml::verbose_operation) {
 	std::cout << "    '" << var.first << "' has a DIMENSION_LIST: ";
-	attribute_value.print(std::cout,istream.reference_table_pointer());
+	attr_it->second.print(std::cout,istream.reference_table_pointer());
 	std::cout << std::endl;
     }
-    if (attribute_value._class_ == 9 && attribute_value.dim_sizes.size() == 1 && (attribute_value.dim_sizes[0] > 2 || (attribute_value.dim_sizes[0] == 2 && gcoords.valid_time.data_array.num_values == 1)) && attribute_value.vlen.class_ == 7 && parameter_matches_dimensions(istream,*attr_it,gcoords,level_id)) {
+    if (attr_it->second._class_ == 9 && attr_it->second.dim_sizes.size() == 1 && (attr_it->second.dim_sizes[0] > 2 || (attr_it->second.dim_sizes[0] == 2 && gcoords.valid_time.data_array.num_values == 1)) && attr_it->second.vlen.class_ == 7 && parameter_matches_dimensions(istream,*attr_it,gcoords,level_id)) {
 	if (gatherxml::verbose_operation) {
 	  std::cout << "    ...is a netCDF variable" << std::endl;
 	}
@@ -1455,8 +1449,7 @@ void update_level_entry(InputHDF5Stream& istream,const metautils::NcTime::TimeRa
   for (const auto& var : vars) {
     auto& dset_ptr=var.second;
     auto attr_it=dset_ptr->attributes.find("DIMENSION_LIST");
-    auto& attribute_value=attr_it->second;
-    if (attribute_value._class_ == 9 && attribute_value.dim_sizes.size() == 1 && attribute_value.dim_sizes[0] > 2 && attribute_value.vlen.class_ == 7 && parameter_matches_dimensions(istream,*attr_it,gcoords,level_id)) {
+    if (attr_it->second._class_ == 9 && attr_it->second.dim_sizes.size() == 1 && attr_it->second.dim_sizes[0] > 2 && attr_it->second.vlen.class_ == 7 && parameter_matches_dimensions(istream,*attr_it,gcoords,level_id)) {
 	parameter_entry_ptr->key="ds"+metautils::args.dsnum+":"+var.first;
 	auto time_method=gridded_time_method(dset_ptr,gcoords);
 	time_method=strutils::capitalize(time_method);
@@ -1694,9 +1687,8 @@ void scan_cf_point_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data,gat
     auto& dset_ptr=ds_entry.second;
     if (dset_ptr->datatype.class_ == 3) {
 	auto attr_it=dset_ptr->attributes.find("long_name");
-	auto& attr_val=attr_it->second;
-	if (attr_it != dset_ptr->attributes.end() && attr_val._class_ == 3) {
-	  std::string attribute_value(reinterpret_cast<char *>(attr_val.get()),attr_val.size);
+	if (attr_it != dset_ptr->attributes.end() && attr_it->second._class_ == 3) {
+	  std::string attribute_value(reinterpret_cast<char *>(attr_it->second.get()),attr_it->second.size);
 	  if (std::regex_search(attribute_value,std::regex("ID")) || std::regex_search(attribute_value,std::regex("ident",std::regex::icase))) {
 	    dgd.indexes.stn_id_var=ds_entry.first;
 	  }
@@ -1717,8 +1709,7 @@ void scan_cf_point_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data,gat
     }
     auto attr_it=ds->attributes.find("calendar");
     if (attr_it != ds->attributes.end()) {
-	auto& attribute_value=attr_it->second;
-	time_data.calendar.assign(reinterpret_cast<char *>(attribute_value.get()),attribute_value.size);
+	time_data.calendar.assign(reinterpret_cast<char *>(attr_it->second.get()),attr_it->second.size);
     }
     time_vals.fill(istream,*ds);
   }
@@ -2241,6 +2232,199 @@ void scan_cf_profile_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data,g
   }
 }
 
+bool grid_is_polar_stereographic(const GridCoordinates& gcoords,Grid::GridDimensions& dim,Grid::GridDefinition& def)
+{
+  auto center_x=dim.x/2;
+  auto center_y=dim.y/2;
+  auto xm=center_x-1;
+  auto ym=center_y-1;
+  if (floatutils::myequalf(data_array_value(gcoords.latitude.data_array,ym*dim.x+xm,gcoords.latitude.ds.get()),data_array_value(gcoords.latitude.data_array,center_y*dim.x+xm,gcoords.latitude.ds.get()),0.00001) && floatutils::myequalf(data_array_value(gcoords.latitude.data_array,center_y*dim.x+xm,gcoords.latitude.ds.get()),data_array_value(gcoords.latitude.data_array,center_y*dim.x+center_x,gcoords.latitude.ds.get()),0.00001) && floatutils::myequalf(data_array_value(gcoords.latitude.data_array,center_y*dim.x+center_x,gcoords.latitude.ds.get()),data_array_value(gcoords.latitude.data_array,ym*dim.x+center_x,gcoords.latitude.ds.get()),0.00001) && floatutils::myequalf(fabs(data_array_value(gcoords.longitude.data_array,ym*dim.x+xm,gcoords.longitude.ds.get()))+fabs(data_array_value(gcoords.longitude.data_array,center_y*dim.x+xm,gcoords.longitude.ds.get()))+fabs(data_array_value(gcoords.longitude.data_array,center_y*dim.x+center_x,gcoords.longitude.ds.get()))+fabs(data_array_value(gcoords.longitude.data_array,ym*dim.x+center_x,gcoords.longitude.ds.get())),360.,0.00001)) {
+    def.type=Grid::polarStereographicType;
+    if (data_array_value(gcoords.latitude.data_array,ym*dim.x+xm,gcoords.latitude.ds.get()) >= 0.) {
+		  def.projection_flag=0;
+		  def.llatitude=60.;
+    }
+    else {
+		  def.projection_flag=1;
+		  def.llatitude=-60.;
+    }
+    def.olongitude=lroundf(data_array_value(gcoords.longitude.data_array,ym*dim.x+xm,gcoords.longitude.ds.get())+45.);
+    if (def.olongitude > 180.) {
+		  def.olongitude-=360.;
+    }
+// look for dx and dy at the 60-degree parallel
+    double min_fabs=999.,f;
+    int min_m=0;
+    for (size_t m=0; m < gcoords.latitude.data_array.num_values; ++m) {
+		  if ( (f=fabs(def.llatitude-data_array_value(gcoords.latitude.data_array,m,gcoords.latitude.ds.get()))) < min_fabs) {
+			min_fabs=f;
+			min_m=m;
+		  }
+    }
+    double rad=3.141592654/180.;
+// great circle formula:
+// //  theta=2*arcsin[ sqrt( sin^2(delta_phi/2) + cos(phi_1)*cos(phi_2)*sin^2(delta_lambda/2) ) ]
+// //  phi_1 and phi_2 are latitudes
+// //  lambda_1 and lambda_2 are longitudes
+// //  dist = 6372.8 * theta
+// //  6372.8 is radius of Earth in km
+    def.dx=lroundf(asin(sqrt(sin(fabs(data_array_value(gcoords.latitude.data_array,min_m,gcoords.latitude.ds.get())-data_array_value(gcoords.latitude.data_array,min_m+1,gcoords.latitude.ds.get()))/2.*rad)*sin(fabs(data_array_value(gcoords.latitude.data_array,min_m,gcoords.latitude.ds.get())-data_array_value(gcoords.latitude.data_array,min_m+1,gcoords.latitude.ds.get()))/2.*rad)+sin(fabs(data_array_value(gcoords.longitude.data_array,min_m,gcoords.longitude.ds.get())-data_array_value(gcoords.longitude.data_array,min_m+1,gcoords.longitude.ds.get()))/2.*rad)*sin(fabs(data_array_value(gcoords.longitude.data_array,min_m,gcoords.longitude.ds.get())-data_array_value(gcoords.longitude.data_array,min_m+1,gcoords.longitude.ds.get()))/2.*rad)*cos(data_array_value(gcoords.latitude.data_array,min_m,gcoords.latitude.ds.get())*rad)*cos(data_array_value(gcoords.latitude.data_array,min_m+1,gcoords.latitude.ds.get())*rad)))*12745.6);
+    def.dy=lroundf(asin(sqrt(sin(fabs(data_array_value(gcoords.latitude.data_array,min_m,gcoords.latitude.ds.get())-data_array_value(gcoords.latitude.data_array,min_m+dim.x,gcoords.latitude.ds.get()))/2.*rad)*sin(fabs(data_array_value(gcoords.latitude.data_array,min_m,gcoords.latitude.ds.get())-data_array_value(gcoords.latitude.data_array,min_m+dim.x,gcoords.latitude.ds.get()))/2.*rad)+sin(fabs(data_array_value(gcoords.longitude.data_array,min_m,gcoords.longitude.ds.get())-data_array_value(gcoords.longitude.data_array,min_m+dim.x,gcoords.longitude.ds.get()))/2.*rad)*sin(fabs(data_array_value(gcoords.longitude.data_array,min_m,gcoords.longitude.ds.get())-data_array_value(gcoords.longitude.data_array,min_m+dim.x,gcoords.longitude.ds.get()))/2.*rad)*cos(data_array_value(gcoords.latitude.data_array,min_m,gcoords.latitude.ds.get())*rad)*cos(data_array_value(gcoords.latitude.data_array,min_m+dim.x,gcoords.latitude.ds.get())*rad)))*12745.6);
+    return true;
+  }
+  return false;
+}
+
+bool grid_is_lambert_conformal(const GridCoordinates& gcoords,Grid::GridDimensions& dim,Grid::GridDefinition& def)
+{
+  if (gatherxml::verbose_operation) {
+    std::cout << "...checking grid for a Lambert-Conformal projection..." << std::endl;
+  }
+// check for a "centered" LC projection
+  auto center_x=dim.x/2;
+  auto center_y=dim.y/2;
+  switch (dim.x % 2) {
+    case 0: {
+	auto xm=center_x-1;
+	auto ym=center_y-1;
+	auto yp=center_y+1;
+	if (floatutils::myequalf((data_array_value(gcoords.longitude.data_array,ym*gcoords.longitude.data_array.dimensions[1]+xm,gcoords.longitude.ds.get())+data_array_value(gcoords.longitude.data_array,ym*gcoords.longitude.data_array.dimensions[1]+center_x,gcoords.longitude.ds.get())),(data_array_value(gcoords.longitude.data_array,yp*gcoords.longitude.data_array.dimensions[1]+xm,gcoords.longitude.ds.get())+data_array_value(gcoords.longitude.data_array,yp*gcoords.longitude.data_array.dimensions[1]+center_x,gcoords.longitude.ds.get())),0.00001) && floatutils::myequalf(data_array_value(gcoords.latitude.data_array,center_y*gcoords.longitude.data_array.dimensions[1]+xm,gcoords.latitude.ds.get()),data_array_value(gcoords.latitude.data_array,center_y*gcoords.longitude.data_array.dimensions[1]+center_x,gcoords.latitude.ds.get()))) {
+	  def.type=Grid::lambertConformalType;
+	  def.llatitude=def.stdparallel1=def.stdparallel2=lround(data_array_value(gcoords.latitude.data_array,center_y*gcoords.longitude.data_array.dimensions[1]+center_x,gcoords.latitude.ds.get()));
+	  if (def.llatitude >= 0.) {
+	    def.projection_flag=0;
+	  }
+	  else {
+	    def.projection_flag=1;
+	  }
+	  def.olongitude=lround((data_array_value(gcoords.longitude.data_array,center_y*gcoords.longitude.data_array.dimensions[1]+xm,gcoords.longitude.ds.get())+data_array_value(gcoords.longitude.data_array,center_y*gcoords.longitude.data_array.dimensions[1]+center_x,gcoords.longitude.ds.get()))/2.);
+		def.dx=def.dy=lround(111.1*cos(data_array_value(gcoords.latitude.data_array,center_y*gcoords.longitude.data_array.dimensions[1]+center_x-1,gcoords.latitude.ds.get())*3.141592654/180.)*(data_array_value(gcoords.longitude.data_array,center_y*gcoords.longitude.data_array.dimensions[1]+center_x,gcoords.longitude.ds.get())-data_array_value(gcoords.longitude.data_array,center_y*gcoords.longitude.data_array.dimensions[1]+center_x-1,gcoords.longitude.ds.get())));
+	  if (gatherxml::verbose_operation) {
+	    std::cout << "...confirmed a centered Lambert-Conformal projection." << std::endl;
+	  }
+	  return true;
+	}
+	break;
+    }
+    case 1: {
+	auto xp=center_x+1;
+	if (floatutils::myequalf(data_array_value(gcoords.longitude.data_array,(center_y-1)*gcoords.longitude.data_array.dimensions[1]+center_x,gcoords.longitude.ds.get()),data_array_value(gcoords.longitude.data_array,(center_y+1)*gcoords.longitude.data_array.dimensions[1]+center_x,gcoords.longitude.ds.get()),0.00001) && floatutils::myequalf(data_array_value(gcoords.latitude.data_array,center_y*gcoords.longitude.data_array.dimensions[1]+center_x-1,gcoords.latitude.ds.get()),data_array_value(gcoords.latitude.data_array,center_y*gcoords.longitude.data_array.dimensions[1]+xp,gcoords.latitude.ds.get()),0.00001)) {
+	  def.type=Grid::lambertConformalType;
+	  def.llatitude=def.stdparallel1=def.stdparallel2=lround(data_array_value(gcoords.latitude.data_array,center_y*gcoords.longitude.data_array.dimensions[1]+center_x,gcoords.latitude.ds.get()));
+	  if (def.llatitude >= 0.) {
+	    def.projection_flag=0;
+	  }
+	  else {
+	    def.projection_flag=1;
+	  }
+	  def.olongitude=lround(data_array_value(gcoords.longitude.data_array,center_y*gcoords.longitude.data_array.dimensions[1]+center_x,gcoords.longitude.ds.get()));
+	  def.dx=def.dy=lround(111.1*cos(data_array_value(gcoords.latitude.data_array,center_y*gcoords.longitude.data_array.dimensions[1]+center_x,gcoords.latitude.ds.get())*3.141592654/180.)*(data_array_value(gcoords.longitude.data_array,center_y*gcoords.longitude.data_array.dimensions[1]+center_y+1,gcoords.longitude.ds.get())-data_array_value(gcoords.longitude.data_array,center_y*gcoords.longitude.data_array.dimensions[1]+center_x,gcoords.longitude.ds.get())));
+	  if (gatherxml::verbose_operation) {
+	    std::cout << "...confirmed a centered Lambert-Conformal projection." << std::endl;
+	  }
+	  return true;
+	}
+	break;
+    }
+  }
+
+  if (gatherxml::verbose_operation) {
+    std::cout << "...check for a centered Lambert-Conformal projection failed, checking for a non-centered projection..." << std::endl;
+  }
+
+// try to detect a non-centered LC projection
+// find the x-offsets in each row where the change in latitude goes from
+//   positive to negative
+  std::vector<double> olon_x_offsets;
+  olon_x_offsets.reserve(dim.y);
+  double avg_olon=0.;
+  for (auto n=0; n < dim.y; ++n) {
+    auto off=n*dim.x;
+    for (auto m=0; m < dim.x-1; ++m) {
+	auto x_offset=off+m;
+	if (data_array_value(gcoords.latitude.data_array,x_offset+1,gcoords.latitude.ds.get()) <= data_array_value(gcoords.latitude.data_array,x_offset,gcoords.latitude.ds.get())) {
+	  olon_x_offsets.emplace_back(x_offset-off);
+	  avg_olon+=data_array_value(gcoords.longitude.data_array,x_offset,gcoords.longitude.ds.get());
+	  break;
+	}
+    }
+  }
+// find the variance in the x-offsets
+  auto olon_x_offsets_mean=lround(std::accumulate(olon_x_offsets.begin(),olon_x_offsets.end(),0.)/olon_x_offsets.size());
+  double ss=0.;
+  for (const auto& olon_x_offset : olon_x_offsets) {
+    auto diff=olon_x_offset-olon_x_offsets_mean;
+    ss+=diff*diff;
+  }
+  auto var=ss/(olon_x_offsets.size()-1);
+// if the variance is low, confident that we found the orientation longitude
+  if (var < 1.) {
+    def.type=Grid::lambertConformalType;
+    auto olon_x_offset=lround(std::accumulate(olon_x_offsets.begin(),olon_x_offsets.end(),0.)/olon_x_offsets.size());
+    def.olongitude=lround(avg_olon/olon_x_offsets.size());
+// find the x-direction distance for each row at the orientation longitude
+    const double PI=3.141592654;
+    const double DEGRAD=PI/180.;
+    std::vector<double> dist_x_list;
+    dist_x_list.reserve(dim.y);
+    for (auto n=olon_x_offset; n < dim.x*dim.y; n+=dim.x) {
+	auto dist_lon=(data_array_value(gcoords.longitude.data_array,n+1,gcoords.longitude.ds.get())-data_array_value(gcoords.longitude.data_array,n,gcoords.longitude.ds.get()))*111.1*cos(data_array_value(gcoords.latitude.data_array,n,gcoords.latitude.ds.get())*DEGRAD);
+	auto dist_lat=(data_array_value(gcoords.latitude.data_array,n+1,gcoords.latitude.ds.get())-data_array_value(gcoords.latitude.data_array,n,gcoords.latitude.ds.get()))*111.1;
+	dist_x_list.emplace_back(sqrt(dist_lon*dist_lon+dist_lat*dist_lat));
+    }
+    def.dx=lround(std::accumulate(dist_x_list.begin(),dist_x_list.end(),0.)/dist_x_list.size());
+    def.stdparallel1=def.stdparallel2=-99.;
+    size_t first_dy_index=0;
+    for (size_t n=0; n < dist_x_list.size(); ++n) {
+	if (floatutils::myequalf(dist_x_list[n],def.dx,0.001)) {
+	  auto tanlat=lround(data_array_value(gcoords.latitude.data_array,olon_x_offset+n*dim.x,gcoords.latitude.ds.get()));
+	  if (def.stdparallel1 < -90.) {
+	    def.stdparallel1=tanlat;
+	    first_dy_index=olon_x_offset+n*dim.x;
+	  }
+	  else if (def.stdparallel2 < -90.) {
+	    if (tanlat != def.stdparallel1) {
+		def.stdparallel2=tanlat;
+	    }
+	  }
+	  else if (tanlat != def.stdparallel2) {
+	    if (gatherxml::verbose_operation) {
+		std::cout << "...check for a non-centered projection failed. Too many tangent latitudes." << std::endl;
+	    }
+	    return false;
+	  }
+	}
+    }
+    if (def.stdparallel1 < -90.) {
+	if (gatherxml::verbose_operation) {
+	  std::cout << "...check for a non-centered projection failed. No tangent latitude could be identified." << std::endl;
+	}
+	return false;
+    }
+    else if (def.stdparallel2 < -90.) {
+	def.stdparallel2=def.stdparallel1;
+    }
+    def.llatitude=def.stdparallel1;
+    if (def.llatitude >= 0.) {
+	def.projection_flag=0;
+    }
+    else {
+	def.projection_flag=1;
+    }
+    auto dist_lon=(data_array_value(gcoords.longitude.data_array,first_dy_index,gcoords.longitude.ds.get())-data_array_value(gcoords.longitude.data_array,first_dy_index-dim.x,gcoords.longitude.ds.get()))*111.1*cos(data_array_value(gcoords.latitude.data_array,first_dy_index-dim.x,gcoords.latitude.ds.get())*DEGRAD);
+    auto dist_lat=(data_array_value(gcoords.latitude.data_array,first_dy_index,gcoords.latitude.ds.get())-data_array_value(gcoords.latitude.data_array,first_dy_index-dim.x,gcoords.latitude.ds.get()))*111.1;
+    def.dy=lround(sqrt(dist_lon*dist_lon+dist_lat*dist_lat));
+    if (gatherxml::verbose_operation) {
+	std::cout << "...confirmed a non-centered Lambert-Conformal projection." << std::endl;
+    }
+    return true;
+  }
+  if (gatherxml::verbose_operation) {
+    std::cout << "...check for a Lambert-Conformal projection finished. Not an LC projection." << std::endl;
+  }
+  return false;
+}
+
 void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
 {
   static const std::string THIS_FUNC=__func__;
@@ -2267,7 +2451,7 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
   }
   auto dim_vars=istream.datasets_with_attribute("CLASS=DIMENSION_SCALE");
   if (gatherxml::verbose_operation) {
-    std::cout << "...found " << dim_vars.size() << " 'DIMENSION_SCALE' variables..." << std::endl;
+    std::cout << "...found " << dim_vars.size() << " 'DIMENSION_SCALE' variables:" << std::endl;
   }
   std::string climo_bounds_id;
   GridCoordinates gcoords;
@@ -2283,28 +2467,27 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
     }
     metautils::StringEntry se;
     auto attr_it=dset_ptr->attributes.find("units");
-    auto& attribute_value=attr_it->second;
-    if (attr_it != dset_ptr->attributes.end() && (attribute_value._class_ == 3 || (attribute_value._class_ == 9 && attribute_value.vlen.class_ == 3))) {
+    if (attr_it != dset_ptr->attributes.end() && (attr_it->second._class_ == 3 || (attr_it->second._class_ == 9 && attr_it->second.vlen.class_ == 3))) {
 	std::string units_value;
-	if (attribute_value._class_ == 3) {
-	  units_value=reinterpret_cast<char *>(attribute_value.array);
+	if (attr_it->second._class_ == 3) {
+	  units_value=reinterpret_cast<char *>(attr_it->second.array);
 	}
 	else {
-	  int len=(attribute_value.vlen.buffer[0] << 24)+(attribute_value.vlen.buffer[1] << 16)+(attribute_value.vlen.buffer[2] << 8)+attribute_value.vlen.buffer[3];
-	  units_value=std::string(reinterpret_cast<char *>(&attribute_value.vlen.buffer[4]),len);
+	  int len=(attr_it->second.vlen.buffer[0] << 24)+(attr_it->second.vlen.buffer[1] << 16)+(attr_it->second.vlen.buffer[2] << 8)+attr_it->second.vlen.buffer[3];
+	  units_value=std::string(reinterpret_cast<char *>(&attr_it->second.vlen.buffer[4]),len);
 	}
 	if (gatherxml::verbose_operation) {
 	  std::cout << "    units attribute: '" << units_value << "'" << std::endl;
 	}
 	std::string standard_name_value;
 	attr_it=dset_ptr->attributes.find("standard_name");
-	if (attr_it != dset_ptr->attributes.end() && (attribute_value._class_ == 3 || (attribute_value._class_ == 9 && attribute_value.vlen.class_ == 3))) {
-	  if (attribute_value._class_ == 3) {
-	    standard_name_value=reinterpret_cast<char *>(attribute_value.array);
+	if (attr_it != dset_ptr->attributes.end() && (attr_it->second._class_ == 3 || (attr_it->second._class_ == 9 && attr_it->second.vlen.class_ == 3))) {
+	  if (attr_it->second._class_ == 3) {
+	    standard_name_value=reinterpret_cast<char *>(attr_it->second.array);
 	  }
 	  else {
-	    int len=(attribute_value.vlen.buffer[0] << 24)+(attribute_value.vlen.buffer[1] << 16)+(attribute_value.vlen.buffer[2] << 8)+attribute_value.vlen.buffer[3];
-	    standard_name_value=std::string(reinterpret_cast<char *>(&attribute_value.vlen.buffer[4]),len);
+	    int len=(attr_it->second.vlen.buffer[0] << 24)+(attr_it->second.vlen.buffer[1] << 16)+(attr_it->second.vlen.buffer[2] << 8)+attr_it->second.vlen.buffer[3];
+	    standard_name_value=std::string(reinterpret_cast<char *>(&attr_it->second.vlen.buffer[4]),len);
 	  }
 	}
 	if (std::regex_search(units_value,std::regex("since"))) {
@@ -2455,8 +2638,7 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
 	auto& var_name=v.first;
 	auto& dset_ptr=v.second;
 	auto attr_it=dset_ptr->attributes.find("DIMENSION_LIST");
-	auto& attribute_value=attr_it->second;
-	if (attr_it != dset_ptr->attributes.end() && attribute_value.dim_sizes.size() == 1 && attribute_value.dim_sizes[0] == 1 && attribute_value._class_ == 9) {
+	if (attr_it != dset_ptr->attributes.end() && attr_it->second.dim_sizes.size() == 1 && attr_it->second.dim_sizes[0] == 1 && attr_it->second._class_ == 9) {
 	  level_info.ID.emplace_back(var_name);
 	  if (gatherxml::verbose_operation) {
 	    std::cout << "   ...found '" << var_name << "'" << std::endl;
@@ -2471,22 +2653,21 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
 	auto& var_name=v.first;
 	auto& dset_ptr=v.second;
 	auto attr_it=dset_ptr->attributes.find("DIMENSION_LIST");
-	auto& attribute_value=attr_it->second;
-	if (attr_it != dset_ptr->attributes.end() && attribute_value.dim_sizes.size() == 1 && attribute_value.dim_sizes[0] == 1 && attribute_value._class_ == 9) {
+	if (attr_it != dset_ptr->attributes.end() && attr_it->second.dim_sizes.size() == 1 && attr_it->second.dim_sizes[0] == 1 && attr_it->second._class_ == 9) {
 	  level_info.ID.emplace_back(var_name);
 	  if (gatherxml::verbose_operation) {
 	    std::cout << "   ...found '" << var_name << "'" << std::endl;
 	  }
 	  attr_it=dset_ptr->attributes.find("description");
-	  if (attr_it != dset_ptr->attributes.end() && attribute_value._class_ == 3) {
-	    level_info.description.emplace_back(reinterpret_cast<char *>(attribute_value.array));
+	  if (attr_it != dset_ptr->attributes.end() && attr_it->second._class_ == 3) {
+	    level_info.description.emplace_back(reinterpret_cast<char *>(attr_it->second.array));
 	  }
 	  else {
 	    level_info.description.emplace_back("");
 	  }
 	  attr_it=dset_ptr->attributes.find("units");
-	  if (attr_it != dset_ptr->attributes.end() && attribute_value._class_ == 3) {
-	    level_info.units.emplace_back(reinterpret_cast<char *>(attribute_value.array));
+	  if (attr_it != dset_ptr->attributes.end() && attr_it->second._class_ == 3) {
+	    level_info.units.emplace_back(reinterpret_cast<char *>(attr_it->second.array));
 	  }
 	  else {
 	    level_info.units.emplace_back("");
@@ -2695,11 +2876,10 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
 	    if (rtp_it[0] != rtp_end && rtp_it[1] != rtp_end && rtp_it[0]->second == rtp_it[1]->second && rtp_it[2] != rtp_end && rtp_it[3] != rtp_end && rtp_it[2]->second == rtp_it[3]->second) {
 		auto ds=istream.dataset("/"+rtp_it[0]->second);
 		auto attr_it=ds->attributes.find("NAME");
-		auto& attribute_value=attr_it->second;
-		if (ds == nullptr || attr_it == ds->attributes.end() || attribute_value._class_ != 3) {
+		if (ds == nullptr || attr_it == ds->attributes.end() || attr_it->second._class_ != 3) {
 		  metautils::log_error("(1)unable to determine grid definition from '"+lat_ids[n]+"' and '"+lon_ids[n]+"'","hdf2xml",USER);
 		}
-		auto attr_parts=strutils::split(std::string(reinterpret_cast<char *>(attribute_value.array)));
+		auto attr_parts=strutils::split(std::string(reinterpret_cast<char *>(attr_it->second.array)));
 		if (attr_parts.size() == 11) {
 // netCDF dimension - the convention is:
 // "This is a netCDF dimension but not a netCDF variable.xxxxxxxxxx"
@@ -2711,10 +2891,10 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
 		}
 		ds=istream.dataset("/"+rtp_it[2]->second);
 		attr_it=ds->attributes.find("NAME");
-		if (ds == nullptr || attr_it == ds->attributes.end() || attribute_value._class_ != 3) {
+		if (ds == nullptr || attr_it == ds->attributes.end() || attr_it->second._class_ != 3) {
 		  metautils::log_error("(3)unable to determine grid definition from '"+lat_ids[n]+"' and '"+lon_ids[n]+"'","hdf2xml",USER);
 		}
-		attr_parts=strutils::split(std::string(reinterpret_cast<char *>(attribute_value.array)));
+		attr_parts=strutils::split(std::string(reinterpret_cast<char *>(attr_it->second.array)));
 		if (attr_parts.size() == 11) {
 // netCDF dimension
 // "This is a netCDF dimension but not a netCDF variable.xxxxxxxxxx"
@@ -2728,115 +2908,11 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
 	    else {
 		metautils::log_error("(5)unable to determine grid definition from '"+lat_ids[n]+"' and '"+lon_ids[n]+"'","hdf2xml",USER);
 	    }
-	    auto center_x=dim.x/2;
-	    auto center_y=dim.y/2;
-	    auto xm=center_x-1;
-	    auto ym=center_y-1;
-	    if (floatutils::myequalf(
-                  data_array_value(gcoords.latitude.data_array,ym*dim.x+xm,gcoords.latitude.ds.get()),
-                  data_array_value(gcoords.latitude.data_array,center_y*dim.x+xm,gcoords.latitude.ds.get()),
-                  0.00001
-                ) &&
-                floatutils::myequalf(
-                  data_array_value(gcoords.latitude.data_array,center_y*dim.x+xm,gcoords.latitude.ds.get()),
-                  data_array_value(gcoords.latitude.data_array,center_y*dim.x+center_x,gcoords.latitude.ds.get()),
-                  0.00001
-                ) &&
-                floatutils::myequalf(
-                  data_array_value(gcoords.latitude.data_array,center_y*dim.x+center_x,gcoords.latitude.ds.get()),
-                  data_array_value(gcoords.latitude.data_array,ym*dim.x+center_x,gcoords.latitude.ds.get()),
-                  0.00001
-                ) &&
-                floatutils::myequalf(
-                  fabs(data_array_value(gcoords.longitude.data_array,ym*dim.x+xm,gcoords.longitude.ds.get()))+fabs(data_array_value(gcoords.longitude.data_array,center_y*dim.x+xm,gcoords.longitude.ds.get()))+fabs(data_array_value(gcoords.longitude.data_array,center_y*dim.x+center_x,gcoords.longitude.ds.get()))+fabs(data_array_value(gcoords.longitude.data_array,ym*dim.x+center_x,gcoords.longitude.ds.get())),
-                  360.,
-                  0.00001
-                )
-              ) {
-		def.type=Grid::polarStereographicType;
-		if (data_array_value(gcoords.latitude.data_array,ym*dim.x+xm,gcoords.latitude.ds.get()) >= 0.) {
-		  def.projection_flag=0;
-		  def.llatitude=60.;
-		}
-		else {
-		  def.projection_flag=1;
-		  def.llatitude=-60.;
-		}
-		def.olongitude=lroundf(data_array_value(gcoords.longitude.data_array,ym*dim.x+xm,gcoords.longitude.ds.get())+45.);
-		if (def.olongitude > 180.) {
-		  def.olongitude-=360.;
-		}
-// look for dx and dy at the 60-degree parallel
- 		double min_fabs=999.,f;
-		int min_m=0;
-		for (size_t m=0; m < gcoords.latitude.data_array.num_values; ++m) {
-		  if ( (f=fabs(def.llatitude-data_array_value(gcoords.latitude.data_array,m,gcoords.latitude.ds.get()))) < min_fabs) {
-			min_fabs=f;
-			min_m=m;
-		  }
-		}
-		double rad=3.141592654/180.;
-// great circle formula:
-// //  theta=2*arcsin[ sqrt( sin^2(delta_phi/2) + cos(phi_1)*cos(phi_2)*sin^2(delta_lambda/2) ) ]
-// //  phi_1 and phi_2 are latitudes
-// //  lambda_1 and lambda_2 are longitudes
-// //  dist = 6372.8 * theta
-// //  6372.8 is radius of Earth in km
-		def.dx=lroundf(
-                         asin(
-                           sqrt(
-                             sin(fabs(data_array_value(gcoords.latitude.data_array,min_m,gcoords.latitude.ds.get())-data_array_value(gcoords.latitude.data_array,min_m+1,gcoords.latitude.ds.get()))/2.*rad)*
-                             sin(fabs(data_array_value(gcoords.latitude.data_array,min_m,gcoords.latitude.ds.get())-data_array_value(gcoords.latitude.data_array,min_m+1,gcoords.latitude.ds.get()))/2.*rad)+
-                             sin(fabs(data_array_value(gcoords.longitude.data_array,min_m,gcoords.longitude.ds.get())-data_array_value(gcoords.longitude.data_array,min_m+1,gcoords.longitude.ds.get()))/2.*rad)*
-                             sin(fabs(data_array_value(gcoords.longitude.data_array,min_m,gcoords.longitude.ds.get())-data_array_value(gcoords.longitude.data_array,min_m+1,gcoords.longitude.ds.get()))/2.*rad)*
-                             cos(data_array_value(gcoords.latitude.data_array,min_m,gcoords.latitude.ds.get())*rad)*
-                             cos(data_array_value(gcoords.latitude.data_array,min_m+1,gcoords.latitude.ds.get())*rad)
-                           )
-                         )*12745.6);
-		def.dy=lroundf(
-                         asin(
-                           sqrt(
-                             sin(fabs(data_array_value(gcoords.latitude.data_array,min_m,gcoords.latitude.ds.get())-data_array_value(gcoords.latitude.data_array,min_m+dim.x,gcoords.latitude.ds.get()))/2.*rad)*
-                             sin(fabs(data_array_value(gcoords.latitude.data_array,min_m,gcoords.latitude.ds.get())-data_array_value(gcoords.latitude.data_array,min_m+dim.x,gcoords.latitude.ds.get()))/2.*rad)+
-                             sin(fabs(data_array_value(gcoords.longitude.data_array,min_m,gcoords.longitude.ds.get())-data_array_value(gcoords.longitude.data_array,min_m+dim.x,gcoords.longitude.ds.get()))/2.*rad)*
-                             sin(fabs(data_array_value(gcoords.longitude.data_array,min_m,gcoords.longitude.ds.get())-data_array_value(gcoords.longitude.data_array,min_m+dim.x,gcoords.longitude.ds.get()))/2.*rad)*
-                             cos(data_array_value(gcoords.latitude.data_array,min_m,gcoords.latitude.ds.get())*rad)*
-                             cos(data_array_value(gcoords.latitude.data_array,min_m+dim.x,gcoords.latitude.ds.get())*rad)
-                           )
-                         )*12745.6);
+	    auto determined_grid_type=grid_is_polar_stereographic(gcoords,dim,def);
+	    if (!determined_grid_type) {
+		determined_grid_type=grid_is_lambert_conformal(gcoords,dim,def);
 	    }
-	    else if ((dim.x % 2) == 1 && floatutils::myequalf(data_array_value(gcoords.longitude.data_array,ym*gcoords.longitude.data_array.dimensions[1]+center_x,gcoords.longitude.ds.get()),data_array_value(gcoords.longitude.data_array,(center_y+1)*gcoords.longitude.data_array.dimensions[1]+center_x,gcoords.longitude.ds.get()),0.00001) && floatutils::myequalf(data_array_value(gcoords.latitude.data_array,center_y*gcoords.longitude.data_array.dimensions[1]+xm,gcoords.latitude.ds.get()),data_array_value(gcoords.latitude.data_array,center_y*gcoords.longitude.data_array.dimensions[1]+center_x+1,gcoords.latitude.ds.get()),0.00001)) {
-		def.type=Grid::lambertConformalType;
-		def.llatitude=def.stdparallel1=def.stdparallel2=lround(data_array_value(gcoords.latitude.data_array,center_y*gcoords.longitude.data_array.dimensions[1]+center_x,gcoords.latitude.ds.get()));
-		if (def.llatitude >= 0.) {
-		  def.projection_flag=0;
-		}
-		else {
-		  def.projection_flag=1;
-		}
-		def.olongitude=lround(data_array_value(gcoords.longitude.data_array,center_y*gcoords.longitude.data_array.dimensions[1]+center_x,gcoords.longitude.ds.get()));
-		def.dx=def.dy=lround(111.1*cos(data_array_value(gcoords.latitude.data_array,center_y*gcoords.longitude.data_array.dimensions[1]+center_x,gcoords.latitude.ds.get())*3.141592654/180.)*(data_array_value(gcoords.longitude.data_array,center_y*gcoords.longitude.data_array.dimensions[1]+center_x+1,gcoords.longitude.ds.get())-data_array_value(gcoords.longitude.data_array,center_y*gcoords.longitude.data_array.dimensions[1]+center_x,gcoords.longitude.ds.get())));
-	    }
-	    else if ((dim.x % 2) == 0 && floatutils::myequalf((data_array_value(gcoords.longitude.data_array,ym*gcoords.longitude.data_array.dimensions[1]+xm,gcoords.longitude.ds.get())+data_array_value(gcoords.longitude.data_array,ym*gcoords.longitude.data_array.dimensions[1]+center_x,gcoords.longitude.ds.get())),(data_array_value(gcoords.longitude.data_array,(center_y+1)*gcoords.longitude.data_array.dimensions[1]+xm,gcoords.longitude.ds.get())+data_array_value(gcoords.longitude.data_array,(center_y+1)*gcoords.longitude.data_array.dimensions[1]+center_x,gcoords.longitude.ds.get())),0.00001) && floatutils::myequalf(data_array_value(gcoords.latitude.data_array,center_y*gcoords.longitude.data_array.dimensions[1]+xm,gcoords.latitude.ds.get()),data_array_value(gcoords.latitude.data_array,center_y*gcoords.longitude.data_array.dimensions[1]+center_x,gcoords.latitude.ds.get()))) {
-		def.type=Grid::lambertConformalType;
-		def.llatitude=def.stdparallel1=def.stdparallel2=lround(data_array_value(gcoords.latitude.data_array,center_y*gcoords.longitude.data_array.dimensions[1]+center_x,gcoords.latitude.ds.get()));
-		if (def.llatitude >= 0.) {
-		  def.projection_flag=0;
-		}
-		else {
-		  def.projection_flag=1;
-		}
-		def.olongitude=lround((data_array_value(gcoords.longitude.data_array,center_y*gcoords.longitude.data_array.dimensions[1]+xm,gcoords.longitude.ds.get())+data_array_value(gcoords.longitude.data_array,center_y*gcoords.longitude.data_array.dimensions[1]+center_x,gcoords.longitude.ds.get()))/2.);
-		def.dx=def.dy=lround(111.1*cos(data_array_value(gcoords.latitude.data_array,center_y*gcoords.longitude.data_array.dimensions[1]+center_x-1,gcoords.latitude.ds.get())*3.141592654/180.)*(data_array_value(gcoords.longitude.data_array,center_y*gcoords.longitude.data_array.dimensions[1]+center_x,gcoords.longitude.ds.get())-data_array_value(gcoords.longitude.data_array,center_y*gcoords.longitude.data_array.dimensions[1]+center_x-1,gcoords.longitude.ds.get())));
-	    }
-	    else {
-std::cerr.precision(10);
-std::cerr << data_array_value(gcoords.longitude.data_array,ym*gcoords.longitude.data_array.dimensions[1]+center_x,gcoords.longitude.ds.get()) << std::endl;
-std::cerr << data_array_value(gcoords.longitude.data_array,(center_y+1)*gcoords.longitude.data_array.dimensions[1]+center_x,gcoords.longitude.ds.get()) << std::endl;
-std::cerr << floatutils::myequalf(data_array_value(gcoords.longitude.data_array,ym*gcoords.longitude.data_array.dimensions[1]+center_x,gcoords.longitude.ds.get()),data_array_value(gcoords.longitude.data_array,(center_y+1)*gcoords.longitude.data_array.dimensions[1]+center_x,gcoords.longitude.ds.get()),0.00001) << std::endl;
-std::cerr << data_array_value(gcoords.latitude.data_array,center_y*gcoords.longitude.data_array.dimensions[1]+xm,gcoords.latitude.ds.get()) << " " << center_y << " " << gcoords.longitude.data_array.dimensions[1] << " " << xm << std::endl;
-std::cerr << data_array_value(gcoords.latitude.data_array,center_y*gcoords.longitude.data_array.dimensions[1]+center_x+1,gcoords.latitude.ds.get()) << " " << center_y << " " << gcoords.longitude.data_array.dimensions[1] << " " << center_x+1 << std::endl;
-std::cerr << floatutils::myequalf(data_array_value(gcoords.latitude.data_array,center_y*gcoords.longitude.data_array.dimensions[1]+xm,gcoords.latitude.ds.get()),data_array_value(gcoords.latitude.data_array,center_y*gcoords.longitude.data_array.dimensions[1]+center_x+1,gcoords.latitude.ds.get()),0.00001) << std::endl;
+	    if (!determined_grid_type ) {
 		metautils::log_error("(6)unable to determine grid definition from '"+lat_ids[n]+"' and '"+lon_ids[n]+"'","hdf2xml",USER);
 	    }
 	  }
@@ -2896,7 +2972,7 @@ std::cerr << floatutils::myequalf(data_array_value(gcoords.latitude.data_array,c
 	    add_gridded_lat_lon_keys(grid_entry_set,dim,def,tre,tr_time_data,gcoords,istream);
 	    for (const auto& grid_entry : grid_entry_set) {
 		if (gatherxml::verbose_operation) {
-		  std::cout << "  processing grid entry: " << grid_entry << std::endl;
+		  std::cout << "...processing grid entry: " << grid_entry << " ..." << std::endl;
 		}
 		grid_entry_ptr->key=grid_entry;
 		auto key_parts=strutils::split(grid_entry_ptr->key,"<!>");
