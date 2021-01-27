@@ -292,8 +292,8 @@ extern void write(my::map<ScanLineEntry>& scan_line_table,std::list<std::string>
 
 } // end namespace gatherxml::markup::SatML
 
-extern void write_finalize(bool is_mss_file,std::string filename,std::string ext,std::string tdir_name,std::ofstream& ofs,std::string caller,std::string user);
-extern void write_initialize(bool& is_mss_file,std::string& filename,std::string ext,std::string tdir_name,std::ofstream& ofs,std::string caller,std::string user);
+extern void write_finalize(std::string filename,std::string ext,std::string tdir_name,std::ofstream& ofs,std::string caller,std::string user);
+extern void write_initialize(std::string& filename,std::string ext,std::string tdir_name,std::ofstream& ofs,std::string caller,std::string user);
 
 } // end namespace gatherxml::markup
 
