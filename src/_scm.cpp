@@ -98,6 +98,8 @@ struct StringEntry {
   std::string key;
 };
 
+const std::string THIS_UTILITY="scm";
+
 void parse_args(const char ARG_DELIMITER)
 {
   auto args=strutils::split(metautils::args.args_string,std::string(1,ARG_DELIMITER));
@@ -105,7 +107,7 @@ void parse_args(const char ARG_DELIMITER)
     if (strutils::to_lower(args[n]) == "-wa") {
 // need strutils::to_lower() because dsarch often uses -WA
 	if (!local_args.file.empty()) {
-	  std::cerr << "Error: specify only one of -a or -wa or -f or -wf" << std::endl;
+	  std::cerr << THIS_UTILITY << ": specify only one of -wa or -wf" << std::endl;
 	  exit(1);
 	}
 	else {
@@ -125,7 +127,7 @@ void parse_args(const char ARG_DELIMITER)
     }
     else if (args[n] == "-wf") {
 	if (local_args.summarize_all) {
-	  std::cerr << "Error: specify only one of -a or -wa or -f or -wf" << std::endl;
+	  std::cerr << THIS_UTILITY << ": specify only one of -wa or -wf" << std::endl;
 	  exit(1);
 	}
 	else {
@@ -134,7 +136,7 @@ void parse_args(const char ARG_DELIMITER)
 	    local_args.is_web_file=true;
 	  }
 	  else {
-	    std::cerr << "Error: the -wf flag requires a file name" << std::endl;
+	    std::cerr << THIS_UTILITY << ": the -wf flag requires a file name" << std::endl;
 	    exit(1);
 	  }
 	}
@@ -182,16 +184,16 @@ void parse_args(const char ARG_DELIMITER)
 	local_args.verbose=true;
     }
     else {
-	std::cerr << "Error: don't understand argument " << args[n] << std::endl;
+	std::cerr << THIS_UTILITY << ": don't understand argument " << args[n] << std::endl;
 	exit(1);
     }
   }
   if (metautils::args.dsnum.empty()) {
-    std::cerr << "Error: no dataset number specified" << std::endl;
+    std::cerr << THIS_UTILITY << ": no dataset number specified" << std::endl;
     exit(1);
   }
   if (!local_args.summarize_all && !local_args.is_hpss_file && !local_args.is_web_file && !local_args.refresh_web && !local_args.refresh_inv) {
-    std::cerr << "Exiting - nothing to do" << std::endl;
+    std::cerr << "Terminating " << THIS_UTILITY << " - nothing to do" << std::endl;
     exit(1);
   }
   if (local_args.update_graphics && !local_args.file.empty() && !std::regex_search(local_args.file,std::regex("(Ob|Fix)ML$"))) {
@@ -341,7 +343,7 @@ void summarize_grml()
     fname.name=e.attribute_value("uri");
     if (std::regex_search(fname.name,std::regex("^file://MSS:/FS/DECS"))) {
 delete_temporary_directory();
-std::cerr << "Terminating - scm no longer works on HPSS files" << std::endl;
+std::cerr << "Terminating - " << THIS_UTILITY << " no longer works on HPSS files" << std::endl;
 exit(1);
     }
     else if (std::regex_search(fname.name,std::regex("^http(s){0,1}://rda\\.ucar\\.edu")) || std::regex_search(fname.name,std::regex("^http://dss\\.ucar\\.edu"))) {
@@ -1553,7 +1555,7 @@ void summarize_obml(std::list<KMLData>& kml_list)
     fname.name=e.attribute_value("uri");
     if (std::regex_search(fname.name,std::regex("^file://MSS:/FS/DECS"))) {
 delete_temporary_directory();
-std::cerr << "Terminating - scm no longer works on HPSS files" << std::endl;
+std::cerr << "Terminating - " << THIS_UTILITY << " no longer works on HPSS files" << std::endl;
 exit(1);
     }
     else if (std::regex_search(fname.name,std::regex("^http(s){0,1}://rda\\.ucar\\.edu"))) {
@@ -1873,6 +1875,7 @@ exit(1);
 
 void summarize_satml()
 {
+  std::string THIS_FUNC=__func__;
   XMLDocument xdoc;
   XMLElement e;
   std::list<XMLElement> satellite_list,image_list,swath_data_list;
@@ -1889,7 +1892,7 @@ void summarize_satml()
   for (auto& fname : satml_file_list) {
     sdum=unixutils::remote_web_file("https://rda.ucar.edu"+fname.path,temp_dir.name());
     if (!xdoc.open(sdum)) {
-	metautils::log_error("summarize_satml() returned error: unable to open "+fname.path,"scm",USER);
+	metautils::log_error(THIS_FUNC+"() returned error: unable to open "+fname.path,"scm",USER);
     }
     e=xdoc.element("SatML");
     fname.name=e.attribute_value("uri");
@@ -1899,16 +1902,16 @@ void summarize_satml()
 	local_args.summarized_hpss_file=true;
 	MySQL::Server server_d(metautils::directives.database_server,metautils::directives.rdadb_username,metautils::directives.rdadb_password,"dssdb");
 	if (!server_d) {
-	  metautils::log_error("summarize_satml() could not connect to mysql server - error: "+server_d.error(),"scm",USER);
+	  metautils::log_error(THIS_FUNC+"() could not connect to mysql server - error: "+server_d.error(),"scm",USER);
 	}
 	if (server_d.update("mssfile","meta_link = 'Sat'","dsid = 'ds"+metautils::args.dsnum+"' and mssfile = '"+fname.name+"'") < 0) {
-	  metautils::log_error("summarize_satml() returned error: "+server.error(),"scm",USER);
+	  metautils::log_error(THIS_FUNC+"() returned error: "+server.error(),"scm",USER);
 	}
 	server_d.disconnect();
     }
     entry.key=e.attribute_value("format");
     if (entry.key.empty()) {
-	std::cerr << "Error: missing SatML format attribute" << std::endl;
+	std::cerr << THIS_UTILITY << ": " << THIS_FUNC << "(): missing SatML format attribute" << std::endl;
 	exit(1);
     }
     if (!format_table.found(entry.key,entry)) {
@@ -1935,7 +1938,7 @@ void summarize_satml()
 	    if (strutils::contains(error,"doesn't exist")) {
 		std::string result;
 		if (server.command("create table "+files_table2_name+" like "+files_template_name,result) < 0) {
-		  metautils::log_error("summarize_satml() returned error: "+server.error()+" while creating table "+files_table2_name,"scm",USER);
+		  metautils::log_error(THIS_FUNC+"() returned error: "+server.error()+" while creating table "+files_table2_name,"scm",USER);
 		}
 	    }
 	    else {
@@ -1944,17 +1947,17 @@ void summarize_satml()
 	  }
 	  if (query.num_rows() == 0) {
 	    if (server.insert(files_table2_name,"mssID,format_code,num_products,start_date,end_date,product,uflag","'"+entry.key+"',"+format_code+",0,0,0,'','"+strutils::strand(5)+"'","") < 0) {
-		metautils::log_error("summarize_satml() returned error: "+server.error()+" when trying to insert '"+entry.key+"',"+format_code+",0,0,0,'' into "+files_table2_name,"scm",USER);
+		metautils::log_error(THIS_FUNC+"() returned error: "+server.error()+" when trying to insert '"+entry.key+"',"+format_code+",0,0,0,'' into "+files_table2_name,"scm",USER);
 	    }
 	    query.submit(server);
 	    if (query.num_rows() == 0) {
-		metautils::log_error("summarize_satml() returned error: unable to retrieve code from "+files_table2_name+" for value "+entry.key,"scm",USER);
+		metautils::log_error(THIS_FUNC+"() returned error: unable to retrieve code from "+files_table2_name+" for value "+entry.key,"scm",USER);
 	    }
 	  }
 	  else {
 	    query.fetch_row(row);
 	    if (server.update(files_table2_name,"format_code = "+format_code,"code = "+row[0]) < 0) {
-		metautils::log_error("summarize_satml() returned error: "+server.error()+" while updating "+files_table2_name+" with format_code and code","scm",USER);
+		metautils::log_error(THIS_FUNC+"() returned error: "+server.error()+" while updating "+files_table2_name+" with format_code and code","scm",USER);
 	    }
 	    query.rewind();
 	  }
@@ -2002,7 +2005,7 @@ void summarize_satml()
 	strutils::replace_all(end,"+0000","");
 	update_string="num_products="+strutils::itos(num_products)+",start_date="+start+",end_date="+end+",product='"+prod_type+"'";
 	if (server.update(files_table2_name,update_string+",uflag='"+strutils::strand(5)+"'","code = "+file_id_code) < 0) {
-	  metautils::log_error("summarize_satml() returned error: "+server.error()+" while updating "+files_table2_name+" with '"+update_string+"'","scm",USER);
+	  metautils::log_error(THIS_FUNC+"() returned error: "+server.error()+" while updating "+files_table2_name+" with '"+update_string+"'","scm",USER);
 	}
     }
     xdoc.close();
@@ -2011,7 +2014,7 @@ void summarize_satml()
   if (server.insert("search.data_types","'satellite','','SatML','"+metautils::args.dsnum+"'") < 0) {
     error=server.error();
     if (!strutils::contains(error,"Duplicate entry")) {
-	std::cerr << error << std::endl;
+	std::cerr << THIS_UTILITY << ": " << THIS_FUNC << "(): " << error << std::endl;
 	exit(1);
     }
   }
@@ -2069,7 +2072,7 @@ void summarize_fixml()
     fname.name=e.attribute_value("uri");
     if (std::regex_search(fname.name,std::regex("^file://MSS:/FS/DECS"))) {
 delete_temporary_directory();
-std::cerr << "Terminating - scm no longer works on HPSS files" << std::endl;
+std::cerr << "Terminating - " << THIS_UTILITY << " no longer works on HPSS files" << std::endl;
 exit(1);
     }
     else if (std::regex_search(fname.name,std::regex("^http(s){0,1}://rda\\.ucar\\.edu"))) {
@@ -2456,7 +2459,7 @@ int main(int argc,char **argv)
   MySQL::Row row;
 
   if (argc < 3) {
-    std::cerr << "usage: scm -d [ds]nnn.n [options...] {-a|-wa <type> | -f|-wf file | -rm|-rw|-ri <tindex|all>}" << std::endl;
+    std::cerr << "usage: " << THIS_UTILITY << " -d [ds]nnn.n [options...] {-a|-wa <type> | -f|-wf file | -rm|-rw|-ri <tindex|all>}" << std::endl;
     std::cerr << "\nrequired:" << std::endl;
     std::cerr << "-d nnn.n   specifies the dataset number" << std::endl;
     std::cerr << "\nrequired (choose one):" << std::endl;
