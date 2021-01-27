@@ -21,12 +21,7 @@ void close(std::string filename,TempDir **tdir,std::ofstream& ofs,std::string cm
   ofs.close();
   ofs.clear();
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
-  if (std::regex_search(metautils::args.path,std::regex("^/FS/DECS/"))) {
-    server.update(cmd_type+".ds"+strutils::substitute(metautils::args.dsnum,".","")+"_primaries2","inv = 'Y'","mssID = '"+strutils::substitute(filename,"%","/")+"'");
-  }
-  else {
-    server.update("W"+cmd_type+".ds"+strutils::substitute(metautils::args.dsnum,".","")+"_webfiles2","inv = 'Y'","webID = '"+strutils::substitute(filename,"%","/")+"'");
-  }
+  server.update("W"+cmd_type+".ds"+strutils::substitute(metautils::args.dsnum,".","")+"_webfiles2","inv = 'Y'","webID = '"+strutils::substitute(filename,"%","/")+"'");
   if (metautils::args.inventory_only) {
     metautils::args.filename=filename;
   }
@@ -57,13 +52,7 @@ void open(std::string& filename,TempDir **tdir,std::ofstream& ofs,std::string cm
   if (!std::regex_search(metautils::args.path,std::regex("^https://rda.ucar.edu"))) {
     return;
   }
-  filename=metautils::args.path+"/"+metautils::args.filename;
-  if (std::regex_search(metautils::args.path,std::regex("^/FS/DECS/"))) {
-    strutils::replace_all(filename,"/FS/DECS/","");
-  }
-  else {
-    filename=metautils::relative_web_filename(filename);
-  }
+  filename=metautils::relative_web_filename(metautils::args.path+"/"+metautils::args.filename);
   strutils::replace_all(filename,"/","%");
   if (*tdir == nullptr) {
     *tdir=new TempDir();
@@ -81,9 +70,10 @@ void open(std::string& filename,TempDir **tdir,std::ofstream& ofs,std::string cm
 
 void copy_ancillary_files(std::string file_type,std::string metadata_file,std::string file_type_name,std::string caller,std::string user)
 {
+  const std::string THIS_FUNC=__func__;
   std::stringstream output,error;
   if (unixutils::mysystem2("/bin/tcsh -c \"curl -s --data 'authKey=qGNlKijgo9DJ7MN&cmd=listfiles&value=/SERVER_ROOT/web/datasets/ds"+metautils::args.dsnum+"/metadata/fmd&pattern="+metadata_file+"' http://rda.ucar.edu/cgi-bin/dss/remoteRDAServerUtils\"",output,error) < 0) {
-    metautils::log_warning("copy_ancillary_files(): unable to copy "+file_type+" files - error: '"+error.str()+"'",caller,user);
+    metautils::log_warning(THIS_FUNC+"(): unable to copy "+file_type+" files - error: '"+error.str()+"'",caller,user);
   }
   else {
     auto oparts=strutils::split(output.str(),"\n");
@@ -92,12 +82,14 @@ void copy_ancillary_files(std::string file_type,std::string metadata_file,std::s
     TempFile itemp(metautils::directives.temp_path),otemp(metautils::directives.temp_path);
     TempDir tdir;
     if (!tdir.create(metautils::directives.temp_path)) {
-	metautils::log_error("copy_ancillary_files(): unable to create temporary directory",caller,user);
+	metautils::log_error(THIS_FUNC+"(): unable to create temporary directory",caller,user);
     }
+
 // create the directory tree in the temp directory
+    std::string metadata_path="metadata/wfmd";
     std::stringstream output,error;
-    if (unixutils::mysystem2("/bin/mkdir -p "+tdir.name()+"/metadata/wfmd",output,error) < 0) {
-	metautils::log_error("copy_ancillary_files(): unable to create a temporary directory - '"+error.str()+"'",caller,user);
+    if (unixutils::mysystem2("/bin/mkdir -p "+tdir.name()+"/"+metadata_path,output,error) < 0) {
+	metautils::log_error(THIS_FUNC+"(): unable to create a temporary directory - '"+error.str()+"'",caller,user);
     }
     for (size_t n=0; n < oparts.size(); ++n) {
 	if (strutils::has_ending(oparts[n],".xml")) {
@@ -107,7 +99,7 @@ void copy_ancillary_files(std::string file_type,std::string metadata_file,std::s
 	  std::ifstream ifs(itemp.name().c_str());
 	  if (ifs.is_open()) {
 	    auto fparts=strutils::split(oparts[n],file_type);
-	    std::ofstream ofs((tdir.name()+"/metadata/wfmd/"+file_type_name+"."+file_type+fparts[1]).c_str());
+	    std::ofstream ofs((tdir.name()+"/"+metadata_path+"/"+file_type_name+"."+file_type+fparts[1]).c_str());
 	    char line[32768];
 	    ifs.getline(line,32768);
 	    while (!ifs.eof()) {
@@ -123,72 +115,62 @@ void copy_ancillary_files(std::string file_type,std::string metadata_file,std::s
 	    ofs.clear();
 	  }
 	  else {
-	    metautils::log_warning("copy_ancillary_files(): unable to copy "+file_type+" file '"+oparts[n]+"'",caller,user);
+	    metautils::log_warning(THIS_FUNC+"(): unable to copy "+file_type+" file '"+oparts[n]+"'",caller,user);
 	  }
 	}
     }
     std::string herror;
-    if (unixutils::rdadata_sync(tdir.name(),"metadata/wfmd/","/data/web/datasets/ds"+metautils::args.dsnum,metautils::directives.rdadata_home,herror) < 0) {
-	metautils::log_warning("copy_ancillary_files(): unable to sync - rdadata_sync error(s): '"+herror+"'",caller,user);
+    if (unixutils::rdadata_sync(tdir.name(),metadata_path+"/","/data/web/datasets/ds"+metautils::args.dsnum,metautils::directives.rdadata_home,herror) < 0) {
+	metautils::log_warning(THIS_FUNC+"(): unable to sync - rdadata_sync error(s): '"+herror+"'",caller,user);
     }
   }
 }
 
 namespace markup {
 
-void write_finalize(bool is_mss_file,std::string filename,std::string ext,std::string tdir_name,std::ofstream& ofs,std::string caller,std::string user)
+void write_finalize(std::string filename,std::string ext,std::string tdir_name,std::ofstream& ofs,std::string caller,std::string user)
 {
+  const std::string THIS_FUNC=__func__;
   ofs.close();
   if (ext != "GrML") {
-    std::string relative_path="metadata/";
-    if (!is_mss_file) {
-	relative_path+="w";
-    }
-    relative_path+="fmd/";
-    system(("gzip "+tdir_name+"/"+relative_path+filename+"."+ext).c_str());
+    std::string metadata_path="metadata/wfmd";
+    system(("gzip "+tdir_name+"/"+metadata_path+"/"+filename+"."+ext).c_str());
     std::string error;
-    if (unixutils::rdadata_sync(tdir_name,relative_path,"/data/web/datasets/ds"+metautils::args.dsnum,metautils::directives.rdadata_home,error) < 0) {
-	metautils::log_warning("write_finalize(): unable to sync '"+filename+"."+ext+"' - rdadata_sync error(s): '"+error+"'",caller,user);
+    if (unixutils::rdadata_sync(tdir_name,metadata_path+"/","/data/web/datasets/ds"+metautils::args.dsnum,metautils::directives.rdadata_home,error) < 0) {
+	metautils::log_warning(THIS_FUNC+"(): unable to sync '"+filename+"."+ext+"' - rdadata_sync error(s): '"+error+"'",caller,user);
     }
   }
   metautils::args.filename=filename;
 }
 
-void write_initialize(bool& is_mss_file,std::string& filename,std::string ext,std::string tdir_name,std::ofstream& ofs,std::string caller,std::string user)
+void write_initialize(std::string& filename,std::string ext,std::string tdir_name,std::ofstream& ofs,std::string caller,std::string user)
 {
-  if (std::regex_search(metautils::args.path,std::regex("^https://rda.ucar.edu"))) {
-    is_mss_file=false;
-  }
+  const std::string THIS_FUNC=__func__;
   filename=metautils::args.path+"/"+metautils::args.filename;
-  if (is_mss_file) {
-    strutils::replace_all(filename,"/FS/DECS/","");
-    strutils::replace_all(filename,"/","%");
-    if (!metautils::args.member_name.empty()) {
-	filename+="..m.."+strutils::substitute(metautils::args.member_name,"/","%");
-    }
-  }
-  else {
-    filename=metautils::relative_web_filename(filename);
-    strutils::replace_all(filename,"/","%");
-  }
-  if (ext != "GrML") {
-    std::string relative_path="metadata/";
-    if (!is_mss_file) {
-	relative_path+="w";
-    }
-    relative_path+="fmd/";
-// create the directory tree in the temp directory
-    std::stringstream oss,ess;
-    if (unixutils::mysystem2("/bin/mkdir -p "+tdir_name+"/"+relative_path,oss,ess) < 0) {
-	metautils::log_error("write_initialize(): unable to create a temporary directory",caller,user);;
-    }
-    ofs.open(tdir_name+"/"+relative_path+filename+"."+ext);
-  }
-  else {
+  filename=metautils::relative_web_filename(filename);
+  strutils::replace_all(filename,"/","%");
+
+  if (ext == "GrML") {
+// gridded content metadata is not stored on the server; it goes into a temp
+//   directory for 'scm' and then gets deleted
+
     ofs.open(tdir_name+"/"+filename+"."+ext);
   }
+  else {
+// this section is for metadata that gets stored on the server
+
+    std::string metadata_path="metadata/wfmd";
+
+// create the directory tree in the temp directory
+    std::stringstream oss,ess;
+    if (unixutils::mysystem2("/bin/mkdir -p "+tdir_name+"/"+metadata_path+"/",oss,ess) < 0) {
+	metautils::log_error(THIS_FUNC+"(): unable to create a temporary directory",caller,user);;
+    }
+
+    ofs.open(tdir_name+"/"+metadata_path+"/"+filename+"."+ext);
+  }
   if (!ofs.is_open()) {
-    metautils::log_error("write_initialize(): unable to open file for output",caller,user);
+    metautils::log_error(THIS_FUNC+"(): unable to open file for output",caller,user);
   }
   ofs << "<?xml version=\"1.0\" ?>" << std::endl;
 }
@@ -203,9 +185,11 @@ void copy(std::string metadata_file,std::string URL,std::string caller,std::stri
   if (!tdir.create(metautils::directives.temp_path)) {
     metautils::log_error("copy(): unable to create temporary directory",caller,user);
   }
+
 // create the directory tree in the temp directory
+  std::string metadata_path="metadata/wfmd";
   std::stringstream output,error;
-  if (unixutils::mysystem2("/bin/mkdir -p "+tdir.name()+"/metadata/wfmd",output,error) < 0) {
+  if (unixutils::mysystem2("/bin/mkdir -p "+tdir.name()+"/"+metadata_path,output,error) < 0) {
     metautils::log_error("copy(): unable to create a temporary directory - '"+error.str()+"'",caller,user);
   }
   TempFile itemp(metautils::directives.temp_path);
@@ -214,7 +198,7 @@ void copy(std::string metadata_file,std::string URL,std::string caller,std::stri
   if (!ifs.is_open()) {
     metautils::log_error("copy(): unable to open input file",caller,user);
   }
-  std::ofstream ofs((tdir.name()+"/metadata/wfmd/"+FixML_name+".FixML").c_str());
+  std::ofstream ofs((tdir.name()+"/"+metadata_path+"/"+FixML_name+".FixML").c_str());
   if (!ofs.is_open()) {
     metautils::log_error("copy(): unable to open output file",caller,user);
   }
@@ -235,7 +219,7 @@ void copy(std::string metadata_file,std::string URL,std::string caller,std::stri
   ifs.close();
   ofs.close();
   std::string herror;
-  if (unixutils::rdadata_sync(tdir.name(),"metadata/wfmd/","/data/web/datasets/ds"+metautils::args.dsnum,metautils::directives.rdadata_home,herror) < 0) {
+  if (unixutils::rdadata_sync(tdir.name(),metadata_path+"/","/data/web/datasets/ds"+metautils::args.dsnum,metautils::directives.rdadata_home,herror) < 0) {
     metautils::log_warning("copy(): unable to sync '"+FixML_name+".FixML' - rdadata_sync error(s): '"+herror+"'",caller,user);
   }
   copy_ancillary_files("FixML",metadata_file,FixML_name,caller,user);
@@ -244,33 +228,25 @@ void copy(std::string metadata_file,std::string URL,std::string caller,std::stri
 
 void write(my::map<FeatureEntry>& feature_table,my::map<StageEntry>& stage_table,std::string caller,std::string user)
 {
+  const std::string THIS_FUNC=std::string("FixML::")+__func__;
   std::ofstream ofs,ofs2;
   TempFile tfile2(metautils::directives.temp_path);
-  std::string filename,cmd_type,sdum,output,error;
+  std::string filename,sdum,output,error;
   FeatureEntry fe;
   StageEntry se;
   ClassificationEntry ce;
   size_t n,m;
   MySQL::Server server;
-  bool is_mss_file=true;
 
   TempDir tdir;
   if (!tdir.create(metautils::directives.temp_path)) {
-    metautils::log_error("write(): unable to create temporary directory",caller,user);
+    metautils::log_error(THIS_FUNC+"(): unable to create temporary directory",caller,user);
   }
-  write_initialize(is_mss_file,filename,"FixML",tdir.name(),ofs,caller,user);
+  write_initialize(filename,"FixML",tdir.name(),ofs,caller,user);
   ofs << "<FixML xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"" << std::endl;
   ofs << "       xsi:schemaLocation=\"https://rda.ucar.edu/schemas" << std::endl;
   ofs << "                           https://rda.ucar.edu/schemas/FixML.xsd\"" << std::endl;
-  ofs << "       uri=\"";
-  if (is_mss_file) {
-    cmd_type="fmd";
-    ofs << "file://MSS:";
-  }
-  else {
-    cmd_type="wfmd";
-  }
-  ofs << metautils::args.path << "/" << metautils::args.filename << "\" format=\"";
+  ofs << "       uri=\"" << metautils::args.path << "/" << metautils::args.filename << "\" format=\"";
   if (metautils::args.data_format == "hurdat") {
     ofs << "HURDAT";
   }
@@ -337,7 +313,7 @@ void write(my::map<FeatureEntry>& feature_table,my::map<StageEntry>& stage_table
   }
   ofs << "</FixML>" << std::endl;
   for (const auto& key : stage_table.keys()) {
-    ofs2.open((tdir.name()+"/metadata/"+cmd_type+"/"+filename+".FixML."+key+".locations.xml").c_str());
+    ofs2.open((tdir.name()+"/metadata/wfmd/"+filename+".FixML."+key+".locations.xml").c_str());
     ofs2 << "<?xml version=\"1.0\" ?>" << std::endl;
     ofs2 << "<locations parent=\"" << filename << ".FixML\" stage=\"" << key << "\">" << std::endl;
     stage_table.found(key,se);
@@ -359,7 +335,7 @@ void write(my::map<FeatureEntry>& feature_table,my::map<StageEntry>& stage_table
     ofs2 << "</locations>" << std::endl;
     ofs2.close();
   }
-  write_finalize(is_mss_file,filename,"FixML",tdir.name(),ofs,caller,user);
+  write_finalize(filename,"FixML",tdir.name(),ofs,caller,user);
 }
 
 } // end namespace gatherxml::markup::FixML
@@ -595,26 +571,19 @@ void write_grid(std::string grid_entry_key,std::ofstream& ofs,std::string caller
 
 std::string write(my::map<GridEntry>& grid_table,std::string caller,std::string user)
 {
-  bool is_mss_file=true;
+  const std::string THIS_FUNC=std::string("GrML::")+__func__;
   std::string filename;
   TempDir tdir;
   if (!tdir.create(metautils::directives.temp_path)) {
-    metautils::log_error("write(): unable to create a temporary directory",caller,user);
+    metautils::log_error(THIS_FUNC+"(): unable to create a temporary directory",caller,user);
   }
   tdir.set_keep();
   std::ofstream ofs;
-  write_initialize(is_mss_file,filename,"GrML",tdir.name(),ofs,caller,user);
+  write_initialize(filename,"GrML",tdir.name(),ofs,caller,user);
   ofs << "<GrML xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"" << std::endl;
   ofs << "      xsi:schemaLocation=\"https://rda.ucar.edu/schemas" << std::endl;
   ofs << "                          https://rda.ucar.edu/schemas/GrML.xsd\"" << std::endl;
-  ofs << "      uri=\"";
-  if (is_mss_file) {
-    ofs << "file://MSS:";
-  }
-  ofs << metautils::args.path << "/" << metautils::args.filename;
-  if (!metautils::args.member_name.empty()) {
-    ofs << "..m.." << metautils::args.member_name;
-  }
+  ofs << "      uri=\"" << metautils::args.path << "/" << metautils::args.filename;
   ofs << "\" format=\"";
   if (metautils::args.data_format == "grib") {
     ofs << "WMO_GRIB1";
@@ -875,12 +844,12 @@ std::string write(my::map<GridEntry>& grid_table,std::string caller,std::string 
 	gentry.level_table.remove(r_key);
     }
     if (gentry.level_table.size() > 0) {
-	metautils::log_error("write(): level/layer table should be empty but table length is "+strutils::itos(gentry.level_table.size()),caller,user);
+	metautils::log_error(THIS_FUNC+"(): level/layer table should be empty but table length is "+strutils::itos(gentry.level_table.size()),caller,user);
     }
     ofs << "  </grid>" << std::endl;
   }
   ofs << "</GrML>" << std::endl;
-  write_finalize(is_mss_file,filename,"GrML",tdir.name(),ofs,caller,user);
+  write_finalize(filename,"GrML",tdir.name(),ofs,caller,user);
   return tdir.name();
 }
 
@@ -897,9 +866,11 @@ void copy(std::string metadata_file,std::string URL,std::string caller,std::stri
   if (!tdir.create(metautils::directives.temp_path)) {
     metautils::log_error("copy(): unable to create temporary directory",caller,user);
   }
+
 // create the directory tree in the temp directory
+  std::string metadata_path="metadata/wfmd";
   std::stringstream output,error;
-  if (unixutils::mysystem2("/bin/mkdir -p "+tdir.name()+"/metadata/wfmd",output,error) < 0) {
+  if (unixutils::mysystem2("/bin/mkdir -p "+tdir.name()+"/"+metadata_path,output,error) < 0) {
     metautils::log_error("copy(): unable to create a temporary directory - '"+error.str()+"'",caller,user);
   }
   unixutils::rdadata_sync_from("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/fmd/"+metadata_file,itemp.name(),metautils::directives.rdadata_home,error);
@@ -907,7 +878,7 @@ void copy(std::string metadata_file,std::string URL,std::string caller,std::stri
   if (!ifs.is_open()) {
     metautils::log_error("copy(): unable to open input file",caller,user);
   }
-  std::ofstream ofs((tdir.name()+"/metadata/wfmd/"+ObML_name+".ObML").c_str());
+  std::ofstream ofs((tdir.name()+"/"+metadata_path+"/"+ObML_name+".ObML").c_str());
   if (!ofs.is_open()) {
     metautils::log_error("copy(): unable to open output file",caller,user);
   }
@@ -928,7 +899,7 @@ void copy(std::string metadata_file,std::string URL,std::string caller,std::stri
   ifs.close();
   ofs.close();
   std::string herror;
-  if (unixutils::rdadata_sync(tdir.name(),"metadata/wfmd/","/data/web/datasets/ds"+metautils::args.dsnum,metautils::directives.rdadata_home,herror) < 0) {
+  if (unixutils::rdadata_sync(tdir.name(),metadata_path+"/","/data/web/datasets/ds"+metautils::args.dsnum,metautils::directives.rdadata_home,herror) < 0) {
     metautils::log_warning("copy(): unable to sync '"+ObML_name+".ObML' - rdadata_sync error(s): '"+herror+"'",caller,user);
   }
   copy_ancillary_files("ObML",metadata_file,ObML_name,caller,user);
@@ -937,9 +908,10 @@ void copy(std::string metadata_file,std::string URL,std::string caller,std::stri
 
 void write(ObservationData& obs_data,std::string caller,std::string user)
 {
+  const std::string THIS_FUNC=std::string("ObML::")+__func__;
   std::ofstream ofs,ofs2;
   TempFile tfile2(metautils::directives.temp_path);
-  std::string path,filename,cmd_type;
+  std::string path,filename;
   std::deque<std::string> sp;
   size_t numIDs,time,hr,min,sec;
   bitmap::longitudeBitmap::bitmap_gap biggest,current;
@@ -951,7 +923,6 @@ void write(ObservationData& obs_data,std::string caller,std::string user)
     DateTime start,end;
   } platform;
   DataTypeEntry de,de2;
-  bool is_mss_file=true;
   MySQL::Server server;
   std::string sdum,output,error;
   IDEntry ientry;
@@ -959,24 +930,13 @@ void write(ObservationData& obs_data,std::string caller,std::string user)
 
   TempDir tdir;
   if (!tdir.create(metautils::directives.temp_path)) {
-    metautils::log_error("write(): unable to create temporary directory",caller,user);
+    metautils::log_error(THIS_FUNC+"(): unable to create temporary directory",caller,user);
   }
-  write_initialize(is_mss_file,filename,"ObML",tdir.name(),ofs,caller,user);
+  write_initialize(filename,"ObML",tdir.name(),ofs,caller,user);
   ofs << "<ObML xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"" << std::endl;
   ofs << "       xsi:schemaLocation=\"https://rda.ucar.edu/schemas" << std::endl;
   ofs << "                           https://rda.ucar.edu/schemas/ObML.xsd\"" << std::endl;
-  ofs << "       uri=\"";
-  if (is_mss_file) {
-    cmd_type="fmd";
-    ofs << "file://MSS:" << metautils::args.path << "/" << metautils::args.filename;
-    if (!metautils::args.member_name.empty()) {
-	ofs << "..m.." << metautils::args.member_name;
-    }
-  }
-  else {
-    cmd_type="wfmd";
-    ofs << "file://web:" << metautils::relative_web_filename(metautils::args.path+"/"+metautils::args.filename);
-  }
+  ofs << "       uri=\"file://web:" << metautils::relative_web_filename(metautils::args.path+"/"+metautils::args.filename);
   ofs << "\" format=\"";
   if (metautils::args.data_format == "on29" || metautils::args.data_format == "on124") {
     ofs << "NCEP_" << strutils::to_upper(metautils::args.data_format);
@@ -1026,6 +986,7 @@ void write(ObservationData& obs_data,std::string caller,std::string user)
   if (metautils::args.data_format == "cpcsumm" || metautils::args.data_format == "netcdf" || metautils::args.data_format == "hdf5" || metautils::args.data_format == "ghcnmv3" || metautils::args.data_format == "hcn" || metautils::args.data_format == "proprietary_ASCII" || metautils::args.data_format == "proprietary_Binary") {
     datatype_map="ds"+metautils::args.dsnum;
   }
+  std::string metadata_path="metadata/wfmd";
   for (size_t xx=0; xx < obs_data.num_types; ++xx) {
     obs_data.id_tables[xx]->keysort(
     [](const std::string& left,const std::string& right) -> bool
@@ -1041,7 +1002,7 @@ void write(ObservationData& obs_data,std::string caller,std::string user)
 	ofs << "  <observationType value=\"" << obs_data.observation_types[xx] << "\">" << std::endl;
 	for (const auto& key : obs_data.platform_tables[xx]->keys()) {
 	  obs_data.platform_tables[xx]->found(key,pentry);
-	  ofs2.open((tdir.name()+"/metadata/"+cmd_type+"/"+filename+".ObML."+obs_data.observation_types[xx]+"."+key+".IDs.xml").c_str());
+	  ofs2.open((tdir.name()+"/"+metadata_path+"/"+filename+".ObML."+obs_data.observation_types[xx]+"."+key+".IDs.xml").c_str());
 	  ofs2 << "<?xml version=\"1.0\" ?>" << std::endl;
 	  ofs2 << "<IDs parent=\"" << filename << ".ObML\" group=\"" << obs_data.observation_types[xx] << "." << key << "\">" << std::endl;
 	  numIDs=0;
@@ -1160,7 +1121,7 @@ void write(ObservationData& obs_data,std::string caller,std::string user)
 	  ofs << "      <IDs ref=\"" << filename << ".ObML." << obs_data.observation_types[xx] << "." << key << ".IDs.xml\" numIDs=\"" << numIDs << "\" />" << std::endl;
 	  ofs << "      <temporal start=\"" << platform.start.to_string("%Y-%m-%d") << "\" end=\"" << platform.end.to_string("%Y-%m-%d") << "\" />" << std::endl;
 	  ofs << "      <locations ref=\"" << filename << ".ObML." << obs_data.observation_types[xx] << "." << key << ".locations.xml\" />" << std::endl;
-	  ofs2.open((tdir.name()+"/metadata/"+cmd_type+"/"+filename+".ObML."+obs_data.observation_types[xx]+"."+key+".locations.xml").c_str());
+	  ofs2.open((tdir.name()+"/"+metadata_path+"/"+filename+".ObML."+obs_data.observation_types[xx]+"."+key+".locations.xml").c_str());
 	  ofs2 << "<?xml version=\"1.0\" ?>" << std::endl;
 	  ofs2 << "<locations parent=\"" << filename << ".ObML\" group=\"" << obs_data.observation_types[xx] << "." << key << "\">" << std::endl;
 	  if (pentry.boxflags->spole == 1) {
@@ -1205,7 +1166,7 @@ void write(ObservationData& obs_data,std::string caller,std::string user)
     }
   }
   ofs << "</ObML>" << std::endl;
-  write_finalize(is_mss_file,filename,"ObML",tdir.name(),ofs,caller,user);
+  write_finalize(filename,"ObML",tdir.name(),ofs,caller,user);
 }
 
 } // end namespace gatherxml::markup::ObML
@@ -1214,6 +1175,7 @@ namespace SatML {
 
 void write(my::map<ScanLineEntry>& scan_line_table,std::list<std::string>& scan_line_table_keys,my::map<ImageEntry>& image_table,std::list<std::string>& image_table_keys,std::string caller,std::string user)
 {
+  const std::string THIS_FUNC=std::string("SatML::")+__func__;
   std::ofstream ofs,ofs2;
   TempFile tfile2(metautils::directives.temp_path);
   std::string filename,cmd_type;
@@ -1221,25 +1183,16 @@ void write(my::map<ScanLineEntry>& scan_line_table,std::list<std::string>& scan_
   std::string herror;
   ScanLineEntry se;
   ImageEntry ie;
-  bool is_mss_file=true;
 
   TempDir tdir;
   if (!tdir.create(metautils::directives.temp_path)) {
-    metautils::log_error("write(): unable to create temporary directory",caller,user);
+    metautils::log_error(THIS_FUNC+"(): unable to create temporary directory",caller,user);
   }
-  write_initialize(is_mss_file,filename,"SatML",tdir.name(),ofs,caller,user);
+  write_initialize(filename,"SatML",tdir.name(),ofs,caller,user);
   ofs << "<SatML xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"" << std::endl;
   ofs << "       xsi:schemaLocation=\"https://rda.ucar.edu/schemas" << std::endl;
   ofs << "                           https://rda.ucar.edu/schemas/SatML.xsd\"" << std::endl;
-  ofs << "       uri=\"";
-  if (is_mss_file) {
-    cmd_type="fmd";
-    ofs << "file://MSS:";
-  }
-  else {
-    cmd_type="wfmd";
-  }
-  ofs << metautils::args.path << "/" << metautils::args.filename << "\" format=\"";
+  ofs << "       uri=\"" << metautils::args.path << "/" << metautils::args.filename << "\" format=\"";
   if (metautils::args.data_format == "noaapod") {
     ofs << "NOAA_Polar_Orbiter";
   }
@@ -1248,6 +1201,7 @@ void write(my::map<ScanLineEntry>& scan_line_table,std::list<std::string>& scan_
   }
   ofs << "\">" << std::endl;
   ofs << "  <timeStamp value=\"" << dateutils::current_date_time().to_string("%Y-%m-%d %T %Z") << "\" />" << std::endl;
+  std::string metadata_path="metadata/wfmd";
   if (metautils::args.data_format == "noaapod") {
     for (const auto& key : scan_line_table_keys) {
 	scan_line_table.found(key,se);
@@ -1269,7 +1223,7 @@ void write(my::map<ScanLineEntry>& scan_line_table,std::list<std::string>& scan_
 	  ofs << "        <spectralBand units=\"um\" value=\"11.5-12.5\" />" << std::endl;
 	}
 	ofs << "        <scanLines ref=\"" << metautils::args.filename << "." << key << ".scanLines\" num=\"" << se.scan_line_list.size() << "\" />" << std::endl;
-	ofs2.open((tdir.name()+"/metadata/"+cmd_type+"/"+metautils::args.filename+"."+key+".scanLines").c_str());
+	ofs2.open((tdir.name()+"/"+metadata_path+"/"+metautils::args.filename+"."+key+".scanLines").c_str());
 	ofs2 << "<?xml version=\"1.0\" ?>" << std::endl;
 	ofs2 << "<scanLines parent=\"" << metautils::args.filename << ".SatML\">" << std::endl;
 	for (const auto& scanline : se.scan_line_list) {
@@ -1292,7 +1246,7 @@ void write(my::map<ScanLineEntry>& scan_line_table,std::list<std::string>& scan_
 	ofs << "  <satellite ID=\"" << ie.key << "\">" << std::endl;
 	ofs << "    <temporal start=\"" << ie.start_date_time.to_string("%Y-%m-%d %T %Z") << "\" end=\"" << ie.end_date_time.to_string("%Y-%m-%d %T %Z") << "\" />" << std::endl;
 	ofs << "    <images ref=\"" << metautils::args.filename << ".images\" num=\"" << ie.image_list.size() << "\" />" << std::endl;
-	ofs2.open((tdir.name()+"/metadata/"+cmd_type+"/"+metautils::args.filename+".images").c_str());
+	ofs2.open((tdir.name()+"/"+metadata_path+"/"+metautils::args.filename+".images").c_str());
 	ofs2 << "<?xml version=\"1.0\" ?>" << std::endl;
 	ofs2 << "<images parent=\"" << metautils::args.filename << ".SatML\">" << std::endl;
 	for (const auto& image : ie.image_list) {
@@ -1323,7 +1277,7 @@ void write(my::map<ScanLineEntry>& scan_line_table,std::list<std::string>& scan_
     }
   }
   ofs << "</SatML>" << std::endl;
-  write_finalize(is_mss_file,filename,"SatML",tdir.name(),ofs,caller,user);
+  write_finalize(filename,"SatML",tdir.name(),ofs,caller,user);
 }
 
 } // end namespace gatherxml::markup::SatML
