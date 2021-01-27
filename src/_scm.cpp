@@ -193,7 +193,7 @@ void parse_args(const char ARG_DELIMITER)
     exit(1);
   }
   if (!local_args.summarize_all && !local_args.is_hpss_file && !local_args.is_web_file && !local_args.refresh_web && !local_args.refresh_inv) {
-    std::cerr << "Terminating " << THIS_UTILITY << " - nothing to do" << std::endl;
+    myerror="Terminating "+THIS_UTILITY+" - nothing to do";
     exit(1);
   }
   if (local_args.update_graphics && !local_args.file.empty() && !std::regex_search(local_args.file,std::regex("(Ob|Fix)ML$"))) {
@@ -343,7 +343,7 @@ void summarize_grml()
     fname.name=e.attribute_value("uri");
     if (std::regex_search(fname.name,std::regex("^file://MSS:/FS/DECS"))) {
 delete_temporary_directory();
-std::cerr << "Terminating - " << THIS_UTILITY << " no longer works on HPSS files" << std::endl;
+myerror="Terminating - "+THIS_UTILITY+" no longer works on HPSS files";
 exit(1);
     }
     else if (std::regex_search(fname.name,std::regex("^http(s){0,1}://rda\\.ucar\\.edu")) || std::regex_search(fname.name,std::regex("^http://dss\\.ucar\\.edu"))) {
@@ -1555,7 +1555,7 @@ void summarize_obml(std::list<KMLData>& kml_list)
     fname.name=e.attribute_value("uri");
     if (std::regex_search(fname.name,std::regex("^file://MSS:/FS/DECS"))) {
 delete_temporary_directory();
-std::cerr << "Terminating - " << THIS_UTILITY << " no longer works on HPSS files" << std::endl;
+myerror="Terminating - "+THIS_UTILITY+" no longer works on HPSS files";
 exit(1);
     }
     else if (std::regex_search(fname.name,std::regex("^http(s){0,1}://rda\\.ucar\\.edu"))) {
@@ -2072,7 +2072,7 @@ void summarize_fixml()
     fname.name=e.attribute_value("uri");
     if (std::regex_search(fname.name,std::regex("^file://MSS:/FS/DECS"))) {
 delete_temporary_directory();
-std::cerr << "Terminating - " << THIS_UTILITY << " no longer works on HPSS files" << std::endl;
+myerror="Terminating - "+THIS_UTILITY+" no longer works on HPSS files";
 exit(1);
     }
     else if (std::regex_search(fname.name,std::regex("^http(s){0,1}://rda\\.ucar\\.edu"))) {
@@ -2441,6 +2441,10 @@ extern "C" void *thread_aggregate_grids(void *ts)
 
 extern "C" void myexit()
 {
+  if (!myerror.empty()) {
+    delete_temporary_directory();
+    std::cerr << myerror << std::endl;
+  }
   if (!local_args.temp_directory.empty()) {
     metautils::log_error("non-empty temporary directory: "+local_args.temp_directory,"scm",USER);
   }
