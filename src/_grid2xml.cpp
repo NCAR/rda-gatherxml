@@ -110,6 +110,7 @@ bool open_file(void *istream,std::string filename)
 
 void scan_file()
 {
+  const std::string THIS_FUNC=__func__;
   Grid::GridDimensions griddim;
   Grid::GridDefinition griddef;
   std::string units;
@@ -187,7 +188,7 @@ void scan_file()
     grid=new USSRSLPGrid;
   }
   else {
-    metautils::log_error(metautils::args.data_format+"-formatted files not recognized","grid2xml",USER);
+    metautils::log_error(THIS_FUNC+"(): "+metautils::args.data_format+"-formatted files not recognized","grid2xml",USER);
   }
   tfile.reset(new TempFile);
   tdir.reset(new TempDir);
@@ -199,7 +200,7 @@ void scan_file()
     tfile->open(metautils::args.temp_loc);
 // symlink the temporary file when the data file name contains metadata
     if (metautils::args.data_format == "cmorph025" || metautils::args.data_format == "cmorph8km") {
-	tfile_name= (!metautils::args.local_name.empty()) ? metautils::args.local_name : metautils::args.filename;
+	tfile_name=metautils::args.filename;
 	auto idx=tfile_name.rfind("/");
 	if (idx != std::string::npos) {
 	  tfile_name=tfile_name.substr(idx+1);
@@ -208,7 +209,7 @@ void scan_file()
 	tfile_name=(tfile->name()).substr(0,idx+1)+tfile_name;
 	std::stringstream oss,ess;
 	if (unixutils::mysystem2("/bin/ln -s "+tfile->name()+" "+tfile_name,oss,ess) < 0) {
-	  metautils::log_error("unable to sym-link to temporary file - "+ess.str(),"grid2xml",USER);
+	  metautils::log_error(THIS_FUNC+"(): unable to sym-link to temporary file - "+ess.str(),"grid2xml",USER);
 	}
     }
     else {
@@ -223,17 +224,17 @@ void scan_file()
 	exit(1);
     }
     else {
-	metautils::log_error("prepare_file_for_metadata_scanning() returned '"+error+"'","grid2xml",USER);
+	metautils::log_error(THIS_FUNC+"(): prepare_file_for_metadata_scanning() returned '"+error+"'","grid2xml",USER);
     }
   }
   if (!open_file(istream.get(),tfile_name)) {
-    metautils::log_error("scan_file(): unable to open file for input","grid2xml",USER);
+    metautils::log_error(THIS_FUNC+"(): unable to open file for input","grid2xml",USER);
   }
   if ((file_format.empty() || file_format == "TAR") && (metautils::args.data_format == "grib" || metautils::args.data_format == "grib0" || metautils::args.data_format == "grib2")) {
     gatherxml::fileInventory::open(inv_file,&inv_dir,inv_stream,"GrML","grid2xml",USER);
   }
   else if (metautils::args.inventory_only) {
-    metautils::log_error("scan_file() returned error: unable to inventory "+metautils::args.path+"/"+metautils::args.filename+" because archive format is '"+file_format+"'","grid2xml",USER);
+    metautils::log_error(THIS_FUNC+"() returned error: unable to inventory "+metautils::args.path+"/"+metautils::args.filename+" because archive format is '"+file_format+"'","grid2xml",USER);
   }
   xmlutils::LevelMapper level_mapper("/glade/u/home/rdadata/share/metadata/LevelTables");
   std::list<std::string> inv_lines;
@@ -245,7 +246,7 @@ void scan_file()
 	auto bytes_read=istream->peek();
 	if (bytes_read < 0) {
 	  if (bytes_read == bfstream::error) {
-	    metautils::log_error("An error occurred while reading the data file - no content metadata was generated","grid2xml",USER);
+	    metautils::log_error(THIS_FUNC+"(): an error occurred while reading the data file - no content metadata was generated","grid2xml",USER);
 	    exit(1);
 	  }
 	  else {
@@ -266,7 +267,7 @@ void scan_file()
 	    auto bytes_read=istream->peek();
 	    if (bytes_read < 0) {
 		if (bytes_read == bfstream::error) {
-		  metautils::log_error("An error occurred while reading the data file - no content metadata was generated","grid2xml",USER);
+		  metautils::log_error(THIS_FUNC+"(): an error occurred while reading the data file - no content metadata was generated","grid2xml",USER);
 		  exit(1);
 		}
 		else {
@@ -366,7 +367,7 @@ void scan_file()
 	    data_format="WMO_GRIB0";
 	  }
 	  if (level_mapper.level_is_a_layer(data_format,level_type,lentry.key) < 0) {
-	    metautils::log_error("no entry for "+level_type+", '"+lentry.key+"' in level map on "+grid->valid_date_time().to_string(),"grid2xml",USER);
+	    metautils::log_error(THIS_FUNC+"(): no entry for "+level_type+", '"+lentry.key+"' in level map on "+grid->valid_date_time().to_string(),"grid2xml",USER);
 	  }
 	  lentry.key+=",";
 	  if (level_mapper.level_is_a_layer(data_format,level_type,lentry.key)) {
@@ -634,13 +635,11 @@ first_valid_date_time=grid->reference_date_time().hours_added(grid->forecast_tim
 	  last_valid_date_time=first_valid_date_time;
 	  pentry.key=strutils::itos(grid->parameter());
 	  switch ((reinterpret_cast<ON84Grid *>(grid))->time_marker()) {
-	    case 0:
-	    {
+	    case 0: {
 		gentry.key+="<!>Analysis";
 		break;
 	    }
-	    case 3:
-	    {
+	    case 3: {
 		fcst_hr-=(reinterpret_cast<ON84Grid *>(grid))->F2();
 		gentry.key+="<!>";
 		if (fcst_hr > 0) {
@@ -649,8 +648,7 @@ first_valid_date_time=grid->reference_date_time().hours_added(grid->forecast_tim
 		gentry.key+=strutils::itos((reinterpret_cast<ON84Grid *>(grid))->F2())+"-hour Accumulation";
 		break;
 	    }
-	    case 4:
-	    {
+	    case 4: {
 		first_valid_date_time.set_day(1);
 		short ndays=dateutils::days_in_month(last_valid_date_time.year(),last_valid_date_time.month());
 		if (grid->number_averaged() == ndays) {
@@ -662,9 +660,8 @@ first_valid_date_time=grid->reference_date_time().hours_added(grid->forecast_tim
 		last_valid_date_time.set_day(grid->number_averaged());
 		break;
 	    }
-	    default:
-	    {
-		metautils::log_error("ON84 time marker "+strutils::itos((reinterpret_cast<ON84Grid *>(grid))->time_marker())+" not recognized","grid2xml",USER);
+	    default: {
+		metautils::log_error(THIS_FUNC+"(): ON84 time marker "+strutils::itos((reinterpret_cast<ON84Grid *>(grid))->time_marker())+" not recognized","grid2xml",USER);
 	    }
 	  }
 	  pe.key=strutils::itos((reinterpret_cast<ON84Grid *>(grid))->run_marker())+"."+strutils::itos((reinterpret_cast<ON84Grid *>(grid))->generating_program());
@@ -674,13 +671,11 @@ first_valid_date_time=grid->reference_date_time().hours_added(grid->forecast_tim
 		case 145:
 		case 146:
 		case 147:
-		case 148:
-		{
+		case 148: {
 		  lentry.key=strutils::itos((reinterpret_cast<ON84Grid *>(grid))->first_level_type())+":1:0";
 		  break;
 		}
-		default:
-		{
+		default: {
 		  lentry.key=strutils::itos((reinterpret_cast<ON84Grid *>(grid))->first_level_type())+":"+strutils::ftos(grid->first_level_value(),5);
 		}
 	    }
@@ -735,7 +730,7 @@ first_valid_date_time=grid->reference_date_time().hours_added(grid->forecast_tim
 	    gentry.key+="<!>Monthly Mean";
 	  }
 	  else {
-	    metautils::log_error("can't figure out gridded product type","grid2xml",USER);
+	    metautils::log_error(THIS_FUNC+"(): can't figure out gridded product type","grid2xml",USER);
 	  }
 	  lentry.key="surface";
 	}
@@ -876,11 +871,7 @@ int main(int argc,char **argv)
     std::cerr << "-d <nnn.n>       nnn.n is the dataset number to which the data file belongs" << std::endl;
     std::cerr << std::endl;
     std::cerr << "options:" << std::endl;
-    if (USER == "dattore") {
-	std::cerr << "-NC              don't check to see if the MSS file is a primary for the dataset" << std::endl;
-    }
-    std::cerr << "-l <local_name>  name of the MSS file on local disk (this avoids an MSS read)" << std::endl;
-    std::cerr << "-r/-R            regenerate/don't regenerate the dataset webpage" << std::endl;
+    std::cerr << "-r/-R            regenerate/don't regenerate the dataset webpage (default is -r)" << std::endl;
     std::cerr << "-s/-S            do/don't update the dataset summary information (default is -s)" << std::endl;
     if (USER == "dattore") {
 	std::cerr << "-u/-U            do/don't update the database (default is -u)" << std::endl;
@@ -892,9 +883,8 @@ int main(int argc,char **argv)
     }
     std::cerr << std::endl;
     std::cerr << "required:" << std::endl;
-    std::cerr << "<path>           full MSS path or URL of the file to read" << std::endl;
-    std::cerr << "                 - MSS paths must begin with \"/FS/DECS\"" << std::endl;
-    std::cerr << "                 - URLs must begin with \"https://{rda|dss}.ucar.edu\"" << std::endl;
+    std::cerr << "<path>           full URL of the file to read" << std::endl;
+    std::cerr << "                   - URLs must begin with \"https://rda.ucar.edu\"" << std::endl;
     exit(1);
   }
   signal(SIGSEGV,segv_handler);
@@ -926,7 +916,8 @@ int main(int argc,char **argv)
 	  flags+=" -wf";
 	}
 	else {
-	  flags+=" -f";
+	  std::cerr << "Terminating - invalid path '" << metautils::args.path << "'" << std::endl;
+	  exit(1);
 	}
 	if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" "+flags+" "+metautils::args.filename+".GrML",oss,ess) < 0) {
 	  std::cerr << ess.str() << std::endl;
