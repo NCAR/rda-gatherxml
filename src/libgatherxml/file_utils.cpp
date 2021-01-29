@@ -45,8 +45,8 @@ return false;
     auto fetched_row=query.fetch_row(row);
     if (!args.override_primary_check) {
 	if (query.num_rows() == 0 || row[0] != "A") {
-	  std::cerr << "Terminating - " << args.path << "/" << args.filename << " is not active for this dataset" << std::endl;
-	  exit(1);
+	  error="Terminating - "+args.path+"/"+args.filename+" is not active for this dataset";
+	  return false;
 	}
     }
     if (fetched_row) {
