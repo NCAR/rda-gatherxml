@@ -44,6 +44,11 @@ extern "C" void clean_up()
   }
 }
 
+std::string this_function_label(std::string function_name)
+{
+  return std::string(function_name+"()");
+}
+
 bool is_valid_date(DateTime& datetime)
 {
   if (datetime.year() < 1900 || datetime.year() > dateutils::current_date_time().year()+20) {
@@ -60,7 +65,7 @@ bool is_valid_date(DateTime& datetime)
 
 void process_ncep_prepbufr_observation(gatherxml::markup::ObML::ObservationData& obs_data,std::string& message_type,size_t subset_number)
 {
-  const std::string THIS_FUNC=__func__+std::string("()");
+  static const std::string THIS_FUNC=this_function_label(__func__);
   auto **pdata=reinterpret_cast<NCEPPREPBUFRData **>(data);
   auto dhr=pdata[subset_number]->dhr;
   if (dhr == -999) {
@@ -311,7 +316,7 @@ void process_ncep_prepbufr_observation(gatherxml::markup::ObML::ObservationData&
 
 void process_ncep_adp_bufr_observation(gatherxml::markup::ObML::ObservationData& obs_data,size_t subset_number)
 {
-  const std::string THIS_FUNC=__func__+std::string("()");
+  static const std::string THIS_FUNC=this_function_label(__func__);
   auto **adata=reinterpret_cast<NCEPADPBUFRData **>(data);
   if (adata[subset_number]->datetime.year() == 31073) {
     adata[subset_number]->datetime=rpt.date_time();
@@ -659,7 +664,7 @@ void process_ncep_adp_bufr_observation(gatherxml::markup::ObML::ObservationData&
 
 void process_ncep_radiance_bufr_observation(gatherxml::markup::ObML::ObservationData& obs_data,size_t subset_number)
 {
-  const std::string THIS_FUNC=__func__+std::string("()");
+  static const std::string THIS_FUNC=this_function_label(__func__);
   auto **rdata=reinterpret_cast<NCEPRadianceBUFRData **>(data);
   std::string obs_type,platform_type;
   auto type=rpt.data_type()*1000+rpt.data_subtype();
@@ -736,7 +741,7 @@ void process_ncep_radiance_bufr_observation(gatherxml::markup::ObML::Observation
 
 void process_ecmwf_bufr_observation(gatherxml::markup::ObML::ObservationData& obs_data,size_t subset_number)
 {
-  const std::string THIS_FUNC=__func__+std::string("()");
+  static const std::string THIS_FUNC=this_function_label(__func__);
   auto **edata=reinterpret_cast<ECMWFBUFRData **>(data);
   if (edata[subset_number]->datetime.year() > 3000) {
     return;
@@ -895,7 +900,7 @@ void process_ecmwf_bufr_observation(gatherxml::markup::ObML::ObservationData& ob
 
 void scan_file(gatherxml::markup::ObML::ObservationData& obs_data)
 {
-  const std::string THIS_FUNC=__func__+std::string("()");
+  static const std::string THIS_FUNC=this_function_label(__func__);
   tfile.reset(new TempFile);
   if (!tfile->open(metautils::args.temp_loc)) {
     metautils::log_error2("could not open temporary file in '"+metautils::args.temp_loc+"'",THIS_FUNC,"bufr2xml",USER);
@@ -956,6 +961,7 @@ extern "C" void int_handler(int)
 
 int main(int argc,char **argv)
 {
+  const std::string THIS_FUNC=this_function_label(__func__);
   std::stringstream oss,ess;
   std::string flags;
 
@@ -1010,7 +1016,6 @@ int main(int argc,char **argv)
   }
   else {
     metautils::log_error2("Terminating - no data found - no content metadata will be generated","main()","bufr2xml",USER);
-    exit(1);
   }
   if (metautils::args.update_db) {
     if (!metautils::args.update_graphics) {

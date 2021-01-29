@@ -47,8 +47,13 @@ extern "C" void clean_up()
     unixutils::mysystem2("/bin/rm "+tfile_name,oss,ess);
   }
   if (!myerror.empty()) {
-    metautils::log_error(myerror,"grid2xml",USER);
+    metautils::log_error2(myerror,"clean_up()","grid2xml",USER);
   }
+}
+
+std::string this_function_label(std::string function_name)
+{
+  return std::string(function_name+"()");
 }
 
 struct InvEntry {
@@ -103,14 +108,14 @@ bool open_file(void *istream,std::string filename)
     return (reinterpret_cast<InputUSSRSLPGridStream *>(istream))->open(filename);
   }
   else {
-    metautils::log_error("open_file(): "+metautils::args.data_format+"-formatted file not recognized","grid2xml",USER);
+    metautils::log_error2(metautils::args.data_format+"-formatted file not recognized","open_file()","grid2xml",USER);
   }
   return false;
 }
 
 void scan_file()
 {
-  const std::string THIS_FUNC=__func__;
+  static const std::string THIS_FUNC=this_function_label(__func__);
   Grid::GridDimensions griddim;
   Grid::GridDefinition griddef;
   std::string units;
@@ -188,7 +193,7 @@ void scan_file()
     grid=new USSRSLPGrid;
   }
   else {
-    metautils::log_error(THIS_FUNC+"(): "+metautils::args.data_format+"-formatted files not recognized","grid2xml",USER);
+    metautils::log_error2(metautils::args.data_format+"-formatted files not recognized",THIS_FUNC,"grid2xml",USER);
   }
   tfile.reset(new TempFile);
   tdir.reset(new TempDir);
@@ -209,7 +214,7 @@ void scan_file()
 	tfile_name=(tfile->name()).substr(0,idx+1)+tfile_name;
 	std::stringstream oss,ess;
 	if (unixutils::mysystem2("/bin/ln -s "+tfile->name()+" "+tfile_name,oss,ess) < 0) {
-	  metautils::log_error(THIS_FUNC+"(): unable to sym-link to temporary file - "+ess.str(),"grid2xml",USER);
+	  metautils::log_error2("unable to sym-link to temporary file - "+ess.str(),THIS_FUNC,"grid2xml",USER);
 	}
     }
     else {
@@ -219,22 +224,16 @@ void scan_file()
   tdir->create(metautils::args.temp_loc);
   std::string file_format,error;
   if (!metautils::primaryMetadata::prepare_file_for_metadata_scanning(*tfile,*tdir,NULL,file_format,error)) {
-    if (std::regex_search(error,std::regex("^Terminating"))) {
-	std::cerr << error << std::endl;
-	exit(1);
-    }
-    else {
-	metautils::log_error(THIS_FUNC+"(): prepare_file_for_metadata_scanning() returned '"+error+"'","grid2xml",USER);
-    }
+    metautils::log_error2("'"+error+"'",THIS_FUNC+": prepare_file_for_metadata_scanning()","grid2xml",USER);
   }
   if (!open_file(istream.get(),tfile_name)) {
-    metautils::log_error(THIS_FUNC+"(): unable to open file for input","grid2xml",USER);
+    metautils::log_error2("unable to open file for input",THIS_FUNC,"grid2xml",USER);
   }
   if ((file_format.empty() || file_format == "TAR") && (metautils::args.data_format == "grib" || metautils::args.data_format == "grib0" || metautils::args.data_format == "grib2")) {
     gatherxml::fileInventory::open(inv_file,&inv_dir,inv_stream,"GrML","grid2xml",USER);
   }
   else if (metautils::args.inventory_only) {
-    metautils::log_error(THIS_FUNC+"() returned error: unable to inventory "+metautils::args.path+"/"+metautils::args.filename+" because archive format is '"+file_format+"'","grid2xml",USER);
+    metautils::log_error2("unable to inventory "+metautils::args.path+"/"+metautils::args.filename+" because archive format is '"+file_format+"'",THIS_FUNC,"grid2xml",USER);
   }
   xmlutils::LevelMapper level_mapper("/glade/u/home/rdadata/share/metadata/LevelTables");
   std::list<std::string> inv_lines;
@@ -246,7 +245,7 @@ void scan_file()
 	auto bytes_read=istream->peek();
 	if (bytes_read < 0) {
 	  if (bytes_read == bfstream::error) {
-	    metautils::log_error(THIS_FUNC+"(): an error occurred while reading the data file - no content metadata was generated","grid2xml",USER);
+	    metautils::log_error2("an error occurred while reading the data file - no content metadata was generated",THIS_FUNC,"grid2xml",USER);
 	    exit(1);
 	  }
 	  else {
@@ -267,7 +266,7 @@ void scan_file()
 	    auto bytes_read=istream->peek();
 	    if (bytes_read < 0) {
 		if (bytes_read == bfstream::error) {
-		  metautils::log_error(THIS_FUNC+"(): an error occurred while reading the data file - no content metadata was generated","grid2xml",USER);
+		  metautils::log_error2("an error occurred while reading the data file - no content metadata was generated",THIS_FUNC,"grid2xml",USER);
 		  exit(1);
 		}
 		else {
@@ -367,7 +366,7 @@ void scan_file()
 	    data_format="WMO_GRIB0";
 	  }
 	  if (level_mapper.level_is_a_layer(data_format,level_type,lentry.key) < 0) {
-	    metautils::log_error(THIS_FUNC+"(): no entry for "+level_type+", '"+lentry.key+"' in level map on "+grid->valid_date_time().to_string(),"grid2xml",USER);
+	    metautils::log_error2("no entry for "+level_type+", '"+lentry.key+"' in level map on "+grid->valid_date_time().to_string(),THIS_FUNC,"grid2xml",USER);
 	  }
 	  lentry.key+=",";
 	  if (level_mapper.level_is_a_layer(data_format,level_type,lentry.key)) {
@@ -661,7 +660,7 @@ first_valid_date_time=grid->reference_date_time().hours_added(grid->forecast_tim
 		break;
 	    }
 	    default: {
-		metautils::log_error(THIS_FUNC+"(): ON84 time marker "+strutils::itos((reinterpret_cast<ON84Grid *>(grid))->time_marker())+" not recognized","grid2xml",USER);
+		metautils::log_error2("ON84 time marker "+strutils::itos((reinterpret_cast<ON84Grid *>(grid))->time_marker())+" not recognized",THIS_FUNC,"grid2xml",USER);
 	    }
 	  }
 	  pe.key=strutils::itos((reinterpret_cast<ON84Grid *>(grid))->run_marker())+"."+strutils::itos((reinterpret_cast<ON84Grid *>(grid))->generating_program());
@@ -730,7 +729,7 @@ first_valid_date_time=grid->reference_date_time().hours_added(grid->forecast_tim
 	    gentry.key+="<!>Monthly Mean";
 	  }
 	  else {
-	    metautils::log_error(THIS_FUNC+"(): can't figure out gridded product type","grid2xml",USER);
+	    metautils::log_error2("can't figure out gridded product type",THIS_FUNC,"grid2xml",USER);
 	  }
 	  lentry.key="surface";
 	}
@@ -794,8 +793,7 @@ first_valid_date_time=grid->reference_date_time().hours_added(grid->forecast_tim
   }
   istream->close();
   if (grid_table.size() == 0) {
-    std::cerr << "Terminating - no grids found so no content metadata will be generated" << std::endl;
-    exit(1);
+    metautils::log_error2("Terminating - no grids found so no content metadata will be generated",THIS_FUNC,"grid2xml",USER);
   }
   if (inv_lines.size() > 0) {
     InvEntry ie;
@@ -833,7 +831,7 @@ extern "C" void segv_handler(int)
 {
   clean_up();
   metautils::cmd_unregister();
-  metautils::log_error("core dump","grid2xml",USER);
+  metautils::log_error2("core dump","segv_handler()","grid2xml",USER);
 }
 
 extern "C" void int_handler(int)
@@ -844,6 +842,7 @@ extern "C" void int_handler(int)
 
 int main(int argc,char **argv)
 {
+  const std::string THIS_FUNC=this_function_label(__func__);
   std::string web_home;
   std::stringstream oss,ess;
 
@@ -916,11 +915,10 @@ int main(int argc,char **argv)
 	  flags+=" -wf";
 	}
 	else {
-	  std::cerr << "Terminating - invalid path '" << metautils::args.path << "'" << std::endl;
-	  exit(1);
+	  metautils::log_error2("Terminating - invalid path '"+metautils::args.path+"'",THIS_FUNC,"grid2xml",USER);
 	}
 	if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" "+flags+" "+metautils::args.filename+".GrML",oss,ess) < 0) {
-	  std::cerr << ess.str() << std::endl;
+	  metautils::log_error2(ess.str(),"main() running scm","grid2xml",USER);
 	}
     }
     else if (metautils::args.dsnum == "999.9") {
