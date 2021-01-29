@@ -135,7 +135,6 @@ int main(int argc,char **argv)
   Entry e,u;
   FILE *p;
   std::stringstream oss,ess;
-  bool ignore_local_file=false;
 
   if (argc < 6 && argc != 2 && argc != 3) {
     std::cerr << "For command usage, see the \"Metadata Utilities\" man pages, which are accessible" << std::endl;
@@ -145,14 +144,10 @@ int main(int argc,char **argv)
   if (argc == 3) {
     separator=argv[1];
     metautils::args.args_string=argv[2];
-    ignore_local_file=true;
   }
   else {
     separator="%";
     metautils::args.args_string=unixutils::unix_args_string(argc,argv,'%');
-    if (argc == 2) {
-	ignore_local_file=true;
-    }
   }
   metautils::read_config("gatherxml",USER);
   ifs.open((metautils::directives.decs_root+"/bin/conf/gatherxml.conf").c_str());
