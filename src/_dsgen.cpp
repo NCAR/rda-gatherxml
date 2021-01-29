@@ -508,6 +508,153 @@ void insert_text_field(std::ofstream& ofs,const XMLElement& e,std::string sectio
   }
 }
 
+void add_publications(TokenDocument& tdoc,XMLDocument& xdoc)
+{
+  auto reference_list=xdoc.element_list("dsOverview/reference");
+  std::stringstream publications_s;
+  if (reference_list.size() > 0) {
+    tdoc.add_if("__HAS_PUBLICATIONS__");
+    reference_list.sort(compare_references);
+    for (const auto& reference : reference_list) {
+	publications_s << "<div>" << reference.element("authorList").content() << ", " << reference.element("year").content() << ": ";
+	auto pub_type=reference.attribute_value("type");
+	if (pub_type == "journal") {
+	  auto periodical=reference.element("periodical");
+	  auto url=reference.element("url").content();
+	  auto title=reference.element("title").content();
+	  if (!url.empty()) {
+	    publications_s << "<a href=\"" << url << "\">" << title << "</a>";
+	  }
+	  else {
+	    publications_s << title;
+	  }
+	  if (!strutils::has_ending(title,"?")) {
+	    publications_s << ".";
+	  }
+	  publications_s << "  <i>" << periodical.content() << "</i>, ";
+	  if (periodical.attribute_value("pages") == "0-0") {
+	    if (periodical.attribute_value("number") == "0") {
+		publications_s << "Submitted";
+	    }
+	    else if (periodical.attribute_value("number") == "1") {
+		publications_s << "Accepted";
+	    }
+	    else if (periodical.attribute_value("number") == "2") {
+		publications_s << "In Press";
+	    }
+	  }
+	  else {
+	    publications_s << "<b>" << periodical.attribute_value("number") << "</b>, ";
+	    auto pages=periodical.attribute_value("pages");
+	    if (std::regex_search(pages,std::regex("^AGU:"))) {
+		publications_s << pages.substr(4);
+	    }
+	    else {
+		auto page_parts=strutils::split(pages,"-"); 
+		if (page_parts.size() == 2 && page_parts[0] == page_parts[1]) {
+		  publications_s << page_parts[0];
+		}
+		else {
+		  publications_s << periodical.attribute_value("pages");
+		}
+	    }
+	  }
+	  auto doi=reference.element("doi").content();
+	  if (!doi.empty()) {
+	    publications_s << " (DOI: " << doi << ")";
+	  }
+	  publications_s << ".";
+	}
+	else if (pub_type == "preprint") {
+	  auto conference=reference.element("conference");
+	  auto url=reference.element("url").content();
+	  if (!url.empty()) {
+	    publications_s << "<a href=\"" << url << "\">" << reference.element("title").content() << "</a>";
+	  }
+	  else {
+	    publications_s << reference.element("title").content();
+	  }
+	  publications_s << ".  <i>Proceedings of the " << conference.content() << "</i>, " << conference.attribute_value("host") << ", " << conference.attribute_value("location");
+	  auto pages=conference.attribute_value("pages");
+	  if (!pages.empty()) {
+	    publications_s << ", " << pages;
+	  }
+	  auto doi=reference.element("doi").content();
+	  if (!doi.empty()) {
+	    publications_s << " (DOI: " << doi << ")";
+	  }
+	  publications_s << ".";
+	}
+	else if (pub_type == "technical_report") {
+	  auto organization=reference.element("organization");
+	  auto url=reference.element("url").content();
+	  if (!url.empty()) {
+	    publications_s << "<i><a href=\"" << url << "\">" << reference.element("title").content() << "</a>.</i>";
+	  }
+	  else {
+	    publications_s << "<i>" << reference.element("title").content() << ".</i>";
+	  }
+	  publications_s << "  ";
+	  auto report_ID=organization.attribute_value("reportID");
+	  if (!report_ID.empty()) {
+	    publications_s << report_ID << ", ";
+	  }
+	  publications_s << organization.content();
+	  auto pages=organization.attribute_value("pages");
+	  if (pages != "-99") {
+	    publications_s << ", " << organization.attribute_value("pages") << " pp.";
+	  }
+	  auto doi=reference.element("doi").content();
+	  if (!doi.empty()) {
+	    publications_s << " (DOI: " << doi << ").";
+	  }
+	}
+	else if (pub_type == "book") {
+	  auto publisher=reference.element("publisher");
+	  publications_s << "<i>" << reference.element("title").content() << "</i>. " << publisher.content() << ", " << publisher.attribute_value("place");
+	  auto doi=reference.element("doi").content();
+	  if (!doi.empty()) {
+	    publications_s << " (DOI: " << doi << ")";
+	  }
+	  publications_s << ".";
+	}
+	else if (pub_type == "book_chapter") {
+	  auto book=reference.element("book");
+	  publications_s << "\"" << reference.element("title").content() << "\", in " << book.content() << ". Ed. " << book.attribute_value("editor") << ", " << book.attribute_value("publisher") << ", ";
+	  if (book.attribute_value("pages") == "0-0") {
+	    publications_s << "In Press";
+	  }
+	  else {
+	    publications_s << book.attribute_value("pages");
+	  }
+	  auto doi=reference.element("doi").content();
+	  if (!doi.empty()) {
+	    publications_s << " (DOI: " << doi << ")";
+	  }
+	  publications_s << ".";
+	}
+	publications_s << "</div>" << std::endl;
+	auto annotation=reference.element("annotation").content();
+	if (!annotation.empty() > 0) {
+	  publications_s << "<div style=\"margin-left: 15px; color: #5f5f5f\">" << annotation << "</div>" << std::endl;
+	}
+	publications_s << "<br />" << std::endl;
+    }
+  }
+  auto reference_url_list=xdoc.element_list("dsOverview/referenceURL");
+  if (reference_url_list.size() > 0) {
+    if (publications_s.str().empty()) {
+	tdoc.add_if("__HAS_PUBLICATIONS__");
+    }
+    for (const auto& url : reference_url_list) {
+	publications_s << "<a href=\"" << url.attribute_value("url") << "\">" << url.content() << "</a><br>" << std::endl;
+    }
+  }
+  if (!publications_s.str().empty()) {
+    tdoc.add_replacement("__PUBLICATIONS__",publications_s.str());
+  }
+}
+
 void add_data_formats(TokenDocument& tdoc,std::vector<std::string>& formats,bool found_content_metadata)
 {
   if (!found_content_metadata) {
@@ -1465,150 +1612,10 @@ void generate_description(std::string type,std::string tdir_name)
     tdoc.add_if("__HAS_RELATED_WEB_SITES__");
     tdoc.add_replacement("__RELATED_WEB_SITES__",related_web_sites_s.str());
   }
+
 // publications
-  elist=xdoc.element_list("dsOverview/reference");
-  std::stringstream publications_s;
-  if (elist.size() > 0) {
-    tdoc.add_if("__HAS_PUBLICATIONS__");
-    elist.sort(compare_references);
-    for (const auto& ele : elist) {
-	publications_s << "<div>" << ele.element("authorList").content() << ", " << ele.element("year").content() << ": ";
-	auto pub_type=ele.attribute_value("type");
-	if (pub_type == "journal") {
-	  e=ele.element("periodical");
-	  auto url=ele.element("url").content();
-	  auto title=ele.element("title").content();
-	  if (!url.empty()) {
-	    publications_s << "<a href=\"" << url << "\">" << title << "</a>";
-	  }
-	  else {
-	    publications_s << title;
-	  }
-	  if (!strutils::has_ending(title,"?")) {
-	    publications_s << ".";
-	  }
-	  publications_s << "  <i>" << e.content() << "</i>, ";
-	  if (e.attribute_value("pages") == "0-0") {
-	    if (e.attribute_value("number") == "0") {
-		publications_s << "Submitted";
-	    }
-	    else if (e.attribute_value("number") == "1") {
-		publications_s << "Accepted";
-	    }
-	    else if (e.attribute_value("number") == "2") {
-		publications_s << "In Press";
-	    }
-	  }
-	  else {
-	    publications_s << "<b>" << e.attribute_value("number") << "</b>, ";
-	    auto pages=e.attribute_value("pages");
-	    if (std::regex_search(pages,std::regex("^AGU:"))) {
-		publications_s << pages.substr(4);
-	    }
-	    else {
-		auto page_parts=strutils::split(pages,"-"); 
-		if (page_parts.size() == 2 && page_parts[0] == page_parts[1]) {
-		  publications_s << page_parts[0];
-		}
-		else {
-		  publications_s << e.attribute_value("pages");
-		}
-	    }
-	  }
-	  auto doi=ele.element("doi").content();
-	  if (!doi.empty()) {
-	    publications_s << " (DOI: " << doi << ")";
-	  }
-	  publications_s << ".";
-	}
-	else if (pub_type == "preprint") {
-	  e=ele.element("conference");
-	  auto url=ele.element("url").content();
-	  if (!url.empty()) {
-	    publications_s << "<a href=\"" << url << "\">" << ele.element("title").content() << "</a>";
-	  }
-	  else {
-	    publications_s << ele.element("title").content();
-	  }
-	  publications_s << ".  <i>Proceedings of the " << e.content() << "</i>, " << e.attribute_value("host") << ", " << e.attribute_value("location");
-	  auto pages=e.attribute_value("pages");
-	  if (!pages.empty()) {
-	    publications_s << ", " << pages;
-	  }
-	  auto doi=ele.element("doi").content();
-	  if (!doi.empty()) {
-	    publications_s << " (DOI: " << doi << ")";
-	  }
-	  publications_s << ".";
-	}
-	else if (pub_type == "technical_report") {
-	  e=ele.element("organization");
-	  auto url=ele.element("url").content();
-	  if (!url.empty()) {
-	    publications_s << "<i><a href=\"" << url << "\">" << ele.element("title").content() << "</a>.</i>";
-	  }
-	  else {
-	    publications_s << "<i>" << ele.element("title").content() << ".</i>";
-	  }
-	  publications_s << "  ";
-	  auto report_ID=e.attribute_value("reportID");
-	  if (!report_ID.empty()) {
-	    publications_s << report_ID << ", ";
-	  }
-	  publications_s << e.content();
-	  auto pages=e.attribute_value("pages");
-	  if (pages != "-99") {
-	    publications_s << ", " << e.attribute_value("pages") << " pp.";
-	  }
-	  auto doi=ele.element("doi").content();
-	  if (!doi.empty()) {
-	    publications_s << " (DOI: " << doi << ").";
-	  }
-	}
-	else if (pub_type == "book") {
-	  e=ele.element("publisher");
-	  publications_s << "<i>" << ele.element("title").content() << "</i>. " << e.content() << ", " << e.attribute_value("place");
-	  auto doi=ele.element("doi").content();
-	  if (!doi.empty()) {
-	    publications_s << " (DOI: " << doi << ")";
-	  }
-	  publications_s << ".";
-	}
-	else if (pub_type == "book_chapter") {
-	  e=ele.element("book");
-	  publications_s << "\"" << ele.element("title").content() << "\", in " << e.content() << ". Ed. " << e.attribute_value("editor") << ", " << e.attribute_value("publisher") << ", ";
-	  if (e.attribute_value("pages") == "0-0") {
-	    publications_s << "In Press";
-	  }
-	  else {
-	    publications_s << e.attribute_value("pages");
-	  }
-	  auto doi=ele.element("doi").content();
-	  if (!doi.empty()) {
-	    publications_s << " (DOI: " << doi << ")";
-	  }
-	  publications_s << ".";
-	}
-	publications_s << "</div>" << std::endl;
-	auto annotation=ele.element("annotation").content();
-	if (!annotation.empty() > 0) {
-	  publications_s << "<div style=\"margin-left: 15px; color: #5f5f5f\">" << annotation << "</div>" << std::endl;
-	}
-	publications_s << "<br />" << std::endl;
-    }
-  }
-  elist=xdoc.element_list("dsOverview/referenceURL");
-  if (elist.size() > 0) {
-    if (publications_s.str().empty()) {
-	tdoc.add_if("__HAS_PUBLICATIONS__");
-    }
-    for (const auto& ele : elist) {
-	publications_s << "<a href=\"" << ele.attribute_value("url") << "\">" << ele.content() << "</a><br>" << std::endl;
-    }
-  }
-  if (!publications_s.str().empty()) {
-    tdoc.add_replacement("__PUBLICATIONS__",publications_s.str());
-  }
+  add_publications(tdoc,xdoc);
+
 // volume
   query.set("primary_size","dssdb.dataset","dsid = 'ds"+metautils::args.dsnum+"'");
   if (query.submit(server) < 0) {
