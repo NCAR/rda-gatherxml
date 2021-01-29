@@ -508,6 +508,69 @@ void insert_text_field(std::ofstream& ofs,const XMLElement& e,std::string sectio
   }
 }
 
+void add_data_formats(TokenDocument& tdoc,std::vector<std::string>& formats,bool found_content_metadata)
+{
+  if (!found_content_metadata) {
+    auto format_list=xdoc.element_list("dsOverview/contentMetadata/format");
+    for (const auto& format : format_list) {
+	formats.emplace_back(format.content()+"<!>"+format.attribute_value("href"));
+    }
+  }
+  struct stat buf;
+  XMLDocument fdoc;
+  if (stat("/usr/local/www/server_root/web/metadata",&buf) == 0) {
+    fdoc.open("/usr/local/www/server_root/web/metadata/FormatReferences.xml");
+  }
+  else {
+    auto file=unixutils::remote_web_file("https://rda.ucar.edu/metadata/FormatReferences.xml",temp_dir.name());
+    fdoc.open(file);
+  }
+  if (!fdoc) {
+    metautils::log_error("unable to open FormatReferences.xml","dsgen",USER);
+  }
+  std::string data_formats;
+  size_t n=0;
+  for (const auto& format_entry : formats) {
+    auto format_parts=strutils::split(format_entry,"<!>");
+    auto description=format_parts[0];
+    std::string url;
+    if (std::regex_search(description,std::regex("^proprietary_"))) {
+	strutils::replace_all(description,"proprietary_","");
+	if (!format_parts[1].empty()) {
+	  url=format_parts[1];
+	}
+	else {
+	  description+=" (see dataset documentation)";
+	  url="";
+	}
+    }
+    else {
+	auto format_reference=fdoc.element(("formatReferences/format@name="+description));
+	url=format_reference.attribute_value("href");
+    }
+    if (!url.empty()) {
+	data_formats+="<a href=\""+url+"\" target=\"_format\">";
+	if (!std::regex_search(url,std::regex("^http://rda.ucar.edu"))) {
+	  data_formats+="<i>";
+	}
+    }
+    strutils::replace_all(description,"_"," ");
+    data_formats+=description;
+    if (!url.empty()) {
+	data_formats+="</a>";
+	if (!std::regex_search(url,std::regex("^http://rda.ucar.edu"))) {
+	  data_formats+="</i>";
+	}
+    }
+    ++n;
+    if (n < formats.size()) {
+	data_formats+=", ";
+    }
+  }
+  fdoc.close();
+  tdoc.add_replacement("__DATA_FORMATS__",data_formats);
+}
+
 void add_citations(TokenDocument& tdoc)
 {
   MySQL::LocalQuery citations_query("select distinct d.DOI_work from citation.data_citations as d left join dssdb.dsvrsn as v on v.doi = d.DOI_data where v.dsid = 'ds"+metautils::args.dsnum+"'");
@@ -1590,66 +1653,10 @@ void generate_description(std::string type,std::string tdir_name)
     volume_s << "</span></span>";
   }
   tdoc.add_replacement("__VOLUME__",volume_s.str());
+
 // data formats
-  if (!found_content_metadata) {
-    elist=xdoc.element_list("dsOverview/contentMetadata/format");
-    for (const auto& ele : elist) {
-	formats.emplace_back(ele.content()+"<!>"+ele.attribute_value("href"));
-    }
-  }
-  struct stat buf;
-  XMLDocument fdoc;
-  if (stat("/usr/local/www/server_root/web/metadata",&buf) == 0) {
-    fdoc.open("/usr/local/www/server_root/web/metadata/FormatReferences.xml");
-  }
-  else {
-    auto file=unixutils::remote_web_file("https://rda.ucar.edu/metadata/FormatReferences.xml",temp_dir.name());
-    fdoc.open(file);
-  }
-  if (!fdoc) {
-    metautils::log_error("unable to open FormatReferences.xml","dsgen",USER);
-  }
-  std::string data_formats;
-  n=0;
-  for (const auto& format : formats) {
-    auto format_parts=strutils::split(format,"<!>");
-    auto description=format_parts[0];
-    std::string url;
-    if (std::regex_search(description,std::regex("^proprietary_"))) {
-	strutils::replace_all(description,"proprietary_","");
-	if (!format_parts[1].empty()) {
-	  url=format_parts[1];
-	}
-	else {
-	  description+=" (see dataset documentation)";
-	  url="";
-	}
-    }
-    else {
-	e=fdoc.element(("formatReferences/format@name="+description));
-	url=e.attribute_value("href");
-    }
-    if (!url.empty()) {
-	data_formats+="<a href=\""+url+"\" target=\"_format\">";
-	if (!std::regex_search(url,std::regex("^http://rda.ucar.edu"))) {
-	  data_formats+="<i>";
-	}
-    }
-    strutils::replace_all(description,"_"," ");
-    data_formats+=description;
-    if (!url.empty()) {
-	data_formats+="</a>";
-	if (!std::regex_search(url,std::regex("^http://rda.ucar.edu"))) {
-	  data_formats+="</i>";
-	}
-    }
-    if (n != static_cast<int>(formats.size()-1)) {
-	data_formats+=", ";
-    }
-    ++n;
-  }
-  fdoc.close();
-  tdoc.add_replacement("__DATA_FORMATS__",data_formats);
+  add_data_formats(tdoc,formats,found_content_metadata);
+
 // related datasets
   elist=xdoc.element_list("dsOverview/relatedDataset");
   if (elist.size() > 0) {
@@ -1683,6 +1690,7 @@ void generate_description(std::string type,std::string tdir_name)
     tdoc.add_if("__HAS_RELATED_DATASETS__");
     tdoc.add_replacement("__RELATED_DATASETS__",related_datasets);
   }
+
 // more details
   if (unixutils::exists_on_server(metautils::directives.web_server,"/data/web/datasets/ds"+metautils::args.dsnum+"/metadata/detailed.html",metautils::directives.rdadata_home)) {
     tdoc.add_if("__HAS_MORE_DETAILS__");
