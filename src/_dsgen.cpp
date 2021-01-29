@@ -558,8 +558,7 @@ void generate_description(std::string type,std::string tdir_name)
 	if (query.submit(server) < 0) {
 	  metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",USER);
 	}
-	MySQL::Row row;
-	while (query.fetch_row(row)) {
+	for (const auto& row : query) {
 	  formats.emplace_back(row[0]+"<!>");
 	}
 	if (formats.size() > 0) {
@@ -603,41 +602,41 @@ void generate_description(std::string type,std::string tdir_name)
   if (query.num_rows() > 0) {
     tdoc.add_if("__HAS_TEMPORAL_RANGE__");
     if (query.num_rows() > 1) {
-	MySQL::LocalQuery query2("distinct gindex","dssdb.dsperiod","dsid = 'ds"+metautils::args.dsnum+"'");
-	if (query2.submit(server) < 0) {
-	  metautils::log_error("query: "+query2.show()+" returned error: "+query2.error(),"dsgen",USER);
+	MySQL::LocalQuery grouped_periods_query("distinct gindex","dssdb.dsperiod","dsid = 'ds"+metautils::args.dsnum+"'");
+	if (grouped_periods_query.submit(server) < 0) {
+	  metautils::log_error("query: "+grouped_periods_query.show()+" returned error: "+grouped_periods_query.error(),"dsgen",USER);
 	}
-	if (query2.num_rows() > 1) {
+	if (grouped_periods_query.num_rows() > 1) {
 	  grouped_periods=true;
 	  tdoc.add_if("__HAS_TEMPORAL_BY_GROUP1__");
-	  query2.set("select gindex,title from dssdb.dsgroup where dsid = 'ds"+metautils::args.dsnum+"'");
-	  if (query2.submit(server) < 0) {
-	    metautils::log_error("error: "+query2.error()+" while getting groups data","dsgen",USER);
+	  MySQL::LocalQuery groups_query("select gindex,title from dssdb.dsgroup where dsid = 'ds"+metautils::args.dsnum+"'");
+	  if (groups_query.submit(server) < 0) {
+	    metautils::log_error("error: "+groups_query.error()+" while getting groups data","dsgen",USER);
 	  }
-	  MySQL::Row row2;
-	  while (query2.fetch_row(row2)) {
-	    groups_table.emplace(row2[0],row2[1]);
+	  for (const auto& row : groups_query) {
+	    groups_table.emplace(row[0],row[1]);
 	  }
-	  query2.set("select mssfile,tindex from dssdb.mssfile where dsid = 'ds"+metautils::args.dsnum+"' and type = 'P' and status = 'P'");
-	  if (query2.submit(server) < 0) {
-	    metautils::log_error("error: "+query2.error()+" while getting RDA files data","dsgen",USER);
+	  MySQL::LocalQuery rda_files_query("select wfile,tindex from dssdb.wfile where dsid = 'ds"+metautils::args.dsnum+"' and type = 'D' and status = 'P'");
+	  if (rda_files_query.submit(server) < 0) {
+	    metautils::log_error("error: "+rda_files_query.error()+" while getting RDA files data","dsgen",USER);
 	  }
-	  while (query2.fetch_row(row2)) {
-	    rda_files_table.emplace(row2[0],row2[1]);
+	  for (const auto& row : rda_files_query) {
+	    rda_files_table.emplace(row[0],row[1]);
 	  }
-	  query2.set("select code,mssID from GrML.ds"+dsnum2+"_primaries2");
-	  if (query2.submit(server) == 0) {
-	    while (query2.fetch_row(row2)) {
-		metadata_files_table.emplace(row2[0],row2[1]);
+	  MySQL::LocalQuery metadata_files_query("select code,webID from WGrML.ds"+dsnum2+"_webfiles2");
+	  if (metadata_files_query.submit(server) == 0) {
+	    for (const auto& row : metadata_files_query) {
+		metadata_files_table.emplace(row[0],row[1]);
 	    }
 	  }
-	  query2.set("select min(concat(date_start,' ',time_start)),min(start_flag),max(concat(date_end,' ',time_end)),min(end_flag),any_value(time_zone) from dssdb.dsperiod where dsid = 'ds"+metautils::args.dsnum+"' and date_start > '0000-00-00' and date_start < '3000-01-01' and date_end > '0000-00-00' and date_end < '3000-01-01' group by dsid");
-	  if (query2.submit(server) < 0) {
-	    metautils::log_error("query: "+query2.show()+" returned error: "+query2.error(),"dsgen",USER);
+	  MySQL::LocalQuery date_query("select min(concat(date_start,' ',time_start)),min(start_flag),max(concat(date_end,' ',time_end)),min(end_flag),any_value(time_zone) from dssdb.dsperiod where dsid = 'ds"+metautils::args.dsnum+"' and date_start > '0000-00-00' and date_start < '3000-01-01' and date_end > '0000-00-00' and date_end < '3000-01-01' group by dsid");
+	  if (date_query.submit(server) < 0) {
+	    metautils::log_error("query: "+date_query.show()+" returned error: "+date_query.error(),"dsgen",USER);
 	  }
-	  query2.fetch_row(row2);
-	  auto start_date_time=metatranslations::date_time(row2[0],row2[1],row2[4]);
-	  auto end_date_time=metatranslations::date_time(row2[2],row2[3],row2[4]);
+	  MySQL::Row date_row;
+	  date_query.fetch_row(date_row);
+	  auto start_date_time=metatranslations::date_time(date_row[0],date_row[1],date_row[4]);
+	  auto end_date_time=metatranslations::date_time(date_row[2],date_row[3],date_row[4]);
 	  auto temporal=start_date_time;
 	  if (!end_date_time.empty() && end_date_time != start_date_time) {
 	    temporal+=" to "+end_date_time;
@@ -649,8 +648,7 @@ void generate_description(std::string type,std::string tdir_name)
 	}
     }
     std::map<std::string,std::tuple<std::string,std::string>> periods_table;
-    MySQL::Row row;
-    while (query.fetch_row(row)) {
+    for (const auto& row : query) {
 	auto start_date_time=metatranslations::date_time(row[0]+" "+row[1],row[2],row[6]);
 	auto end_date_time=metatranslations::date_time(row[3]+" "+row[4],row[5],row[6]);
 	std::string key;
@@ -737,8 +735,7 @@ void generate_description(std::string type,std::string tdir_name)
     metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",USER);
   }
   std::list<std::string> strings;
-  MySQL::Row row;
-  while (query.fetch_row(row)) {
+  for (const auto& row : query) {
     strings.emplace_back(strutils::capitalize(row[0]));
   }
   tdoc.add_replacement("__VARIABLES__",create_table_from_strings(strings,4,"#e1eaff","#c8daff"));
@@ -776,12 +773,12 @@ void generate_description(std::string type,std::string tdir_name)
     }
     tdoc.add_replacement("__ON84_TABLE__",table);
   }
-  query.set("gindex,title","dssdb.dsgroup","dsid = 'ds"+metautils::args.dsnum+"' and pindex = 0 and pmsscnt > 0");
+  query.set("gindex,title","dssdb.dsgroup","dsid = 'ds"+metautils::args.dsnum+"' and pindex = 0 and dwebcnt > 0");
   if (query.submit(server) == 0) {
     std::stringstream vars_by_product_s;
-    while (query.fetch_row(row)) {
-	if (unixutils::exists_on_server(metautils::directives.web_server,"/data/web/datasets/ds"+metautils::args.dsnum+"/metadata/customize.GrML."+row[0],metautils::directives.rdadata_home)) {
-	  auto c_file=unixutils::remote_web_file("https://rda.ucar.edu/datasets/ds"+metautils::args.dsnum+"/metadata/customize.GrML."+row[0],temp_dir.name());
+    for (const auto& row : query) {
+	if (unixutils::exists_on_server(metautils::directives.web_server,"/data/web/datasets/ds"+metautils::args.dsnum+"/metadata/customize.WGrML."+row[0],metautils::directives.rdadata_home)) {
+	  auto c_file=unixutils::remote_web_file("https://rda.ucar.edu/datasets/ds"+metautils::args.dsnum+"/metadata/customize.WGrML."+row[0],temp_dir.name());
 	  if (!c_file.empty()) {
 	    std::ifstream ifs;
 	    char line[32768];
@@ -991,29 +988,30 @@ void generate_description(std::string type,std::string tdir_name)
     std::unordered_map<size_t,std::tuple<std::string,std::string>> grid_definition_table;
     for (const auto& data_type : data_types) {
 	if (data_type == "grid") {
+	  MySQL::LocalQuery grid_codes_query;
 	  if (grouped_periods) {
-	    query.set("select gridDefinition_codes,mssID_code from GrML.ds"+dsnum2+"_grid_definitions");
+	    grid_codes_query.set("select gridDefinition_codes,webID_code from WGrML.ds"+dsnum2+"_grid_definitions");
 	  }
 	  else {
-	    query.set("select distinct gridDefinition_codes from GrML.ds"+dsnum2+"_agrids");
+	    grid_codes_query.set("select distinct gridDefinition_codes from WGrML.ds"+dsnum2+"_agrids");
 	  }
-	  if (query.submit(server) < 0) {
-	    metautils::log_error("error: "+query.error()+" while getting grid definitions","dsgen",USER);
+	  if (grid_codes_query.submit(server) < 0) {
+	    metautils::log_error("error: "+grid_codes_query.error()+" while getting grid definitions","dsgen",USER);
 	  }
-	  while (query.fetch_row(row)) {
+	  for (const auto& grid_codes_row : grid_codes_query) {
 	    std::vector<size_t> values;
-	    bitmap::uncompress_values(row[0],values);
+	    bitmap::uncompress_values(grid_codes_row[0],values);
 	    for (const auto& value : values) {
 		std::string ugd_key;
 		if (grid_definition_table.find(value) == grid_definition_table.end()) {
-		  MySQL::LocalQuery query2("definition,defParams","GrML.gridDefinitions","code = "+strutils::itos(value));
-		  if (query2.submit(server) < 0) {
-		    metautils::log_error("query: "+query2.show()+" returned error: "+query2.error(),"dsgen",USER);
+		  MySQL::LocalQuery grid_definition_query("definition,defParams","WGrML.gridDefinitions","code = "+strutils::itos(value));
+		  if (grid_definition_query.submit(server) < 0) {
+		    metautils::log_error("query: "+grid_definition_query.show()+" returned error: "+grid_definition_query.error(),"dsgen",USER);
 		  }
-		  MySQL::Row row2;
-		  query2.fetch_row(row2);
-		  grid_definition_table.emplace(value,std::make_tuple(row2[0],row2[1]));
-		  ugd_key=row2[0]+"<!>"+row2[1];
+		  MySQL::Row grid_definition_row;
+		  grid_definition_query.fetch_row(grid_definition_row);
+		  grid_definition_table.emplace(value,std::make_tuple(grid_definition_row[0],grid_definition_row[1]));
+		  ugd_key=grid_definition_row[0]+"<!>"+grid_definition_row[1];
 		}
 		else {
 		  auto kval=grid_definition_table[value];
@@ -1022,7 +1020,7 @@ void generate_description(std::string type,std::string tdir_name)
 		std::string group="";
 		if (query.length() > 1) {
 		  std::unordered_map<std::string,std::string>::iterator m,r,g;
-		  if ( (m=metadata_files_table.find(row[1])) != metadata_files_table.end() && (r=rda_files_table.find(m->second)) != rda_files_table.end() && (g=groups_table.find(r->second)) != groups_table.end()) {
+		  if ( (m=metadata_files_table.find(grid_codes_row[1])) != metadata_files_table.end() && (r=rda_files_table.find(m->second)) != rda_files_table.end() && (g=groups_table.find(r->second)) != groups_table.end()) {
 		    group=g->second;
 		  }
 		}
@@ -1178,7 +1176,7 @@ void generate_description(std::string type,std::string tdir_name)
   }
   std::stringstream data_contributors_s;
   auto n=0;
-  while (query.fetch_row(row)) {
+  for (const auto& row : query) {
     if (n > 0) {
 	data_contributors_s << " | ";
     }
@@ -1384,6 +1382,7 @@ void generate_description(std::string type,std::string tdir_name)
   std::stringstream volume_s;
   const int VOLUME_LEN=4;
   const char *v[VOLUME_LEN]={"MB","GB","TB","PB"};
+  MySQL::Row row;
   if (query.fetch_row(row) && !row[0].empty()) {
     auto volume=std::stof(row[0])/1000000.;
     n=0;
@@ -1396,8 +1395,7 @@ void generate_description(std::string type,std::string tdir_name)
   if (query2.num_rows() > 1) {
     volume_s << " <span class=\"fs13px\">(Entire dataset)</span><br /><span id=\"D" << div_num << "\"><a href=\"javascript:swapDivs(" << div_num << "," << div_num+1 << ")\"><img src=\"/images/bluetriangle.gif\" width=\"12\" height=\"15\" border=\"0\" title=\"Expand dataset product volume list\"><font size=\"-1\">Volume details by dataset product</font></a></span><span style=\"visibility: hidden; position: absolute; top: 0\" id=\"D" << div_num+1 << "\"><a href=\"javascript:swapDivs(" << div_num+1 << "," << div_num << ")\" title=\"Collapse dataset product volume list\"><img src=\"/images/bluetriangle90.gif\" width=\"15\" height=\"12\" border=\"0\"></a><span class=\"fs13px\">Volume details by dataset product:";
     div_num+=2;
-    MySQL::Row row2;
-    while (query2.fetch_row(row2)) {
+    for (const auto& row2: query2) {
 	auto volume=std::stof(row2[0])/1000000.;
 	n=0;
 	while (volume > 1000. && n < VOLUME_LEN) {
@@ -1501,6 +1499,7 @@ void generate_description(std::string type,std::string tdir_name)
 	if (query.submit(server) < 0) {
           metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",USER);
 	}
+	MySQL::Row row;
 	if (query.fetch_row(row)) {
 	  related_datasets+="<tr valign=\"top\"><td><a href=\"/datasets/ds"+row[0]+"#description\">"+row[0]+"</a></td><td>-</td><td>"+row[1]+"</td></tr>";
 	}
