@@ -52,12 +52,18 @@ return false;
     if (fetched_row) {
 	file_format=row[1];
     }
-    auto local_name=args.path;
-    strutils::replace_all(local_name,"https://rda.ucar.edu","");
-    if (std::regex_search(local_name,std::regex("^"+directives.data_root_alias))) {
-	local_name=directives.data_root+local_name.substr(directives.data_root_alias.length());
+    std::string local_name;
+    if (!args.override_primary_check) {
+	local_name=args.path;
+	strutils::replace_all(local_name,"https://rda.ucar.edu","");
+	if (std::regex_search(local_name,std::regex("^"+directives.data_root_alias))) {
+	  local_name=directives.data_root+local_name.substr(directives.data_root_alias.length());
+	}
+	local_name=local_name+"/"+args.filename;
     }
-    local_name=local_name+"/"+args.filename;
+    else {
+	local_name=args.filename;
+    }
     struct stat64 statbuf;
     if ( (stat64(local_name.c_str(),&statbuf)) != 0) {
 	local_name=unixutils::remote_web_file(args.path+"/"+args.filename,temp_dir.name());
