@@ -911,7 +911,7 @@ void scan_file(gatherxml::markup::ObML::ObservationData& obs_data)
   }
   std::string file_format,error;
   if (!metautils::primaryMetadata::prepare_file_for_metadata_scanning(*tfile,*tdir,NULL,file_format,error)) {
-    metautils::log_error2(error,"prepare_file_for_metadata_scanning()","bufr2xml",USER);
+    metautils::log_error2(error,THIS_FUNC+": prepare_file_for_metadata_scanning()","bufr2xml",USER);
   }
   const size_t BUF_LEN=800000;
   std::unique_ptr<unsigned char[]> buffer(new unsigned char[BUF_LEN]);

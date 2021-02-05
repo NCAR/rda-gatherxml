@@ -3256,7 +3256,7 @@ void scan_file(ScanData& scan_data)
   std::string file_format,error;
   std::list<std::string> filelist;
   if (!metautils::primaryMetadata::prepare_file_for_metadata_scanning(*work_file,*work_dir,&filelist,file_format,error)) {
-    metautils::log_error2(error+"'",THIS_FUNC,"hdf2xml",USER);
+    metautils::log_error2(error+"'",THIS_FUNC+": prepare_file_for_metadata_scanning()","hdf2xml",USER);
   }
   if (filelist.empty()) {
     filelist.emplace_back(work_file->name());
