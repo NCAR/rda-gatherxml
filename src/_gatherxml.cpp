@@ -292,7 +292,7 @@ exit(1);
 	    auto t1=std::time(nullptr);
 	    auto exit_status=unixutils::mysystem2(metautils::directives.decs_bindir+"/"+e.string+" "+strutils::substitute(metautils::args.args_string,"%"," "),oss,ess);
 	    if (exit_status != 0) {
-		if (exit_status == 2) {
+		if (exit_status == 2 || metautils::args.dsnum >= "999.0") {
 		  std::cerr << ess.str() << std::endl;
 		  exit(1);
 		}
