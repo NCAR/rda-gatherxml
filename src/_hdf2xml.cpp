@@ -2646,7 +2646,7 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
 	std::cout << "...looking for alternate latitude and longitude coordinates..." << std::endl;
     }
     std::vector<std::string> compass{"north","east"};
-    std::vector<std::vector<std::string> *> id_list{&lat_ids,&lon_ids};
+    std::unordered_map<std::string,std::string> dim_map[compass.size()];
     for (size_t n=0; n < compass.size(); ++n) {
 	auto vars=istream.datasets_with_attribute("units=degrees_"+compass[n]);
 	if (vars.empty()) {
@@ -2659,13 +2659,19 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
 	    if (gatherxml::verbose_operation) {
 		std::cout << "   ...found '" << var_name << "'" << std::endl;
 	    }
-	    id_list[n]->emplace_back(var_name);
-	    std::stringstream ss;
-            v.second->attributes["DIMENSION_LIST"].print(ss,istream.reference_table_pointer());
-	    auto dparts=strutils::split(ss.str().substr(1,ss.str().length()-2),",");
-	    for (auto& d : dparts) {
-		strutils::trim(d);
-	    }
+	    std::stringstream dimension_list;
+            v.second->attributes["DIMENSION_LIST"].print(dimension_list,istream.reference_table_pointer());
+	    dim_map[n].emplace(dimension_list.str(),var_name);
+	  }
+	}
+    }
+    std::vector<std::vector<std::string> *> id_list{&lat_ids,&lon_ids};
+    for (const auto& entry : dim_map[0]) {
+	id_list[0]->emplace_back(entry.second);
+	for (size_t n = 1; n < compass.size(); ++n) {
+	  auto var_name = dim_map[n].find(entry.first);
+	  if (var_name != dim_map[n].end()) {
+	    id_list[n]->emplace_back(var_name->second);
 	  }
 	}
     }
@@ -2738,7 +2744,7 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
   }
   if (found_time && !lat_ids.empty() && !lon_ids.empty()) {
     if (gatherxml::verbose_operation) {
-	std::cout << "...found time ('" << gcoords.valid_time.id << "'), latitude ('" << lat_ids.front() << "'), and longitude ('" << lon_ids.front() << "') coordinates..." << std::endl;
+	std::cout << "...found time ('" << gcoords.valid_time.id << "'), latitude ('" << strutils::vector_to_string(lat_ids) << "'), and longitude ('" << strutils::vector_to_string(lon_ids) << "') coordinates..." << std::endl;
     }
     my::map<metautils::NcTime::TimeRangeEntry> time_range_table;
     metautils::NcTime::TimeRangeEntry tre;
