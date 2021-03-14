@@ -91,11 +91,20 @@ std::string xml_directory;
 
 extern "C" void clean_up()
 {
-  if (!wss.str().empty()) {
-    metautils::log_warning(wss.str(),"hdf2xml",USER);
-  }
-  if (!myerror.empty()) {
-    metautils::log_error2(myerror,"clean_up()","hdf2xml",USER);
+  if (metautils::args.dsnum < "999.0") {
+    if (!wss.str().empty()) {
+      metautils::log_warning(wss.str(), "hdf2xml", USER);
+    }
+    if (!myerror.empty()) {
+      metautils::log_error2(myerror, "clean_up()", "hdf2xml", USER);
+    }
+  } else {
+    if (!wss.str().empty()) {
+      std::cerr << wss.str() << std::endl;
+    }
+    if (!myerror.empty()) {
+      std::cerr << myerror << std::endl;
+    }
   }
 }
 
@@ -103,7 +112,12 @@ extern "C" void segv_handler(int)
 {
   clean_up();
   metautils::cmd_unregister();
-  metautils::log_error2("core dump","segv_handler()","hdf2xml",USER);
+  if (metautils::args.dsnum < "999.0") {
+    metautils::log_error2("core dump", "segv_handler()", "hdf2xml", USER);
+  } else {
+    std::cerr << "core dump" << std::endl;
+    exit(1);
+  }
 }
 
 extern "C" void int_handler(int)
