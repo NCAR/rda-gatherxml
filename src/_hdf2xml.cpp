@@ -1125,6 +1125,7 @@ void add_gridded_time_range(std::string key_start,std::unordered_set<std::string
     auto& dset_ptr=var.second;
     auto attr_it=dset_ptr->attributes.find("DIMENSION_LIST");
     if (attr_it != dset_ptr->attributes.end() && attr_it->second.dim_sizes.size() == 1 && (attr_it->second.dim_sizes[0] > 2 || (attr_it->second.dim_sizes[0] == 2 && gcoords.valid_time.data_array.num_values == 1))) {
+std::cerr << var.first << " " << attr_it->second.dim_sizes.size() << " " << attr_it->second.dim_sizes[0] << " " << gcoords.valid_time.data_array.num_values << " " << gcoords.latitude.id << " " << gcoords.longitude.id << std::endl;
 	auto time_method=gridded_time_method(dset_ptr,gcoords);
 	if (time_method.empty()) {
 	  found_no_method=true;
@@ -1318,38 +1319,37 @@ void add_gridded_netcdf_parameter(const InputHDF5Stream::DatasetEntry& var,ScanD
   level_entry_ptr->parameter_code_table.insert(*parameter_entry_ptr);
 }
 
-bool parameter_matches_dimensions(InputHDF5Stream& istream,const InputHDF5Stream::Attribute& attr,const GridCoordinates& gcoords,std::string level_id)
+bool parameter_matches_dimensions(InputHDF5Stream& istream,const InputHDF5Stream::DataValue& dimension_list,const GridCoordinates& gcoords,std::string level_id)
 {
   static const std::string THIS_FUNC=this_function_label(__func__);
   bool parameter_matches=false;
   auto off=4;
   size_t first=1;
-  auto& attribute_value=attr.second;
-  if (attribute_value.dim_sizes[0] == 2 && gcoords.valid_time.data_array.num_values == 1) {
+  if (dimension_list.dim_sizes[0] == 2 && gcoords.valid_time.data_array.num_values == 1) {
     first=0;
   }
   else {
-    off+=attribute_value.precision_+4;
+    off+=dimension_list.precision_+4;
   }
   if (gatherxml::verbose_operation) {
     std::cout << "      dimension names to check:" << std::endl;
   }
   std::unordered_map<size_t,std::string>::iterator rtp_it[3];
-  for (size_t n=first,rcnt=0; n < attribute_value.dim_sizes[0]; ++n,++rcnt) {
-    rtp_it[rcnt]=istream.reference_table_pointer()->find(HDF5::value(&attribute_value.vlen.buffer[off],attribute_value.precision_));
+  for (size_t n=first,rcnt=0; n < dimension_list.dim_sizes[0]; ++n,++rcnt) {
+    rtp_it[rcnt]=istream.reference_table_pointer()->find(HDF5::value(&dimension_list.vlen.buffer[off],dimension_list.precision_));
     if (rtp_it[rcnt] == istream.reference_table_pointer()->end()) {
 	metautils::log_error2("unable to dereference dimension reference",THIS_FUNC,"hdf2xml",USER);
     }
     if (gatherxml::verbose_operation) {
 	std::cout << "       '" << rtp_it[rcnt]->second << "'" << std::endl;
     }
-    off+=attribute_value.precision_+4;
+    off+=dimension_list.precision_+4;
   }
-  switch (attribute_value.dim_sizes[0]) {
+  switch (dimension_list.dim_sizes[0]) {
     case 2:
     case 3: {
 // data variables dimensioned [time, lat, lon] or [lat, lon] with scalar time
-	if (level_id == "sfc" && (attribute_value.dim_sizes[0] == 3 || gcoords.valid_time.data_array.num_values == 1)) {
+	if (level_id == "sfc" && (dimension_list.dim_sizes[0] == 3 || gcoords.valid_time.data_array.num_values == 1)) {
 	  if (rtp_it[0]->second == gcoords.latitude.id && rtp_it[1]->second == gcoords.longitude.id) {
 // latitude and longitude are coordinate variables
 	    parameter_matches=true;
@@ -1374,7 +1374,7 @@ bool parameter_matches_dimensions(InputHDF5Stream& istream,const InputHDF5Stream
     case 4:
     case 5: {
 // data variables dimensioned [time, lev, lat, lon] or [reference_time, forecast_period, lev, lat, lon]
-	auto off=attribute_value.dim_sizes[0]-4;
+	auto off=dimension_list.dim_sizes[0]-4;
 	auto can_continue=true;
 	if (rtp_it[off]->second != level_id) {
 	  can_continue=false;
@@ -1435,7 +1435,7 @@ void add_gridded_parameters_to_netcdf_level_entry(InputHDF5Stream& istream,std::
 	attr_it->second.print(std::cout,istream.reference_table_pointer());
 	std::cout << std::endl;
     }
-    if (attr_it->second._class_ == 9 && attr_it->second.dim_sizes.size() == 1 && (attr_it->second.dim_sizes[0] > 2 || (attr_it->second.dim_sizes[0] == 2 && gcoords.valid_time.data_array.num_values == 1)) && attr_it->second.vlen.class_ == 7 && parameter_matches_dimensions(istream,*attr_it,gcoords,level_id)) {
+    if (attr_it->second._class_ == 9 && attr_it->second.dim_sizes.size() == 1 && (attr_it->second.dim_sizes[0] > 2 || (attr_it->second.dim_sizes[0] == 2 && gcoords.valid_time.data_array.num_values == 1)) && attr_it->second.vlen.class_ == 7 && parameter_matches_dimensions(istream,attr_it->second,gcoords,level_id)) {
 	if (gatherxml::verbose_operation) {
 	  std::cout << "    ...is a netCDF variable" << std::endl;
 	}
@@ -1479,7 +1479,7 @@ void update_level_entry(InputHDF5Stream& istream,const metautils::NcTime::TimeRa
   for (const auto& var : vars) {
     auto& dset_ptr=var.second;
     auto attr_it=dset_ptr->attributes.find("DIMENSION_LIST");
-    if (attr_it->second._class_ == 9 && attr_it->second.dim_sizes.size() == 1 && attr_it->second.dim_sizes[0] > 2 && attr_it->second.vlen.class_ == 7 && parameter_matches_dimensions(istream,*attr_it,gcoords,level_id)) {
+    if (attr_it->second._class_ == 9 && attr_it->second.dim_sizes.size() == 1 && attr_it->second.dim_sizes[0] > 2 && attr_it->second.vlen.class_ == 7 && parameter_matches_dimensions(istream,attr_it->second,gcoords,level_id)) {
 	parameter_entry_ptr->key="ds"+metautils::args.dsnum+":"+var.first;
 	auto time_method=gridded_time_method(dset_ptr,gcoords);
 	time_method=strutils::capitalize(time_method);
