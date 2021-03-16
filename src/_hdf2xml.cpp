@@ -50,9 +50,9 @@ struct GridCoordinates {
     std::shared_ptr<InputHDF5Stream::Dataset> ds;
     HDF5::DataArray data_array;
   };
-  GridCoordinates() : reference_time(),valid_time(),time_bounds(),forecast_period(),latitude(),longitude() {}
+  GridCoordinates() : reference_time(),valid_time(),time_bounds(),forecast_period(),latitude(),longitude(),level() {}
 
-  CoordinateData reference_time,valid_time,time_bounds,forecast_period,latitude,longitude;
+  CoordinateData reference_time,valid_time,time_bounds,forecast_period,latitude,longitude,level;
 };
 struct DiscreteGeometriesData {
   DiscreteGeometriesData() : indexes(),z_units(),z_pos() {}
@@ -1319,7 +1319,7 @@ void add_gridded_netcdf_parameter(const InputHDF5Stream::DatasetEntry& var,ScanD
   level_entry_ptr->parameter_code_table.insert(*parameter_entry_ptr);
 }
 
-bool parameter_matches_dimensions(InputHDF5Stream& istream,const InputHDF5Stream::DataValue& dimension_list,const GridCoordinates& gcoords,std::string level_id)
+bool parameter_matches_dimensions(InputHDF5Stream& istream,const InputHDF5Stream::DataValue& dimension_list,const GridCoordinates& gcoords)
 {
   static const std::string THIS_FUNC=this_function_label(__func__);
   bool parameter_matches=false;
@@ -1349,7 +1349,7 @@ bool parameter_matches_dimensions(InputHDF5Stream& istream,const InputHDF5Stream
     case 2:
     case 3: {
 // data variables dimensioned [time, lat, lon] or [lat, lon] with scalar time
-	if (level_id == "sfc" && (dimension_list.dim_sizes[0] == 3 || gcoords.valid_time.data_array.num_values == 1)) {
+	if (gcoords.level.id == "sfc" && (dimension_list.dim_sizes[0] == 3 || gcoords.valid_time.data_array.num_values == 1)) {
 	  if (rtp_it[0]->second == gcoords.latitude.id && rtp_it[1]->second == gcoords.longitude.id) {
 // latitude and longitude are coordinate variables
 	    parameter_matches=true;
@@ -1376,17 +1376,16 @@ bool parameter_matches_dimensions(InputHDF5Stream& istream,const InputHDF5Stream
 // data variables dimensioned [time, lev, lat, lon] or [reference_time, forecast_period, lev, lat, lon]
 	auto off=dimension_list.dim_sizes[0]-4;
 	auto can_continue=true;
-	if (rtp_it[off]->second != level_id) {
+	if (rtp_it[off]->second != gcoords.level.id) {
 	  can_continue=false;
-	  auto lev_ds=istream.dataset("/"+level_id);
-	  if (lev_ds != nullptr) {
+	  if (gcoords.level.ds != nullptr) {
 	    std::stringstream lev_dims;
-	    lev_ds->attributes["DIMENSION_LIST"].print(lev_dims,istream.reference_table_pointer());
+	    gcoords.level.ds->attributes["DIMENSION_LIST"].print(lev_dims,istream.reference_table_pointer());
 	    if (lev_dims.str() == "["+rtp_it[off]->second+"]") {
 		can_continue=true;
 	    }
 	  }
-	  else if (level_id == "sfc" && rtp_it[off]->second == gcoords.forecast_period.id) {
+	  else if (gcoords.level.id == "sfc" && rtp_it[off]->second == gcoords.forecast_period.id) {
 	    can_continue=true;
 	  }
 	}
@@ -1421,7 +1420,7 @@ bool parameter_matches_dimensions(InputHDF5Stream& istream,const InputHDF5Stream
   return parameter_matches;
 }
 
-void add_gridded_parameters_to_netcdf_level_entry(InputHDF5Stream& istream,std::string& grid_entry_key,const GridCoordinates& gcoords,std::string level_id,ScanData& scan_data,const metautils::NcTime::TimeRangeEntry& tre,const metautils::NcTime::TimeData& time_data,const metautils::NcTime::TimeBounds& time_bounds,ParameterData& parameter_data)
+void add_gridded_parameters_to_netcdf_level_entry(InputHDF5Stream& istream,std::string& grid_entry_key,const GridCoordinates& gcoords,ScanData& scan_data,const metautils::NcTime::TimeRangeEntry& tre,const metautils::NcTime::TimeData& time_data,const metautils::NcTime::TimeBounds& time_bounds,ParameterData& parameter_data)
 {
   static const std::string THIS_FUNC=this_function_label(__func__);
 
@@ -1435,7 +1434,7 @@ void add_gridded_parameters_to_netcdf_level_entry(InputHDF5Stream& istream,std::
 	attr_it->second.print(std::cout,istream.reference_table_pointer());
 	std::cout << std::endl;
     }
-    if (attr_it->second._class_ == 9 && attr_it->second.dim_sizes.size() == 1 && (attr_it->second.dim_sizes[0] > 2 || (attr_it->second.dim_sizes[0] == 2 && gcoords.valid_time.data_array.num_values == 1)) && attr_it->second.vlen.class_ == 7 && parameter_matches_dimensions(istream,attr_it->second,gcoords,level_id)) {
+    if (attr_it->second._class_ == 9 && attr_it->second.dim_sizes.size() == 1 && (attr_it->second.dim_sizes[0] > 2 || (attr_it->second.dim_sizes[0] == 2 && gcoords.valid_time.data_array.num_values == 1)) && attr_it->second.vlen.class_ == 7 && parameter_matches_dimensions(istream,attr_it->second,gcoords)) {
 	if (gatherxml::verbose_operation) {
 	  std::cout << "    ...is a netCDF variable" << std::endl;
 	}
@@ -1472,14 +1471,14 @@ void add_gridded_parameters_to_netcdf_level_entry(InputHDF5Stream& istream,std::
   }
 }
 
-void update_level_entry(InputHDF5Stream& istream,const metautils::NcTime::TimeRangeEntry tre,const metautils::NcTime::TimeData& time_data,const metautils::NcTime::TimeBounds& time_bounds,const GridCoordinates& gcoords,std::string level_id,ScanData& scan_data,ParameterData& parameter_data,unsigned char& level_write)
+void update_level_entry(InputHDF5Stream& istream,const metautils::NcTime::TimeRangeEntry tre,const metautils::NcTime::TimeData& time_data,const metautils::NcTime::TimeBounds& time_bounds,const GridCoordinates& gcoords,ScanData& scan_data,ParameterData& parameter_data,unsigned char& level_write)
 {
   static const std::string THIS_FUNC=this_function_label(__func__);
   auto vars=istream.datasets_with_attribute("DIMENSION_LIST");
   for (const auto& var : vars) {
     auto& dset_ptr=var.second;
     auto attr_it=dset_ptr->attributes.find("DIMENSION_LIST");
-    if (attr_it->second._class_ == 9 && attr_it->second.dim_sizes.size() == 1 && attr_it->second.dim_sizes[0] > 2 && attr_it->second.vlen.class_ == 7 && parameter_matches_dimensions(istream,attr_it->second,gcoords,level_id)) {
+    if (attr_it->second._class_ == 9 && attr_it->second.dim_sizes.size() == 1 && attr_it->second.dim_sizes[0] > 2 && attr_it->second.vlen.class_ == 7 && parameter_matches_dimensions(istream,attr_it->second,gcoords)) {
 	parameter_entry_ptr->key="ds"+metautils::args.dsnum+":"+var.first;
 	auto time_method=gridded_time_method(dset_ptr,gcoords);
 	time_method=strutils::capitalize(time_method);
@@ -2990,26 +2989,24 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
     }
     for (size_t m=0; m < level_info.ID.size(); ++m) {
 	std::unordered_set<std::string> grid_entry_set;
-	auto level_id=level_info.ID[m];
-	std::shared_ptr<InputHDF5Stream::Dataset> levels_ds;
-	HDF5::DataArray levels_array;
+	gcoords.level.id=level_info.ID[m];
 	size_t num_levels;
-	if (m == (level_info.ID.size()-1) && level_id == "sfc") {
+	if (m == (level_info.ID.size()-1) && gcoords.level.id == "sfc") {
 	  num_levels=1;
 	}
 	else {
-	  levels_ds=istream.dataset("/"+level_id);
-	  if (levels_ds == nullptr) {
-	    metautils::log_error2("unable to access the /"+level_id+" dataset for level information",THIS_FUNC,"hdf2xml",USER);
+	  gcoords.level.ds=istream.dataset("/"+gcoords.level.id);
+	  if (gcoords.level.ds == nullptr) {
+	    metautils::log_error2("unable to access the /"+gcoords.level.id+" dataset for level information",THIS_FUNC,"hdf2xml",USER);
 	  }
-	  levels_array.fill(istream,*levels_ds);
-	  num_levels=levels_array.num_values;
-	  auto attr_it=levels_ds->attributes.find("bounds");
-	  if (attr_it != levels_ds->attributes.end() && attr_it->second._class_ == 3) {
+	  gcoords.level.data_array.fill(istream,*gcoords.level.ds);
+	  num_levels=gcoords.level.data_array.num_values;
+	  auto attr_it=gcoords.level.ds->attributes.find("bounds");
+	  if (attr_it != gcoords.level.ds->attributes.end() && attr_it->second._class_ == 3) {
 	    std::string attr_value=reinterpret_cast<char *>(attr_it->second.array);
 	    gcoords.time_bounds.ds=istream.dataset("/"+attr_value);
 	    if (gcoords.time_bounds.ds == nullptr) {
-		metautils::log_error2("unable to get bounds for level '"+level_id+"'",THIS_FUNC,"hdf2xml",USER);
+		metautils::log_error2("unable to get bounds for level '"+gcoords.level.id+"'",THIS_FUNC,"hdf2xml",USER);
 	    }
 	    gcoords.time_bounds.data_array.fill(istream,*gcoords.time_bounds.ds);
 	  }
@@ -3038,12 +3035,12 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
 		grid_entry_ptr->level_table.clear();
 		level_entry_ptr->parameter_code_table.clear();
 		parameter_entry_ptr->num_time_steps=0;
-		add_gridded_parameters_to_netcdf_level_entry(istream,grid_entry_ptr->key,gcoords,level_id,scan_data,tre,tr_time_data,time_bounds,parameter_data);
+		add_gridded_parameters_to_netcdf_level_entry(istream,grid_entry_ptr->key,gcoords,scan_data,tre,tr_time_data,time_bounds,parameter_data);
 		if (!level_entry_ptr->parameter_code_table.empty()) {
 		  for (size_t l=0; l < num_levels; ++l) {
-		    level_entry_ptr->key="ds"+metautils::args.dsnum+","+level_id+":";
+		    level_entry_ptr->key="ds"+metautils::args.dsnum+","+gcoords.level.id+":";
 		    if (gcoords.time_bounds.ds == nullptr) {
-			auto level_value= (levels_ds == nullptr) ? 0. : data_array_value(levels_array,l,levels_ds.get());
+			auto level_value= (gcoords.level.ds == nullptr) ? 0. : data_array_value(gcoords.level.data_array,l,gcoords.level.ds.get());
 			if (floatutils::myequalf(level_value,static_cast<int>(level_value),0.001)) {
 			  level_entry_ptr->key+=strutils::itos(level_value);
 			}
@@ -3082,8 +3079,8 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
 	    else {
 // existing grid - needs update
 		for (size_t l=0; l < num_levels; ++l) {
-		  level_entry_ptr->key="ds"+metautils::args.dsnum+","+level_id+":";
-		  auto level_value= (levels_ds == nullptr) ? 0. : data_array_value(levels_array,l,levels_ds.get());
+		  level_entry_ptr->key="ds"+metautils::args.dsnum+","+gcoords.level.id+":";
+		  auto level_value= (gcoords.level.ds == nullptr) ? 0. : data_array_value(gcoords.level.data_array,l,gcoords.level.ds.get());
 		  if (floatutils::myequalf(level_value,static_cast<int>(level_value),0.001)) {
 		    level_entry_ptr->key+=strutils::itos(level_value);
 		  }
@@ -3092,14 +3089,14 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
 		  }
 		  if (!grid_entry_ptr->level_table.found(level_entry_ptr->key,*level_entry_ptr)) {
 		    level_entry_ptr->parameter_code_table.clear();
-		    add_gridded_parameters_to_netcdf_level_entry(istream,grid_entry_ptr->key,gcoords,level_id,scan_data,tre,tr_time_data,time_bounds,parameter_data);
+		    add_gridded_parameters_to_netcdf_level_entry(istream,grid_entry_ptr->key,gcoords,scan_data,tre,tr_time_data,time_bounds,parameter_data);
 		    if (!level_entry_ptr->parameter_code_table.empty()) {
 			grid_entry_ptr->level_table.insert(*level_entry_ptr);
 			level_info.write[m]=1;
 		    }
 		  }
 		  else {
- 		    update_level_entry(istream,tre,tr_time_data,time_bounds,gcoords,level_id,scan_data,parameter_data,level_info.write[m]);
+ 		    update_level_entry(istream,tre,tr_time_data,time_bounds,gcoords,scan_data,parameter_data,level_info.write[m]);
 		  }
 		  if (level_info.write[m] == 1 && inv_stream.is_open()) {
 		    update_inventory(inv_U_map[product_key],inv_G_map[grid_key],gcoords,tr_time_data);
