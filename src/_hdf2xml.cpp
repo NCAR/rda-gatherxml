@@ -1133,8 +1133,7 @@ double data_array_value(const HDF5::DataArray& data_array,size_t index,const Inp
           value=(reinterpret_cast<long long *>(data_array.values))[index];
           break;
         }
-        default:
-        {
+        default: {
           metautils::log_error2("unable to get value for fixed-point size "+strutils::itos(ds->data.size_of_element),THIS_FUNC,"hdf2xml",USER);
         }
       }
@@ -1150,15 +1149,13 @@ double data_array_value(const HDF5::DataArray& data_array,size_t index,const Inp
           value=(reinterpret_cast<double *>(data_array.values))[index];
           break;
         }
-        default:
-        {
+        default: {
           metautils::log_error2("unable to get value for floating-point size "+strutils::itos(ds->data.size_of_element),THIS_FUNC,"hdf2xml",USER);
         }
       }
       break;
     }
-    default:
-    {
+    default: {
       metautils::log_error2("unable to decode time from datatype class "+strutils::itos(ds->datatype.class_),THIS_FUNC,"hdf2xml",USER);
     }
   }
