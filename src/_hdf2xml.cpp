@@ -50,11 +50,12 @@ struct GridData {
     std::shared_ptr<InputHDF5Stream::Dataset> ds;
     HDF5::DataArray data_array;
   };
-  GridData() : time_range_entry(),time_data(nullptr),reference_time(),valid_time(),time_bounds(),forecast_period(),latitude(),longitude(),level() {}
+  GridData() : time_range_entry(),time_data(nullptr),reference_time(),valid_time(),time_bounds(),forecast_period(),latitude(),longitude(),level(),coordinate_variables_set() {}
 
   metautils::NcTime::TimeRangeEntry time_range_entry;
   std::shared_ptr<metautils::NcTime::TimeData> time_data;
   CoordinateData reference_time,valid_time,time_bounds,forecast_period,latitude,longitude,level;
+  std::unordered_set<std::string> coordinate_variables_set;
 };
 struct DiscreteGeometriesData {
   DiscreteGeometriesData() : indexes(),z_units(),z_pos() {}
@@ -1126,8 +1127,7 @@ void add_gridded_time_range(std::string key_start,std::unordered_set<std::string
   for (const auto& var : vars) {
     auto& dset_ptr=var.second;
     auto attr_it=dset_ptr->attributes.find("DIMENSION_LIST");
-    if (attr_it != dset_ptr->attributes.end() && attr_it->second.dim_sizes.size() == 1 && (attr_it->second.dim_sizes[0] > 2 || (attr_it->second.dim_sizes[0] == 2 && grid_data.valid_time.data_array.num_values == 1))) {
-std::cerr << var.first << " " << attr_it->second.dim_sizes.size() << " " << attr_it->second.dim_sizes[0] << " " << grid_data.valid_time.data_array.num_values << " " << grid_data.latitude.id << " " << grid_data.longitude.id << std::endl;
+    if (attr_it != dset_ptr->attributes.end() && grid_data.coordinate_variables_set.find(var.first) == grid_data.coordinate_variables_set.end() && attr_it->second.dim_sizes.size() == 1 && (attr_it->second.dim_sizes[0] > 2 || (attr_it->second.dim_sizes[0] == 2 && grid_data.valid_time.data_array.num_values == 1))) {
 	auto time_method=gridded_time_method(dset_ptr,grid_data);
 	if (time_method.empty()) {
 	  found_no_method=true;
@@ -1429,45 +1429,47 @@ void add_gridded_parameters_to_netcdf_level_entry(InputHDF5Stream& istream,std::
 // find all of the variables
   auto vars=istream.datasets_with_attribute("DIMENSION_LIST");
   for (const auto& var : vars) {
-    auto& dset_ptr=var.second;
-    auto attr_it=dset_ptr->attributes.find("DIMENSION_LIST");
-    if (gatherxml::verbose_operation) {
-	std::cout << "    '" << var.first << "' has a DIMENSION_LIST: ";
-	attr_it->second.print(std::cout,istream.reference_table_pointer());
-	std::cout << std::endl;
-    }
-    if (attr_it->second._class_ == 9 && attr_it->second.dim_sizes.size() == 1 && (attr_it->second.dim_sizes[0] > 2 || (attr_it->second.dim_sizes[0] == 2 && grid_data.valid_time.data_array.num_values == 1)) && attr_it->second.vlen.class_ == 7 && parameter_matches_dimensions(istream,attr_it->second,grid_data)) {
+    if (grid_data.coordinate_variables_set.find(var.first) == grid_data.coordinate_variables_set.end()) {
+	auto& dset_ptr=var.second;
+	auto attr_it=dset_ptr->attributes.find("DIMENSION_LIST");
 	if (gatherxml::verbose_operation) {
-	  std::cout << "    ...is a netCDF variable" << std::endl;
+	  std::cout << "    '" << var.first << "' has a DIMENSION_LIST: ";
+	  attr_it->second.print(std::cout,istream.reference_table_pointer());
+	  std::cout << std::endl;
 	}
-	auto time_method=gridded_time_method(dset_ptr,grid_data);
-	metautils::NcTime::TimeRange time_range;
-	if (time_method.empty() || (floatutils::myequalf(time_bounds.t1,0,0.0001) && floatutils::myequalf(time_bounds.t1,time_bounds.t2,0.0001))) {
-	  time_range.first_valid_datetime=grid_data.time_range_entry.data->instantaneous.first_valid_datetime;
-	  time_range.last_valid_datetime=grid_data.time_range_entry.data->instantaneous.last_valid_datetime;
-	}
-	else {
-	  if (time_bounds.changed) {
-	    metautils::log_error2("time bounds changed",THIS_FUNC,"hdf2xml",USER);
+	if (attr_it->second._class_ == 9 && attr_it->second.dim_sizes.size() == 1 && (attr_it->second.dim_sizes[0] > 2 || (attr_it->second.dim_sizes[0] == 2 && grid_data.valid_time.data_array.num_values == 1)) && attr_it->second.vlen.class_ == 7 && parameter_matches_dimensions(istream,attr_it->second,grid_data)) {
+	  if (gatherxml::verbose_operation) {
+	    std::cout << "    ...is a netCDF variable" << std::endl;
 	  }
-	  time_range.first_valid_datetime=grid_data.time_range_entry.data->bounded.first_valid_datetime;
-	  time_range.last_valid_datetime=grid_data.time_range_entry.data->bounded.last_valid_datetime;
-	}
-	time_method=strutils::capitalize(time_method);
-	std::string tr_description,error;
-	tr_description=metautils::NcTime::gridded_netcdf_time_range_description(grid_data.time_range_entry,*grid_data.time_data,time_method,error);
-	if (!error.empty()) {
-	  metautils::log_error2(error,THIS_FUNC,"hdf2xml",USER);
-	}
-	tr_description=strutils::capitalize(tr_description);
-	if (std::regex_search(grid_entry_key,std::regex(tr_description+"$"))) {
-//	  if (attr.value.dim_sizes[0] == 4 || attr.value.dim_sizes[0] == 3 || (attr.value.dim_sizes[0] == 2 && grid_data.valid_time.data_array.num_values == 1)) {
-	    parameter_entry_ptr->key="ds"+metautils::args.dsnum+":"+var.first;
-	    add_gridded_netcdf_parameter(var,scan_data,time_range,parameter_data,grid_data.time_range_entry.data->num_steps);
-	    if (inv_P_map.find(parameter_entry_ptr->key) == inv_P_map.end()) {
-		inv_P_map.emplace(parameter_entry_ptr->key,inv_P_map.size());
+	  auto time_method=gridded_time_method(dset_ptr,grid_data);
+	  metautils::NcTime::TimeRange time_range;
+	  if (time_method.empty() || (floatutils::myequalf(time_bounds.t1,0,0.0001) && floatutils::myequalf(time_bounds.t1,time_bounds.t2,0.0001))) {
+	    time_range.first_valid_datetime=grid_data.time_range_entry.data->instantaneous.first_valid_datetime;
+	    time_range.last_valid_datetime=grid_data.time_range_entry.data->instantaneous.last_valid_datetime;
+	  }
+	  else {
+	    if (time_bounds.changed) {
+		metautils::log_error2("time bounds changed",THIS_FUNC,"hdf2xml",USER);
 	    }
+	    time_range.first_valid_datetime=grid_data.time_range_entry.data->bounded.first_valid_datetime;
+	    time_range.last_valid_datetime=grid_data.time_range_entry.data->bounded.last_valid_datetime;
+	  }
+	  time_method=strutils::capitalize(time_method);
+	  std::string tr_description,error;
+	  tr_description=metautils::NcTime::gridded_netcdf_time_range_description(grid_data.time_range_entry,*grid_data.time_data,time_method,error);
+	  if (!error.empty()) {
+	    metautils::log_error2(error+"; var name '"+var.first+"'",THIS_FUNC,"hdf2xml",USER);
+	  }
+	  tr_description=strutils::capitalize(tr_description);
+	  if (std::regex_search(grid_entry_key,std::regex(tr_description+"$"))) {
+//	  if (attr.value.dim_sizes[0] == 4 || attr.value.dim_sizes[0] == 3 || (attr.value.dim_sizes[0] == 2 && grid_data.valid_time.data_array.num_values == 1)) {
+		parameter_entry_ptr->key="ds"+metautils::args.dsnum+":"+var.first;
+		add_gridded_netcdf_parameter(var,scan_data,time_range,parameter_data,grid_data.time_range_entry.data->num_steps);
+		if (inv_P_map.find(parameter_entry_ptr->key) == inv_P_map.end()) {
+		  inv_P_map.emplace(parameter_entry_ptr->key,inv_P_map.size());
+		}
 //	  }
+	  }
 	}
     }
   }
@@ -2544,6 +2546,7 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
 	    if (attribute.second._class_ == 3) {
 		if (attribute.first == "bounds") {
 		  grid_data.time_bounds.id=reinterpret_cast<char *>(attribute.second.array);
+		  grid_data.coordinate_variables_set.emplace(grid_data.time_bounds.id);
 		  break;
 		}
 		else if (attribute.first == "climatology") {
@@ -2555,8 +2558,10 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
 	  time_data->units=units_value.substr(0,units_value.find("since"));
 	  strutils::trim(time_data->units);
 	  grid_data.valid_time.id=var_name;
+	  grid_data.coordinate_variables_set.emplace(grid_data.valid_time.id);
 	  if (standard_name_value == "forecast_reference_time") {
 	    grid_data.reference_time.id=var_name;
+	    grid_data.coordinate_variables_set.emplace(grid_data.reference_time.id);
 	  }
 	  time_data->reference=metautils::NcTime::reference_date_time(units_value);
 	  if (time_data->reference.year() == 0) {
@@ -2577,6 +2582,7 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
 	else {
 	  if (standard_name_value == "forecast_period") {
 	    grid_data.forecast_period.id=var_name;
+	    grid_data.coordinate_variables_set.emplace(grid_data.forecast_period.id);
 	    if (!units_value.empty()) {
 		forecast_period_time_data->units=units_value;
 		if (forecast_period_time_data->units.back() != 's') {
@@ -2635,6 +2641,7 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
 		metautils::log_error2("time and forecast reference time have different units",THIS_FUNC,"hdf2xml",USER);
 	    }
 	    grid_data.reference_time.id=var.first;
+	    grid_data.coordinate_variables_set.emplace(grid_data.reference_time.id);
 	    auto ref_dt=metautils::NcTime::reference_date_time(units_value);
 	    if (ref_dt.year() == 0) {
 		metautils::log_error2("bad netcdf date in units for forecast_reference_time",THIS_FUNC,"hdf2xml",USER);
@@ -2664,6 +2671,7 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
 	    std::stringstream dimension_list;
             v.second->attributes["DIMENSION_LIST"].print(dimension_list,istream.reference_table_pointer());
 	    dim_map[n].emplace(dimension_list.str(),var_name);
+	    grid_data.coordinate_variables_set.emplace(var_name);
 	  }
 	}
     }
@@ -2698,6 +2706,7 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
 	  level_info.description.emplace_back("Pressure Level");
 	  level_info.units.emplace_back("Pa");
 	  level_info.write.emplace_back(0);
+	  grid_data.coordinate_variables_set.emplace(var_name);
 	}
     }
     vars=istream.datasets_with_attribute("positive");
