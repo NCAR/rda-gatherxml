@@ -92,8 +92,7 @@ std::list<std::string> inv_lines;
 std::stringstream wss;
 std::string xml_directory;
 
-extern "C" void clean_up()
-{
+extern "C" void clean_up() {
   if (metautils::args.dsnum < "999.0") {
     if (!wss.str().empty()) {
       metautils::log_warning(wss.str(), "hdf2xml", USER);
@@ -111,8 +110,7 @@ extern "C" void clean_up()
   }
 }
 
-extern "C" void segv_handler(int)
-{
+extern "C" void segv_handler(int) {
   clean_up();
   metautils::cmd_unregister();
   if (metautils::args.dsnum < "999.0") {
@@ -123,19 +121,16 @@ extern "C" void segv_handler(int)
   }
 }
 
-extern "C" void int_handler(int)
-{
+extern "C" void int_handler(int) {
   clean_up();
   metautils::cmd_unregister();
 }
 
-std::string this_function_label(std::string function_name)
-{
+std::string this_function_label(std::string function_name) {
   return std::string(function_name+"()");
 }
 
-void grid_initialize()
-{
+void grid_initialize() {
   if (grid_table_ptr == nullptr) {
     grid_table_ptr.reset(new my::map<gatherxml::markup::GrML::GridEntry>);
     grid_entry_ptr.reset(new gatherxml::markup::GrML::GridEntry);
@@ -144,13 +139,11 @@ void grid_initialize()
   }
 }
 
-void scan_quikscat_hdf4_file(InputHDF4Stream& istream)
-{
+void scan_quikscat_hdf4_file(InputHDF4Stream& istream) {
 istream.print_data_descriptors(1965);
 }
 
-void scan_hdf4_file(std::list<std::string>& filelist,ScanData& scan_data)
-{
+void scan_hdf4_file(std::list<std::string>& filelist,ScanData& scan_data) {
   static const std::string THIS_FUNC=this_function_label(__func__);
   InputHDF4Stream istream;
 
@@ -166,8 +159,7 @@ void scan_hdf4_file(std::list<std::string>& filelist,ScanData& scan_data)
   }
 }
 
-void extract_from_hdf5_variable_attributes(std::unordered_map<std::string,InputHDF5Stream::DataValue>& attributes,NetCDFVariableAttributeData& nc_attribute_data)
-{
+void extract_from_hdf5_variable_attributes(std::unordered_map<std::string, InputHDF5Stream::DataValue>& attributes, NetCDFVariableAttributeData& nc_attribute_data) {
   nc_attribute_data.long_name="";
   nc_attribute_data.units="";
   nc_attribute_data.cf_keyword="";
@@ -188,8 +180,7 @@ void extract_from_hdf5_variable_attributes(std::unordered_map<std::string,InputH
   }
 }
 
-bool found_missing(const double& time,HDF5::DataArray::Type time_type,const InputHDF5Stream::DataValue *time_missing_value,const HDF5::DataArray &var_vals,size_t var_val_index,const InputHDF5Stream::DataValue& var_missing_value)
-{
+bool found_missing(const double& time, HDF5::DataArray::Type time_type, const InputHDF5Stream::DataValue *time_missing_value, const HDF5::DataArray &var_vals, size_t var_val_index, const InputHDF5Stream::DataValue& var_missing_value) {
   static const std::string THIS_FUNC=this_function_label(__func__);
   bool missing=false;
   if (time_missing_value != nullptr && time_missing_value->_class_ != -1) {
@@ -290,8 +281,7 @@ bool found_missing(const double& time,HDF5::DataArray::Type time_type,const Inpu
   return missing;
 }
 
-std::string ispd_hdf5_platform_type(const std::tuple<std::string,std::string,float,float,short,short,char,bool>& library_entry)
-{
+std::string ispd_hdf5_platform_type(const std::tuple<std::string, std::string, float, float, short, short, char, bool>& library_entry) {
   std::string id,ispd_id;
   float lat,lon;
   short plat_type,isrc;
@@ -419,8 +409,7 @@ std::string ispd_hdf5_platform_type(const std::tuple<std::string,std::string,flo
   }
 }
 
-std::string ispd_hdf5_id_entry(const std::tuple<std::string,std::string,float,float,short,short,char,bool>& library_entry,std::string platform_type,DateTime& dt)
-{
+std::string ispd_hdf5_id_entry(const std::tuple<std::string, std::string, float, float, short, short, char, bool>& library_entry, std::string platform_type, DateTime& dt) {
   std::string id,ispd_id;
   float lat,lon;
   short plat_type,isrc;
@@ -553,8 +542,7 @@ std::string ispd_hdf5_id_entry(const std::tuple<std::string,std::string,float,fl
   return ientry_key;
 }
 
-void scan_ispd_hdf5_file(InputHDF5Stream& istream,ScanData& scan_data,gatherxml::markup::ObML::ObservationData& obs_data)
-{
+void scan_ispd_hdf5_file(InputHDF5Stream& istream,ScanData& scan_data,gatherxml::markup::ObML::ObservationData& obs_data) {
   static const std::string THIS_FUNC=this_function_label(__func__);
   auto ds=istream.dataset("/ISPD_Format_Version");
   if (ds == nullptr || ds->datatype.class_ != 3) {
@@ -915,8 +903,7 @@ void scan_ispd_hdf5_file(InputHDF5Stream& istream,ScanData& scan_data,gatherxml:
   scan_data.write_type=ScanData::ObML_type;
 }
 
-void scan_usarray_transportable_hdf5_file(InputHDF5Stream& istream,ScanData& scan_data,gatherxml::markup::ObML::ObservationData& obs_data)
-{
+void scan_usarray_transportable_hdf5_file(InputHDF5Stream& istream, ScanData& scan_data, gatherxml::markup::ObML::ObservationData& obs_data) {
   static const std::string THIS_FUNC=this_function_label(__func__);
   obs_data.set_track_unique_observations(false);
 // load the pressure dataset
@@ -1016,7 +1003,7 @@ void scan_usarray_transportable_hdf5_file(InputHDF5Stream& istream,ScanData& sca
   scan_data.write_type=ScanData::ObML_type;
 }
 
-std::string gridded_time_method(const std::shared_ptr<InputHDF5Stream::Dataset> ds,const GridData& grid_data)
+std::string gridded_time_method(const std::shared_ptr<InputHDF5Stream::Dataset> ds, const GridData& grid_data)
 {
   static const std::string THIS_FUNC=this_function_label(__func__);
   auto attr_it=ds->attributes.find("cell_methods");
@@ -1031,8 +1018,7 @@ std::string gridded_time_method(const std::shared_ptr<InputHDF5Stream::Dataset> 
   return "";
 }
 
-void add_gridded_time_range(std::string key_start,std::unordered_set<std::string>& grid_entry_set,const GridData& grid_data,InputHDF5Stream& istream)
-{
+void add_gridded_time_range(std::string key_start, std::unordered_set<std::string>& grid_entry_set, const GridData& grid_data, InputHDF5Stream& istream) {
   static const std::string THIS_FUNC=this_function_label(__func__);
   std::string grid_entry_key,inv_key;
   bool found_no_method=false;
@@ -1075,8 +1061,7 @@ void add_gridded_time_range(std::string key_start,std::unordered_set<std::string
   }
 }
 
-void add_gridded_lat_lon_keys(std::unordered_set<std::string>& grid_entry_set,Grid::GridDimensions dim,Grid::GridDefinition def,const GridData& grid_data,InputHDF5Stream& istream)
-{
+void add_gridded_lat_lon_keys(std::unordered_set<std::string>& grid_entry_set, Grid::GridDimensions dim, Grid::GridDefinition def, const GridData& grid_data, InputHDF5Stream& istream) {
   std::string key_start;
   switch (def.type) {
     case Grid::latitudeLongitudeType: {
@@ -1118,8 +1103,7 @@ void add_gridded_lat_lon_keys(std::unordered_set<std::string>& grid_entry_set,Gr
   }
 }
 
-double data_array_value(const HDF5::DataArray& data_array,size_t index,const InputHDF5Stream::Dataset *ds)
-{
+double data_array_value(const HDF5::DataArray& data_array, size_t index, const InputHDF5Stream::Dataset *ds) {
   static const std::string THIS_FUNC=this_function_label(__func__);
   double value=0.;
   switch (ds->datatype.class_) {
@@ -1162,8 +1146,7 @@ double data_array_value(const HDF5::DataArray& data_array,size_t index,const Inp
   return value;
 }
 
-void add_gridded_netcdf_parameter(const InputHDF5Stream::DatasetEntry& var,ScanData& scan_data,const metautils::NcTime::TimeRange& time_range,ParameterData& parameter_data,int num_steps)
-{
+void add_gridded_netcdf_parameter(const InputHDF5Stream::DatasetEntry& var, ScanData& scan_data, const metautils::NcTime::TimeRange& time_range, ParameterData& parameter_data, int num_steps) {
   std::string description;
   std::string units;
   auto& attributes=var.second->attributes;
@@ -1227,8 +1210,7 @@ void add_gridded_netcdf_parameter(const InputHDF5Stream::DatasetEntry& var,ScanD
   level_entry_ptr->parameter_code_table.insert(*parameter_entry_ptr);
 }
 
-bool parameter_matches_dimensions(InputHDF5Stream& istream,const InputHDF5Stream::DataValue& dimension_list,const GridData& grid_data)
-{
+bool parameter_matches_dimensions(InputHDF5Stream& istream, const InputHDF5Stream::DataValue& dimension_list, const GridData& grid_data) {
   static const std::string THIS_FUNC=this_function_label(__func__);
   bool parameter_matches=false;
   auto off=4;
@@ -1324,8 +1306,7 @@ bool parameter_matches_dimensions(InputHDF5Stream& istream,const InputHDF5Stream
   return parameter_matches;
 }
 
-void add_gridded_parameters_to_netcdf_level_entry(InputHDF5Stream& istream,std::string& grid_entry_key,const GridData& grid_data,ScanData& scan_data,const metautils::NcTime::TimeBounds& time_bounds,ParameterData& parameter_data)
-{
+void add_gridded_parameters_to_netcdf_level_entry(InputHDF5Stream& istream, std::string& grid_entry_key, const GridData& grid_data, ScanData& scan_data, const metautils::NcTime::TimeBounds& time_bounds, ParameterData& parameter_data) {
   static const std::string THIS_FUNC=this_function_label(__func__);
 
 // find all of the variables
@@ -1376,8 +1357,7 @@ void add_gridded_parameters_to_netcdf_level_entry(InputHDF5Stream& istream,std::
   }
 }
 
-void update_level_entry(InputHDF5Stream& istream,const metautils::NcTime::TimeBounds& time_bounds,const GridData& grid_data,ScanData& scan_data,ParameterData& parameter_data,unsigned char& level_write)
-{
+void update_level_entry(InputHDF5Stream& istream, const metautils::NcTime::TimeBounds& time_bounds, const GridData& grid_data, ScanData& scan_data, ParameterData& parameter_data, unsigned char& level_write) {
   static const std::string THIS_FUNC=this_function_label(__func__);
   auto vars=istream.datasets_with_attribute("DIMENSION_LIST");
   for (const auto& var : vars) {
@@ -1438,8 +1418,7 @@ void update_level_entry(InputHDF5Stream& istream,const metautils::NcTime::TimeBo
   }
 }
 
-void fill_time_bounds(const HDF5::DataArray& data_array,InputHDF5Stream::Dataset *ds,metautils::NcTime::TimeRangeEntry& tre,const metautils::NcTime::TimeData& time_data,metautils::NcTime::TimeBounds& time_bounds)
-{
+void fill_time_bounds(const HDF5::DataArray& data_array, InputHDF5Stream::Dataset *ds, metautils::NcTime::TimeRangeEntry& tre, const metautils::NcTime::TimeData& time_data, metautils::NcTime::TimeBounds& time_bounds) {
   static const std::string THIS_FUNC=this_function_label(__func__);
   time_bounds.t1=data_array_value(data_array,0,ds);
   time_bounds.diff=data_array_value(data_array,1,ds)-time_bounds.t1;
@@ -1461,8 +1440,7 @@ void fill_time_bounds(const HDF5::DataArray& data_array,InputHDF5Stream::Dataset
   }
 }
 
-DateTime compute_nc_time(const HDF5::DataArray& times,const metautils::NcTime::TimeData& time_data,size_t index)
-{
+DateTime compute_nc_time(const HDF5::DataArray& times, const metautils::NcTime::TimeData& time_data, size_t index) {
   static const std::string THIS_FUNC=this_function_label(__func__);
   auto val=times.value(index);
   DateTime dt;
@@ -1486,8 +1464,7 @@ DateTime compute_nc_time(const HDF5::DataArray& times,const metautils::NcTime::T
   return dt;
 }
 
-void update_inventory(int unum,int gnum,const GridData& grid_data)
-{
+void update_inventory(int unum, int gnum, const GridData& grid_data) {
   if (inv_L_map.find(level_entry_ptr->key) == inv_L_map.end()) {
     inv_L_map.emplace(level_entry_ptr->key,inv_L_map.size());
   }
@@ -1501,8 +1478,7 @@ void update_inventory(int unum,int gnum,const GridData& grid_data)
   }
 }
 
-void process_units_attribute(const InputHDF5Stream::DatasetEntry& ds_entry,DiscreteGeometriesData& dgd,metautils::NcTime::TimeData& time_data)
-{
+void process_units_attribute(const InputHDF5Stream::DatasetEntry& ds_entry, DiscreteGeometriesData& dgd, metautils::NcTime::TimeData& time_data) {
   static const std::string THIS_FUNC=this_function_label(__func__);
   auto& var_name=ds_entry.first;
   auto attr_val=ds_entry.second->attributes["units"];
@@ -1524,8 +1500,7 @@ void process_units_attribute(const InputHDF5Stream::DatasetEntry& ds_entry,Discr
   }
 }
 
-void fill_dgd_index(InputHDF5Stream& istream,std::string attribute_name_to_match,std::string attribute_value_to_match,std::string& dgd_index)
-{
+void fill_dgd_index(InputHDF5Stream& istream, std::string attribute_name_to_match, std::string attribute_value_to_match, std::string& dgd_index) {
   static const std::string THIS_FUNC=this_function_label(__func__);
   auto ds_entry_list=istream.datasets_with_attribute(attribute_name_to_match);
   if (ds_entry_list.size() > 1) {
@@ -1543,8 +1518,7 @@ void fill_dgd_index(InputHDF5Stream& istream,std::string attribute_name_to_match
   }
 }
 
-void fill_dgd_index(InputHDF5Stream& istream,std::string attribute_name_to_match,std::unordered_map<std::string,std::string>& dgd_index)
-{
+void fill_dgd_index(InputHDF5Stream& istream, std::string attribute_name_to_match, std::unordered_map<std::string, std::string>& dgd_index) {
   static const std::string THIS_FUNC=this_function_label(__func__);
   auto ds_entry_list=istream.datasets_with_attribute(attribute_name_to_match);
   for (const auto& ds_entry : ds_entry_list) {
@@ -1558,8 +1532,7 @@ void fill_dgd_index(InputHDF5Stream& istream,std::string attribute_name_to_match
   }
 }
 
-void process_vertical_coordinate_variable(InputHDF5Stream& istream,DiscreteGeometriesData& dgd,std::string& obs_type)
-{
+void process_vertical_coordinate_variable(InputHDF5Stream& istream, DiscreteGeometriesData& dgd, std::string& obs_type) {
   static const std::string THIS_FUNC=this_function_label(__func__);
   obs_type="";
   auto ds=istream.dataset("/"+dgd.indexes.z_var);
@@ -1597,8 +1570,7 @@ void process_vertical_coordinate_variable(InputHDF5Stream& istream,DiscreteGeome
   }
 }
 
-void scan_cf_point_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data,gatherxml::markup::ObML::ObservationData& obs_data)
-{
+void scan_cf_point_hdf5nc4_file(InputHDF5Stream& istream, ScanData& scan_data, gatherxml::markup::ObML::ObservationData& obs_data) {
   static const std::string THIS_FUNC=this_function_label(__func__);
   auto ds_entry_list=istream.datasets_with_attribute("units");
   DiscreteGeometriesData dgd;
@@ -1754,8 +1726,7 @@ void scan_cf_point_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data,gat
   scan_data.write_type=ScanData::ObML_type;
 }
 
-void scan_cf_orthogonal_time_series_hdf5nc4_file(InputHDF5Stream& istream,const DiscreteGeometriesData& dgd,const metautils::NcTime::TimeData& time_data,ScanData& scan_data,gatherxml::markup::ObML::ObservationData& obs_data)
-{
+void scan_cf_orthogonal_time_series_hdf5nc4_file(InputHDF5Stream& istream, const DiscreteGeometriesData& dgd, const metautils::NcTime::TimeData& time_data, ScanData& scan_data, gatherxml::markup::ObML::ObservationData& obs_data) {
   static const std::string THIS_FUNC=this_function_label(__func__);
   if (gatherxml::verbose_operation) {
     std::cout << "...beginning function "+THIS_FUNC+"()..." << std::endl;
@@ -1897,8 +1868,7 @@ metautils::log_error2("determining platforms is not implemented",THIS_FUNC,"hdf2
   }
 }
 
-void scan_cf_time_series_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data,gatherxml::markup::ObML::ObservationData& obs_data)
-{
+void scan_cf_time_series_hdf5nc4_file(InputHDF5Stream& istream, ScanData& scan_data, gatherxml::markup::ObML::ObservationData& obs_data) {
   static const std::string THIS_FUNC=this_function_label(__func__);
   if (gatherxml::verbose_operation) {
     std::cout << "...beginning function "+THIS_FUNC+"()..." << std::endl;
@@ -1928,8 +1898,7 @@ void scan_cf_time_series_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_da
   scan_data.write_type=ScanData::ObML_type;
 }
 
-void scan_cf_non_orthogonal_profile_hdf5nc4_file(InputHDF5Stream& istream,const DiscreteGeometriesData& dgd,const metautils::NcTime::TimeData& time_data,const HDF5::DataArray& time_vals,const NetCDFVariableAttributeData& nc_ta_data,ScanData& scan_data,gatherxml::markup::ObML::ObservationData& obs_data,std::string obs_type)
-{
+void scan_cf_non_orthogonal_profile_hdf5nc4_file(InputHDF5Stream& istream, const DiscreteGeometriesData& dgd, const metautils::NcTime::TimeData& time_data, const HDF5::DataArray& time_vals, const NetCDFVariableAttributeData& nc_ta_data, ScanData& scan_data, gatherxml::markup::ObML::ObservationData& obs_data, std::string obs_type) {
   static const std::string THIS_FUNC=this_function_label(__func__);
   if (gatherxml::verbose_operation) {
     std::cout << "...beginning function "+THIS_FUNC+"()..." << std::endl;
@@ -2078,8 +2047,7 @@ metautils::log_error2("indexed ragged array not implemented",THIS_FUNC,"hdf2xml"
   }
 }
 
-void scan_cf_orthogonal_profile_hdf5nc4_file(InputHDF5Stream& istream,const DiscreteGeometriesData& dgd,const HDF5::DataArray& time_vals,const NetCDFVariableAttributeData& nc_ta_data,ScanData& scan_data,gatherxml::markup::ObML::ObservationData& obs_data,std::string obs_type)
-{
+void scan_cf_orthogonal_profile_hdf5nc4_file(InputHDF5Stream& istream, const DiscreteGeometriesData& dgd, const HDF5::DataArray& time_vals, const NetCDFVariableAttributeData& nc_ta_data, ScanData& scan_data, gatherxml::markup::ObML::ObservationData& obs_data, std::string obs_type) {
   if (gatherxml::verbose_operation) {
     std::cout << "...beginning function scan_cf_orthogonal_profile_hdf5nc4_file()..." << std::endl;
   }
@@ -2088,8 +2056,7 @@ void scan_cf_orthogonal_profile_hdf5nc4_file(InputHDF5Stream& istream,const Disc
   }
 }
 
-void scan_cf_profile_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data,gatherxml::markup::ObML::ObservationData& obs_data)
-{
+void scan_cf_profile_hdf5nc4_file(InputHDF5Stream& istream, ScanData& scan_data, gatherxml::markup::ObML::ObservationData& obs_data) {
   static const std::string THIS_FUNC=this_function_label(__func__);
   if (gatherxml::verbose_operation) {
     std::cout << "...beginning function scan_cf_profile_hdf5nc4_file()..." << std::endl;
@@ -2147,8 +2114,7 @@ void scan_cf_profile_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data,g
   }
 }
 
-bool grid_is_polar_stereographic(const GridData& grid_data,Grid::GridDimensions& dim,Grid::GridDefinition& def)
-{
+bool grid_is_polar_stereographic(const GridData& grid_data, Grid::GridDimensions& dim, Grid::GridDefinition& def) {
   auto center_x=dim.x/2;
   auto center_y=dim.y/2;
   auto xm=center_x-1;
@@ -2189,8 +2155,7 @@ bool grid_is_polar_stereographic(const GridData& grid_data,Grid::GridDimensions&
   return false;
 }
 
-bool grid_is_lambert_conformal(const GridData& grid_data,Grid::GridDimensions& dim,Grid::GridDefinition& def)
-{
+bool grid_is_lambert_conformal(const GridData& grid_data, Grid::GridDimensions& dim, Grid::GridDefinition& def) {
   if (gatherxml::verbose_operation) {
     std::cout << "...checking grid for a Lambert-Conformal projection..." << std::endl;
   }
@@ -2333,8 +2298,7 @@ bool grid_is_lambert_conformal(const GridData& grid_data,Grid::GridDimensions& d
   return false;
 }
 
-void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data)
-{
+void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream, ScanData& scan_data) {
   static const std::string THIS_FUNC=this_function_label(__func__);
   if (gatherxml::verbose_operation) {
     std::cout << "...beginning function scan_gridded_hdf5nc4_file()..." << std::endl;
@@ -2968,8 +2932,7 @@ inv_R_map.emplace("x",0);
   }
 }
 
-void scan_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data,gatherxml::markup::ObML::ObservationData& obs_data)
-{
+void scan_hdf5nc4_file(InputHDF5Stream& istream, ScanData& scan_data, gatherxml::markup::ObML::ObservationData& obs_data) {
   static const std::string THIS_FUNC=this_function_label(__func__);
   auto ds=istream.dataset("/");
   if (ds == nullptr) {
@@ -3019,8 +2982,7 @@ void scan_hdf5nc4_file(InputHDF5Stream& istream,ScanData& scan_data,gatherxml::m
   }
 }
 
-void scan_hdf5_file(std::list<std::string>& filelist,ScanData& scan_data)
-{
+void scan_hdf5_file(std::list<std::string>& filelist, ScanData& scan_data) {
   static const std::string THIS_FUNC=this_function_label(__func__);
   if (gatherxml::verbose_operation) {
     std::cout << "Beginning HDF5 file scan..." << std::endl;
@@ -3081,8 +3043,7 @@ void scan_hdf5_file(std::list<std::string>& filelist,ScanData& scan_data)
   }
 }
 
-void scan_file(ScanData& scan_data)
-{
+void scan_file(ScanData& scan_data) {
   static const std::string THIS_FUNC=this_function_label(__func__);
   if (gatherxml::verbose_operation) {
     std::cout << "Beginning file scan..." << std::endl;
@@ -3120,8 +3081,7 @@ void scan_file(ScanData& scan_data)
   }
 }
 
-int main(int argc,char **argv)
-{
+int main(int argc, char **argv) {
   if (argc < 6) {
     std::cerr << "usage: hdf2xml -f format -d [ds]nnn.n [options...] <path>" << std::endl;
     std::cerr << "\nrequired (choose one):" << std::endl;
