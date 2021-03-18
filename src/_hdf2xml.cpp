@@ -2931,8 +2931,12 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream, ScanData& scan_data) {
   }
   auto found_time = false;
   grid_initialize();
-  gatherxml::fileInventory::open(inv_file, &inv_dir, inv_stream, "GrML",
-      "hdf2xml", USER);
+
+  // open a file inventory unless this is a test run
+  if (metautils::args.dsnum < "999.0") {
+    gatherxml::fileInventory::open(inv_file, &inv_dir, inv_stream, "GrML",
+        "hdf2xml", USER);
+  }
   scan_data.map_name = unixutils::remote_web_file(
       "https://rda.ucar.edu/metadata/ParameterTables/netCDF4.ds" +
       metautils::args.dsnum + ".xml", scan_data.tdir->name());
