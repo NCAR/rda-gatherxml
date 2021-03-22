@@ -1774,7 +1774,7 @@ void fill_time_bounds(const HDF5::DataArray& data_array,
       break;
     }
   }
-  time_bounds.t2 = data_array_value(data_array, data_array.num_values-1, ds);
+  time_bounds.t2 = data_array_value(data_array, data_array.num_values - 1, ds);
   string error;
   tre.data->bounded.first_valid_datetime = metautils::NcTime::actual_date_time(
       time_bounds.t1, time_data, error);
@@ -2363,11 +2363,11 @@ void scan_cf_non_orthogonal_profile_hdf5nc4_file(InputHDF5Stream& istream,
 id_types.emplace_back("unknown");
       auto lat = lat_vals.value(n);
       if (lat < -90. || lat > 90.) {
-        lat=-999.;
+        lat = -999.;
       }
       auto lon = lon_vals.value(n);
       if (lon < -180. || lon > 360.) {
-        lon=-999.;
+        lon = -999.;
       }
       if (lat > -999. && lon > -999. && !obs_data.added_to_platforms(obs_type,
           platform_types[n], lat, lon)) {
@@ -2448,11 +2448,11 @@ id_types.emplace_back("unknown");
           for (size_t n = 0; n < time_vals.num_values; ++n) {
             auto lat = lat_vals.value(n);
             if (lat < -90. || lat > 90.) {
-              lat=-999.;
+              lat = -999.;
             }
             auto lon = lon_vals.value(n);
             if (lon < -180. || lon > 360.) {
-              lon=-999.;
+              lon = -999.;
             }
             std::vector<double> level_list;
             for (size_t m = 0; m < rowsize_vals.value(n); ++m) {
@@ -2814,7 +2814,7 @@ bool grid_is_lambert_conformal(const GridData& grid_data,
   double avg_olon = 0.;
   for (auto n = 0; n < dim.y; ++n) {
     auto off = n*dim.x;
-    for (auto m = 0; m < dim.x-1; ++m) {
+    for (auto m = 0; m < dim.x - 1; ++m) {
       auto x_offset = off + m;
       if (data_array_value(grid_data.latitude.data_array, x_offset + 1,
           grid_data.latitude.ds.get()) <= data_array_value(
@@ -3275,7 +3275,7 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream, ScanData& scan_data) {
   nctime.t1 = data_array_value(grid_data.valid_time.data_array, 0,
       grid_data.valid_time.ds.get());
   nctime.t2 = data_array_value(grid_data.valid_time.data_array,
-      grid_data.valid_time.data_array.num_values-1,
+      grid_data.valid_time.data_array.num_values - 1,
       grid_data.valid_time.ds.get());
   string error;
   grid_data.time_range_entry.data->instantaneous.first_valid_datetime =
@@ -3650,7 +3650,7 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream, ScanData& scan_data) {
           string grid_key;
           if (inv_stream.is_open()) {
             grid_key = key_parts[0];
-            for (size_t nn = 1; nn < key_parts.size()-1; ++nn) {
+            for (size_t nn = 1; nn < key_parts.size() - 1; ++nn) {
               grid_key += "," + key_parts[nn];
             }
           }
