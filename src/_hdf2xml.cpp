@@ -3607,7 +3607,6 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream, ScanData& scan_data) {
           "..." << endl;
     }
     for (size_t m = 0; m < level_info.ID.size(); ++m) {
-      std::unordered_set<string> grid_entry_set;
       grid_data.level.id = level_info.ID[m];
       size_t num_levels;
       if (m == (level_info.ID.size() - 1) && grid_data.level.id == "sfc") {
@@ -3633,9 +3632,9 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream, ScanData& scan_data) {
               *grid_data.time_bounds.ds);
         }
       }
+      std::unordered_set<string> grid_entry_set;
       for (const auto& key : time_range_table.keys()) {
-        metautils::NcTime::TimeRangeEntry tre;
-        time_range_table.found(key, tre);
+        time_range_table.found(key, grid_data.time_range_entry);
         grid_data.time_data = (grid_data.forecast_period.id.empty()) ?
             time_data : forecast_period_time_data;
         add_gridded_lat_lon_keys(grid_entry_set, dim, def, grid_data, istream);
