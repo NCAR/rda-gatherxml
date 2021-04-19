@@ -21,6 +21,7 @@
 #include <bufr.hpp>
 
 using metautils::log_error2;
+using metautils::log_warning;
 using std::cerr;
 using std::cout;
 using std::endl;
@@ -1201,12 +1202,12 @@ void scan_cf_non_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,
 		}
 		else {
 		  platform_types.emplace_back("unknown");
-		  metautils::log_warning("ID '"+id+"' does not appear to be a WMO ID","nc2xml",USER);
+		  log_warning("ID '"+id+"' does not appear to be a WMO ID","nc2xml",USER);
 		}
 	    }
 	    else {
 		platform_types.emplace_back("unknown");
-		metautils::log_warning("ID '"+id+"' does not appear to be a WMO ID","nc2xml",USER);
+		log_warning("ID '"+id+"' does not appear to be a WMO ID","nc2xml",USER);
 	    }
 	  }
 	  else if (id_platform_map.find(id_types.back()) != id_platform_map.end()) {
@@ -3489,8 +3490,8 @@ else {
     string error;
     if (unixutils::rdadata_sync(tdir->name(), "metadata/LevelTables/",
         "/data/web", metautils::directives.rdadata_home, error) < 0) {
-      metautils::log_warning("level map was not synced - error(s): '" + error +
-          "'", "nc2xml", USER);
+      log_warning("level map was not synced - error(s): '" + error + "'",
+          "nc2xml", USER);
     }
     mysystem2("/bin/cp " + tdir->name() + "/metadata/LevelTables/netCDF.ds" +
         metautils::args.dsnum + ".xml /glade/u/home/rdadata/share/metadata/"
@@ -3743,7 +3744,7 @@ void scan_wrf_simulation_netcdf_file(InputNetCDFStream& istream,bool& found_map,
   ofs.close();
   string error;
   if (unixutils::rdadata_sync(tmpfile->name(),".","/data/web/metadata/LevelTables",metautils::directives.rdadata_home,error) < 0) {
-    metautils::log_warning("scan_wrf_simulation_netcdf_file() - level map was not synced - error(s): '"+error+"'","nc2xml",USER);
+    log_warning("scan_wrf_simulation_netcdf_file() - level map was not synced - error(s): '"+error+"'","nc2xml",USER);
   }
   stringstream oss,ess;
   unixutils::mysystem2("/bin/cp "+tmpfile->name()+"/netCDF.ds"+metautils::args.dsnum+".xml /glade/u/home/rdadata/share/metadata/LevelTables/",oss,ess);
@@ -5295,7 +5296,7 @@ void scan_file(ScanData& scan_data, gatherxml::markup::ObML::ObservationData&
     }
     ofs.close();
     if (unixutils::rdadata_sync(tdir->name(),"metadata/ParameterTables/","/data/web",metautils::directives.rdadata_home,error) < 0) {
-      metautils::log_warning("parameter map was not synced - error(s): '"+error+"'","nc2xml",USER);
+      log_warning("parameter map was not synced - error(s): '"+error+"'","nc2xml",USER);
     }
     unixutils::mysystem2("/bin/cp "+scan_data.map_name+" /glade/u/home/rdadata/share/metadata/ParameterTables/netCDF.ds"+metautils::args.dsnum+".xml",oss,ess);
     if (gatherxml::verbose_operation) {
@@ -5319,52 +5320,59 @@ extern "C" void int_handler(int)
 
 int main(int argc,char **argv)
 {
-  const string THIS_FUNC=this_function_label(__func__);
-  std::ifstream ifs;
-  char line[32768];
-  string metadata_file,wfile,ext;
-
   if (argc < 4) {
     cerr << "usage: nc2xml -f format -d [ds]nnn.n [options...] path" << endl;
     cerr << endl;
     cerr << "required (choose one):" << endl;
-    cerr << "-f cfnetcdf      Climate and Forecast compliant netCDF3 data" << endl;
+    cerr << "-f cfnetcdf      Climate and Forecast compliant netCDF3 data" <<
+        endl;
     cerr << "-f iddnetcdf     Unidata IDD netCDF3 station data" << endl;
-    cerr << "-f npnnetcdf     NOAA Profiler Network vertical profile data" << endl;
+    cerr << "-f npnnetcdf     NOAA Profiler Network vertical profile data" <<
+        endl;
     cerr << "-f pbnetcdf      NetCDF3 converted from prepbufr" << endl;
-    cerr << "-f rafnetcdf     NCAR-RAF/nimbus compliant netCDF3 aircraft data" << endl;
+    cerr << "-f rafnetcdf     NCAR-RAF/nimbus compliant netCDF3 aircraft "
+        "data" << endl;
     cerr << "-f samosnc       SAMOS netCDF3 data" << endl;
 //    cerr << "-f wrfsimnetcdf  Climate Simulations from WRF" << endl;
     cerr << endl;
     cerr << "required:" << endl;
-    cerr << "-d <nnn.n>       nnn.n is the dataset number to which the data file belongs" << endl;
+    cerr << "-d <nnn.n>       nnn.n is the dataset number to which the data "
+        "file belongs" << endl;
     cerr << endl;
     cerr << "options:" << endl;
     if (USER == "dattore") {
-	cerr << "-r/-R            regenerate/don't regenerate the dataset webpage" << endl;
-	cerr << "-s/-S            do/don't update the dataset summary information (default is -s)" << endl;
-	cerr << "-u/-U            do/don't update the database (default is -u)" << endl;
-	cerr << "-t <path>        path where temporary files should be created" << endl;
-      cerr << "-OO              overwrite only - when content metadata already exists, the" << endl;
-	cerr << "                 default is to first delete existing metadata; this option saves" << endl;
-	cerr << "                 time by overwriting without the delete" << endl;
+      cerr << "-r/-R            regenerate/don't regenerate the dataset "
+          "webpage" << endl;
+      cerr << "-s/-S            do/don't update the dataset summary "
+          "information (default is -s)" << endl;
+      cerr << "-u/-U            do/don't update the database (default is -u)" <<
+          endl;
+      cerr << "-t <path>        path where temporary files should be created" <<
+          endl;
+      cerr << "-OO              overwrite only - when content metadata already "
+          "exists, the" << endl;
+      cerr << "                 default is to first delete existing metadata; "
+          "this option saves" << endl;
+      cerr << "                 time by overwriting without the delete" << endl;
     }
     cerr << "-V               verbose operation" << endl;
     cerr << endl;
     cerr << "required:" << endl;
     cerr << "<path>           full MSS path or URL of the file to read" << endl;
     cerr << "                 - MSS paths must begin with \"/FS/DECS\"" << endl;
-    cerr << "                 - URLs must begin with \"https://rda.ucar.edu\"" << endl;
+    cerr << "                 - URLs must begin with "
+        "\"https://rda.ucar.edu\"" << endl;
     exit(1);
   }
-  signal(SIGSEGV,segv_handler);
-  signal(SIGINT,int_handler);
-  auto arg_delimiter='%';
-  metautils::args.args_string=unixutils::unix_args_string(argc,argv,arg_delimiter);
-  metautils::read_config("nc2xml",USER);
+  signal(SIGSEGV, segv_handler);
+  signal(SIGINT, int_handler);
+  auto arg_delimiter = '%';
+  metautils::args.args_string=unixutils::unix_args_string(argc, argv,
+      arg_delimiter);
+  metautils::read_config("nc2xml", USER);
   gatherxml::parse_args(arg_delimiter);
   atexit(clean_up);
-  metautils::cmd_register("nc2xml",USER);
+  metautils::cmd_register("nc2xml", USER);
   if (!metautils::args.overwrite_only && !metautils::args.inventory_only) {
     metautils::check_for_existing_cmd("GrML");
     metautils::check_for_existing_cmd("ObML");
@@ -5375,21 +5383,21 @@ int main(int argc,char **argv)
   if (gatherxml::verbose_operation && !metautils::args.inventory_only) {
     cout << "Writing XML..." << endl;
   }
-  string tdir;
+  string ext, tdir;
   if (scan_data.write_type == ScanData::GrML_type) {
-    ext="GrML";
+    ext = "GrML";
     if (!metautils::args.inventory_only) {
-      tdir=gatherxml::markup::GrML::write(grid_table,"nc2xml",USER);
+      tdir = gatherxml::markup::GrML::write(grid_table, "nc2xml", USER);
     }
   } else if (scan_data.write_type == ScanData::ObML_type) {
-    ext="ObML";
+    ext = "ObML";
     if (!metautils::args.inventory_only) {
       if (scan_data.num_not_missing > 0) {
         gatherxml::markup::ObML::write(obs_data, "nc2xml", USER);
       } else {
         log_error2("Terminating - data variables could not be identified or "
             "they only contain missing values. No content metadata will be "
-            "saved for this file", THIS_FUNC, "nc2xml", USER);
+            "saved for this file", "main()", "nc2xml", USER);
       }
     }
   }
@@ -5399,26 +5407,29 @@ int main(int argc,char **argv)
   if (metautils::args.update_db) {
     string flags;
     if (!metautils::args.update_summary) {
-      flags+=" -S ";
+      flags += " -S ";
     }
     if (!metautils::args.regenerate) {
-      flags+=" -R ";
+      flags += " -R ";
     }
     if (!tdir.empty()) {
-      flags+=" -t "+tdir;
+      flags += " -t "+tdir;
     }
-    if (!metautils::args.inventory_only && regex_search(metautils::args.path,regex("^https://rda.ucar.edu"))) {
-      flags+=" -wf";
+    if (!metautils::args.inventory_only && regex_search(metautils::args.path,
+        regex("^https://rda.ucar.edu"))) {
+      flags += " -wf";
     }
     else {
-      flags+=" -f";
+      flags += " -f";
     }
     if (gatherxml::verbose_operation) {
       cout << "Calling 'scm' to update the database..." << endl;
     }
-    stringstream oss,ess;
-    if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" "+flags+" "+metautils::args.filename+"."+ext,oss,ess) < 0) {
-      metautils::log_error2(ess.str(),"main() running scm","nc2xml",USER);
+    stringstream oss, ess;
+    if (unixutils::mysystem2(metautils::directives.local_root + "/bin/scm -d " +
+        metautils::args.dsnum + " " + flags + " " + metautils::args.filename +
+        "." + ext,oss,ess) < 0) {
+      metautils::log_error2(ess.str(), "main() running scm", "nc2xml", USER);
     }
     if (gatherxml::verbose_operation) {
       cout << "...'scm' finished." << endl;
@@ -5443,21 +5454,21 @@ int main(int argc,char **argv)
     cout << "ML" << endl;
   }
   if (inv_stream.is_open()) {
-    vector<pair<int,string>> sorted_keys;
+    vector<pair<int, string>> sorted_keys;
     if (scan_data.write_type == ScanData::GrML_type) {
-      sort_inventory_map(U_map,sorted_keys);
+      sort_inventory_map(U_map, sorted_keys);
       for (const auto& s_key : sorted_keys) {
         inv_stream << "U<!>" << s_key.first << "<!>" << s_key.second << endl;
       }
-      sort_inventory_map(G_map,sorted_keys);
+      sort_inventory_map(G_map, sorted_keys);
       for (const auto& s_key : sorted_keys) {
         inv_stream << "G<!>" << s_key.first << "<!>" << s_key.second << endl;
       }
-      sort_inventory_map(L_map,sorted_keys);
+      sort_inventory_map(L_map, sorted_keys);
       for (const auto& s_key : sorted_keys) {
         inv_stream << "L<!>" << s_key.first << "<!>" << s_key.second << endl;
       }
-      sort_inventory_map(P_map,sorted_keys);
+      sort_inventory_map(P_map, sorted_keys);
       for (const auto& s_key : sorted_keys) {
         inv_stream << "P<!>" << s_key.first << "<!>" << s_key.second;
         if (is_large_offset) {
@@ -5465,27 +5476,29 @@ int main(int argc,char **argv)
         }
         inv_stream << endl;
       }
-      sort_inventory_map(R_map,sorted_keys);
+      sort_inventory_map(R_map, sorted_keys);
       for (const auto& s_key : sorted_keys) {
         inv_stream << "R<!>" << s_key.first << "<!>" << s_key.second << endl;
       }
     }
     else if (scan_data.write_type == ScanData::ObML_type) {
-      sort_inventory_map(O_map,sorted_keys);
+      sort_inventory_map(O_map, sorted_keys);
       for (const auto& s_key : sorted_keys) {
         inv_stream << "O<!>" << s_key.first << "<!>" << s_key.second << endl;
       }
-      sort_inventory_map(P_map,sorted_keys);
+      sort_inventory_map(P_map, sorted_keys);
       for (const auto& s_key : sorted_keys) {
         inv_stream << "P<!>" << s_key.first << "<!>" << s_key.second << endl;
       }
-      sort_inventory_map(I_map,sorted_keys);
+      sort_inventory_map(I_map, sorted_keys);
       for (const auto& s_key : sorted_keys) {
-        inv_stream << "I<!>" << s_key.first << "<!>" << s_key.second << "[!]" << I_map[s_key.second].second << endl;
+        inv_stream << "I<!>" << s_key.first << "<!>" << s_key.second << "[!]" <<
+            I_map[s_key.second].second << endl;
       }
-      sort_inventory_map(D_map,sorted_keys);
+      sort_inventory_map(D_map, sorted_keys);
       for (const auto& s_key : sorted_keys) {
-        inv_stream << "D<!>" << s_key.first << "<!>" << s_key.second << D_map[s_key.second].second << endl;
+        inv_stream << "D<!>" << s_key.first << "<!>" << s_key.second <<
+            D_map[s_key.second].second << endl;
       }
     }
     inv_stream << "-----" << endl;
@@ -5496,23 +5509,25 @@ int main(int argc,char **argv)
     }
     else {
       inv_lines2.close();
-      ifs.open(inv_lines2.name().c_str());
+      std::ifstream ifs(inv_lines2.name().c_str());
       if (ifs.is_open()) {
-        ifs.getline(line,32768);
+        char line[32768];
+        ifs.getline(line, 32768);
         while (!ifs.eof()) {
           inv_stream << line << endl;
-          ifs.getline(line,32768);
+          ifs.getline(line, 32768);
         }
         ifs.close();
       }
     }
-    gatherxml::fileInventory::close(inv_file,&inv_dir,inv_stream,ext,true,metautils::args.update_summary,"nc2xml",USER);
+    gatherxml::fileInventory::close(inv_file, &inv_dir, inv_stream, ext, true,
+        metautils::args.update_summary, "nc2xml", USER);
   }
   if (unknown_IDs.size() > 0) {
     stringstream ss;
     for (const auto& id : unknown_IDs) {
       ss << id << endl;
     }
-    metautils::log_warning("unknown ID(s):\n"+ss.str(),"nc2xml",USER);
+    log_warning("unknown ID(s):\n" + ss.str(), "nc2xml", USER);
   }
 }
