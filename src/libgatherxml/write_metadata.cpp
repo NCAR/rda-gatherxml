@@ -539,27 +539,27 @@ void write_grid(std::string grid_entry_key,std::ofstream& ofs,std::string caller
     grid_params.front().pop_back();
   }
   switch (std::stoi(grid_params.front())) {
-    case Grid::latitudeLongitudeType: {
+    case static_cast<int>(Grid::Type::latitudeLongitude): {
 	write_latitude_longitude_grid(grid_params,is_cell,ofs);
 	break;
     }
-    case Grid::gaussianLatitudeLongitudeType: {
+    case static_cast<int>(Grid::Type::gaussianLatitudeLongitude): {
 	write_gaussian_latitude_longitude_grid(grid_params,is_cell,ofs);
 	break;
     }
-    case Grid::polarStereographicType: {
+    case static_cast<int>(Grid::Type::polarStereographic): {
 	write_polar_stereographic_grid(grid_params,is_cell,ofs);
 	break;
     }
-    case Grid::lambertConformalType: {
+    case static_cast<int>(Grid::Type::lambertConformal): {
 	write_lambert_conformal_grid(grid_params,is_cell,ofs);
 	break;
     }
-    case Grid::mercatorType: {
+    case static_cast<int>(Grid::Type::mercator): {
 	write_mercator_grid(grid_params,is_cell,ofs);
 	break;
     }
-    case Grid::sphericalHarmonicsType: {
+    case static_cast<int>(Grid::Type::sphericalHarmonics): {
 	write_spherical_harmonics_grid(grid_params,is_cell,ofs);
 	break;
     }
