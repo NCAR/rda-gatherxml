@@ -2827,7 +2827,8 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
               grid_defs.back().projection_flag = 1;
               grid_defs.back().llatitude = -60.;
             }
-            grid_defs.back().olongitude = lroundf(lons[ny2 * nx + nx2] + 45.);
+            grid_defs.back().olongitude = lroundf((lons[nx2] + lons[nx2 + 1]) /
+                2.);
             if (grid_defs.back().olongitude > 180.) {
               grid_defs.back().olongitude -= 360.;
             }
