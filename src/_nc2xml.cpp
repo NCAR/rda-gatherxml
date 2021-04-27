@@ -2983,6 +2983,8 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
         }
       }
     }
+
+    // pop any unused levels
     while (grid_data.levels.size() > 0 && grid_data.levels.back().dim ==
         MISSING_FLAG) {
       grid_data.levels.pop_back();
@@ -2998,8 +3000,8 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
       }
       for (size_t n = 0; n < grid_data.levels.size(); ++n) {
         for (size_t k = 0; k < vars.size(); ++k) {
-          if (!vars[k].is_coord && vars[k].dimids.size() == 1 && vars[k]
-              .dimids[0] == grid_data.levels[n].dim) {
+          if (!vars[k].is_coord && vars[k].dimids.size() == 1 && vars[k].dimids[
+              0] == grid_data.levels[n].dim) {
             grid_data.levels[n].id = vars[k].name;
             grid_data.levels[n].type = vars[k].data_type;
             string d, u;
@@ -3064,16 +3066,16 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
           time_s.times[m] = v[m];
         }
       }
-      string error;
+      string e;
       tre.data->instantaneous.first_valid_datetime = metautils::NcTime
-          ::actual_date_time(time_s.t1, time_data, error);
-      if (!error.empty()) {
-        log_error2(error, THIS_FUNC, "nc2xml", USER);
+          ::actual_date_time(time_s.t1, time_data, e);
+      if (!e.empty()) {
+        log_error2(e, THIS_FUNC, "nc2xml", USER);
       }
       tre.data->instantaneous.last_valid_datetime = metautils::NcTime
-          ::actual_date_time(time_s.t2, time_data, error);
-      if (!error.empty()) {
-        log_error2(error, THIS_FUNC, "nc2xml", USER);
+          ::actual_date_time(time_s.t2, time_data, e);
+      if (!e.empty()) {
+        log_error2(e, THIS_FUNC, "nc2xml", USER);
       }
       if (gatherxml::verbose_operation) {
         cout << "   ...setting temporal range to:" << endl;
@@ -3113,15 +3115,16 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
           }
         }
         time_bounds_s.t2 = v.back();
+        string e;
         tre.data->bounded.first_valid_datetime = metautils::NcTime
-            ::actual_date_time(time_bounds_s.t1, time_data, error);
-        if (!error.empty()) {
-          log_error2(error, THIS_FUNC, "nc2xml", USER);
+            ::actual_date_time(time_bounds_s.t1, time_data, e);
+        if (!e.empty()) {
+          log_error2(e, THIS_FUNC, "nc2xml", USER);
         }
         tre.data->bounded.last_valid_datetime = metautils::NcTime
-            ::actual_date_time(time_bounds_s.t2, time_data, error);
-        if (!error.empty()) {
-          log_error2(error, THIS_FUNC, "nc2xml", USER);
+            ::actual_date_time(time_bounds_s.t2, time_data, e);
+        if (!e.empty()) {
+          log_error2(e, THIS_FUNC, "nc2xml", USER);
         }
         if (gatherxml::verbose_operation) {
           cout << "      ...now temporal range is:" << endl;
@@ -3202,12 +3205,12 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
       auto levid = grid_data.levdata.ID[m].substr(0, grid_data.levdata.ID[m]
           .find("@@"));
       NetCDF::VariableData levels;
-      size_t num_levels;
+      size_t nl;
       if (grid_data.levels[m].type == NetCDF::DataType::_NULL) {
-        num_levels = 1;
+        nl = 1;
       } else {
         istream.variable_data(levid, levels);
-        num_levels = levels.size();
+        nl = levels.size();
       }
       for (const auto& tr_key : tr_table.keys()) {
         metautils::NcTime::TimeRangeEntry tre;
@@ -3234,7 +3237,7 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
                   grid_data.time.id, grid_data.time.dim, grid_data.levels[m].dim,
                   grid_data.lats[k].dim, grid_data.lons[k].dim, tre,
                   parameter_table, scan_data);
-              for (size_t n = 0; n < num_levels; ++n) {
+              for (size_t n = 0; n < nl; ++n) {
                 lentry_p->key = "ds" + metautils::args.dsnum + "," + grid_data
                     .levdata.ID[m] + ":";
                 switch (grid_data.levels[m].type) {
@@ -3270,7 +3273,7 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
             } else {
 
               // existing grid - needs update
-              for (size_t n = 0; n < num_levels; ++n) {
+              for (size_t n = 0; n < nl; ++n) {
                 lentry_p->key = "ds" + metautils::args.dsnum + "," + grid_data
                     .levdata.ID[m] + ":";
                 switch (grid_data.levels[m].type) {
