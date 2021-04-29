@@ -2648,75 +2648,68 @@ bool found_alternate_lat_lon_coordinates(vector<NetCDF::Variable>& vars,
       .size();
 }
 
-void fill_grid_projection(Grid::GridDimensions& dim,double *lats,double *lons,Grid::GridDefinition& def)
-{
-  static const string THIS_FUNC=this_function_label(__func__);
-  const double PI=3.141592654;
-  double min_lat_var=99999.,max_lat_var=0.;
-  double min_lon_var=99999.,max_lon_var=0.;
-  int n,m,l;
-  double diff,min_diff;
-  double first_lat,last_lat;
-
-  for (n=1,m=dim.x; n < dim.y; ++n,m+=dim.x) {
-    diff=fabs(lats[m]-lats[m-dim.x]);
-    if (diff < min_lat_var) {
-      min_lat_var=diff;
+bool filled_grid_projection(const unique_ptr<double[]>& la, const unique_ptr<
+    double[]>& lo, Grid::GridDimensions& d, Grid::GridDefinition& f) {
+  static const string THIS_FUNC = this_function_label(__func__);
+  double nla = 99999., xla = 0.;
+  for (int n = 1, m = d.x; n < d.y; ++n, m += d.x) {
+    double a = fabs(la[m] - la[m - d.x]);
+    if (a < nla) {
+      nla = a;
     }
-    if (diff > max_lat_var) {
-      max_lat_var=diff;
+    if (a > xla) {
+      xla = a;
     }
   }
-  for (n=1; n < dim.x; ++n) {
-    diff=fabs(lons[n]-lons[n-1]);
-    if (diff < min_lon_var) {
-      min_lon_var=diff;
+  double nlo = 99999., xlo = 0.;
+  for (int n = 1; n < d.x; ++n) {
+    double a = fabs(lo[n] - lo[n - 1]);
+    if (a < nlo) {
+      nlo = a;
     }
-    if (diff > max_lon_var) {
-      max_lon_var=diff;
+    if (a > xlo) {
+      xlo = a;
     }
   }
-  def.type = Grid::Type::not_set;
-  dim.size=dim.x*dim.y;
-  if (fabs(max_lon_var-min_lon_var) < 0.0001) {
-    if (fabs(max_lat_var-min_lat_var) < 0.0001) {
-      def.type=Grid::Type::latitudeLongitude;
-      def.elatitude=lats[dim.size-1];
-      def.elongitude=lons[dim.size-1];
+  f.type = Grid::Type::not_set;
+  d.size = d.x * d.y;
+  if (fabs(xlo - nlo) < 0.0001) {
+    if (fabs(xla - nla) < 0.0001) {
+      f.type = Grid::Type::latitudeLongitude;
+      f.elatitude = la[d.size - 1];
+      f.elongitude = lo[d.size - 1];
     } else {
-      first_lat=lats[0];
-      last_lat=lats[dim.size-1];
-      if (first_lat >= 0. && last_lat >= 0.) {
-      }
-      else if (first_lat < 0. && last_lat < 0.) {
-      }
-      else {
-        if (fabs(first_lat) > fabs(last_lat)) {
+      auto la1 = la[0];
+      auto la2 = la[d.size - 1];
+      if (la1 >= 0. && la2 >= 0.) {
+      } else if (la1 < 0. && la2 < 0.) {
+      } else {
+        if (fabs(la1) > fabs(la2)) {
         } else {
-          if (fabs(cos(last_lat*PI/180.)-(min_lat_var/max_lat_var)) < 0.01) {
-            def.type=Grid::Type::mercator;
-            def.elatitude=lats[dim.size-1];
-            def.elongitude=lons[dim.size-1];
-            min_diff=99999.;
-            l=-1;
-            for (n=0,m=0; n < dim.y; ++n,m+=dim.x) {
-              diff=fabs(lats[m]-lround(lats[m]));
-              if (diff < min_diff) {
-                min_diff=diff;
-                l=m;
+          const double PI = 3.141592654;
+          if (fabs(cos(la2 * PI / 180.) - (nla / xla)) < 0.01) {
+            f.type = Grid::Type::mercator;
+            f.elatitude = la[d.size - 1];
+            f.elongitude = lo[d.size - 1];
+            double ma = 99999.;
+            int l = -1;
+            for (int n = 0, m = 0; n < d.y; ++n, m += d.x) {
+              double a = fabs(la[m] - lround(la[m]));
+              if (a < ma) {
+                ma = a;
+                l = m;
               }
             }
-            def.dx=lround(cos(lats[l]*PI/180.)*min_lon_var*111.2);
-            def.dy=lround((fabs(lats[l+dim.x]-lats[l])+fabs(lats[l]-lats[l-dim.x]))/2.*111.2);
-            def.stdparallel1=lats[l];
+            f.dx = lround(cos(la[l] * PI / 180.) * nlo * 111.2);
+            f.dy = lround((fabs(la[l + d.x] - la[l]) + fabs(la[l] - la[l - d
+                .x])) / 2. * 111.2);
+            f.stdparallel1 = la[l];
           }
         }
       }
     }
   }
-  if (def.type == Grid::Type::not_set) {
-    log_error2("unable to determine grid projection",THIS_FUNC,"nc2xml",USER);
-  }
+  return !(f.type == Grid::Type::not_set);
 }
 
 void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
@@ -2793,12 +2786,13 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
         for (size_t m = 0; m < nlons; ++m) {
           lons[m] = v[m];
         }
-        if ( (dims[grid_dims.back().y].length % 2) == 1 && (dims[grid_dims.back()
-            .x].length % 2) == 1) {
-          grid_dims.back().x = dims[grid_dims.back().x].length;
-          grid_dims.back().y = dims[grid_dims.back().y].length;
-          fill_grid_projection(grid_dims.back(), lats.get(), lons.get(),
-              grid_defs.back());
+        Grid::GridDimensions d;
+        d.x = dims[grid_dims.back().x].length;
+        d.y = dims[grid_dims.back().y].length;
+        Grid::GridDefinition f;
+        if (filled_grid_projection(lats, lons, d, f)) {
+          grid_dims.back() = d;
+          grid_defs.back() = f;
         } else {
           auto& xd = grid_dims.back().x;
           auto& nx = dims[xd].length;
