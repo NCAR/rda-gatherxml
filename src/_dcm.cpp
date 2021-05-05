@@ -38,7 +38,6 @@ struct ThreadStruct {
   pthread_t tid;
 };
 std::string dsnum2;
-std::unordered_set<std::string> cmd_set;
 std::vector<std::string> files;
 std::unordered_set<std::string> web_tindex_set,inv_tindex_set;
 std::unordered_set<std::string> web_gindex_set;
@@ -63,13 +62,6 @@ void parse_args(MySQL::Server& server)
     } else if (*arg == "-N") {
       local_args.notify=true;
     } else {
-      std::string cmd;
-      if (std::regex_search(*arg,std::regex("^/FS/DECS/"))) {
-        cmd="fmd";
-      } else {
-        cmd="wfmd";
-      }
-      cmd_set.emplace(cmd);
       files.emplace_back(*arg);
     }
   }
@@ -508,21 +500,6 @@ int main(int argc, char **argv) {
   parse_args(server);
 /*
   if (metautils::args.dsnum == "999.9") {
-    exit(0);
-  }
-*/
-/*
-  for (auto cmd = cmd_set.begin(); cmd != cmd_set.end(); ) {
-    if (!unixutils::exists_on_server(metautils::directives.web_server,
-        "/data/web/datasets/ds" + metautils::args.dsnum + "/metadata/" + *cmd,
-        metautils::directives.rdadata_home)) {
-      cmd_set.erase(cmd);
-    }
-    else {
-      ++cmd;
-    }
-  }
-  if (cmd_set.size() == 0) {
     exit(0);
   }
 */
