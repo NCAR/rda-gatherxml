@@ -2678,6 +2678,8 @@ bool filled_grid_projection(const unique_ptr<double[]>& la, const unique_ptr<
       f.type = Grid::Type::latitudeLongitude;
       f.elatitude = la[d.size - 1];
       f.elongitude = lo[d.size - 1];
+      f.laincrement = xla;
+      f.loincrement = xlo;
     } else {
       auto la1 = la[0];
       auto la2 = la[d.size - 1];
