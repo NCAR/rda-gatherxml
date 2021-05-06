@@ -2382,14 +2382,12 @@ void find_coordinate_variables(InputNetCDFStream& istream, vector<NetCDF
         if (vars[n].attrs[m].data_type == NetCDF::DataType::CHAR && (vars[n]
             .attrs[m].name == "units" || regex_search(standard_name,
             regex("hybrid_sigma")))) {
-          string u;
+          string units;
           if (vars[n].attrs[m].name == "units") {
-            u = *(reinterpret_cast<string *>(vars[n].attrs[m].values));
-          } else {
-            u= "";
+            units = *(reinterpret_cast<string *>(vars[n].attrs[m].values));
           }
-          u = to_lower(u);
-          if (regex_search(u, regex("since"))) {
+          auto ul = to_lower(units);
+          if (regex_search(ul, regex("since"))) {
             if (!grid_data.time.id.empty()) {
               log_error2("time was already identified - don't know what to do "
                   "with variable: " + vars[n].name, THIS_FUNC, "nc2xml", USER);
@@ -2411,13 +2409,13 @@ void find_coordinate_variables(InputNetCDFStream& istream, vector<NetCDF
                 }
               }
             }
-            time_data.units = u.substr(0, u.find("since"));
+            time_data.units = ul.substr(0, ul.find("since"));
             trim(time_data.units);
             grid_data.time.dim = vars[n].dimids[0];
             grid_data.time.id = vars[n].name;
-            u = u.substr(u.find("since") + 5);
-            trim(u);
-            auto sp = split(u);
+            ul = ul.substr(ul.find("since") + 5);
+            trim(ul);
+            auto sp = split(ul);
             auto sp2 = split(sp[0], "-");
             if (sp2.size() != 3) {
               log_error2("bad netcdf date", THIS_FUNC, "nc2xml", USER);
@@ -2526,8 +2524,8 @@ void find_coordinate_variables(InputNetCDFStream& istream, vector<NetCDF
                 }
               }
             }
-          } else if (u == "degrees_north" || u == "degree_north" ||
-              u == "degrees_n" || u == "degree_n" || (u ==
+          } else if (ul == "degrees_north" || ul == "degree_north" ||
+              ul == "degrees_n" || ul == "degree_n" || (ul ==
               "degrees" && vars[n].name == "lat")) {
 /*
                 if (found_lat) {
@@ -2550,8 +2548,8 @@ else {
             grid_data.lats_b.emplace_back();
             grid_data.lats_b.back().id = s;
 //}
-          } else if (u == "degrees_east" || u == "degree_east" || u ==
-              "degrees_e" || u == "degree_e" || (u == "degrees" && vars[n]
+          } else if (ul == "degrees_east" || ul == "degree_east" || ul ==
+              "degrees_e" || ul == "degree_e" || (ul == "degrees" && vars[n]
               .name == "lon")) {
 /*
                 if (found_lon) {
@@ -2588,9 +2586,9 @@ else {
                 grid_data.levels.back().dim = vars[n].dimids[0];
                 grid_data.levels.back().id = vars[n].name;
                 grid_data.levels.back().type = vars[n].data_type;
-                grid_data.levdata.ID.emplace_back(vars[n].name + "@@" + u);
+                grid_data.levdata.ID.emplace_back(vars[n].name + "@@" + units);
                 grid_data.levdata.description.emplace_back();
-                grid_data.levdata.units.emplace_back(u);
+                grid_data.levdata.units.emplace_back(units);
                 grid_data.levdata.write.emplace_back(false);
                 for (size_t l = 0; l < vars[n].attrs.size(); ++l) {
                   if (vars[n].attrs[l].data_type == NetCDF::DataType::CHAR &&
