@@ -9,6 +9,13 @@
 #include <MySQL.hpp>
 #include <tempfile.hpp>
 
+using metautils::log_error2;
+using std::deque;
+using std::regex;
+using std::regex_search;
+using std::stof;
+using std::string;
+
 namespace gatherxml {
 
 namespace fileInventory {
@@ -342,37 +349,41 @@ void write(my::map<FeatureEntry>& feature_table,my::map<StageEntry>& stage_table
 
 namespace GrML {
 
-void write_latitude_longitude_grid(std::deque<std::string>& grid_params,bool is_cell,std::ofstream& ofs)
-{
-  auto slat=grid_params[3];
-  if (std::regex_search(slat,std::regex("^-"))) {
-    slat=slat.substr(1)+"S";
+void write_latitude_longitude_grid(deque<string>& grid_params, bool is_cell,
+    std::ofstream& ofs, string caller, string user) {
+  auto slat = grid_params[3];
+  if (slat.front() == '-') {
+    slat = slat.substr(1) + "S";
+  } else {
+    slat += "N";
   }
-  else {
-    slat+="N";
+  auto slon = grid_params[4];
+  if (slon.front() == '-') {
+    slon = slon.substr(1) + "W";
+  } else {
+    slon += "E";
   }
-  auto slon=grid_params[4];
-  if (std::regex_search(slon,std::regex("^-"))) {
-    slon=slon.substr(1)+"W";
+  auto elat = grid_params[5];
+  if (elat.front() == '-') {
+    elat = elat.substr(1) + "S";
+  } else {
+    elat += "N";
   }
-  else {
-    slon+="E";
+  auto elon = grid_params[6];
+  if (elon.front() == '-') {
+    elon = elon.substr(1) + "W";
+  } else {
+    elon += "E";
   }
-  auto elat=grid_params[5];
-  if (std::regex_search(elat,std::regex("^-"))) {
-    elat=elat.substr(1)+"S";
+  if (stof(grid_params[7]) == 0. || stof(grid_params[8]) == 0.) {
+    log_error2("horizontal grid resolutions must be non-zero",
+        "write_latitude_longitude_grid()", caller, user);
   }
-  else {
-    elat+="N";
-  }
-  auto elon=grid_params[6];
-  if (std::regex_search(elon,std::regex("^-"))) {
-    elon=elon.substr(1)+"W";
-  }
-  else {
-    elon+="E";
-  }
-  ofs << "  <grid timeRange=\"" << grid_params[9] << "\" definition=\"latLon\" numX=\"" << grid_params[1] << "\" numY=\"" << grid_params[2] << "\" startLat=\"" << slat << "\" startLon=\"" << slon << "\" endLat=\"" << elat << "\" endLon=\"" << elon << "\" xRes=\"" << grid_params[7] << "\" yRes=\"" << grid_params[8] << "\"";
+  ofs << "  <grid timeRange=\"" << grid_params[9] << "\" definition=\"latLon\" "
+      "numX=\"" << grid_params[1] << "\" numY=\"" << grid_params[2] << "\" "
+      "startLat=\"" << slat << "\" startLon=\"" << slon << "\" endLat=\"" <<
+      elat << "\" endLon=\"" << elon << "\" xRes=\"" << grid_params[7] << "\" "
+      "yRes=\"" << grid_params[8] << "\"";
   if (is_cell) {
     ofs << " isCell=\"true\"";
   }
@@ -540,7 +551,7 @@ void write_grid(std::string grid_entry_key,std::ofstream& ofs,std::string caller
   }
   switch (std::stoi(grid_params.front())) {
     case static_cast<int>(Grid::Type::latitudeLongitude): {
-	write_latitude_longitude_grid(grid_params,is_cell,ofs);
+	write_latitude_longitude_grid(grid_params,is_cell,ofs, caller, user);
 	break;
     }
     case static_cast<int>(Grid::Type::gaussianLatitudeLongitude): {
