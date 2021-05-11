@@ -59,8 +59,7 @@ void generate_index(string type,string tdir_name)
   ofstream ofs;
   if (dataset_type == "W") {
     ofs.open((tdir_name+"/test_index.html").c_str());
-  }
-  else {
+  } else {
     ofs.open((tdir_name+"/index.html").c_str());
   }
   if (!ofs.is_open()) {
@@ -78,14 +77,12 @@ void generate_index(string type,string tdir_name)
   tdoc.add_replacement("__DSNUM__",metautils::args.dsnum);
   if (dataset_type == "I") {
     tdoc.add_if("__IS_INTERNAL_DATASET__");
-  }
-  else {
+  } else {
     struct stat buf;
     string ds_overview;
     if (stat(("/data/web/datasets/ds"+metautils::args.dsnum+"/metadata/dsOverview.xml").c_str(),&buf) == 0) {
       ds_overview="/data/web/datasets/ds"+metautils::args.dsnum+"/metadata/dsOverview.xml";
-    }
-    else {
+    } else {
       ds_overview=unixutils::remote_web_file("https://rda.ucar.edu/datasets/ds"+metautils::args.dsnum+"/metadata/dsOverview.xml",temp_dir.name());
       if (ds_overview.empty()) {
         log_error2("dsOverview.xml does not exist for " + metautils::args.dsnum,
@@ -118,8 +115,7 @@ void generate_index(string type,string tdir_name)
       auto height=stoi(geometry_parts[geometry_parts.size()-1]);
       tdoc.add_replacement("__LOGO_IMAGE__",e.content());
       tdoc.add_replacement("__LOGO_WIDTH__",strutils::itos(lroundf(width*70./height)));
-    }
-    else {
+    } else {
       tdoc.add_replacement("__LOGO_IMAGE__","default_200_200.png");
       tdoc.add_replacement("__LOGO_WIDTH__","70");
     }
@@ -161,9 +157,7 @@ bool compare_strings(const string& left,const string& right)
   if (left <= right) {
     return true;
   }
-  else {
-    return false;
-  }
+  return false;
 }
 
 bool compare_references(XMLElement& left,XMLElement& right)
@@ -174,23 +168,12 @@ bool compare_references(XMLElement& left,XMLElement& right)
   auto r=e.content();
   if (l > r) {
     return true;
-  }
-  else if (l < r) {
+  } else if (l < r) {
     return false;
+  } else if (left.attribute_value("type") == "journal" && right.attribute_value("type") == "journal" && left.element("periodical").content() == right.element("periodical").content() && left.element("periodical").attribute_value("pages") > right.element("periodical").attribute_value("pages")) {
+    return true;
   }
-  else {
-    if (left.attribute_value("type") == "journal" && right.attribute_value("type") == "journal" && left.element("periodical").content() == right.element("periodical").content()) {
-      if (left.element("periodical").attribute_value("pages") > right.element("periodical").attribute_value("pages")) {
-        return true;
-      }
-      else {
-        return false;
-      }
-    }
-    else {
-      return false;
-    }
-  }
+  return false;
 }
 
 bool compare_levels(const string& left,const string& right)
@@ -201,8 +184,7 @@ bool compare_levels(const string& left,const string& right)
     if (lidx != string::npos) {
       lval=left.substr(0,lidx);
       lunits=left.substr(lidx+1);
-    }
-    else {
+    } else {
       lval=left;
       lunits="";
     }
@@ -211,8 +193,7 @@ bool compare_levels(const string& left,const string& right)
     if (ridx != string::npos) {
       rval=right.substr(0,ridx);
       runits=right.substr(ridx+1);
-    }
-    else {
+    } else {
       rval=right;
       runits="";
     }
@@ -223,41 +204,28 @@ bool compare_levels(const string& left,const string& right)
         if (ilval >= irval) {
           return true;
         }
-        else {
-          return false;
-        }
-      }
-      else {
+        return false;
+      } else {
         if (ilval <= irval) {
           return true;
         }
-        else {
-          return false;
-        }
+        return false;
       }
-    }
-    else {
+    } else {
       if (lunits <= runits) {
         return true;
       }
-      else {
-        return false;
-      }
+      return false;
     }
-  }
-  else {
+  } else {
     if (left[0] >= '0' && left[0] <= '9') {
       return false;
-    }
-    else if (right[0] >= '0' && right[0] <= '9') {
+    } else if (right[0] >= '0' && right[0] <= '9') {
+      return true;
+    } else if (left <= right) {
       return true;
     }
-    else if (left <= right) {
-      return true;
-    }
-    else {
-      return false;
-    }
+    return false;
   }
 }
 
@@ -274,8 +242,7 @@ string create_table_from_strings(list<string> list,int max_columns,string color1
         if ( (list.size() % n) == 0) {
           max_columns=n;
           break;
-        }
-        else if ( (list.size() % n) > max_mod) {
+        } else if ( (list.size() % n) > max_mod) {
           max_mod=(list.size() % n);
           max_columns=n;
         }
@@ -306,42 +273,34 @@ string create_table_from_strings(list<string> list,int max_columns,string color1
     ss << "\" style=\"padding: 5px 8px 5px 8px; text-align: left; background-color: ";
     if ( (m % 2) == 0) {
       ss << color1;
-    }
-    else {
+    } else {
       ss << color2;
     }
     ss << "; height: 18px;";
     if (m == 1 && n == 0) {
       if (num_rows > 1) {
         ss << " border-radius: 10px 0px 0px 0px";
-      }
-      else {
+      } else {
         if (list.size() == 1) {
           ss << " border-radius: 10px 10px 10px 10px";
-        }
-        else {
+        } else {
           ss << " border-radius: 10px 0px 0px 10px";
         }
       }
-    }
-    else if (m == 1 && n == cmax) {
+    } else if (m == 1 && n == cmax) {
       if (m == num_rows) {
         ss << " border-radius: 0px 10px 10px 0px";
-      }
-      else {
+      } else {
         ss << " border-radius: 0px 10px 0px 0px";
       }
-    }
-    else if (m == num_rows && n == 0) {
+    } else if (m == num_rows && n == 0) {
       ss << " border-radius: 0px 0px 0px 10px";
-    }
-    else if (m == num_rows) {
+    } else if (m == num_rows) {
       if (num_rows > 1) {
         if (n == cmax) {
           ss << " border-radius: 0px 0px 10px 0px";
         }
-      }
-      else {
+      } else {
         if (n == static_cast<int>(list.size()-1)) {
           ss << " border-radius: 0px 10px 10px 0px";
         }
@@ -363,8 +322,7 @@ string create_table_from_strings(list<string> list,int max_columns,string color1
         ss << "\" style=\"background-color: ";
         if ( (m % 2) == 0) {
           ss << color1;
-        }
-        else {
+        } else {
           ss << color2;
         }
         ss << "; height: 18px;";
@@ -392,8 +350,7 @@ void insert_table(ofstream& ofs,list<string> list,int max_columns,string color1,
         if ( (list.size() % n) == 0) {
           max_columns=n;
           break;
-        }
-        else if ( (list.size() % n) > max_mod) {
+        } else if ( (list.size() % n) > max_mod) {
           max_mod=(list.size() % n);
           max_columns=n;
         }
@@ -424,42 +381,34 @@ void insert_table(ofstream& ofs,list<string> list,int max_columns,string color1,
     ofs << "\" style=\"padding: 5px 8px 5px 8px; text-align: left; background-color: ";
     if ( (m % 2) == 0) {
       ofs << color1;
-    }
-    else {
+    } else {
       ofs << color2;
     }
     ofs << "; height: 18px;";
     if (m == 1 && n == 0) {
       if (num_rows > 1) {
         ofs << " border-radius: 10px 0px 0px 0px";
-      }
-      else {
+      } else {
         if (list.size() == 1) {
           ofs << " border-radius: 10px 10px 10px 10px";
-        }
-        else {
+        } else {
           ofs << " border-radius: 10px 0px 0px 10px";
         }
       }
-    }
-    else if (m == 1 && n == cmax) {
+    } else if (m == 1 && n == cmax) {
       if (m == num_rows) {
         ofs << " border-radius: 0px 10px 10px 0px";
-      }
-      else {
+      } else {
         ofs << " border-radius: 0px 10px 0px 0px";
       }
-    }
-    else if (m == num_rows && n == 0) {
+    } else if (m == num_rows && n == 0) {
       ofs << " border-radius: 0px 0px 0px 10px";
-    }
-    else if (m == num_rows) {
+    } else if (m == num_rows) {
       if (num_rows > 1) {
         if (n == cmax) {
           ofs << " border-radius: 0px 0px 10px 0px";
         }
-      }
-      else {
+      } else {
         if (n == static_cast<int>(list.size()-1)) {
           ofs << " border-radius: 0px 10px 10px 0px";
         }
@@ -481,8 +430,7 @@ void insert_table(ofstream& ofs,list<string> list,int max_columns,string color1,
         ofs << "\" style=\"background-color: ";
         if ( (m % 2) == 0) {
           ofs << color1;
-        }
-        else {
+        } else {
           ofs << color2;
         }
         ofs << "; height: 18px;";
@@ -551,8 +499,7 @@ void add_publications(TokenDocument& tdoc,XMLDocument& xdoc)
         auto title=reference.element("title").content();
         if (!url.empty()) {
           publications_s << "<a href=\"" << url << "\">" << title << "</a>";
-        }
-        else {
+        } else {
           publications_s << title;
         }
         if (!strutils::has_ending(title,"?")) {
@@ -562,26 +509,21 @@ void add_publications(TokenDocument& tdoc,XMLDocument& xdoc)
         if (periodical.attribute_value("pages") == "0-0") {
           if (periodical.attribute_value("number") == "0") {
             publications_s << "Submitted";
-          }
-          else if (periodical.attribute_value("number") == "1") {
+          } else if (periodical.attribute_value("number") == "1") {
             publications_s << "Accepted";
-          }
-          else if (periodical.attribute_value("number") == "2") {
+          } else if (periodical.attribute_value("number") == "2") {
             publications_s << "In Press";
           }
-        }
-        else {
+        } else {
           publications_s << "<b>" << periodical.attribute_value("number") << "</b>, ";
           auto pages=periodical.attribute_value("pages");
           if (regex_search(pages,regex("^AGU:"))) {
             publications_s << pages.substr(4);
-          }
-          else {
+          } else {
             auto page_parts=strutils::split(pages,"-"); 
             if (page_parts.size() == 2 && page_parts[0] == page_parts[1]) {
               publications_s << page_parts[0];
-            }
-            else {
+            } else {
               publications_s << periodical.attribute_value("pages");
             }
           }
@@ -591,14 +533,12 @@ void add_publications(TokenDocument& tdoc,XMLDocument& xdoc)
           publications_s << " (DOI: " << doi << ")";
         }
         publications_s << ".";
-      }
-      else if (pub_type == "preprint") {
+      } else if (pub_type == "preprint") {
         auto conference=reference.element("conference");
         auto url=reference.element("url").content();
         if (!url.empty()) {
           publications_s << "<a href=\"" << url << "\">" << reference.element("title").content() << "</a>";
-        }
-        else {
+        } else {
           publications_s << reference.element("title").content();
         }
         publications_s << ".  <i>Proceedings of the " << conference.content() << "</i>, " << conference.attribute_value("host") << ", " << conference.attribute_value("location");
@@ -611,14 +551,12 @@ void add_publications(TokenDocument& tdoc,XMLDocument& xdoc)
           publications_s << " (DOI: " << doi << ")";
         }
         publications_s << ".";
-      }
-      else if (pub_type == "technical_report") {
+      } else if (pub_type == "technical_report") {
         auto organization=reference.element("organization");
         auto url=reference.element("url").content();
         if (!url.empty()) {
           publications_s << "<i><a href=\"" << url << "\">" << reference.element("title").content() << "</a>.</i>";
-        }
-        else {
+        } else {
           publications_s << "<i>" << reference.element("title").content() << ".</i>";
         }
         publications_s << "  ";
@@ -635,8 +573,7 @@ void add_publications(TokenDocument& tdoc,XMLDocument& xdoc)
         if (!doi.empty()) {
           publications_s << " (DOI: " << doi << ").";
         }
-      }
-      else if (pub_type == "book") {
+      } else if (pub_type == "book") {
         auto publisher=reference.element("publisher");
         publications_s << "<i>" << reference.element("title").content() << "</i>. " << publisher.content() << ", " << publisher.attribute_value("place");
         auto doi=reference.element("doi").content();
@@ -644,14 +581,12 @@ void add_publications(TokenDocument& tdoc,XMLDocument& xdoc)
           publications_s << " (DOI: " << doi << ")";
         }
         publications_s << ".";
-      }
-      else if (pub_type == "book_chapter") {
+      } else if (pub_type == "book_chapter") {
         auto book=reference.element("book");
         publications_s << "\"" << reference.element("title").content() << "\", in " << book.content() << ". Ed. " << book.attribute_value("editor") << ", " << book.attribute_value("publisher") << ", ";
         if (book.attribute_value("pages") == "0-0") {
           publications_s << "In Press";
-        }
-        else {
+        } else {
           publications_s << book.attribute_value("pages");
         }
         auto doi=reference.element("doi").content();
@@ -695,8 +630,7 @@ void add_data_formats(TokenDocument& tdoc,vector<string>& formats,bool found_con
   XMLDocument fdoc;
   if (stat("/usr/local/www/server_root/web/metadata",&buf) == 0) {
     fdoc.open("/usr/local/www/server_root/web/metadata/FormatReferences.xml");
-  }
-  else {
+  } else {
     auto file=unixutils::remote_web_file("https://rda.ucar.edu/metadata/FormatReferences.xml",temp_dir.name());
     fdoc.open(file);
   }
@@ -713,13 +647,11 @@ void add_data_formats(TokenDocument& tdoc,vector<string>& formats,bool found_con
       strutils::replace_all(description,"proprietary_","");
       if (!format_parts[1].empty()) {
         url=format_parts[1];
-      }
-      else {
+      } else {
         description+=" (see dataset documentation)";
         url="";
       }
-    }
-    else {
+    } else {
       auto format_reference=fdoc.element(("formatReferences/format@name="+description));
       url=format_reference.attribute_value("href");
     }
@@ -774,8 +706,7 @@ void add_citations(TokenDocument& tdoc)
             if (!doi_authors_row[2].empty()) {
               citation+=" "+doi_authors_row[2].substr(0,1)+".";
             }
-          }
-          else {
+          } else {
             citation+=", ";
             if (n == doi_authors_query.num_rows()) {
               citation+="and ";
@@ -824,16 +755,13 @@ void add_citations(TokenDocument& tdoc)
                       ++n;
                     }
                     citation+=", "+htmlutils::unicode_escape_to_html(book_works_row[1])+", "+chapter_works_row[0]+".";
-                  }
-                  else {
+                  } else {
                     citation="";
                   }
-                }
-                else {
+                } else {
                   citation="";
                 }
-              }
-              else {
+              } else {
                 citation="";
               }
               break;
@@ -851,8 +779,7 @@ void add_citations(TokenDocument& tdoc)
                   citation+=", "+journal_works_row[2];
                 }
                 citation+=", <a href=\"https://doi.org/"+doi+"\" target=\"_doi\">https://doi.org/"+doi+"</a>";
-              }
-              else {
+              } else {
                 citation="";
               }
               break;
@@ -870,8 +797,7 @@ void add_citations(TokenDocument& tdoc)
                   pub_data+=", "+proceedings_works_row[1];
                 }
                 citation+=pub_data+", <a href=\"https://doi.org/"+doi+"\" target=\"_doi\">https://doi.org/"+doi+"</a>";
-              }
-              else {
+              } else {
                 citation="";
               }
               break;
@@ -888,8 +814,7 @@ void add_citations(TokenDocument& tdoc)
     tdoc.add_if("__HAS_DATA_CITATIONS__");
     if (citations.size() > 1) {
       tdoc.add_replacement("__NUM_DATA_CITATIONS__","<strong>"+strutils::itos(citations.size())+"</strong> times");
-    }
-    else {
+    } else {
       tdoc.add_replacement("__NUM_DATA_CITATIONS__","<strong>"+strutils::itos(citations.size())+"</strong> time");
     }
     std::sort(citations.begin(),citations.end(),
@@ -897,13 +822,10 @@ void add_citations(TokenDocument& tdoc)
     {
       if (get<0>(left) > get<0>(right)) {
         return true;
-      }
-      else if (get<0>(left) < get<0>(right)) {
+      } else if (get<0>(left) < get<0>(right)) {
         return false;
       }
-      else {
-        return (get<1>(left) < get<1>(right));
-      }
+      return (get<1>(left) < get<1>(right));
     });
     unordered_set<string> pub_years;
     for (const auto& c : citations) {
@@ -911,13 +833,11 @@ void add_citations(TokenDocument& tdoc)
       if (pub_years.find(pub_year) == pub_years.end()) {
         tdoc.add_repeat("__DATA_CITER__","CITATION[!]"+get<1>(c)+"<!>YEAR[!]"+pub_year);
         pub_years.emplace(pub_year);
-      }
-      else {
+      } else {
         tdoc.add_repeat("__DATA_CITER__","CITATION[!]"+get<1>(c));
       }
     }
-  }
-  else {
+  } else {
     tdoc.add_replacement("__NUM_DATA_CITATIONS__","<strong>0</strong> times");
   }
 }
@@ -929,8 +849,7 @@ void generate_description(string type,string tdir_name)
   ofstream ofs;
   if (dataset_type == "W") {
     ofs.open((tdir_name+"/test_description.html").c_str());
-  }
-  else {
+  } else {
     ofs.open((tdir_name+"/description.html").c_str());
   }
   if (!ofs.is_open()) {
@@ -1002,8 +921,7 @@ void generate_description(string type,string tdir_name)
   }
   if (query.num_rows() > 0) {
     query.set("select p.date_start,p.time_start,p.start_flag,p.date_end,p.time_end,p.end_flag,p.time_zone,g.title,g.grpid from dssdb.dsperiod as p left join dssdb.dsgroup as g on (p.dsid = g.dsid and p.gindex = g.gindex) where p.dsid = 'ds"+metautils::args.dsnum+"' and g.pindex = 0 and date_start > '0000-00-00' and date_start < '3000-01-01' and date_end > '0000-00-00' and date_end < '3000-01-01' union select p.date_start,p.time_start,p.start_flag,p.date_end,p.time_end,p.end_flag,p.time_zone,g2.title,g.grpid from dssdb.dsperiod as p left join dssdb.dsgroup as g on (p.dsid = g.dsid and p.gindex = g.gindex) left join dssdb.dsgroup as g2 on (p.dsid = g2.dsid and g.pindex = g2.gindex) where p.dsid = 'ds"+metautils::args.dsnum+"' and date_start > '0000-00-00' and date_start < '3000-01-01' and date_end > '0000-00-00' and date_end < '3000-01-01' and !isnull(g2.title) order by title");
-  }
-  else {
+  } else {
     query.set("select date_start,time_start,start_flag,date_end,time_end,end_flag,time_zone,NULL,NULL from dssdb.dsperiod where dsid = 'ds"+metautils::args.dsnum+"' and date_start > '0000-00-00' and date_start < '3000-01-01' and date_end > '0000-00-00' and date_end < '3000-01-01'");
   }
   if (query.submit(server) < 0) {
@@ -1079,14 +997,12 @@ void generate_description(string type,string tdir_name)
       string key;
       if (!row[7].empty()) {
         key=row[7];
-      }
-      else {
+      } else {
         key=row[8];
       }
       if (periods_table.find(key) == periods_table.end()) {
         periods_table.emplace(key,make_tuple(start_date_time,end_date_time));
-      }
-      else {
+      } else {
         string &start=get<0>(periods_table[key]);
         if (start_date_time < start) {
           start=start_date_time;
@@ -1106,8 +1022,7 @@ void generate_description(string type,string tdir_name)
       if (periods_table.size() > 1) {
         temporal+=" ("+e.first+")";
         tdoc.add_repeat("__TEMPORAL_RANGE__","<div style=\"margin-left: 10px\">"+temporal+"</div>");
-      }
-      else {
+      } else {
         tdoc.add_repeat("__TEMPORAL_RANGE__",temporal);
       }
     }
@@ -1255,8 +1170,7 @@ void generate_description(string type,string tdir_name)
         break;
       }
     }
-  }
-  else {
+  } else {
     elist=xdoc.element_list("dsOverview/contentMetadata/levels/level");
     auto elist2=xdoc.element_list("dsOverview/contentMetadata/levels/layer");
     elist.insert(elist.end(),elist2.begin(),elist2.end());
@@ -1266,8 +1180,7 @@ void generate_description(string type,string tdir_name)
       for (const auto& ele : elist) {
         if ((ele.attribute_value("value") == "0" || (ele.attribute_value("top") == "0" && ele.attribute_value("bottom") == "0")) && ele.attribute_value("units").empty()) {
           levels.emplace_back(ele.attribute_value("type"));
-        }
-        else {
+        } else {
           if (!ele.attribute_value("value").empty()) {
             auto level=ele.attribute_value("value")+" "+ele.attribute_value("units");
             if (regex_search(level,regex("^\\."))) {
@@ -1277,8 +1190,7 @@ void generate_description(string type,string tdir_name)
               level="-"+level;
             }
             levels.emplace_back(level);
-          }
-          else {
+          } else {
             auto layer=ele.attribute_value("top");
             if (regex_search(layer,regex("^\\."))) {
               layer="0"+layer;
@@ -1326,44 +1238,33 @@ void generate_description(string type,string tdir_name)
             temporal_frequency_s << " (" << strutils::capitalize(stats) << ")";
           }
           temporal_frequency_s << endl;
-        }
-        else if (tfreq_type == "irregular") {
+        } else if (tfreq_type == "irregular") {
           temporal_frequency_s << "various times per " << ele.attribute_value("unit");
           auto stats=ele.attribute_value("statistics");
           if (!stats.empty()) {
             temporal_frequency_s << " (" << strutils::capitalize(stats) << ")";
           }
-        }
-        else if (tfreq_type == "climatology") {
+        } else if (tfreq_type == "climatology") {
           auto unit=ele.attribute_value("unit");
           if (unit == "hour") {
             unit="Hourly";
-          }
-          else if (unit == "day") {
+          } else if (unit == "day") {
             unit="Daily";
-          }
-          else if (unit == "week") {
+          } else if (unit == "week") {
             unit="Weekly";
-          }
-          else if (unit == "month") {
+          } else if (unit == "month") {
             unit="Monthly";
-          }
-          else if (unit == "winter") {
+          } else if (unit == "winter") {
             unit="Winter Season";
-          }
-          else if (unit == "spring") {
+          } else if (unit == "spring") {
             unit="Spring Season";
-          }
-          else if (unit == "summer") {
+          } else if (unit == "summer") {
             unit="Summer Season";
-          }
-          else if (unit == "autumn") {
+          } else if (unit == "autumn") {
             unit="Autumn Season";
-          }
-          else if (unit == "year") {
+          } else if (unit == "year") {
             unit="Annual";
-          }
-          else if (unit == "30-year") {
+          } else if (unit == "30-year") {
             unit="30-year (climate normal)";
           }
           temporal_frequency_s << unit << " Climatology";
@@ -1388,8 +1289,7 @@ void generate_description(string type,string tdir_name)
       }
       tdoc.add_replacement("__DATA_TYPES__",data_types_string);
     }
-  }
-  else {
+  } else {
     elist=xdoc.element_list("dsOverview/contentMetadata/dataType");
     if (elist.size() > 0) {
       tdoc.add_if("__HAS_DATA_TYPES__");
@@ -1417,8 +1317,7 @@ void generate_description(string type,string tdir_name)
         MySQL::LocalQuery grid_codes_query;
         if (grouped_periods) {
           grid_codes_query.set("select gridDefinition_codes,webID_code from WGrML.ds"+dsnum2+"_grid_definitions");
-        }
-        else {
+        } else {
           grid_codes_query.set("select distinct gridDefinition_codes from WGrML.ds"+dsnum2+"_agrids");
         }
         if (grid_codes_query.submit(server) < 0) {
@@ -1441,8 +1340,7 @@ void generate_description(string type,string tdir_name)
               grid_definition_query.fetch_row(grid_definition_row);
               grid_definition_table.emplace(value,make_tuple(grid_definition_row[0],grid_definition_row[1]));
               ugd_key=grid_definition_row[0]+"<!>"+grid_definition_row[1];
-            }
-            else {
+            } else {
               auto kval=grid_definition_table[value];
               ugd_key=get<0>(kval)+"<!>"+get<1>(kval);
             }
@@ -1461,8 +1359,7 @@ void generate_description(string type,string tdir_name)
                 g->emplace(group);
               }
               unique_grid_definitions_table.emplace(ugd_key,g);
-            }
-            else if (!group.empty()) {
+            } else if (!group.empty()) {
               if (u->second == nullptr) {
                 u->second.reset(new unordered_set<string>);
               }
@@ -1475,8 +1372,7 @@ void generate_description(string type,string tdir_name)
         break;
       }
     }
-  }
-  else {
+  } else {
     elist=xdoc.element_list("dsOverview/contentMetadata/geospatialCoverage/grid");
     for (const auto& ele : elist) {
       auto definition=ele.attribute_value("definition");
@@ -1486,14 +1382,11 @@ void generate_description(string type,string tdir_name)
       auto ugd_key=definition+"<!>"+ele.attribute_value("numX")+":"+ele.attribute_value("numY");
       if (regex_search(ugd_key,regex("^(latLon|mercator)"))) {
         ugd_key+=":"+ele.attribute_value("startLat")+":"+ele.attribute_value("startLon")+":"+ele.attribute_value("endLat")+":"+ele.attribute_value("endLon")+":"+ele.attribute_value("xRes")+":"+ele.attribute_value("yRes");
-      }
-      else if (regex_search(ugd_key,regex("^gaussLatLon"))) {
+      } else if (regex_search(ugd_key,regex("^gaussLatLon"))) {
         ugd_key+=":"+ele.attribute_value("startLat")+":"+ele.attribute_value("startLon")+":"+ele.attribute_value("endLat")+":"+ele.attribute_value("endLon")+":"+ele.attribute_value("xRes")+":"+ele.attribute_value("numY");
-      }
-      else if (regex_search(ugd_key,regex("^polarStereographic"))) {
+      } else if (regex_search(ugd_key,regex("^polarStereographic"))) {
         ugd_key+=":"+ele.attribute_value("startLat")+":"+ele.attribute_value("startLon")+":60"+ele.attribute_value("pole")+":"+ele.attribute_value("projLon")+":"+ele.attribute_value("pole")+":"+ele.attribute_value("xRes")+":"+ele.attribute_value("yRes");
-      }
-      else if (regex_search(ugd_key,regex("^lambertConformal"))) {
+      } else if (regex_search(ugd_key,regex("^lambertConformal"))) {
         ugd_key+=":"+ele.attribute_value("startLat")+":"+ele.attribute_value("startLon")+":"+ele.attribute_value("resLat")+":"+ele.attribute_value("projLon")+":"+ele.attribute_value("pole")+":"+ele.attribute_value("xRes")+":"+ele.attribute_value("yRes")+":"+ele.attribute_value("stdParallel1")+":"+ele.attribute_value("stdParallel2");
       }
       unique_grid_definitions_table.emplace(ugd_key,nullptr);
@@ -1507,8 +1400,7 @@ void generate_description(string type,string tdir_name)
       if (east_lon < 0. && east_lon < west_lon) {
 // data straddle the date line
         straddle_east_lons.emplace_back(east_lon);
-      }
-      else {
+      } else {
         if (east_lon > max_east_lon) {
           max_east_lon=east_lon;
         }
@@ -1541,8 +1433,7 @@ void generate_description(string type,string tdir_name)
     auto west=strutils::ftos(fabs(min_west_lon),3);
     if (min_west_lon < 0) {
       west+="W";
-    }
-    else {
+    } else {
       west+="E";
     }
     stringstream spatial_coverage_s;
@@ -1550,24 +1441,21 @@ void generate_description(string type,string tdir_name)
     auto east=strutils::ftos(fabs(max_east_lon),3);
     if (max_east_lon < 0) {
       east+="W";
-    }
-    else {
+    } else {
       east+="E";
     }
     spatial_coverage_s << east << "<br />" << endl;
     auto south=strutils::ftos(fabs(min_south_lat),3);
     if (min_south_lat < 0) {
       south+="S";
-    }
-    else {
+    } else {
         south+="N";
     }
     spatial_coverage_s << "Latitude Range:  Southernmost=" << south << "  Northernmost=";
     auto north=strutils::ftos(fabs(max_north_lat),3);
     if (max_north_lat < 0) {
       north+="S";
-    }
-    else {
+    } else {
       north+="N";
     }
     spatial_coverage_s << north << endl;
@@ -1627,8 +1515,7 @@ void generate_description(string type,string tdir_name)
   if (elist.size() > 0) {
     if (elist.size() > 1) {
       tdoc.add_replacement("__WEB_SITES_VALIGN__","top");
-    }
-    else {
+    } else {
       tdoc.add_replacement("__WEB_SITES_VALIGN__","bottom");
     }
     stringstream related_web_sites_s;
@@ -1697,8 +1584,7 @@ void generate_description(string type,string tdir_name)
       volume_s << "<div style=\"margin-left: 10px\">";
       if (!row2[1].empty()) {
         volume_s << row2[1];
-      }
-      else {
+      } else {
         volume_s << row2[2];
       }
       volume_s << ": " << strutils::ftos(llround(volume*100.)/100.,6,2,' ') << " " << v[n] << "</div>";
@@ -1715,8 +1601,7 @@ void generate_description(string type,string tdir_name)
   if (elist.size() > 0) {
     if (elist.size() > 1) {
       tdoc.add_replacement("__RELATED_DATASETS_VALIGN__","top");
-    }
-    else {
+    } else {
       tdoc.add_replacement("__RELATED_DATASETS_VALIGN__","bottom");
     }
     elist.sort(
@@ -1725,9 +1610,7 @@ void generate_description(string type,string tdir_name)
       if (left.attribute_value("ID") <= right.attribute_value("ID")) {
         return true;
       }
-      else {
-        return false;
-      }
+      return false;
     });
     string related_datasets;
     for (const auto& ele : elist) {
