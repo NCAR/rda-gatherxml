@@ -20,21 +20,39 @@
 #include <search.hpp>
 #include <tokendoc.hpp>
 
+using std::endl;
+using std::get;
+using std::list;
+using std::make_tuple;
+using std::map;
+using std::ofstream;
+using std::regex;
+using std::regex_search;
+using std::shared_ptr;
+using std::stof;
+using std::stoi;
+using std::string;
+using std::stringstream;
+using std::tuple;
+using std::unordered_map;
+using std::unordered_set;
+using std::vector;
+
 metautils::Directives metautils::directives;
 metautils::Args metautils::args;
-std::string myerror="";
-std::string mywarning="";
-extern const std::string USER=getenv("USER");
+string myerror="";
+string mywarning="";
+extern const string USER=getenv("USER");
 
 TempDir temp_dir;
 XMLDocument xdoc;
 MySQL::Server server;
-std::string dataset_type;
+string dataset_type;
 bool no_dset_waf=false;
 
-void generate_index(std::string type,std::string tdir_name)
+void generate_index(string type,string tdir_name)
 {
-  std::ofstream ofs;
+  ofstream ofs;
   if (dataset_type == "W") {
     ofs.open((tdir_name+"/test_index.html").c_str());
   }
@@ -59,7 +77,7 @@ void generate_index(std::string type,std::string tdir_name)
   }
   else {
     struct stat buf;
-    std::string ds_overview;
+    string ds_overview;
     if (stat(("/data/web/datasets/ds"+metautils::args.dsnum+"/metadata/dsOverview.xml").c_str(),&buf) == 0) {
       ds_overview="/data/web/datasets/ds"+metautils::args.dsnum+"/metadata/dsOverview.xml";
     }
@@ -72,7 +90,7 @@ void generate_index(std::string type,std::string tdir_name)
     if (!xdoc.open(ds_overview)) {
       metautils::log_error("unable to open dsOverview.xml for "+metautils::args.dsnum+"; parse error: '"+xdoc.parse_error()+"'","dsgen",USER);
     }
-    std::stringstream dc_meta_tags_s;
+    stringstream dc_meta_tags_s;
     if (!metadataExport::export_to_dc_meta_tags(dc_meta_tags_s,metautils::args.dsnum,xdoc,0)) {
       metautils::log_error("unable to export DC meta tags: '"+myerror+"'","dsgen",USER);
     }
@@ -80,7 +98,7 @@ void generate_index(std::string type,std::string tdir_name)
     auto e=xdoc.element("dsOverview/title");
     auto title=e.content();
     tdoc.add_replacement("__TITLE__",title);
-    std::stringstream json_ld_s;
+    stringstream json_ld_s;
     if (!metadataExport::export_to_json_ld(json_ld_s,metautils::args.dsnum,xdoc,0)) {
       metautils::log_error("unable to export JSON-LD metadata","dsgen",USER);
     }
@@ -89,8 +107,8 @@ void generate_index(std::string type,std::string tdir_name)
     if (!e.content().empty()) {
       auto logo_parts=strutils::split(e.content(),".");
       auto geometry_parts=strutils::split(logo_parts[logo_parts.size()-2],"_");
-      auto width=std::stoi(geometry_parts[geometry_parts.size()-2]);
-      auto height=std::stoi(geometry_parts[geometry_parts.size()-1]);
+      auto width=stoi(geometry_parts[geometry_parts.size()-2]);
+      auto height=stoi(geometry_parts[geometry_parts.size()-1]);
       tdoc.add_replacement("__LOGO_IMAGE__",e.content());
       tdoc.add_replacement("__LOGO_WIDTH__",strutils::itos(lroundf(width*70./height)));
     }
@@ -100,7 +118,7 @@ void generate_index(std::string type,std::string tdir_name)
     }
     MySQL::Query query("doi","dssdb.dsvrsn","dsid = 'ds"+metautils::args.dsnum+"' and status = 'A'");
     MySQL::Row row;
-    std::string doi_span;
+    string doi_span;
     if (query.submit(server) == 0 && query.fetch_row(row) && !row[0].empty()) {
       doi_span="&nbsp;|&nbsp;<span class=\"blue\">DOI: "+row[0]+"</span>";
     }
@@ -129,7 +147,7 @@ void generate_index(std::string type,std::string tdir_name)
   delete t;
 }
 
-bool compare_strings(const std::string& left,const std::string& right)
+bool compare_strings(const string& left,const string& right)
 {
   if (left <= right) {
     return true;
@@ -166,12 +184,12 @@ bool compare_references(XMLElement& left,XMLElement& right)
   }
 }
 
-bool compare_levels(const std::string& left,const std::string& right)
+bool compare_levels(const string& left,const string& right)
 {
   if (((left[0] >= '0' && left[0] <= '9') || (left[0] == '-' && left[1] >= '0' && left[1] <= '9')) && ((right[0] >= '0' && right[0] <= '9') || (right[0] == '-' && right[1] >= '0' && right[1] <= '9'))) {
     auto lidx=left.find(" ");
-    std::string lval,lunits;
-    if (lidx != std::string::npos) {
+    string lval,lunits;
+    if (lidx != string::npos) {
       lval=left.substr(0,lidx);
       lunits=left.substr(lidx+1);
     }
@@ -180,8 +198,8 @@ bool compare_levels(const std::string& left,const std::string& right)
       lunits="";
     }
     auto ridx=right.find(" ");
-    std::string rval,runits;
-    if (ridx != std::string::npos) {
+    string rval,runits;
+    if (ridx != string::npos) {
       rval=right.substr(0,ridx);
       runits=right.substr(ridx+1);
     }
@@ -189,8 +207,8 @@ bool compare_levels(const std::string& left,const std::string& right)
       rval=right;
       runits="";
     }
-    auto ilval=std::stoi(lval);
-    auto irval=std::stoi(rval);
+    auto ilval=stoi(lval);
+    auto irval=stoi(rval);
     if (lunits == runits) {
       if (lunits == "mbar" || lunits == "deg K") {
         if (ilval >= irval) {
@@ -234,10 +252,10 @@ bool compare_levels(const std::string& left,const std::string& right)
   }
 }
 
-std::string create_table_from_strings(std::list<std::string> list,int max_columns,std::string color1,std::string color2)
+string create_table_from_strings(list<string> list,int max_columns,string color1,string color2)
 {
-  std::stringstream ss;
-  ss << "<table cellspacing=\"0\">" << std::endl;
+  stringstream ss;
+  ss << "<table cellspacing=\"0\">" << endl;
   auto num_rows=list.size()/max_columns;
   if ( (list.size() % max_columns) != 0) {
     ++num_rows;
@@ -266,7 +284,7 @@ std::string create_table_from_strings(std::list<std::string> list,int max_column
     n=n % max_columns;
     if (n == 0) {
       ++m;
-      ss << "<tr style=\"vertical-align: top\">" << std::endl;
+      ss << "<tr style=\"vertical-align: top\">" << endl;
     }
     ss << "<td class=\"";
     if (m == 1) {
@@ -320,9 +338,9 @@ std::string create_table_from_strings(std::list<std::string> list,int max_column
         }
       }
     }
-    ss << "\">"+item+"</td>" << std::endl;
+    ss << "\">"+item+"</td>" << endl;
     if (n == cmax) {
-      ss << "</tr>" << std::endl;
+      ss << "</tr>" << endl;
     }
     ++n;
   }
@@ -344,18 +362,18 @@ std::string create_table_from_strings(std::list<std::string> list,int max_column
         if (l == cmax) {
           ss << " border-radius: 0px 0px 10px 0px";
         }
-        ss << "\">&nbsp;</td>" << std::endl;
+        ss << "\">&nbsp;</td>" << endl;
       }
     }
     ss << "</tr>";
   }
-  ss << "</table>" << std::endl;
+  ss << "</table>" << endl;
   return ss.str();
 }
 
-void insert_table(std::ofstream& ofs,std::list<std::string> list,int max_columns,std::string color1,std::string color2)
+void insert_table(ofstream& ofs,list<string> list,int max_columns,string color1,string color2)
 {
-  ofs << "<table cellspacing=\"0\">" << std::endl;
+  ofs << "<table cellspacing=\"0\">" << endl;
   auto num_rows=list.size()/max_columns;
   if ( (list.size() % max_columns) != 0) {
     ++num_rows;
@@ -384,7 +402,7 @@ void insert_table(std::ofstream& ofs,std::list<std::string> list,int max_columns
     n=n % max_columns;
     if (n == 0) {
       ++m;
-      ofs << "<tr style=\"vertical-align: top\">" << std::endl;
+      ofs << "<tr style=\"vertical-align: top\">" << endl;
     }
     ofs << "<td class=\"";
     if (m == 1) {
@@ -438,9 +456,9 @@ void insert_table(std::ofstream& ofs,std::list<std::string> list,int max_columns
         }
       }
     }
-    ofs << "\">"+item+"</td>" << std::endl;
+    ofs << "\">"+item+"</td>" << endl;
     if (n == cmax) {
-      ofs << "</tr>" << std::endl;
+      ofs << "</tr>" << endl;
     }
     ++n;
   }
@@ -462,15 +480,15 @@ void insert_table(std::ofstream& ofs,std::list<std::string> list,int max_columns
         if (l == cmax) {
           ofs << " border-radius: 0px 0px 10px 0px";
         }
-        ofs << "\">&nbsp;</td>" << std::endl;
+        ofs << "\">&nbsp;</td>" << endl;
       }
     }
     ofs << "</tr>";
   }
-  ofs << "</table>" << std::endl;
+  ofs << "</table>" << endl;
 }
 
-std::string text_field_from_element(const XMLElement& e)
+string text_field_from_element(const XMLElement& e)
 {
   auto s=e.to_string();
   if (!s.empty()) {
@@ -478,7 +496,7 @@ std::string text_field_from_element(const XMLElement& e)
     strutils::replace_all(s,"</"+e.name()+">","");
     strutils::trim(s);
     size_t idx;
-    if ( (idx=s.find("<p")) == std::string::npos) {
+    if ( (idx=s.find("<p")) == string::npos) {
       idx=s.find("<P");
     }
     if (idx == 0) {
@@ -489,7 +507,7 @@ std::string text_field_from_element(const XMLElement& e)
   return s;
 }
 
-void insert_text_field(std::ofstream& ofs,const XMLElement& e,std::string section_title)
+void insert_text_field(ofstream& ofs,const XMLElement& e,string section_title)
 {
   auto s=e.to_string();
   if (!s.empty()) {
@@ -497,21 +515,21 @@ void insert_text_field(std::ofstream& ofs,const XMLElement& e,std::string sectio
     strutils::replace_all(s,"</"+e.name()+">","");
     strutils::trim(s);
     size_t idx;
-    if ( (idx=s.find("<p")) == std::string::npos) {
+    if ( (idx=s.find("<p")) == string::npos) {
       idx=s.find("<P");
     }
     if (idx == 0) {
       auto idx2=s.find(">",idx);
       s.insert(idx2," style=\"margin: 0px; padding: 0px\"");
     }
-    ofs << "<tr style=\"vertical-align: top\"><td class=\"bold\">" << section_title << ":</td><td>" << s << "</td></tr>" << std::endl;
+    ofs << "<tr style=\"vertical-align: top\"><td class=\"bold\">" << section_title << ":</td><td>" << s << "</td></tr>" << endl;
   }
 }
 
 void add_publications(TokenDocument& tdoc,XMLDocument& xdoc)
 {
   auto reference_list=xdoc.element_list("dsOverview/reference");
-  std::stringstream publications_s;
+  stringstream publications_s;
   if (reference_list.size() > 0) {
     tdoc.add_if("__HAS_PUBLICATIONS__");
     reference_list.sort(compare_references);
@@ -546,7 +564,7 @@ void add_publications(TokenDocument& tdoc,XMLDocument& xdoc)
         else {
           publications_s << "<b>" << periodical.attribute_value("number") << "</b>, ";
           auto pages=periodical.attribute_value("pages");
-          if (std::regex_search(pages,std::regex("^AGU:"))) {
+          if (regex_search(pages,regex("^AGU:"))) {
             publications_s << pages.substr(4);
           }
           else {
@@ -633,12 +651,12 @@ void add_publications(TokenDocument& tdoc,XMLDocument& xdoc)
         }
         publications_s << ".";
       }
-      publications_s << "</div>" << std::endl;
+      publications_s << "</div>" << endl;
       auto annotation=reference.element("annotation").content();
       if (!annotation.empty() > 0) {
-        publications_s << "<div style=\"margin-left: 15px; color: #5f5f5f\">" << annotation << "</div>" << std::endl;
+        publications_s << "<div style=\"margin-left: 15px; color: #5f5f5f\">" << annotation << "</div>" << endl;
       }
-      publications_s << "<br />" << std::endl;
+      publications_s << "<br />" << endl;
     }
   }
   auto reference_url_list=xdoc.element_list("dsOverview/referenceURL");
@@ -647,7 +665,7 @@ void add_publications(TokenDocument& tdoc,XMLDocument& xdoc)
       tdoc.add_if("__HAS_PUBLICATIONS__");
     }
     for (const auto& url : reference_url_list) {
-      publications_s << "<a href=\"" << url.attribute_value("url") << "\">" << url.content() << "</a><br>" << std::endl;
+      publications_s << "<a href=\"" << url.attribute_value("url") << "\">" << url.content() << "</a><br>" << endl;
     }
   }
   if (!publications_s.str().empty()) {
@@ -655,7 +673,7 @@ void add_publications(TokenDocument& tdoc,XMLDocument& xdoc)
   }
 }
 
-void add_data_formats(TokenDocument& tdoc,std::vector<std::string>& formats,bool found_content_metadata)
+void add_data_formats(TokenDocument& tdoc,vector<string>& formats,bool found_content_metadata)
 {
   if (!found_content_metadata) {
     auto format_list=xdoc.element_list("dsOverview/contentMetadata/format");
@@ -675,13 +693,13 @@ void add_data_formats(TokenDocument& tdoc,std::vector<std::string>& formats,bool
   if (!fdoc) {
     metautils::log_error("unable to open FormatReferences.xml","dsgen",USER);
   }
-  std::string data_formats;
+  string data_formats;
   size_t n=0;
   for (const auto& format_entry : formats) {
     auto format_parts=strutils::split(format_entry,"<!>");
     auto description=format_parts[0];
-    std::string url;
-    if (std::regex_search(description,std::regex("^proprietary_"))) {
+    string url;
+    if (regex_search(description,regex("^proprietary_"))) {
       strutils::replace_all(description,"proprietary_","");
       if (!format_parts[1].empty()) {
         url=format_parts[1];
@@ -697,7 +715,7 @@ void add_data_formats(TokenDocument& tdoc,std::vector<std::string>& formats,bool
     }
     if (!url.empty()) {
       data_formats+="<a href=\""+url+"\" target=\"_format\">";
-      if (!std::regex_search(url,std::regex("^http://rda.ucar.edu"))) {
+      if (!regex_search(url,regex("^http://rda.ucar.edu"))) {
         data_formats+="<i>";
       }
     }
@@ -705,7 +723,7 @@ void add_data_formats(TokenDocument& tdoc,std::vector<std::string>& formats,bool
     data_formats+=description;
     if (!url.empty()) {
       data_formats+="</a>";
-      if (!std::regex_search(url,std::regex("^http://rda.ucar.edu"))) {
+      if (!regex_search(url,regex("^http://rda.ucar.edu"))) {
         data_formats+="</i>";
       }
     }
@@ -724,7 +742,7 @@ void add_citations(TokenDocument& tdoc)
   if (citations_query.submit(server) < 0) {
     return;
   }
-  std::vector<std::tuple<std::string,std::string>> citations;
+  vector<tuple<string,string>> citations;
   for (const auto& citations_row : citations_query) {
     auto doi=citations_row[0];
     MySQL::LocalQuery works_query("select title,pub_year,type,publisher from citation.works where DOI = '"+doi+"'");
@@ -735,7 +753,7 @@ void add_citations(TokenDocument& tdoc)
       auto type=works_row[2];
       MySQL::LocalQuery doi_authors_query("select last_name,first_name,middle_name from citation.works_authors where ID = '"+doi+"' and ID_type = 'DOI' order by sequence");
       if (doi_authors_query.submit(server) == 0) {
-        std::string citation;
+        string citation;
         size_t n=1;
         for (const auto& doi_authors_row : doi_authors_query) {
           if (citation.empty()) {
@@ -851,7 +869,7 @@ void add_citations(TokenDocument& tdoc)
           }
         }
         if (!citation.empty()) {
-          citations.emplace_back(std::make_tuple(pub_year,citation));
+          citations.emplace_back(make_tuple(pub_year,citation));
         }
       }
     }
@@ -865,27 +883,27 @@ void add_citations(TokenDocument& tdoc)
       tdoc.add_replacement("__NUM_DATA_CITATIONS__","<strong>"+strutils::itos(citations.size())+"</strong> time");
     }
     std::sort(citations.begin(),citations.end(),
-    [](const std::tuple<std::string,std::string>& left,const std::tuple<std::string,std::string>& right) -> bool
+    [](const tuple<string,string>& left,const tuple<string,string>& right) -> bool
     {
-      if (std::get<0>(left) > std::get<0>(right)) {
+      if (get<0>(left) > get<0>(right)) {
         return true;
       }
-      else if (std::get<0>(left) < std::get<0>(right)) {
+      else if (get<0>(left) < get<0>(right)) {
         return false;
       }
       else {
-        return (std::get<1>(left) < std::get<1>(right));
+        return (get<1>(left) < get<1>(right));
       }
     });
-    std::unordered_set<std::string> pub_years;
+    unordered_set<string> pub_years;
     for (const auto& c : citations) {
-      auto pub_year=std::get<0>(c);
+      auto pub_year=get<0>(c);
       if (pub_years.find(pub_year) == pub_years.end()) {
-        tdoc.add_repeat("__DATA_CITER__","CITATION[!]"+std::get<1>(c)+"<!>YEAR[!]"+pub_year);
+        tdoc.add_repeat("__DATA_CITER__","CITATION[!]"+get<1>(c)+"<!>YEAR[!]"+pub_year);
         pub_years.emplace(pub_year);
       }
       else {
-        tdoc.add_repeat("__DATA_CITER__","CITATION[!]"+std::get<1>(c));
+        tdoc.add_repeat("__DATA_CITER__","CITATION[!]"+get<1>(c));
       }
     }
   }
@@ -894,10 +912,10 @@ void add_citations(TokenDocument& tdoc)
   }
 }
 
-void generate_description(std::string type,std::string tdir_name)
+void generate_description(string type,string tdir_name)
 {
-  std::string dsnum2=strutils::substitute(metautils::args.dsnum,".","");
-  std::ofstream ofs;
+  string dsnum2=strutils::substitute(metautils::args.dsnum,".","");
+  ofstream ofs;
   if (dataset_type == "W") {
     ofs.open((tdir_name+"/test_description.html").c_str());
   }
@@ -925,7 +943,7 @@ void generate_description(std::string type,std::string tdir_name)
   }
 /*
   if (dataset_type == "I") {
-    ofs << "<ul>This dataset has been removed from public view.  If you have questions about this dataset, please contact the specialist that is named above.</ul>" << std::endl;
+    ofs << "<ul>This dataset has been removed from public view.  If you have questions about this dataset, please contact the specialist that is named above.</ul>" << endl;
     ofs.close();
     return;
   }
@@ -934,10 +952,10 @@ void generate_description(std::string type,std::string tdir_name)
   if (databases.size() == 0) {
     metautils::log_error("empty CMD database list","dsgen",USER);
   }
-  std::vector<std::string> formats,data_types;
+  vector<string> formats,data_types;
   auto found_content_metadata=false;
   for (const auto& db : databases) {
-    std::string db_name,data_type;
+    string db_name,data_type;
     std::tie(db_name,data_type)=db;
     if (db_name[0] != 'V' && table_exists(server,db_name+".ds"+dsnum2+"_primaries2")) {
       MySQL::LocalQuery query("select distinct format from "+db_name+".formats as f left join "+db_name+".ds"+dsnum2+"_primaries2 as d on d.format_code = f.code where !isnull(d.format_code)");
@@ -984,7 +1002,7 @@ void generate_description(std::string type,std::string tdir_name)
   }
   auto div_num=0;
   bool grouped_periods=false;
-  std::unordered_map<std::string,std::string> groups_table,rda_files_table,metadata_files_table;
+  unordered_map<string,string> groups_table,rda_files_table,metadata_files_table;
   if (query.num_rows() > 0) {
     tdoc.add_if("__HAS_TEMPORAL_RANGE__");
     if (query.num_rows() > 1) {
@@ -1033,11 +1051,11 @@ void generate_description(std::string type,std::string tdir_name)
         div_num+=2;
       }
     }
-    std::map<std::string,std::tuple<std::string,std::string>> periods_table;
+    map<string,tuple<string,string>> periods_table;
     for (const auto& row : query) {
       auto start_date_time=metatranslations::date_time(row[0]+" "+row[1],row[2],row[6]);
       auto end_date_time=metatranslations::date_time(row[3]+" "+row[4],row[5],row[6]);
-      std::string key;
+      string key;
       if (!row[7].empty()) {
         key=row[7];
       }
@@ -1045,22 +1063,22 @@ void generate_description(std::string type,std::string tdir_name)
         key=row[8];
       }
       if (periods_table.find(key) == periods_table.end()) {
-        periods_table.emplace(key,std::make_tuple(start_date_time,end_date_time));
+        periods_table.emplace(key,make_tuple(start_date_time,end_date_time));
       }
       else {
-        std::string &start=std::get<0>(periods_table[key]);
+        string &start=get<0>(periods_table[key]);
         if (start_date_time < start) {
           start=start_date_time;
         }
-        std::string &end=std::get<1>(periods_table[key]);
+        string &end=get<1>(periods_table[key]);
         if (end_date_time > end) {
           end=end_date_time;
         }
       }   
     }
     for (const auto& e : periods_table) {
-      auto temporal=std::get<0>(e.second);
-      auto end=std::get<1>(e.second);
+      auto temporal=get<0>(e.second);
+      auto end=get<1>(e.second);
       if (!end.empty() && end != temporal) {
         temporal+=" to "+end;
       }
@@ -1088,10 +1106,10 @@ void generate_description(std::string type,std::string tdir_name)
   strutils::replace_all(access,"<access>","");
   strutils::replace_all(access,"</access>","");
   size_t idx;
-  if ( (idx=access.find("<p")) == std::string::npos) {
+  if ( (idx=access.find("<p")) == string::npos) {
     idx=access.find("<P");
   }
-  if (idx != std::string::npos) {
+  if (idx != string::npos) {
     auto idx2=access.find(">",idx);
     access.insert(idx2," style=\"margin: 0px; padding: 0px\"");
   }
@@ -1104,10 +1122,10 @@ void generate_description(std::string type,std::string tdir_name)
   auto usage=e.to_string();
   strutils::replace_all(usage,"<usage>","");
   strutils::replace_all(usage,"</usage>","");
-  if ( (idx=usage.find("<p")) == std::string::npos) {
+  if ( (idx=usage.find("<p")) == string::npos) {
     idx=usage.find("<P");
   }
-  if (idx != std::string::npos) {
+  if (idx != string::npos) {
     auto idx2=usage.find(">",idx);
     usage.insert(idx2," style=\"margin: 0px; padding: 0px\"");
   }
@@ -1120,7 +1138,7 @@ void generate_description(std::string type,std::string tdir_name)
   if (query.submit(server) < 0) {
     metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",USER);
   }
-  std::list<std::string> strings;
+  list<string> strings;
   for (const auto& row : query) {
     strings.emplace_back(strutils::capitalize(row[0]));
   }
@@ -1128,7 +1146,7 @@ void generate_description(std::string type,std::string tdir_name)
   auto elist=xdoc.element_list("dsOverview/contentMetadata/detailedVariables/detailedVariable");
   if (elist.size() > 0) {
     for (const auto& ele : elist) {
-      if (std::regex_search(ele.content(),std::regex("^http://")) || std::regex_search(ele.content(),std::regex("^https://"))) {
+      if (regex_search(ele.content(),regex("^http://")) || regex_search(ele.content(),regex("^https://"))) {
         tdoc.add_if("__HAS_DETAILED_VARIABLES__");
         tdoc.add_replacement("__DETAILED_VARIABLES_LINK__",ele.content());
         break;
@@ -1161,7 +1179,7 @@ void generate_description(std::string type,std::string tdir_name)
   }
   query.set("gindex,title","dssdb.dsgroup","dsid = 'ds"+metautils::args.dsnum+"' and pindex = 0 and dwebcnt > 0");
   if (query.submit(server) == 0) {
-    std::stringstream vars_by_product_s;
+    stringstream vars_by_product_s;
     for (const auto& row : query) {
       if (unixutils::exists_on_server(metautils::directives.web_server,"/data/web/datasets/ds"+metautils::args.dsnum+"/metadata/customize.WGrML."+row[0],metautils::directives.rdadata_home)) {
         auto c_file=unixutils::remote_web_file("https://rda.ucar.edu/datasets/ds"+metautils::args.dsnum+"/metadata/customize.WGrML."+row[0],temp_dir.name());
@@ -1170,11 +1188,11 @@ void generate_description(std::string type,std::string tdir_name)
           char line[32768];
           ifs.open(c_file);
           ifs.getline(line,32768);
-          if (std::regex_search(line,std::regex("^curl_subset="))) {
+          if (regex_search(line,regex("^curl_subset="))) {
             ifs.getline(line,32768);
           }
-          auto nvar=std::stoi(line);
-          std::list<std::string> varlist;
+          auto nvar=stoi(line);
+          list<string> varlist;
           for (int n=0; n < nvar; ++n) {
             ifs.getline(line,32768);
             auto var_parts=strutils::split(line,"<!>");
@@ -1207,7 +1225,7 @@ void generate_description(std::string type,std::string tdir_name)
     for (const auto& data_type : data_types) {
       if (data_type == "grid") {
         tdoc.add_if("__HAS_VERTICAL_LEVELS__");
-        std::string vertical_levels="See the <a href=\"#metadata/detailed.html?_do=y&view=level\">detailed metadata</a> for level information";
+        string vertical_levels="See the <a href=\"#metadata/detailed.html?_do=y&view=level\">detailed metadata</a> for level information";
         if (unixutils::exists_on_server(metautils::directives.web_server,"/data/web/datasets/ds"+metautils::args.dsnum+"/metadata/grib2_levels.html",metautils::directives.rdadata_home)) {
           vertical_levels+="<br /><a href=\"/datasets/ds"+metautils::args.dsnum+"/#metadata/grib2_levels.html?_do=y\">GRIB2 level table</a>"; 
         }
@@ -1222,7 +1240,7 @@ void generate_description(std::string type,std::string tdir_name)
     elist.insert(elist.end(),elist2.begin(),elist2.end());
     if (elist.size() > 0) {
       tdoc.add_if("__HAS_VERTICAL_LEVELS__");
-      std::list<std::string> levels;
+      list<string> levels;
       for (const auto& ele : elist) {
         if ((ele.attribute_value("value") == "0" || (ele.attribute_value("top") == "0" && ele.attribute_value("bottom") == "0")) && ele.attribute_value("units").empty()) {
           levels.emplace_back(ele.attribute_value("type"));
@@ -1230,7 +1248,7 @@ void generate_description(std::string type,std::string tdir_name)
         else {
           if (!ele.attribute_value("value").empty()) {
             auto level=ele.attribute_value("value")+" "+ele.attribute_value("units");
-            if (std::regex_search(level,std::regex("^\\."))) {
+            if (regex_search(level,regex("^\\."))) {
               level="0"+level;
             }
             if (ele.attribute_value("value") != "0" && strutils::contains(ele.attribute_value("type"),"height below")) {
@@ -1240,12 +1258,12 @@ void generate_description(std::string type,std::string tdir_name)
           }
           else {
             auto layer=ele.attribute_value("top");
-            if (std::regex_search(layer,std::regex("^\\."))) {
+            if (regex_search(layer,regex("^\\."))) {
               layer="0"+layer;
             }
             if (ele.attribute_value("top") != ele.attribute_value("bottom")) {
               auto bottom=ele.attribute_value("bottom");
-              if (std::regex_search(bottom,std::regex("^\\."))) {
+              if (regex_search(bottom,regex("^\\."))) {
                 bottom="0"+bottom;
               }
               layer+="-"+bottom;
@@ -1265,14 +1283,14 @@ void generate_description(std::string type,std::string tdir_name)
     auto m=0;
     if (elist.size() > 0) {
       tdoc.add_if("__HAS_TEMPORAL_FREQUENCY__");
-      std::stringstream temporal_frequency_s;
+      stringstream temporal_frequency_s;
       for (const auto& ele : elist) {
         auto tfreq_type=ele.attribute_value("type");
         if (m > 0) {
           temporal_frequency_s << ", ";
         }
         if (tfreq_type == "regular") {
-          auto n=std::stoi(ele.attribute_value("number"));
+          auto n=stoi(ele.attribute_value("number"));
           temporal_frequency_s << "Every ";
           if (n > 1) {
             temporal_frequency_s << n << " ";
@@ -1285,7 +1303,7 @@ void generate_description(std::string type,std::string tdir_name)
           if (!stats.empty()) {
             temporal_frequency_s << " (" << strutils::capitalize(stats) << ")";
           }
-          temporal_frequency_s << std::endl;
+          temporal_frequency_s << endl;
         }
         else if (tfreq_type == "irregular") {
           temporal_frequency_s << "various times per " << ele.attribute_value("unit");
@@ -1337,7 +1355,7 @@ void generate_description(std::string type,std::string tdir_name)
   if (found_content_metadata) {
     if (data_types.size() > 0) {
       tdoc.add_if("__HAS_DATA_TYPES__");
-      std::string data_types_string;
+      string data_types_string;
       auto n=0;
       for (const auto& data_type : data_types) {
         if (n > 0) {
@@ -1353,9 +1371,9 @@ void generate_description(std::string type,std::string tdir_name)
     elist=xdoc.element_list("dsOverview/contentMetadata/dataType");
     if (elist.size() > 0) {
       tdoc.add_if("__HAS_DATA_TYPES__");
-      std::string data_types_string;
+      string data_types_string;
       auto n=0;
-      std::unordered_map<std::string,char> unique_data_types;
+      unordered_map<string,char> unique_data_types;
       for (const auto& ele : elist) {
         if (unique_data_types.find(ele.content()) == unique_data_types.end()) {
           if (n++ > 0) {
@@ -1369,9 +1387,9 @@ void generate_description(std::string type,std::string tdir_name)
     }
   }
 // spatial coverage
-  std::unordered_map<std::string,std::shared_ptr<std::unordered_set<std::string>>> unique_grid_definitions_table;
+  unordered_map<string,shared_ptr<unordered_set<string>>> unique_grid_definitions_table;
   if (found_content_metadata) {
-    std::unordered_map<size_t,std::tuple<std::string,std::string>> grid_definition_table;
+    unordered_map<size_t,tuple<string,string>> grid_definition_table;
     for (const auto& data_type : data_types) {
       if (data_type == "grid") {
         MySQL::LocalQuery grid_codes_query;
@@ -1385,10 +1403,10 @@ void generate_description(std::string type,std::string tdir_name)
           metautils::log_error("error: "+grid_codes_query.error()+" while getting grid definitions","dsgen",USER);
         }
         for (const auto& grid_codes_row : grid_codes_query) {
-          std::vector<size_t> values;
+          vector<size_t> values;
           bitmap::uncompress_values(grid_codes_row[0],values);
           for (const auto& value : values) {
-            std::string ugd_key;
+            string ugd_key;
             if (grid_definition_table.find(value) == grid_definition_table.end()) {
               MySQL::LocalQuery grid_definition_query("definition,defParams","WGrML.gridDefinitions","code = "+strutils::itos(value));
               if (grid_definition_query.submit(server) < 0) {
@@ -1396,32 +1414,32 @@ void generate_description(std::string type,std::string tdir_name)
               }
               MySQL::Row grid_definition_row;
               grid_definition_query.fetch_row(grid_definition_row);
-              grid_definition_table.emplace(value,std::make_tuple(grid_definition_row[0],grid_definition_row[1]));
+              grid_definition_table.emplace(value,make_tuple(grid_definition_row[0],grid_definition_row[1]));
               ugd_key=grid_definition_row[0]+"<!>"+grid_definition_row[1];
             }
             else {
               auto kval=grid_definition_table[value];
-              ugd_key=std::get<0>(kval)+"<!>"+std::get<1>(kval);
+              ugd_key=get<0>(kval)+"<!>"+get<1>(kval);
             }
-            std::string group="";
+            string group="";
             if (query.length() > 1) {
-              std::unordered_map<std::string,std::string>::iterator m,r,g;
+              unordered_map<string,string>::iterator m,r,g;
               if ( (m=metadata_files_table.find(grid_codes_row[1])) != metadata_files_table.end() && (r=rda_files_table.find(m->second)) != rda_files_table.end() && (g=groups_table.find(r->second)) != groups_table.end()) {
                 group=g->second;
               }
             }
             auto u=unique_grid_definitions_table.find(ugd_key);
             if (u == unique_grid_definitions_table.end()) {
-              std::shared_ptr<std::unordered_set<std::string>> g;
+              shared_ptr<unordered_set<string>> g;
               if (!group.empty()) {
-                g.reset(new std::unordered_set<std::string>);
+                g.reset(new unordered_set<string>);
                 g->emplace(group);
               }
               unique_grid_definitions_table.emplace(ugd_key,g);
             }
             else if (!group.empty()) {
               if (u->second == nullptr) {
-                u->second.reset(new std::unordered_set<std::string>);
+                u->second.reset(new unordered_set<string>);
               }
               if (u->second->find(group) == u->second->end()) {
                 u->second->emplace(group);
@@ -1441,23 +1459,23 @@ void generate_description(std::string type,std::string tdir_name)
         definition+="Cell";
       }
       auto ugd_key=definition+"<!>"+ele.attribute_value("numX")+":"+ele.attribute_value("numY");
-      if (std::regex_search(ugd_key,std::regex("^(latLon|mercator)"))) {
+      if (regex_search(ugd_key,regex("^(latLon|mercator)"))) {
         ugd_key+=":"+ele.attribute_value("startLat")+":"+ele.attribute_value("startLon")+":"+ele.attribute_value("endLat")+":"+ele.attribute_value("endLon")+":"+ele.attribute_value("xRes")+":"+ele.attribute_value("yRes");
       }
-      else if (std::regex_search(ugd_key,std::regex("^gaussLatLon"))) {
+      else if (regex_search(ugd_key,regex("^gaussLatLon"))) {
         ugd_key+=":"+ele.attribute_value("startLat")+":"+ele.attribute_value("startLon")+":"+ele.attribute_value("endLat")+":"+ele.attribute_value("endLon")+":"+ele.attribute_value("xRes")+":"+ele.attribute_value("numY");
       }
-      else if (std::regex_search(ugd_key,std::regex("^polarStereographic"))) {
+      else if (regex_search(ugd_key,regex("^polarStereographic"))) {
         ugd_key+=":"+ele.attribute_value("startLat")+":"+ele.attribute_value("startLon")+":60"+ele.attribute_value("pole")+":"+ele.attribute_value("projLon")+":"+ele.attribute_value("pole")+":"+ele.attribute_value("xRes")+":"+ele.attribute_value("yRes");
       }
-      else if (std::regex_search(ugd_key,std::regex("^lambertConformal"))) {
+      else if (regex_search(ugd_key,regex("^lambertConformal"))) {
         ugd_key+=":"+ele.attribute_value("startLat")+":"+ele.attribute_value("startLon")+":"+ele.attribute_value("resLat")+":"+ele.attribute_value("projLon")+":"+ele.attribute_value("pole")+":"+ele.attribute_value("xRes")+":"+ele.attribute_value("yRes")+":"+ele.attribute_value("stdParallel1")+":"+ele.attribute_value("stdParallel2");
       }
       unique_grid_definitions_table.emplace(ugd_key,nullptr);
     }
   }
   double min_west_lon=9999.,max_east_lon=-9999.,min_south_lat=9999.,max_north_lat=-9999.;
-  std::list<double> straddle_east_lons;
+  list<double> straddle_east_lons;
   for (const auto& e : unique_grid_definitions_table) {
     double west_lon,east_lon,south_lat,north_lat;
     if (gridutils::fill_spatial_domain_from_grid_definition(e.first,"primeMeridian",west_lon,south_lat,east_lon,north_lat)) {
@@ -1502,7 +1520,7 @@ void generate_description(std::string type,std::string tdir_name)
     else {
       west+="E";
     }
-    std::stringstream spatial_coverage_s;
+    stringstream spatial_coverage_s;
     spatial_coverage_s << "Longitude Range:  Westernmost=" << west << "  Easternmost=";
     auto east=strutils::ftos(fabs(max_east_lon),3);
     if (max_east_lon < 0) {
@@ -1511,7 +1529,7 @@ void generate_description(std::string type,std::string tdir_name)
     else {
       east+="E";
     }
-    spatial_coverage_s << east << "<br />" << std::endl;
+    spatial_coverage_s << east << "<br />" << endl;
     auto south=strutils::ftos(fabs(min_south_lat),3);
     if (min_south_lat < 0) {
       south+="S";
@@ -1527,10 +1545,10 @@ void generate_description(std::string type,std::string tdir_name)
     else {
       north+="N";
     }
-    spatial_coverage_s << north << std::endl;
-    spatial_coverage_s << "<br /><span id=\"D" << div_num << "\"><a href=\"javascript:swapDivs(" << div_num << "," << div_num+1 << ")\" title=\"Expand coverage details\"><img src=\"/images/triangle.gif\" width=\"12\" height=\"15\" border=\"0\"><span class=\"fs13px\">Detailed coverage information</span></a></span><span style=\"visibility: hidden; position: absolute; top: 0\" id=\"D" << div_num+1 << "\"><a href=\"javascript:swapDivs(" << div_num+1 << "," << div_num << ")\"><img src=\"/images/triangle90.gif\" width=\"15\" height=\"12\" border=\"0\" title=\"Collapse coverage details\"></a><span class=\"fs13px\">Detailed coverage information:" << std::endl;
+    spatial_coverage_s << north << endl;
+    spatial_coverage_s << "<br /><span id=\"D" << div_num << "\"><a href=\"javascript:swapDivs(" << div_num << "," << div_num+1 << ")\" title=\"Expand coverage details\"><img src=\"/images/triangle.gif\" width=\"12\" height=\"15\" border=\"0\"><span class=\"fs13px\">Detailed coverage information</span></a></span><span style=\"visibility: hidden; position: absolute; top: 0\" id=\"D" << div_num+1 << "\"><a href=\"javascript:swapDivs(" << div_num+1 << "," << div_num << ")\"><img src=\"/images/triangle90.gif\" width=\"15\" height=\"12\" border=\"0\" title=\"Collapse coverage details\"></a><span class=\"fs13px\">Detailed coverage information:" << endl;
     div_num+=2;
-    std::map<std::string,std::shared_ptr<std::unordered_set<std::string>>> grid_definitions;
+    map<string,shared_ptr<unordered_set<string>>> grid_definitions;
     for (const auto& e : unique_grid_definitions_table) {
       grid_definitions.emplace(gridutils::convert_grid_definition(e.first),e.second);
     }
@@ -1551,7 +1569,7 @@ void generate_description(std::string type,std::string tdir_name)
       }
       spatial_coverage_s << "</div>";
     }
-    spatial_coverage_s << "</span></span>" << std::endl;
+    spatial_coverage_s << "</span></span>" << endl;
     tdoc.add_if("__HAS_SPATIAL_COVERAGE__");
     tdoc.add_replacement("__SPATIAL_COVERAGE__",spatial_coverage_s.str());
   }
@@ -1560,15 +1578,15 @@ void generate_description(std::string type,std::string tdir_name)
   if (query.submit(server) < 0) {
     metautils::log_error("query: "+query.show()+" returned error: "+query.error(),"dsgen",USER);
   }
-  std::stringstream data_contributors_s;
+  stringstream data_contributors_s;
   auto n=0;
   for (const auto& row : query) {
     if (n > 0) {
       data_contributors_s << " | ";
     }
     auto short_name=row[0];
-    std::string long_name="";
-    if ( (idx=short_name.find(">")) != std::string::npos) {
+    string long_name="";
+    if ( (idx=short_name.find(">")) != string::npos) {
       long_name=short_name.substr(idx+1);
       short_name=short_name.substr(0,idx);
     }
@@ -1587,7 +1605,7 @@ void generate_description(std::string type,std::string tdir_name)
     else {
       tdoc.add_replacement("__WEB_SITES_VALIGN__","bottom");
     }
-    std::stringstream related_web_sites_s;
+    stringstream related_web_sites_s;
     for (const auto& ele : elist) {
       auto description=ele.content();
       strutils::trim(description);
@@ -1597,7 +1615,7 @@ void generate_description(std::string type,std::string tdir_name)
       related_web_sites_s << "<a href=\"" << ele.attribute_value("url") << "\">";
       auto is_local=false;
       auto url=ele.attribute_value("url");
-      if (std::regex_search(url,std::regex("^http://rda.ucar.edu")) || std::regex_search(url,std::regex("^https://rda.ucar.edu")) || std::regex_search(url,std::regex("^http://dss.ucar.edu")) || std::regex_search(url,std::regex("^https://dss.ucar.edu"))) {
+      if (regex_search(url,regex("^http://rda.ucar.edu")) || regex_search(url,regex("^https://rda.ucar.edu")) || regex_search(url,regex("^http://dss.ucar.edu")) || regex_search(url,regex("^https://dss.ucar.edu"))) {
         is_local=true;
       }
       if (!is_local) {
@@ -1625,12 +1643,12 @@ void generate_description(std::string type,std::string tdir_name)
   if (query2.submit(server) < 0) {
     metautils::log_error("query: "+query2.show()+" returned error: "+query2.error(),"dsgen",USER);
   }
-  std::stringstream volume_s;
+  stringstream volume_s;
   const int VOLUME_LEN=4;
   const char *v[VOLUME_LEN]={"MB","GB","TB","PB"};
   MySQL::Row row;
   if (query.fetch_row(row) && !row[0].empty()) {
-    auto volume=std::stof(row[0])/1000000.;
+    auto volume=stof(row[0])/1000000.;
     n=0;
     while (volume > 1000. && n < VOLUME_LEN) {
       volume/=1000.;
@@ -1642,7 +1660,7 @@ void generate_description(std::string type,std::string tdir_name)
     volume_s << " <span class=\"fs13px\">(Entire dataset)</span><br /><span id=\"D" << div_num << "\"><a href=\"javascript:swapDivs(" << div_num << "," << div_num+1 << ")\"><img src=\"/images/bluetriangle.gif\" width=\"12\" height=\"15\" border=\"0\" title=\"Expand dataset product volume list\"><font size=\"-1\">Volume details by dataset product</font></a></span><span style=\"visibility: hidden; position: absolute; top: 0\" id=\"D" << div_num+1 << "\"><a href=\"javascript:swapDivs(" << div_num+1 << "," << div_num << ")\" title=\"Collapse dataset product volume list\"><img src=\"/images/bluetriangle90.gif\" width=\"15\" height=\"12\" border=\"0\"></a><span class=\"fs13px\">Volume details by dataset product:";
     div_num+=2;
     for (const auto& row2: query2) {
-      auto volume=std::stof(row2[0])/1000000.;
+      auto volume=stof(row2[0])/1000000.;
       n=0;
       while (volume > 1000. && n < VOLUME_LEN) {
         volume/=1000.;
@@ -1683,7 +1701,7 @@ void generate_description(std::string type,std::string tdir_name)
         return false;
       }
     });
-    std::string related_datasets;
+    string related_datasets;
     for (const auto& ele : elist) {
       query.set("dsid,title","search.datasets","dsid = '"+ele.attribute_value("ID")+"' and (type = 'P' or type = 'H')");
       if (query.submit(server) < 0) {
@@ -1714,18 +1732,18 @@ void generate_description(std::string type,std::string tdir_name)
 int main(int argc,char **argv)
 {
   if (argc != 2 && argc != 3) {
-    std::cerr << "usage: dsgen nnn.n" << std::endl;
-    std::cerr << "\noptions:" << std::endl;
-    std::cerr << "--no-dset-waf  don't add the dataset to the queue for the DSET WAF" << std::endl;
+    std::cerr << "usage: dsgen nnn.n" << endl;
+    std::cerr << "\noptions:" << endl;
+    std::cerr << "--no-dset-waf  don't add the dataset to the queue for the DSET WAF" << endl;
     exit(1);
   }
   auto next=1;
-  if (std::string(argv[next]) == "--no-dset-waf") {
+  if (string(argv[next]) == "--no-dset-waf") {
     no_dset_waf=true;
     ++next;
   }
   metautils::args.dsnum=argv[next];
-  if (std::regex_search(metautils::args.dsnum,std::regex("^ds"))) {
+  if (regex_search(metautils::args.dsnum,regex("^ds"))) {
     metautils::args.dsnum=metautils::args.dsnum.substr(2);
   }
   if (metautils::args.dsnum >= "999.0") {
@@ -1763,12 +1781,12 @@ int main(int argc,char **argv)
     }
   }
   server.disconnect();
-  std::string remote_path="/data/web";
+  string remote_path="/data/web";
   if (dataset_type == "W") {
     remote_path+="/internal";
   }
   remote_path+="/datasets/ds"+metautils::args.dsnum;
-  std::string error;
+  string error;
   if (unixutils::rdadata_sync(dataset_doc_dir.name(),".",remote_path,metautils::directives.rdadata_home,error) < 0) {
     metautils::log_warning("couldn't sync dataset files - rdadata_sync error(s): '"+error+"'","dsgen",USER);
   }
