@@ -40,6 +40,15 @@ using std::tuple;
 using std::unordered_map;
 using std::unordered_set;
 using std::vector;
+using strutils::capitalize;
+using strutils::chop;
+using strutils::ftos;
+using strutils::itos;
+using strutils::replace_all;
+using strutils::split;
+using strutils::substitute;
+using strutils::to_capital;
+using strutils::trim;
 
 metautils::Directives metautils::directives;
 metautils::Args metautils::args;
@@ -109,12 +118,12 @@ void generate_index(string type,string tdir_name)
     tdoc.add_replacement("__JSON_LD__",json_ld_s.str());
     e=xdoc.element("dsOverview/logo");
     if (!e.content().empty()) {
-      auto logo_parts=strutils::split(e.content(),".");
-      auto geometry_parts=strutils::split(logo_parts[logo_parts.size()-2],"_");
+      auto logo_parts=split(e.content(),".");
+      auto geometry_parts=split(logo_parts[logo_parts.size()-2],"_");
       auto width=stoi(geometry_parts[geometry_parts.size()-2]);
       auto height=stoi(geometry_parts[geometry_parts.size()-1]);
       tdoc.add_replacement("__LOGO_IMAGE__",e.content());
-      tdoc.add_replacement("__LOGO_WIDTH__",strutils::itos(lroundf(width*70./height)));
+      tdoc.add_replacement("__LOGO_WIDTH__",itos(lroundf(width*70./height)));
     } else {
       tdoc.add_replacement("__LOGO_IMAGE__","default_200_200.png");
       tdoc.add_replacement("__LOGO_WIDTH__","70");
@@ -127,7 +136,7 @@ void generate_index(string type,string tdir_name)
     }
     tdoc.add_replacement("__DOI_SPAN__",doi_span);
     e=xdoc.element("dsOverview/contact");
-    auto contact_parts=strutils::split(e.content());
+    auto contact_parts=split(e.content());
     query.set("select logname,phoneno from dssdb.dssgrp where fstname = '"+contact_parts[0]+"' and lstname = '"+contact_parts[1]+"'");
     if (query.submit(server) < 0) {
       log_error2("mysql error while trying to get specialist information: " +
@@ -138,8 +147,8 @@ void generate_index(string type,string tdir_name)
           "dsgen", USER);
     }
     auto phoneno=row[1];
-    strutils::replace_all(phoneno,"(","");
-    strutils::replace_all(phoneno,")","");
+    replace_all(phoneno,"(","");
+    replace_all(phoneno,")","");
     tdoc.add_replacement("__CONTACT_LOGIN__",row[0]);
     tdoc.add_replacement("__CONTACT_NAME__",e.content());
     tdoc.add_replacement("__CONTACT_PHONE__",phoneno);
@@ -449,9 +458,9 @@ string text_field_from_element(const XMLElement& e)
 {
   auto s=e.to_string();
   if (!s.empty()) {
-    strutils::replace_all(s,"<"+e.name()+">","");
-    strutils::replace_all(s,"</"+e.name()+">","");
-    strutils::trim(s);
+    replace_all(s,"<"+e.name()+">","");
+    replace_all(s,"</"+e.name()+">","");
+    trim(s);
     size_t idx;
     if ( (idx=s.find("<p")) == string::npos) {
       idx=s.find("<P");
@@ -468,9 +477,9 @@ void insert_text_field(ofstream& ofs,const XMLElement& e,string section_title)
 {
   auto s=e.to_string();
   if (!s.empty()) {
-    strutils::replace_all(s,"<"+e.name()+">","");
-    strutils::replace_all(s,"</"+e.name()+">","");
-    strutils::trim(s);
+    replace_all(s,"<"+e.name()+">","");
+    replace_all(s,"</"+e.name()+">","");
+    trim(s);
     size_t idx;
     if ( (idx=s.find("<p")) == string::npos) {
       idx=s.find("<P");
@@ -502,7 +511,7 @@ void add_publications(TokenDocument& tdoc,XMLDocument& xdoc)
         } else {
           publications_s << title;
         }
-        if (!strutils::has_ending(title,"?")) {
+        if (title.back() == '?') {
           publications_s << ".";
         }
         publications_s << "  <i>" << periodical.content() << "</i>, ";
@@ -520,7 +529,7 @@ void add_publications(TokenDocument& tdoc,XMLDocument& xdoc)
           if (regex_search(pages,regex("^AGU:"))) {
             publications_s << pages.substr(4);
           } else {
-            auto page_parts=strutils::split(pages,"-"); 
+            auto page_parts=split(pages,"-"); 
             if (page_parts.size() == 2 && page_parts[0] == page_parts[1]) {
               publications_s << page_parts[0];
             } else {
@@ -640,11 +649,11 @@ void add_data_formats(TokenDocument& tdoc,vector<string>& formats,bool found_con
   string data_formats;
   size_t n=0;
   for (const auto& format_entry : formats) {
-    auto format_parts=strutils::split(format_entry,"<!>");
+    auto format_parts=split(format_entry,"<!>");
     auto description=format_parts[0];
     string url;
     if (regex_search(description,regex("^proprietary_"))) {
-      strutils::replace_all(description,"proprietary_","");
+      replace_all(description,"proprietary_","");
       if (!format_parts[1].empty()) {
         url=format_parts[1];
       } else {
@@ -661,7 +670,7 @@ void add_data_formats(TokenDocument& tdoc,vector<string>& formats,bool found_con
         data_formats+="<i>";
       }
     }
-    strutils::replace_all(description,"_"," ");
+    replace_all(description,"_"," ");
     data_formats+=description;
     if (!url.empty()) {
       data_formats+="</a>";
@@ -813,9 +822,9 @@ void add_citations(TokenDocument& tdoc)
   if (citations.size() > 0) {
     tdoc.add_if("__HAS_DATA_CITATIONS__");
     if (citations.size() > 1) {
-      tdoc.add_replacement("__NUM_DATA_CITATIONS__","<strong>"+strutils::itos(citations.size())+"</strong> times");
+      tdoc.add_replacement("__NUM_DATA_CITATIONS__","<strong>"+itos(citations.size())+"</strong> times");
     } else {
-      tdoc.add_replacement("__NUM_DATA_CITATIONS__","<strong>"+strutils::itos(citations.size())+"</strong> time");
+      tdoc.add_replacement("__NUM_DATA_CITATIONS__","<strong>"+itos(citations.size())+"</strong> time");
     }
     std::sort(citations.begin(),citations.end(),
     [](const tuple<string,string>& left,const tuple<string,string>& right) -> bool
@@ -845,7 +854,7 @@ void add_citations(TokenDocument& tdoc)
 void generate_description(string type,string tdir_name)
 {
   static const string F = this_function_label(__func__);
-  string dsnum2=strutils::substitute(metautils::args.dsnum,".","");
+  string dsnum2=substitute(metautils::args.dsnum,".","");
   ofstream ofs;
   if (dataset_type == "W") {
     ofs.open((tdir_name+"/test_description.html").c_str());
@@ -985,8 +994,8 @@ void generate_description(string type,string tdir_name)
           temporal+=" to "+end_date_time;
         }
         tdoc.add_replacement("__TEMPORAL_RANGE__",temporal);
-        tdoc.add_replacement("__N_TEMPORAL__",strutils::itos(div_num));
-        tdoc.add_replacement("__N_TEMPORAL1__",strutils::itos(div_num+1));
+        tdoc.add_replacement("__N_TEMPORAL__",itos(div_num));
+        tdoc.add_replacement("__N_TEMPORAL1__",itos(div_num+1));
         div_num+=2;
       }
     }
@@ -1034,13 +1043,13 @@ void generate_description(string type,string tdir_name)
   auto e=xdoc.element("dsOverview/continuingUpdate");
   if (e.attribute_value("value") == "yes") {
     tdoc.add_if("__HAS_UPDATE_FREQUENCY__");
-    tdoc.add_replacement("__UPDATE_FREQUENCY__",strutils::capitalize(e.attribute_value("frequency")));
+    tdoc.add_replacement("__UPDATE_FREQUENCY__",capitalize(e.attribute_value("frequency")));
   }
 // access restrictions
   e=xdoc.element("dsOverview/restrictions/access");
   auto access=e.to_string();
-  strutils::replace_all(access,"<access>","");
-  strutils::replace_all(access,"</access>","");
+  replace_all(access,"<access>","");
+  replace_all(access,"</access>","");
   size_t idx;
   if ( (idx=access.find("<p")) == string::npos) {
     idx=access.find("<P");
@@ -1056,8 +1065,8 @@ void generate_description(string type,string tdir_name)
 // usage restrictions
   e=xdoc.element("dsOverview/restrictions/usage");
   auto usage=e.to_string();
-  strutils::replace_all(usage,"<usage>","");
-  strutils::replace_all(usage,"</usage>","");
+  replace_all(usage,"<usage>","");
+  replace_all(usage,"</usage>","");
   if ( (idx=usage.find("<p")) == string::npos) {
     idx=usage.find("<P");
   }
@@ -1077,7 +1086,7 @@ void generate_description(string type,string tdir_name)
   }
   list<string> strings;
   for (const auto& row : query) {
-    strings.emplace_back(strutils::capitalize(row[0]));
+    strings.emplace_back(capitalize(row[0]));
   }
   tdoc.add_replacement("__VARIABLES__",create_table_from_strings(strings,4,"#e1eaff","#c8daff"));
   auto elist=xdoc.element_list("dsOverview/contentMetadata/detailedVariables/detailedVariable");
@@ -1132,7 +1141,7 @@ void generate_description(string type,string tdir_name)
           list<string> varlist;
           for (int n=0; n < nvar; ++n) {
             ifs.getline(line,32768);
-            auto var_parts=strutils::split(line,"<!>");
+            auto var_parts=split(line,"<!>");
             varlist.emplace_back(var_parts[1]);
           }
           ifs.close();
@@ -1186,7 +1195,7 @@ void generate_description(string type,string tdir_name)
             if (regex_search(level,regex("^\\."))) {
               level="0"+level;
             }
-            if (ele.attribute_value("value") != "0" && strutils::contains(ele.attribute_value("type"),"height below")) {
+            if (ele.attribute_value("value") != "0" && regex_search(ele.attribute_value("type"),regex("height below"))) {
               level="-"+level;
             }
             levels.emplace_back(level);
@@ -1235,14 +1244,14 @@ void generate_description(string type,string tdir_name)
           }
           auto stats=ele.attribute_value("statistics");
           if (!stats.empty()) {
-            temporal_frequency_s << " (" << strutils::capitalize(stats) << ")";
+            temporal_frequency_s << " (" << capitalize(stats) << ")";
           }
           temporal_frequency_s << endl;
         } else if (tfreq_type == "irregular") {
           temporal_frequency_s << "various times per " << ele.attribute_value("unit");
           auto stats=ele.attribute_value("statistics");
           if (!stats.empty()) {
-            temporal_frequency_s << " (" << strutils::capitalize(stats) << ")";
+            temporal_frequency_s << " (" << capitalize(stats) << ")";
           }
         } else if (tfreq_type == "climatology") {
           auto unit=ele.attribute_value("unit");
@@ -1284,7 +1293,7 @@ void generate_description(string type,string tdir_name)
         if (n > 0) {
           data_types_string+=", ";
         }
-        data_types_string+=strutils::to_capital(data_type);
+        data_types_string+=to_capital(data_type);
         ++n;
       }
       tdoc.add_replacement("__DATA_TYPES__",data_types_string);
@@ -1301,7 +1310,7 @@ void generate_description(string type,string tdir_name)
           if (n++ > 0) {
             data_types_string+=", ";
           }
-          data_types_string+=strutils::to_capital(ele.content());
+          data_types_string+=to_capital(ele.content());
           unique_data_types[ele.content()]='Y';
         }
       }
@@ -1330,7 +1339,7 @@ void generate_description(string type,string tdir_name)
           for (const auto& value : values) {
             string ugd_key;
             if (grid_definition_table.find(value) == grid_definition_table.end()) {
-              MySQL::LocalQuery grid_definition_query("definition,defParams","WGrML.gridDefinitions","code = "+strutils::itos(value));
+              MySQL::LocalQuery grid_definition_query("definition,defParams","WGrML.gridDefinitions","code = "+itos(value));
               if (grid_definition_query.submit(server) < 0) {
                 log_error2("query: " + grid_definition_query.show() +
                     " returned error: " + grid_definition_query.error(), F,
@@ -1430,7 +1439,7 @@ void generate_description(string type,string tdir_name)
     if (max_east_lon > 180.) {
       max_east_lon-=360.;
     }
-    auto west=strutils::ftos(fabs(min_west_lon),3);
+    auto west=ftos(fabs(min_west_lon),3);
     if (min_west_lon < 0) {
       west+="W";
     } else {
@@ -1438,21 +1447,21 @@ void generate_description(string type,string tdir_name)
     }
     stringstream spatial_coverage_s;
     spatial_coverage_s << "Longitude Range:  Westernmost=" << west << "  Easternmost=";
-    auto east=strutils::ftos(fabs(max_east_lon),3);
+    auto east=ftos(fabs(max_east_lon),3);
     if (max_east_lon < 0) {
       east+="W";
     } else {
       east+="E";
     }
     spatial_coverage_s << east << "<br />" << endl;
-    auto south=strutils::ftos(fabs(min_south_lat),3);
+    auto south=ftos(fabs(min_south_lat),3);
     if (min_south_lat < 0) {
       south+="S";
     } else {
         south+="N";
     }
     spatial_coverage_s << "Latitude Range:  Southernmost=" << south << "  Northernmost=";
-    auto north=strutils::ftos(fabs(max_north_lat),3);
+    auto north=ftos(fabs(max_north_lat),3);
     if (max_north_lat < 0) {
       north+="S";
     } else {
@@ -1504,8 +1513,8 @@ void generate_description(string type,string tdir_name)
       long_name=short_name.substr(idx+1);
       short_name=short_name.substr(0,idx);
     }
-    strutils::trim(short_name);
-    strutils::trim(long_name);
+    trim(short_name);
+    trim(long_name);
     data_contributors_s << "<span class=\"infosrc\" onMouseOver=\"javascript:popInfo(this,'src" << n << "','#e1eaff','left','bottom')\" onMouseOut=\"javascript:hideInfo('src" << n << "')\">" << short_name << "</span><div class=\"info\" id=\"src" << n << "\" class=\"source\"><small>" << long_name << "</small></div>";
     ++n;
   }
@@ -1521,9 +1530,9 @@ void generate_description(string type,string tdir_name)
     stringstream related_web_sites_s;
     for (const auto& ele : elist) {
       auto description=ele.content();
-      strutils::trim(description);
-      if (strutils::has_ending(description,".") && description[description.length()-2] != '.') {
-        strutils::chop(description);
+      trim(description);
+      if (description.back() == '.' && description[description.length()-2] != '.') {
+        chop(description);
       }
       related_web_sites_s << "<a href=\"" << ele.attribute_value("url") << "\">";
       auto is_local=false;
@@ -1569,7 +1578,7 @@ void generate_description(string type,string tdir_name)
       volume/=1000.;
       ++n;
     }
-    volume_s << strutils::ftos(llround(volume*100.)/100.,6,2,' ') << " " << v[n];
+    volume_s << ftos(llround(volume*100.)/100.,6,2,' ') << " " << v[n];
   }
   if (query2.num_rows() > 1) {
     volume_s << " <span class=\"fs13px\">(Entire dataset)</span><br /><span id=\"D" << div_num << "\"><a href=\"javascript:swapDivs(" << div_num << "," << div_num+1 << ")\"><img src=\"/images/bluetriangle.gif\" width=\"12\" height=\"15\" border=\"0\" title=\"Expand dataset product volume list\"><font size=\"-1\">Volume details by dataset product</font></a></span><span style=\"visibility: hidden; position: absolute; top: 0\" id=\"D" << div_num+1 << "\"><a href=\"javascript:swapDivs(" << div_num+1 << "," << div_num << ")\" title=\"Collapse dataset product volume list\"><img src=\"/images/bluetriangle90.gif\" width=\"15\" height=\"12\" border=\"0\"></a><span class=\"fs13px\">Volume details by dataset product:";
@@ -1587,7 +1596,7 @@ void generate_description(string type,string tdir_name)
       } else {
         volume_s << row2[2];
       }
-      volume_s << ": " << strutils::ftos(llround(volume*100.)/100.,6,2,' ') << " " << v[n] << "</div>";
+      volume_s << ": " << ftos(llround(volume*100.)/100.,6,2,' ') << " " << v[n] << "</div>";
     }
     volume_s << "</span></span>";
   }
