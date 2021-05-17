@@ -55,8 +55,8 @@ TempDir temp_dir;
 
 void parse_args(int argc,char **argv)
 {
-  metautils::args.args_string=unixutils::unix_args_string(argc,argv);
-  auto sp=strutils::split(metautils::args.args_string,":");
+  metautils::args.args_string=unixutils::unix_args_string(argc,argv,'`');
+  auto sp=strutils::split(metautils::args.args_string,"`");
   for (size_t n=0; n < sp.size(); ++n) {
     if (sp[n] == "-d") {
 	metautils::args.dsnum=sp[++n];
@@ -432,13 +432,12 @@ void insert_grml_inventory()
 	    auto gdef_params=strutils::split(line_parts[2],",");
 	    std::string definition,definition_parameters;
 	    switch (std::stoi(gdef_params[0])) {
-		case Grid::latitudeLongitudeType:
-		case Grid::gaussianLatitudeLongitudeType:
-		{
-		  if (std::stoi(gdef_params[0]) == Grid::latitudeLongitudeType) {
+		case static_cast<int>(Grid::Type::latitudeLongitude):
+		case static_cast<int>(Grid::Type::gaussianLatitudeLongitude): {
+		  if (std::stoi(gdef_params[0]) == static_cast<int>(Grid::Type::latitudeLongitude)) {
 		    definition="latLon";
 		  }
-		  else if (std::stoi(gdef_params[0]) == Grid::gaussianLatitudeLongitudeType) {
+		  else if (std::stoi(gdef_params[0]) == static_cast<int>(Grid::Type::gaussianLatitudeLongitude)) {
 		    definition="gaussLatLon";
 		  }
 		  if (gdef_params[0].back() == 'C') {
@@ -472,8 +471,7 @@ void insert_grml_inventory()
 		  definition_parameters+=gdef_params[7]+":"+gdef_params[8];
 		  break;
 		}
-		case Grid::polarStereographicType:
-		{
+		case static_cast<int>(Grid::Type::polarStereographic): {
 		  definition="polarStereographic";
 		  definition_parameters=gdef_params[1]+":"+gdef_params[2]+":";
 		  if (gdef_params[3][0] == '-') {
@@ -503,8 +501,7 @@ void insert_grml_inventory()
 		  definition_parameters+=gdef_params[9]+":"+gdef_params[7]+":"+gdef_params[8];
 		  break;
 		}
-		case Grid::mercatorType:
-		{
+		case static_cast<int>(Grid::Type::mercator): {
 		  definition="mercator";
 		  definition_parameters=gdef_params[1]+":"+gdef_params[2]+":";
 		  if (gdef_params[3][0] == '-') {
@@ -540,8 +537,7 @@ void insert_grml_inventory()
 		  }
 		  break;
 		}
-		case Grid::lambertConformalType:
-		{
+		case static_cast<int>(Grid::Type::lambertConformal): {
 		  definition="lambertConformal";
 		  definition_parameters=gdef_params[1]+":"+gdef_params[2]+":";
 		  if (gdef_params[3][0] == '-') {
@@ -583,14 +579,12 @@ void insert_grml_inventory()
 		  }
 		  break;
 		}
-		case Grid::sphericalHarmonicsType:
-		{
+		case static_cast<int>(Grid::Type::sphericalHarmonics): {
 		  definition="sphericalHarmonics";
 		  definition_parameters=gdef_params[1]+":"+gdef_params[2]+":"+gdef_params[3];
 		  break;
 		}
-		default:
-		{
+		default: {
 		  metautils::log_error("insert_grml_inventory() does not understand grid type "+gdef_params[0],"iinv",USER);
 		}
 	    }
