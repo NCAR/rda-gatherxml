@@ -17,40 +17,55 @@
 #include <tempfile.hpp>
 #include <myerror.hpp>
 
+using std::cerr;
+using std::cout;
+using std::endl;
+using std::list;
+using std::regex;
+using std::regex_search;
+using std::shared_ptr;
+using std::stof;
+using std::stoi;
+using std::stoll;
+using std::string;
+using std::stringstream;
+using std::unordered_map;
+using std::vector;
+
 metautils::Directives metautils::directives;
 metautils::Args metautils::args;
 bool gatherxml::verbose_operation;
-extern const std::string USER=getenv("USER");
-std::string myerror="";
-std::string mywarning="";
+extern const string USER=getenv("USER");
+string myerror="";
+string mywarning="";
 
 struct LocalArgs {
   LocalArgs() : dsnum2(),temp_directory(),create_cache(true),notify(false),verbose(false),wms_only(false) {}
 
-  std::string dsnum2;
-  std::string temp_directory;
+  string dsnum2;
+  string temp_directory;
   bool create_cache,notify,verbose;
   bool wms_only;
 } local_args;
 struct StringEntry {
   StringEntry() : key() {}
 
-  std::string key;
+  string key;
 };
 struct InventoryEntry {
   InventoryEntry() : key(),list(nullptr) {}
 
-  std::string key;
-  std::shared_ptr<std::list<std::string>> list;
+  string key;
+  shared_ptr<list<string>> list;
 };
 struct AncillaryEntry {
   AncillaryEntry() : key(),code(nullptr) {}
 
-  std::string key;
-  std::shared_ptr<std::string> code;
+  string key;
+  shared_ptr<string> code;
 };
-std::string server_root=strutils::token(unixutils::host_name(),".",0);
-std::string tindex;
+string server_root=strutils::token(unixutils::host_name(),".",0);
+string tindex;
 TempDir temp_dir;
 
 void parse_args(int argc,char **argv)
@@ -60,7 +75,7 @@ void parse_args(int argc,char **argv)
   for (size_t n=0; n < sp.size(); ++n) {
     if (sp[n] == "-d") {
 	metautils::args.dsnum=sp[++n];
-	if (std::regex_search(metautils::args.dsnum,std::regex("^ds"))) {
+	if (regex_search(metautils::args.dsnum,regex("^ds"))) {
 	  metautils::args.dsnum=metautils::args.dsnum.substr(2);
 	}
 	local_args.dsnum2=strutils::substitute(metautils::args.dsnum,".","");
@@ -95,13 +110,13 @@ extern "C" void segv_handler(int)
 struct TimeRangeEntry {
   TimeRangeEntry() : code(),hour_diff(0x7fffffff) {}
 
-  std::string code;
+  string code;
   int hour_diff;
 };
 
-std::string grid_definition_parameters(const XMLElement& e)
+string grid_definition_parameters(const XMLElement& e)
 {
-  std::string def_params;
+  string def_params;
   auto definition=e.attribute_value("definition");
   if (definition == "latLon") {
     def_params=e.attribute_value("numX")+":"+e.attribute_value("numY")+":"+e.attribute_value("startLat")+":"+e.attribute_value("startLon")+":"+e.attribute_value("endLat")+":"+e.attribute_value("endLon")+":"+e.attribute_value("xRes")+":"+e.attribute_value("yRes");
@@ -120,7 +135,7 @@ std::string grid_definition_parameters(const XMLElement& e)
 
 void build_wms_capabilities()
 {
-  std::string wms_resource="https://rda.ucar.edu/datasets/ds"+metautils::args.dsnum+"/metadata/wfmd/"+strutils::substitute(metautils::args.filename,"_inv","");
+  string wms_resource="https://rda.ucar.edu/datasets/ds"+metautils::args.dsnum+"/metadata/wfmd/"+strutils::substitute(metautils::args.filename,"_inv","");
   auto file=unixutils::remote_web_file(wms_resource+".gz",temp_dir.name());
   struct stat buf;
   if (stat(file.c_str(),&buf) == 0) {
@@ -138,7 +153,7 @@ void build_wms_capabilities()
   if (!tdir->create(metautils::directives.temp_path)) {
     metautils::log_error("build_wms_capabilities() could not create a temporary directory","iinv",USER);
   }
-  std::stringstream oss,ess;
+  stringstream oss,ess;
   if (unixutils::mysystem2("/bin/mkdir -p "+tdir->name()+"/metadata/wms",oss,ess) < 0) {
     metautils::log_error("build_wms_capabilities() could not create the directory tree","iinv",USER);
   }
@@ -149,7 +164,7 @@ void build_wms_capabilities()
   xmlutils::LevelMapper lmapper("/glade/u/home/rdadata/share/metadata/LevelTables");
   xmlutils::ParameterMapper pmapper("/glade/u/home/rdadata/share/metadata/ParameterTables");
   auto filename=xdoc.element("GrML").attribute_value("uri")+".GrML";
-  if (!std::regex_search(filename,std::regex("^http(s){0,1}://rda.ucar.edu/"))) {
+  if (!regex_search(filename,regex("^http(s){0,1}://rda.ucar.edu/"))) {
     metautils::log_warning("build_wms_capabilities() found an invalid uri: "+filename,"iinv",USER);
     return;
   }
@@ -166,7 +181,7 @@ void build_wms_capabilities()
   ofs.precision(4);
   auto data_format=xdoc.element("GrML").attribute_value("format");
   MySQL::LocalQuery query("code","WGrML.formats","format = '"+data_format+"'");
-  std::string data_format_code;
+  string data_format_code;
   MySQL::Row row;
   if (query.submit(server) == 0 && query.fetch_row(row)) {
     data_format_code=row[0];
@@ -174,7 +189,7 @@ void build_wms_capabilities()
   else {
     metautils::log_error("build_wms_capabilities(): query '"+query.show()+"' failed","iinv",USER);
   }
-  std::string error;
+  string error;
   auto tables=table_names(server,"IGrML","%ds%"+local_args.dsnum2+"_inventory_"+data_format_code+"!%",error);
   if (tables.size() == 0) {
     return;
@@ -183,11 +198,11 @@ void build_wms_capabilities()
   strutils::replace_all(data_file,"%","/");
   auto grids=xdoc.element_list("GrML/grid");
   auto gcount=0;
-  std::string last_grid_definition_code="-1";
+  string last_grid_definition_code="-1";
   for (const auto& grid : grids) {
     auto def_params=grid_definition_parameters(grid);
     query.set("code","WGrML.gridDefinitions","definition = '"+grid.attribute_value("definition")+"' and defParams = '"+def_params+"'");
-    std::string grid_definition_code;
+    string grid_definition_code;
     if (query.submit(server) == 0 && query.fetch_row(row)) {
 	grid_definition_code=row[0];
     }
@@ -201,41 +216,41 @@ void build_wms_capabilities()
 	  return;
 	}
 	if (last_grid_definition_code != "-1") {
-	  ofs << "    </Layer>" << std::endl;
+	  ofs << "    </Layer>" << endl;
 	}
-	ofs << "    <Layer>" << std::endl;
-	ofs << "      <Title>" << grid.attribute_value("definition") << "_" << grid.attribute_value("numX") << "x" << grid.attribute_value("numY") << "</Title>" << std::endl;
-	ofs << "#REPEAT __CRS__" << gcount << "__" << std::endl;
-	ofs << "      <CRS>__CRS__" << gcount << "__.CRS</CRS>" << std::endl;
-	ofs << "#ENDREPEAT __CRS__" << gcount << "__" << std::endl;
-	ofs << "      <EX_GeographicBoundingBox>" << std::endl;
-	ofs << "        <westBoundLongitude>" << west_lon << "</westBoundLongitude>" << std::endl;
-	ofs << "        <eastBoundLongitude>" << east_lon << "</eastBoundLongitude>" << std::endl;
-	ofs << "        <southBoundLatitude>" << south_lat << "</southBoundLatitude>" << std::endl;
-	ofs << "        <northBoundLatitude>" << north_lat << "</northBoundLatitude>" << std::endl;
-	ofs << "      </EX_GeographicBoundingBox>" << std::endl;;
-	ofs << "#REPEAT __CRS__" << gcount << "__" << std::endl;
-	ofs << "      <BoundingBox CRS=\"__CRS__" << gcount << "__.CRS\" minx=\"__CRS__" << gcount << "__." << west_lon << "\" miny=\"__CRS__" << gcount << "__." << south_lat << "\" maxx=\"__CRS__" << gcount << "__." << east_lon << "\" maxy=\"__CRS__" << gcount << "__." << north_lat << "\" />" << std::endl;
-	ofs << "#ENDREPEAT __CRS__" << gcount << "__" << std::endl;
+	ofs << "    <Layer>" << endl;
+	ofs << "      <Title>" << grid.attribute_value("definition") << "_" << grid.attribute_value("numX") << "x" << grid.attribute_value("numY") << "</Title>" << endl;
+	ofs << "#REPEAT __CRS__" << gcount << "__" << endl;
+	ofs << "      <CRS>__CRS__" << gcount << "__.CRS</CRS>" << endl;
+	ofs << "#ENDREPEAT __CRS__" << gcount << "__" << endl;
+	ofs << "      <EX_GeographicBoundingBox>" << endl;
+	ofs << "        <westBoundLongitude>" << west_lon << "</westBoundLongitude>" << endl;
+	ofs << "        <eastBoundLongitude>" << east_lon << "</eastBoundLongitude>" << endl;
+	ofs << "        <southBoundLatitude>" << south_lat << "</southBoundLatitude>" << endl;
+	ofs << "        <northBoundLatitude>" << north_lat << "</northBoundLatitude>" << endl;
+	ofs << "      </EX_GeographicBoundingBox>" << endl;;
+	ofs << "#REPEAT __CRS__" << gcount << "__" << endl;
+	ofs << "      <BoundingBox CRS=\"__CRS__" << gcount << "__.CRS\" minx=\"__CRS__" << gcount << "__." << west_lon << "\" miny=\"__CRS__" << gcount << "__." << south_lat << "\" maxx=\"__CRS__" << gcount << "__." << east_lon << "\" maxy=\"__CRS__" << gcount << "__." << north_lat << "\" />" << endl;
+	ofs << "#ENDREPEAT __CRS__" << gcount << "__" << endl;
 	last_grid_definition_code=grid_definition_code;
     }
     query.set("code","WGrML.timeRanges","timeRange = '"+grid.attribute_value("timeRange")+"'");
-    std::string time_range_code;
+    string time_range_code;
     if (query.submit(server) == 0 && query.fetch_row(row)) {
 	time_range_code=row[0];
     }
     else {
 	metautils::log_error("build_wms_capabilities(): query '"+query.show()+"' failed","iinv",USER);
     }
-    ofs << "      <Layer>" << std::endl;
-    ofs << "        <Title>" << grid.attribute_value("timeRange") << "</Title>" << std::endl;
+    ofs << "      <Layer>" << endl;
+    ofs << "        <Title>" << grid.attribute_value("timeRange") << "</Title>" << endl;
     auto vlevels=grid.element_list("level");
     for (const auto& vlevel : vlevels) {
 	auto lmap=vlevel.attribute_value("map");
 	auto ltype=vlevel.attribute_value("type");
 	auto lvalue=vlevel.attribute_value("value");
 	query.set("code","WGrML.levels","map = '"+lmap+"' and type = '"+ltype+"' and value = '"+lvalue+"'");
-	std::string level_code;
+	string level_code;
 	if (query.submit(server) == 0 && query.fetch_row(row)) {
 	    level_code=row[0];
 	}
@@ -249,37 +264,37 @@ void build_wms_capabilities()
 	else if (vlevel.attribute_value("value") != "0") {
 	    level_title+=": "+vlevel.attribute_value("value")+lmapper.units(data_format,ltype,lmap);
 	}
-	ofs << "        <Layer>" << std::endl;
-	ofs << "          <Title>" << level_title << "</Title>" << std::endl;
+	ofs << "        <Layer>" << endl;
+	ofs << "          <Title>" << level_title << "</Title>" << endl;
 	auto params=vlevel.element_list("parameter");
 	for (const auto& param : params) {
 	    auto pcode=param.attribute_value("map")+":"+param.attribute_value("value");
-	    ofs << "          <Layer>" << std::endl;
-	    ofs << "            <Title>" << pmapper.description(data_format,pcode) << "</Title>" << std::endl;
+	    ofs << "          <Layer>" << endl;
+	    ofs << "            <Title>" << pmapper.description(data_format,pcode) << "</Title>" << endl;
 	    query.set("select distinct valid_date from IGrML.`ds"+local_args.dsnum2+"_inventory_"+data_format_code+"!"+pcode+"` as i left join WGrML.ds"+local_args.dsnum2+"_webfiles2 as w on w.code = i.webID_code where timeRange_code = "+time_range_code+" and gridDefinition_code = "+grid_definition_code+" and level_code = "+level_code+" and webID = '"+data_file+"' order by valid_date");
 	    if (query.submit(server) == 0) {
 		while (query.fetch_row(row)) {
-		  ofs << "            <Layer queryable=\"0\">" << std::endl;
+		  ofs << "            <Layer queryable=\"0\">" << endl;
 		  auto wms_layer_name=grid_definition_code+";"+time_range_code+";"+level_code+";"+data_format_code+"!"+pcode+";"+row[0];
-		  ofs << "              <Name>" << wms_layer_name << "</Name>" << std::endl;
-		  ofs << "              <Title>" << row[0].substr(0,4) << "-" << row[0].substr(4,2) << "-" << row[0].substr(6,2) << "T" << row[0].substr(8,2) << ":" << row[0].substr(10,2) << "Z</Title>" << std::endl;
-		  ofs << "              <Style>" << std::endl;
-		  ofs << "                <Name>Legend</Name>" << std::endl;
-		  ofs << "                <Title>Legend Graphic</Title>" << std::endl;
-		  ofs << "                <LegendURL>" << std::endl;
-		  ofs << "                  <Format>image/png</Format>" << std::endl;
-		  ofs << "                  <OnlineResource xlink:type=\"simple\" xlink:href=\"__SERVICE_RESOURCE_GET_URL__/legend/" << wms_layer_name << "\" />" << std::endl;
-		  ofs << "                </LegendURL>" << std::endl;
-		  ofs << "              </Style>" << std::endl;
-		  ofs << "            </Layer>" << std::endl;
+		  ofs << "              <Name>" << wms_layer_name << "</Name>" << endl;
+		  ofs << "              <Title>" << row[0].substr(0,4) << "-" << row[0].substr(4,2) << "-" << row[0].substr(6,2) << "T" << row[0].substr(8,2) << ":" << row[0].substr(10,2) << "Z</Title>" << endl;
+		  ofs << "              <Style>" << endl;
+		  ofs << "                <Name>Legend</Name>" << endl;
+		  ofs << "                <Title>Legend Graphic</Title>" << endl;
+		  ofs << "                <LegendURL>" << endl;
+		  ofs << "                  <Format>image/png</Format>" << endl;
+		  ofs << "                  <OnlineResource xlink:type=\"simple\" xlink:href=\"__SERVICE_RESOURCE_GET_URL__/legend/" << wms_layer_name << "\" />" << endl;
+		  ofs << "                </LegendURL>" << endl;
+		  ofs << "              </Style>" << endl;
+		  ofs << "            </Layer>" << endl;
 		}
 	    }
 	    else {
 		metautils::log_error("build_wms_capabilities(): query '"+query.show()+"' failed","iinv",USER);
 	    }
-	    ofs << "          </Layer>" << std::endl;
+	    ofs << "          </Layer>" << endl;
 	}
-	ofs << "        </Layer>" << std::endl;
+	ofs << "        </Layer>" << endl;
     }
     auto vlayers=grid.element_list("layer");
     for (const auto& vlayer : vlayers) {
@@ -288,7 +303,7 @@ void build_wms_capabilities()
 	auto bottom=vlayer.attribute_value("bottom");
 	auto top=vlayer.attribute_value("top");
 	query.set("code","WGrML.levels","map = '"+lmap+"' and type = '"+ltype+"' and value = '"+bottom+","+top+"'");
-	std::string layer_code;
+	string layer_code;
 	if (query.submit(server) == 0 && query.fetch_row(row)) {
 	    layer_code=row[0];
 	}
@@ -306,42 +321,42 @@ void build_wms_capabilities()
 	    }
 	    layer_title+=": "+vlayer.attribute_value("bottom")+lmapper.units(data_format,tparts[0],lmap)+", "+vlayer.attribute_value("top")+lmapper.units(data_format,tparts[1],lmap);;
 	}
-	ofs << "        <Layer>" << std::endl;
-	ofs << "          <Title>" << layer_title << "</Title>" << std::endl;
+	ofs << "        <Layer>" << endl;
+	ofs << "          <Title>" << layer_title << "</Title>" << endl;
 	auto params=vlayer.element_list("parameter");
 	for (const auto& param : params) {
 	    auto pcode=param.attribute_value("map")+":"+param.attribute_value("value");
-	    ofs << "          <Layer>" << std::endl;
-	    ofs << "            <Title>" << pmapper.description(data_format,pcode) << "</Title>" << std::endl;
+	    ofs << "          <Layer>" << endl;
+	    ofs << "            <Title>" << pmapper.description(data_format,pcode) << "</Title>" << endl;
 	    query.set("select distinct valid_date from IGrML.`ds"+local_args.dsnum2+"_inventory_"+data_format_code+"!"+pcode+"` as i left join WGrML.ds"+local_args.dsnum2+"_webfiles2 as w on w.code = i.webID_code where timeRange_code = "+time_range_code+" and gridDefinition_code = "+grid_definition_code+" and level_code = "+layer_code+" and webID = '"+data_file+"' order by valid_date");
 	    if (query.submit(server) == 0) {
 		while (query.fetch_row(row)) {
-		  ofs << "            <Layer queryable=\"0\">" << std::endl;
+		  ofs << "            <Layer queryable=\"0\">" << endl;
 		  auto wms_layer_name=grid_definition_code+";"+time_range_code+";"+layer_code+";"+data_format_code+"!"+pcode+";"+row[0];
-		  ofs << "              <Name>" << wms_layer_name << "</Name>" << std::endl;
-		  ofs << "              <Title>" << row[0].substr(0,4) << "-" << row[0].substr(4,2) << "-" << row[0].substr(6,2) << "T" << row[0].substr(8,2) << ":" << row[0].substr(10,2) << "Z</Title>" << std::endl;
-		  ofs << "              <Style>" << std::endl;
-		  ofs << "                <Name>Legend</Name>" << std::endl;
-		  ofs << "                <Title>Legend Graphic</Title>" << std::endl;
-		  ofs << "                <LegendURL>" << std::endl;
-		  ofs << "                  <Format>image/png</Format>" << std::endl;
-		  ofs << "                  <OnlineResource xlink:type=\"simple\" xlink:href=\"__SERVICE_RESOURCE_GET_URL__/legend/" << wms_layer_name << "\" />" << std::endl;
-		  ofs << "                </LegendURL>" << std::endl;
-		  ofs << "              </Style>" << std::endl;
-		  ofs << "            </Layer>" << std::endl;
+		  ofs << "              <Name>" << wms_layer_name << "</Name>" << endl;
+		  ofs << "              <Title>" << row[0].substr(0,4) << "-" << row[0].substr(4,2) << "-" << row[0].substr(6,2) << "T" << row[0].substr(8,2) << ":" << row[0].substr(10,2) << "Z</Title>" << endl;
+		  ofs << "              <Style>" << endl;
+		  ofs << "                <Name>Legend</Name>" << endl;
+		  ofs << "                <Title>Legend Graphic</Title>" << endl;
+		  ofs << "                <LegendURL>" << endl;
+		  ofs << "                  <Format>image/png</Format>" << endl;
+		  ofs << "                  <OnlineResource xlink:type=\"simple\" xlink:href=\"__SERVICE_RESOURCE_GET_URL__/legend/" << wms_layer_name << "\" />" << endl;
+		  ofs << "                </LegendURL>" << endl;
+		  ofs << "              </Style>" << endl;
+		  ofs << "            </Layer>" << endl;
 		}
 	    }
 	    else {
 		metautils::log_error("build_wms_capabilities(): query '"+query.show()+"' failed","iinv",USER);
 	    }
-	    ofs << "          </Layer>" << std::endl;
+	    ofs << "          </Layer>" << endl;
 	}
-	ofs << "        </Layer>" << std::endl;
+	ofs << "        </Layer>" << endl;
     }
-    ofs << "      </Layer>" << std::endl;
+    ofs << "      </Layer>" << endl;
     ++gcount;
   }
-  ofs << "    </Layer>" << std::endl;
+  ofs << "    </Layer>" << endl;
   ofs.close();
   unixutils::mysystem2("/bin/sh -c 'gzip "+tdir->name()+"/metadata/wms/"+filename+"'",oss,ess);
   if (unixutils::rdadata_sync(tdir->name(),"metadata/wms/","/data/web/datasets/ds"+metautils::args.dsnum,metautils::directives.rdadata_home,error) < 0) {
@@ -372,7 +387,7 @@ void insert_grml_inventory()
   auto format_code=row[1];
   tindex=row[2];
   if (!MySQL::table_exists(server,"IGrML.ds"+local_args.dsnum2+"_inventory_summary")) {
-    std::string result;
+    string result;
     if (server.command("create table IGrML.ds"+local_args.dsnum2+"_inventory_summary like IGrML.template_inventory_summary",result) < 0) {
 	metautils::log_error("insert_grml_inventory() returned error: "+server.error()+" while trying to create inventory_summary table","iinv",USER);
     }
@@ -380,37 +395,37 @@ void insert_grml_inventory()
   struct InitTimeEntry {
     InitTimeEntry() : key(),time_range_codes(nullptr) {}
 
-    std::string key;
-    std::shared_ptr<my::map<StringEntry>> time_range_codes;
+    string key;
+    shared_ptr<my::map<StringEntry>> time_range_codes;
   };
   my::map<InitTimeEntry> init_dates_table;
-  std::string dupe_vdates="N";
-  std::string uflag=strutils::strand(3);
+  string dupe_vdates="N";
+  string uflag=strutils::strand(3);
   int nlines=0,num_dupes=0;
   long long total_bytes=0;
-  std::vector<TimeRangeEntry> time_range_codes;
-  std::vector<std::string> grid_definition_codes,level_codes,parameters,processes,ensembles,parameter_codes;
+  vector<TimeRangeEntry> time_range_codes;
+  vector<string> grid_definition_codes,level_codes,parameters,processes,ensembles,parameter_codes;
   char line[32768];
   ifs.getline(line,32768);
   while (!ifs.eof()) {
     nlines++;
-    std::string sline=line;
-    if (std::regex_search(sline,std::regex("<!>"))) {
+    string sline=line;
+    if (regex_search(sline,regex("<!>"))) {
 	auto line_parts=strutils::split(sline,"<!>");
 	switch (line_parts[0][0]) {
 	  case 'U':
 	  {
 	    TimeRangeEntry tre;
-	    if (line_parts[2] == "Analysis" || std::regex_search(line_parts[2],std::regex("^0-hour")) || line_parts[2] == "Monthly Mean") {
+	    if (line_parts[2] == "Analysis" || regex_search(line_parts[2],regex("^0-hour")) || line_parts[2] == "Monthly Mean") {
 		tre.hour_diff=0;
 	    }
-	    else if (std::regex_search(line_parts[2],std::regex("-hour Forecast$"))) {
-		tre.hour_diff=std::stoi(line_parts[2].substr(0,line_parts[2].find("-")));
+	    else if (regex_search(line_parts[2],regex("-hour Forecast$"))) {
+		tre.hour_diff=stoi(line_parts[2].substr(0,line_parts[2].find("-")));
 	    }
-	    else if (std::regex_search(line_parts[2],std::regex("to initial\\+"))) {
+	    else if (regex_search(line_parts[2],regex("to initial\\+"))) {
 		auto hr=line_parts[2].substr(line_parts[2].find("to initial+")+11);
 		strutils::chop(hr);
-		tre.hour_diff=std::stoi(hr);
+		tre.hour_diff=stoi(hr);
 	    }
 	    else {
 		metautils::log_warning("insert_grml_inventory() does not recognize product '"+line_parts[2]+"'","iinv",USER);
@@ -430,14 +445,14 @@ void insert_grml_inventory()
 	  case 'G':
 	  {
 	    auto gdef_params=strutils::split(line_parts[2],",");
-	    std::string definition,definition_parameters;
-	    switch (std::stoi(gdef_params[0])) {
+	    string definition,definition_parameters;
+	    switch (stoi(gdef_params[0])) {
 		case static_cast<int>(Grid::Type::latitudeLongitude):
 		case static_cast<int>(Grid::Type::gaussianLatitudeLongitude): {
-		  if (std::stoi(gdef_params[0]) == static_cast<int>(Grid::Type::latitudeLongitude)) {
+		  if (stoi(gdef_params[0]) == static_cast<int>(Grid::Type::latitudeLongitude)) {
 		    definition="latLon";
 		  }
-		  else if (std::stoi(gdef_params[0]) == static_cast<int>(Grid::Type::gaussianLatitudeLongitude)) {
+		  else if (stoi(gdef_params[0]) == static_cast<int>(Grid::Type::gaussianLatitudeLongitude)) {
 		    definition="gaussLatLon";
 		  }
 		  if (gdef_params[0].back() == 'C') {
@@ -605,8 +620,8 @@ void insert_grml_inventory()
 	    if (lev_parts.size() < 2 || lev_parts.size() > 3) {
 		metautils::log_error("insert_grml_inventory() found bad level code: "+line_parts[2],"iinv",USER);
 	    }
-	    std::string map,type;
-	    if (std::regex_search(lev_parts[0],std::regex(","))) {
+	    string map,type;
+	    if (regex_search(lev_parts[0],regex(","))) {
 		auto idx=lev_parts[0].find(",");
 		map=lev_parts[0].substr(0,idx);
 		type=lev_parts[0].substr(idx+1);
@@ -615,7 +630,7 @@ void insert_grml_inventory()
 		map="";
 		type=lev_parts[0];
 	    }
-	    std::string value;
+	    string value;
 	    switch (lev_parts.size()) {
 		case 2:
 		{
@@ -644,7 +659,7 @@ void insert_grml_inventory()
 	    parameters.emplace_back(line_parts[2]);
 	    auto pcode=format_code+"!"+line_parts[2];
 	    if (!MySQL::table_exists(server,"IGrML.ds"+local_args.dsnum2+"_inventory_"+pcode)) {
-		std::string result;
+		string result;
 		if (line_parts.size() > 3 && line_parts[3] == "BIG") {
 		  if (server.command("create table IGrML.`ds"+local_args.dsnum2+"_inventory_"+pcode+"` like IGrML.template_inventory_p_big",result) < 0) {
 		    metautils::log_error("insert_grml_inventory() returned error: "+server.error()+" while trying to create parameter inventory table","iinv",USER);
@@ -671,7 +686,7 @@ void insert_grml_inventory()
 	  }
 	}
     }
-    else if (std::regex_search(sline,std::regex("\\|"))) {
+    else if (regex_search(sline,regex("\\|"))) {
 /*
 	if (first) {
 	  sdum="lock tables ";
@@ -690,11 +705,11 @@ void insert_grml_inventory()
 	}
 */
 	auto inv_parts=strutils::split(sline,"|");
-	total_bytes+=std::stoll(inv_parts[1]);
-	auto tr_index=std::stoi(inv_parts[3]);
-	std::string init_date;
+	total_bytes+=stoll(inv_parts[1]);
+	auto tr_index=stoi(inv_parts[3]);
+	string init_date;
 	if (time_range_codes[tr_index].hour_diff != 0x7fffffff) {
-	  init_date=DateTime(std::stoll(inv_parts[2])*100).hours_subtracted(time_range_codes[tr_index].hour_diff).to_string("%Y%m%d%H%MM");
+	  init_date=DateTime(stoll(inv_parts[2])*100).hours_subtracted(time_range_codes[tr_index].hour_diff).to_string("%Y%m%d%H%MM");
 	  if (dupe_vdates == "N") {
 	    InitTimeEntry ite;
 	    ite.key=init_date;
@@ -715,35 +730,35 @@ void insert_grml_inventory()
 	else {
 	  init_date="0";
 	}
-	auto insert_string=web_id_code+","+inv_parts[0]+","+inv_parts[1]+","+inv_parts[2]+","+init_date+","+time_range_codes[tr_index].code+","+grid_definition_codes[std::stoi(inv_parts[4])]+","+level_codes[std::stoi(inv_parts[5])]+",";
+	auto insert_string=web_id_code+","+inv_parts[0]+","+inv_parts[1]+","+inv_parts[2]+","+init_date+","+time_range_codes[tr_index].code+","+grid_definition_codes[stoi(inv_parts[4])]+","+level_codes[stoi(inv_parts[5])]+",";
 	if (inv_parts.size() > 7 && !inv_parts[7].empty()) {
-	  insert_string+="'"+processes[std::stoi(inv_parts[7])]+"',";
+	  insert_string+="'"+processes[stoi(inv_parts[7])]+"',";
 	}
 	else {
 	  insert_string+="'',";
 	}
 	if (inv_parts.size() > 8 && !inv_parts[8].empty()) {
-	  insert_string+="'"+ensembles[std::stoi(inv_parts[8])]+"'";
+	  insert_string+="'"+ensembles[stoi(inv_parts[8])]+"'";
 	}
 	else {
 	  insert_string+="''";
 	}
 	insert_string+=",'"+uflag+"'";
-	auto pcode=format_code+"!"+parameters[std::stoi(inv_parts[6])];
+	auto pcode=format_code+"!"+parameters[stoi(inv_parts[6])];
 	if (server.insert("IGrML.`ds"+local_args.dsnum2+"_inventory_"+pcode+"`","webID_code,byte_offset,byte_length,valid_date,init_date,timeRange_code,gridDefinition_code,level_code,process,ensemble,uflag",insert_string,"") < 0) {
-	  if (!std::regex_search(server.error(),std::regex("Duplicate entry"))) {
+	  if (!regex_search(server.error(),regex("Duplicate entry"))) {
 	    metautils::log_error("insert_grml_inventory() returned error: "+server.error()+" while inserting row '"+insert_string+"'","iinv",USER);
 	  }
 	  else {
-	    std::string dupe_where="webID_code = "+web_id_code+" and valid_date = "+inv_parts[2]+" and timeRange_code = "+time_range_codes[tr_index].code+" and gridDefinition_code = "+grid_definition_codes[std::stoi(inv_parts[4])]+" and level_code = "+level_codes[std::stoi(inv_parts[5])];
+	    string dupe_where="webID_code = "+web_id_code+" and valid_date = "+inv_parts[2]+" and timeRange_code = "+time_range_codes[tr_index].code+" and gridDefinition_code = "+grid_definition_codes[stoi(inv_parts[4])]+" and level_code = "+level_codes[stoi(inv_parts[5])];
 	    if (inv_parts.size() > 7 && !inv_parts[7].empty()) {
-		dupe_where+=" and process = '"+processes[std::stoi(inv_parts[7])]+"'";
+		dupe_where+=" and process = '"+processes[stoi(inv_parts[7])]+"'";
 	    }
 	    else {
 		dupe_where+=" and process = ''";
 	    }
 	    if (inv_parts.size() > 8 && !inv_parts[8].empty()) {
-		dupe_where+=" and ensemble = '"+ensembles[std::stoi(inv_parts[8])]+"'";
+		dupe_where+=" and ensemble = '"+ensembles[stoi(inv_parts[8])]+"'";
 	    }
 	    else {
 		dupe_where+=" and ensemble = ''";
@@ -755,7 +770,7 @@ void insert_grml_inventory()
 	    if (row[0] == uflag) {
 		++num_dupes;
 		if (local_args.verbose) {
-		  std::cout << "**duplicate ignored - line " << nlines << std::endl;
+		  cout << "**duplicate ignored - line " << nlines << endl;
 		}
 	    }
 	    else {
@@ -774,7 +789,7 @@ void insert_grml_inventory()
   }
 //  server.issueCommand("unlock tables",error);
   if (server.insert("IGrML.ds"+local_args.dsnum2+"_inventory_summary","webID_code,byte_length,dupe_vdates",web_id_code+","+strutils::lltos(total_bytes)+",'"+dupe_vdates+"'","update byte_length = "+strutils::lltos(total_bytes)+", dupe_vdates = '"+dupe_vdates+"'") < 0) {
-    if (!std::regex_search(server.error(),std::regex("Duplicate entry"))) {
+    if (!regex_search(server.error(),regex("Duplicate entry"))) {
 	metautils::log_error("insert_grml_inventory() returned error: "+server.error()+" while inserting row '"+web_id_code+","+strutils::lltos(total_bytes)+",'"+dupe_vdates+"''","iinv",USER);
     }
   }
@@ -784,27 +799,27 @@ void insert_grml_inventory()
   }
 }
 
-void check_for_times_table(MySQL::Server& server,std::string type,std::string last_decade)
+void check_for_times_table(MySQL::Server& server,string type,string last_decade)
 {
   if (!MySQL::table_exists(server,"IObML.ds"+local_args.dsnum2+"_"+type+"_times_"+last_decade+"0")) {
-    std::string result;
+    string result;
     if (server.command("create table IObML.ds"+local_args.dsnum2+"_"+type+"_times_"+last_decade+"0 like IObML.template_"+type+"_times_decade",result) < 0) {
 	metautils::log_error("check_for_times_table() returned error: "+server.error()+" while trying to create 'ds"+local_args.dsnum2+"_"+type+"_times_"+last_decade+"0'","iinv",USER);
     }
   }
 }
 
-void process_IDs(std::string type,MySQL::Server& server,std::string ID_index,std::string ID_data,std::unordered_map<std::string,std::string>& id_table)
+void process_IDs(string type,MySQL::Server& server,string ID_index,string ID_data,unordered_map<string,string>& id_table)
 {
   auto id_parts=strutils::split(ID_data,"[!]");
-  std::string qspec="select i.code from WObML.ds"+local_args.dsnum2+"_IDs2 as i left join WObML.IDTypes as t on t.code = i.IDType_code where i.ID = '"+id_parts[1]+"' and t.IDType = '"+id_parts[0]+"' and i.sw_lat = "+metatranslations::string_coordinate_to_db(id_parts[2])+" and i.sw_lon = "+metatranslations::string_coordinate_to_db(id_parts[3]);
+  string qspec="select i.code from WObML.ds"+local_args.dsnum2+"_IDs2 as i left join WObML.IDTypes as t on t.code = i.IDType_code where i.ID = '"+id_parts[1]+"' and t.IDType = '"+id_parts[0]+"' and i.sw_lat = "+metatranslations::string_coordinate_to_db(id_parts[2])+" and i.sw_lon = "+metatranslations::string_coordinate_to_db(id_parts[3]);
   if (id_parts.size() > 4) {
     qspec+=" and i.ne_lat = "+metatranslations::string_coordinate_to_db(id_parts[4])+" and ne_lon = "+metatranslations::string_coordinate_to_db(id_parts[5]);
   }
   MySQL::LocalQuery query(qspec);
   MySQL::Row row;
   if (query.submit(server) < 0 || !query.fetch_row(row)) {
-    std::string error="process_IDs() returned error: "+query.error()+" while trying to get ID code for '"+id_parts[0]+","+id_parts[1]+","+id_parts[2]+","+id_parts[3];
+    string error="process_IDs() returned error: "+query.error()+" while trying to get ID code for '"+id_parts[0]+","+id_parts[1]+","+id_parts[2]+","+id_parts[3];
     if (id_parts.size() > 4) {
 	error+=","+id_parts[4]+","+id_parts[5];
     }
@@ -812,9 +827,9 @@ void process_IDs(std::string type,MySQL::Server& server,std::string ID_index,std
     metautils::log_error(error,"iinv",USER);
   }
   size_t min_lat_i,min_lon_i,max_lat_i,max_lon_i;
-  geoutils::convert_lat_lon_to_box(36,std::stof(id_parts[2]),std::stof(id_parts[3]),min_lat_i,min_lon_i);
+  geoutils::convert_lat_lon_to_box(36,stof(id_parts[2]),stof(id_parts[3]),min_lat_i,min_lon_i);
   if (id_parts.size() > 4) {
-    geoutils::convert_lat_lon_to_box(36,std::stof(id_parts[4]),std::stof(id_parts[5]),max_lat_i,max_lon_i);
+    geoutils::convert_lat_lon_to_box(36,stof(id_parts[4]),stof(id_parts[5]),max_lat_i,max_lon_i);
   }
   else {
     max_lat_i=min_lat_i;
@@ -824,16 +839,16 @@ void process_IDs(std::string type,MySQL::Server& server,std::string ID_index,std
     for (size_t m=min_lon_i; m <= max_lon_i; ++m) {
 	auto s_lat_i=strutils::itos(n);
 	auto s_lon_i=strutils::itos(m);
-	std::string check_table="IObML.ds"+local_args.dsnum2+"_inventory_"+s_lat_i+"_"+s_lon_i;
+	string check_table="IObML.ds"+local_args.dsnum2+"_inventory_"+s_lat_i+"_"+s_lon_i;
 	if (type == "irregular") {
 	  check_table+="_b";
 	}
 	if (!MySQL::table_exists(server,check_table)) {
-	  std::string command="create table "+check_table+" like IObML.template_inventory_lati_loni";
+	  string command="create table "+check_table+" like IObML.template_inventory_lati_loni";
 	  if (type == "irregular") {
 	    command+="_b";
 	  }
-	  std::string result;
+	  string result;
 	  if (server.command(command,result) < 0) {
 	    metautils::log_error("process_IDs() returned error: "+server.error()+" while trying to create '"+check_table+"'","iinv",USER);
 	  }
@@ -851,22 +866,22 @@ struct DataVariableEntry {
   struct Data {
     Data() : var_name(),value_type(),offset(0),byte_len(0),missing_table(99999) {}
 
-    std::string var_name,value_type;
+    string var_name,value_type;
     size_t offset,byte_len;
     my::map<StringEntry> missing_table;
   };
   DataVariableEntry() : key(),data(nullptr) {}
 
-  std::string key;
-  std::shared_ptr<Data> data;
+  string key;
+  shared_ptr<Data> data;
 };
 struct MissingEntry {
   MissingEntry() : key(),time_code(0) {}
 
-  std::string key;
+  string key;
   size_t time_code;
 };
-void insert_obml_netcdf_time_series_inventory(std::ifstream& ifs,MySQL::Server& server,std::string web_ID_code,size_t rec_size)
+void insert_obml_netcdf_time_series_inventory(std::ifstream& ifs,MySQL::Server& server,string web_ID_code,size_t rec_size)
 {
   my::map<AncillaryEntry> obstype_table,platform_table,datatype_table;
   AncillaryEntry ae;
@@ -874,17 +889,17 @@ void insert_obml_netcdf_time_series_inventory(std::ifstream& ifs,MySQL::Server& 
   DataVariableEntry dve;
   MySQL::LocalQuery query;
   MySQL::Row row;
-  std::list<std::string> times_list;
+  list<string> times_list;
   my::map<StringEntry> missing_table(999999);
   StringEntry se;
 
 if (rec_size > 0) {
 metautils::log_error("insert_obml_netcdf_time_series_inventory() can't insert for observations with a record dimension","iinv",USER);
 }
-  std::string uflag=strutils::strand(3);
-//std::cerr << "uflag='" << uflag << "'" << std::endl;
+  string uflag=strutils::strand(3);
+//cerr << "uflag='" << uflag << "'" << endl;
   if (!MySQL::table_exists(server,"IObML.ds"+local_args.dsnum2+"_inventory_summary")) {
-    std::string result;
+    string result;
     if (server.command("create table IObML.ds"+local_args.dsnum2+"_inventory_summary like IObML.template_inventory_summary",result) < 0) {
 	metautils::log_error("insert_obml_netcdf_time_series_inventory() returned error: "+server.error()+" while trying to create 'ds"+local_args.dsnum2+"_inventory_summary'","iinv",USER);
     }
@@ -902,16 +917,16 @@ metautils::log_error("insert_obml_netcdf_time_series_inventory() can't insert fo
 	metautils::log_error("insert_obml_netcdf_time_series_inventory() returned error: "+server.error()+" while trying to delete from 'ds"+local_args.dsnum2+"_inventory_summary' where webID_code = "+web_ID_code,"iinv",USER);
     }
   }
-  std::stringstream times;
-  std::unordered_map<std::string,std::string> id_table;
-  std::string last_decade;
-  auto inv_line=std::regex("<!>");
-  auto missing_line=std::regex("^([0-9]){1,}\\|");
+  stringstream times;
+  unordered_map<string,string> id_table;
+  string last_decade;
+  auto inv_line=regex("<!>");
+  auto missing_line=regex("^([0-9]){1,}\\|");
   auto ndbytes=0;
   char line[32768];
   ifs.getline(line,32768);
   while (!ifs.eof()) {
-    if (std::regex_search(line,inv_line)) {
+    if (regex_search(line,inv_line)) {
 	auto sp=strutils::split(line,"<!>");
 	switch (sp[0][0]) {
 	  case 'D':
@@ -920,9 +935,9 @@ metautils::log_error("insert_obml_netcdf_time_series_inventory() can't insert fo
 	    dve.data.reset(new DataVariableEntry::Data);
 	    auto sp2=strutils::split(sp[2],"|");
 	    dve.data->var_name=sp2[0];
-	    dve.data->offset=std::stoi(sp2[1]);
+	    dve.data->offset=stoi(sp2[1]);
 	    dve.data->value_type=sp2[2];
-	    dve.data->byte_len=std::stoi(sp2[3]);
+	    dve.data->byte_len=stoi(sp2[3]);
 	    ndbytes+=dve.data->byte_len;
 	    datavar_table.insert(dve);
 	    break;
@@ -938,7 +953,7 @@ metautils::log_error("insert_obml_netcdf_time_series_inventory() can't insert fo
 		metautils::log_error("insert_obml_netcdf_time_series_inventory() returned error: "+query.error()+" while trying to get obsType code for '"+sp[2]+"'","iinv",USER);
 	    }
 	    ae.key=sp[1];
-	    ae.code.reset(new std::string);
+	    ae.code.reset(new string);
 	    *ae.code=row[0];
 	    obstype_table.insert(ae);
 	    break;
@@ -948,7 +963,7 @@ metautils::log_error("insert_obml_netcdf_time_series_inventory() can't insert fo
 		metautils::log_error("insert_obml_netcdf_time_series_inventory() returned error: "+query.error()+" while trying to get platform code for '"+sp[2]+"'","iinv",USER);
 	    }
 	    ae.key=sp[1];
-	    ae.code.reset(new std::string);
+	    ae.code.reset(new string);
 	    *ae.code=row[0];
 	    platform_table.insert(ae);
 	    break;
@@ -958,7 +973,7 @@ metautils::log_error("insert_obml_netcdf_time_series_inventory() can't insert fo
 	    if (this_decade != last_decade) {
 		if (times.tellp() > 0) {
 		  check_for_times_table(server,"timeSeries",last_decade);
-		  std::string result;
+		  string result;
 		  if (server.command("insert into IObML.ds"+local_args.dsnum2+"_timeSeries_times_"+last_decade+"0 values "+times.str().substr(1)+" on duplicate key update time_index=values(time_index),uflag=values(uflag)",result) < 0) {
 		    metautils::log_error("insert_obml_netcdf_time_series_inventory() returned error: "+server.error()+" while trying to insert list of times into IObML.ds"+local_args.dsnum2+"_timeSeries_times_"+last_decade+"0","iinv",USER);
 		  }
@@ -974,7 +989,7 @@ metautils::log_error("insert_obml_netcdf_time_series_inventory() can't insert fo
 	  }
 	}
     }
-    else if (std::regex_search(line,missing_line)) {
+    else if (regex_search(line,missing_line)) {
 	se.key=line;
 	missing_table.insert(se);
 	auto idx=se.key.rfind("|");
@@ -988,7 +1003,7 @@ metautils::log_error("insert_obml_netcdf_time_series_inventory() can't insert fo
   ifs.close();
   if (times.tellp() > 0) {
     check_for_times_table(server,"timeSeries",last_decade);
-    std::string result;
+    string result;
     if (server.command("insert into IObML.ds"+local_args.dsnum2+"_timeSeries_times_"+last_decade+"0 values "+times.str().substr(1)+" on duplicate key update time_index=values(time_index),uflag=values(uflag)",result) < 0) {
 	metautils::log_error("insert_obml_netcdf_time_series_inventory() returned error: "+server.error()+" while trying to insert list of times into IObML.ds"+local_args.dsnum2+"_timeSeries_times_"+last_decade+"0","iinv",USER);
     }
@@ -996,15 +1011,15 @@ metautils::log_error("insert_obml_netcdf_time_series_inventory() can't insert fo
     server.command("analyze NO_WRITE_TO_BINLOG table IObML.ds"+local_args.dsnum2+"_timeSeries_times_"+last_decade+"0",result);
   }
   auto nbytes=0;
-  std::string inv_insert;
+  string inv_insert;
   inv_insert.reserve(800000);
   for (const auto& id_entry : id_table) {
     auto num_inserts=0;
     auto id_parts=strutils::split(id_entry.second,"|");
-    std::string inventory_file="IObML.ds"+local_args.dsnum2+"_inventory_"+id_parts[1]+"_"+id_parts[2];
+    string inventory_file="IObML.ds"+local_args.dsnum2+"_inventory_"+id_parts[1]+"_"+id_parts[2];
     for (const auto& datavar : datavar_table.keys()) {
 	datavar_table.found(datavar,dve);
-	std::string missing_ind;
+	string missing_ind;
 	if (dve.data->missing_table.size() == 0) {
 // no times are missing
 	  missing_ind="0";
@@ -1031,21 +1046,21 @@ metautils::log_error("insert_obml_netcdf_time_series_inventory() can't insert fo
 		if (query.submit(server) < 0 || !query.fetch_row(row)) {
 		  metautils::log_error("insert_obml_netcdf_time_series_inventory() returned error: "+query.error()+" while trying to get dataType code for '"+*(ae_obs.code)+","+*(ae_plat.code)+",'"+dve.data->var_name+"''","iinv",USER);
 		}
-		ae.code.reset(new std::string);
+		ae.code.reset(new string);
 		*(ae.code)=row[0];
 		datatype_table.insert(ae);
 		if (server.insert("IObML.ds"+local_args.dsnum2+"_dataTypes",web_ID_code+","+id_parts[0]+","+*(ae.code)+",'"+dve.data->value_type+"',"+strutils::itos(dve.data->offset)+","+strutils::itos(dve.data->byte_len)+","+missing_ind+",'"+uflag+"'","update value_type='"+dve.data->value_type+"',byte_offset="+strutils::itos(dve.data->offset)+",byte_length="+strutils::itos(dve.data->byte_len)+",missing_ind="+missing_ind+",uflag='"+uflag+"'") < 0) {
 		  metautils::log_error("insert_obml_netcdf_time_series_inventory() returned error: "+server.error()+" while trying to insert dataType information for '"+*(ae.code)+"'","iinv",USER);
 		}
 	    }
-	    std::string key_end="|"+obstype+"|"+platform+"|"+id_entry.first+"|"+datavar;
+	    string key_end="|"+obstype+"|"+platform+"|"+id_entry.first+"|"+datavar;
 	    auto n=0;
 	    for (const auto& time : times_list) {
 		if (missing_ind != "0") {
 		  auto found_missing=missing_table.found(strutils::itos(n)+key_end,se);
 		  if ((missing_ind == "1" && !found_missing) || (missing_ind == "2" && found_missing)) {
 		    if (num_inserts >= 10000) {
-			std::string result;
+			string result;
 			if (server.command("insert into "+inventory_file+" values "+inv_insert.substr(1)+" on duplicate key update uflag=values(uflag)",result) < 0) {
 			  metautils::log_error("insert_obml_netcdf_time_series_inventory() returned error: "+server.error()+" while trying to insert inventory data","iinv",USER);
 			}
@@ -1062,7 +1077,7 @@ metautils::log_error("insert_obml_netcdf_time_series_inventory() can't insert fo
 	  }
 	}
     }
-    std::string result;
+    string result;
     if (!inv_insert.empty()  && server.command("insert into "+inventory_file+" values "+inv_insert.substr(1)+" on duplicate key update uflag=values(uflag)",result) < 0) {
 	metautils::log_error("insert_obml_netcdf_time_series_inventory() returned error: "+server.error()+" while trying to insert inventory data","iinv",USER);
     }
@@ -1070,7 +1085,7 @@ metautils::log_error("insert_obml_netcdf_time_series_inventory() can't insert fo
     server.command("analyze NO_WRITE_TO_BINLOG table "+inventory_file,result);
   }
   server._delete("IObML.ds"+local_args.dsnum2+"_dataTypes","webID_code = "+web_ID_code+" and uflag != '"+uflag+"'");
-  std::string result;
+  string result;
   server.command("analyze NO_WRITE_TO_BINLOG table IObML.ds"+local_args.dsnum2+"_dataTypes",result);
   if (server.command("insert into IObML.ds"+local_args.dsnum2+"_inventory_summary values ("+web_ID_code+","+strutils::itos(nbytes)+","+strutils::itos(ndbytes)+",'"+uflag+"') on duplicate key update byte_length=values(byte_length),dataType_length=values(dataType_length),uflag=values(uflag)",result) < 0) {
     metautils::log_error("insert_obml_netcdf_time_series_inventory() returned error: "+server.error()+" while trying to insert file size data for '"+web_ID_code+"'","iinv",USER);
@@ -1084,15 +1099,15 @@ struct InsertEntry {
 	inv_insert.reserve(800000);
     }
 
-    std::string inv_insert;
+    string inv_insert;
     int num_inserts;
   };
   InsertEntry() : key(),data(nullptr) {}
 
-  std::string key;
-  std::shared_ptr<Data> data;
+  string key;
+  shared_ptr<Data> data;
 };
-void insert_obml_netcdf_point_inventory(std::ifstream& ifs,MySQL::Server& server,std::string web_ID_code,size_t rec_size)
+void insert_obml_netcdf_point_inventory(std::ifstream& ifs,MySQL::Server& server,string web_ID_code,size_t rec_size)
 {
   my::map<AncillaryEntry> obstype_table,platform_table,datatype_table;
   AncillaryEntry ae;
@@ -1100,16 +1115,16 @@ void insert_obml_netcdf_point_inventory(std::ifstream& ifs,MySQL::Server& server
   DataVariableEntry dve;
   MySQL::LocalQuery query;
   MySQL::Row row;
-  std::list<std::string> times_list;
+  list<string> times_list;
   my::map<StringEntry> missing_table(999999);
   StringEntry se;
 
 if (rec_size > 0) {
 metautils::log_error("insert_obml_netcdf_point_inventory() can't insert for observations with a record dimension","iinv",USER);
 }
-  std::string uflag=strutils::strand(3);
-//std::cerr << "uflag='" << uflag << "'" << std::endl;
-  std::string result;
+  string uflag=strutils::strand(3);
+//cerr << "uflag='" << uflag << "'" << endl;
+  string result;
   if (!MySQL::table_exists(server,"IObML.ds"+local_args.dsnum2+"_inventory_summary")) {
     if (server.command("create table IObML.ds"+local_args.dsnum2+"_inventory_summary like IObML.template_inventory_summary",result) < 0) {
 	metautils::log_error("insert_obml_netcdf_point_inventory() returned error: "+server.error()+" while trying to create 'ds"+local_args.dsnum2+"_inventory_summary'","iinv",USER);
@@ -1118,16 +1133,16 @@ metautils::log_error("insert_obml_netcdf_point_inventory() can't insert for obse
 	metautils::log_error("insert_obml_netcdf_point_inventory() returned error: "+server.error()+" while trying to create 'ds"+local_args.dsnum2+"_dataTypes'","iinv",USER);
     }
   }
-  std::stringstream times;
-  std::unordered_map<std::string,std::string> id_table;
-  std::string last_decade;
-  auto inv_line=std::regex("<!>");
-  auto missing_line=std::regex("^([0-9]){1,}\\|");
+  stringstream times;
+  unordered_map<string,string> id_table;
+  string last_decade;
+  auto inv_line=regex("<!>");
+  auto missing_line=regex("^([0-9]){1,}\\|");
   auto ndbytes=0;
   char line[32768];
   ifs.getline(line,32768);
   while (!ifs.eof()) {
-    if (std::regex_search(line,inv_line)) {
+    if (regex_search(line,inv_line)) {
 	auto sp=strutils::split(line,"<!>");
 	switch (sp[0][0]) {
 	  case 'D':
@@ -1136,9 +1151,9 @@ metautils::log_error("insert_obml_netcdf_point_inventory() can't insert for obse
 	    dve.data.reset(new DataVariableEntry::Data);
 	    auto sp2=strutils::split(sp[2],"|");
 	    dve.data->var_name=sp2[0];
-	    dve.data->offset=std::stoi(sp2[1]);
+	    dve.data->offset=stoi(sp2[1]);
 	    dve.data->value_type=sp2[2];
-	    dve.data->byte_len=std::stoi(sp2[3]);
+	    dve.data->byte_len=stoi(sp2[3]);
 	    ndbytes+=dve.data->byte_len;
 	    datavar_table.insert(dve);
 	    break;
@@ -1155,7 +1170,7 @@ metautils::log_error("insert_obml_netcdf_point_inventory() can't insert for obse
 		metautils::log_error("insert_obml_netcdf_point_inventory() returned error: "+query.error()+" while trying to get obsType code for '"+sp[2]+"'","iinv",USER);
 	    }
 	    ae.key=sp[1];
-	    ae.code.reset(new std::string);
+	    ae.code.reset(new string);
 	    *ae.code=row[0];
 	    obstype_table.insert(ae);
 	    break;
@@ -1167,7 +1182,7 @@ metautils::log_error("insert_obml_netcdf_point_inventory() can't insert for obse
 		metautils::log_error("insert_obml_netcdf_point_inventory() returned error: "+query.error()+" while trying to get platform code for '"+sp[2]+"'","iinv",USER);
 	    }
 	    ae.key=sp[1];
-	    ae.code.reset(new std::string);
+	    ae.code.reset(new string);
 	    *ae.code=row[0];
 	    platform_table.insert(ae);
 	    break;
@@ -1178,7 +1193,7 @@ metautils::log_error("insert_obml_netcdf_point_inventory() can't insert for obse
 	    if (this_decade != last_decade) {
 		if (times.tellp() > 0) {
 		  check_for_times_table(server,"point",last_decade);
-		  std::string result;
+		  string result;
 		  if (server.command("insert into IObML.ds"+local_args.dsnum2+"_point_times_"+last_decade+"0 values "+times.str().substr(1)+" on duplicate key update time_index=values(time_index),lat=values(lat),lon=values(lon),uflag=values(uflag)",result) < 0) {
 		    metautils::log_error("insert_obml_netcdf_point_inventory() returned error: "+server.error()+" while trying to insert list of times into IObML.ds"+local_args.dsnum2+"_point_times_"+last_decade+"0","iinv",USER);
 		  }
@@ -1195,7 +1210,7 @@ metautils::log_error("insert_obml_netcdf_point_inventory() can't insert for obse
 	  }
 	}
     }
-    else if (std::regex_search(line,missing_line)) {
+    else if (regex_search(line,missing_line)) {
 	se.key=line;
 	missing_table.insert(se);
 	auto idx=se.key.rfind("|");
@@ -1209,21 +1224,21 @@ metautils::log_error("insert_obml_netcdf_point_inventory() can't insert for obse
   ifs.close();
   if (times.tellp() > 0) {
     check_for_times_table(server,"point",last_decade);
-    std::string result;
+    string result;
     if (server.command("insert into IObML.ds"+local_args.dsnum2+"_point_times_"+last_decade+"0 values "+times.str().substr(1)+" on duplicate key update time_index=values(time_index),lat=values(lat),lon=values(lon),uflag=values(uflag)",result) < 0) {
 	metautils::log_error("insert_obml_netcdf_point_inventory() returned error: "+server.error()+" while trying to insert list of times into IObML.ds"+local_args.dsnum2+"_point_times_"+last_decade+"0","iinv",USER);
     }
     server._delete("IObML.ds"+local_args.dsnum2+"_point_times_"+last_decade+"0","webID_code = "+web_ID_code+" and uflag != '"+uflag+"'");
     server.command("analyze NO_WRITE_TO_BINLOG table IObML.ds"+local_args.dsnum2+"_point_times_"+last_decade+"0",result);
   }
-  std::stringstream data_type_ss;
+  stringstream data_type_ss;
   auto nbytes=0;
   for (const auto& id_entry : id_table) {
     my::map<InsertEntry> insert_table;
     auto id_parts=strutils::split(id_entry.second,"|");
     for (const auto& datavar : datavar_table.keys()) {
 	datavar_table.found(datavar,dve);
-	std::string missing_ind;
+	string missing_ind;
 	if (dve.data->missing_table.size() == 0) {
 // no times are missing
 	  missing_ind="0";
@@ -1250,17 +1265,17 @@ metautils::log_error("insert_obml_netcdf_point_inventory() can't insert for obse
 		if (query.submit(server) < 0 || !query.fetch_row(row)) {
 		  metautils::log_error("insert_obml_netcdf_point_inventory() returned error: "+query.error()+" while trying to get dataType code for '"+*(ae_obs.code)+","+*(ae_plat.code)+",'"+dve.data->var_name+"''","iinv",USER);
 		}
-		ae.code.reset(new std::string);
+		ae.code.reset(new string);
 		*(ae.code)=row[0];
 		datatype_table.insert(ae);
 		data_type_ss << ",(" << web_ID_code << "," << id_parts[0] << "," << *(ae.code) << ",'" << dve.data->value_type << "'," << dve.data->offset << "," << dve.data->byte_len << "," << missing_ind << ",'" << uflag << "')";
 	    }
-	    std::string key_end="|"+obstype+"|"+platform+"|"+id_entry.first+"|"+datavar;
+	    string key_end="|"+obstype+"|"+platform+"|"+id_entry.first+"|"+datavar;
 	    auto n=0;
 	    for (const auto& time : times_list) {
 		auto tparts=strutils::split(time,"[!]");
 		size_t lat_i,lon_i;
-		geoutils::convert_lat_lon_to_box(36,std::stof(tparts[1]),std::stof(tparts[2]),lat_i,lon_i);
+		geoutils::convert_lat_lon_to_box(36,stof(tparts[1]),stof(tparts[2]),lat_i,lon_i);
 		InsertEntry inse;
 		inse.key=strutils::itos(lat_i)+"_"+strutils::itos(lon_i);
 		if (!insert_table.found(inse.key,inse)) {
@@ -1271,7 +1286,7 @@ metautils::log_error("insert_obml_netcdf_point_inventory() can't insert for obse
 		  auto found_missing=missing_table.found(strutils::itos(n)+key_end,se);
 		  if ((missing_ind == "1" && !found_missing) || (missing_ind == "2" && found_missing)) {
 		    if (inse.data->num_inserts >= 10000) {
-			std::string result;
+			string result;
 			if (server.command("insert into IObML.ds"+local_args.dsnum2+"_inventory_"+inse.key+" values "+inse.data->inv_insert.substr(1)+" on duplicate key update uflag=values(uflag)",result) < 0) {
 			  metautils::log_error("insert_obml_netcdf_point_inventory() returned error: "+server.error()+" while trying to insert inventory data","iinv",USER);
 			}
@@ -1291,7 +1306,7 @@ metautils::log_error("insert_obml_netcdf_point_inventory() can't insert for obse
     for (const auto& key : insert_table.keys()) {
 	InsertEntry inse;
 	insert_table.found(key,inse);
-	std::string result;
+	string result;
 	if (!inse.data->inv_insert.empty()  && server.command("insert into IObML.ds"+local_args.dsnum2+"_inventory_"+key+" values "+inse.data->inv_insert.substr(1)+" on duplicate key update uflag=values(uflag)",result) < 0) {
 	  metautils::log_error("insert_obml_netcdf_point_inventory() returned error: "+server.error()+" while trying to insert inventory data","iinv",USER);
 	}
@@ -1310,12 +1325,12 @@ metautils::log_error("insert_obml_netcdf_point_inventory() can't insert for obse
   server._delete("IObML.ds"+local_args.dsnum2+"_inventory_summary","webID_code = "+web_ID_code+" and uflag != '"+uflag+"'");
 }
 
-void insert_generic_point_inventory(std::ifstream& ifs,MySQL::Server& server,std::string web_ID_code)
+void insert_generic_point_inventory(std::ifstream& ifs,MySQL::Server& server,string web_ID_code)
 {
   auto uflag=strutils::strand(3);
   int d_min_lat_i=99,d_min_lon_i=99,d_max_lat_i=-1,d_max_lon_i=-1;
   if (!MySQL::table_exists(server,"IObML.ds"+local_args.dsnum2+"_dataTypesList_b")) {
-    std::string result;
+    string result;
     if (server.command("create table IObML.ds"+local_args.dsnum2+"_dataTypesList_b like IObML.template_dataTypesList_b",result) < 0) {
 	metautils::log_error("insert_generic_point_inventory() returned error: "+server.error()+" while trying to create 'ds"+local_args.dsnum2+"_dataTypesList_b'","iinv",USER);
     }
@@ -1326,15 +1341,15 @@ void insert_generic_point_inventory(std::ifstream& ifs,MySQL::Server& server,std
 	metautils::log_error("insert_generic_point_inventory() returned error: "+server.error()+" while trying to create 'ds"+local_args.dsnum2+"_inventory_summary'","iinv",USER);
     }
   }
-  std::unordered_map<std::string,std::string> times_table,obs_table,platform_table,id_table;
-  std::unordered_map<size_t,std::tuple<size_t,size_t>> data_type_table;
-  std::unordered_map<std::string,std::shared_ptr<std::unordered_map<size_t,size_t>>> datatypes_table;
+  unordered_map<string,string> times_table,obs_table,platform_table,id_table;
+  unordered_map<size_t,std::tuple<size_t,size_t>> data_type_table;
+  unordered_map<string,shared_ptr<unordered_map<size_t,size_t>>> datatypes_table;
   size_t byte_length=0;
   char line[32768];
   ifs.getline(line,32768);
   while (!ifs.eof()) {
-    std::string sline=line;
-    if (std::regex_search(sline,std::regex("<!>"))) {
+    string sline=line;
+    if (regex_search(sline,regex("<!>"))) {
 	auto lparts=strutils::split(sline,"<!>");
 	switch (lparts[0][0]) {
 	  case 'T':
@@ -1376,8 +1391,8 @@ void insert_generic_point_inventory(std::ifstream& ifs,MySQL::Server& server,std
 		if (query.submit(server) < 0 || !query.fetch_row(row)) {
 		  metautils::log_error("insert_generic_point_inventory() returned error: "+query.error()+" while trying to get dataType code for '"+lparts[2]+"'","iinv",USER);
 		}
-		data_type_table.emplace(std::stoi(lparts[1]),std::make_tuple(std::stoi(row[0]),std::stoi(dparts[3].substr(1))));
-		std::string value_type;
+		data_type_table.emplace(stoi(lparts[1]),std::make_tuple(stoi(row[0]),stoi(dparts[3].substr(1))));
+		string value_type;
 		switch (dparts[3][0]) {
 		  case 'B':
 		  {
@@ -1395,7 +1410,7 @@ void insert_generic_point_inventory(std::ifstream& ifs,MySQL::Server& server,std
 		    break;
 		  }
 		}
-		std::string scale;
+		string scale;
 		if (dparts.size() > 4) {
 		  scale=dparts[4];
 		}
@@ -1403,7 +1418,7 @@ void insert_generic_point_inventory(std::ifstream& ifs,MySQL::Server& server,std
 		  scale="1";
 		}
 		if (server.insert("IObML.ds"+local_args.dsnum2+"_dataTypesList_b",row[0]+",'"+value_type+"',"+scale+","+dparts[3].substr(1)+",NULL") < 0) {
-		  if (!std::regex_search(server.error(),std::regex("Duplicate entry"))) {
+		  if (!regex_search(server.error(),regex("Duplicate entry"))) {
 		    metautils::log_error("insert_generic_point_inventory() returned error: "+server.error()+" while inserting row '"+row[0]+",'"+value_type+"',"+scale+","+dparts[3].substr(1)+",NULL'","iinv",USER);
 		  }
 		}
@@ -1412,35 +1427,35 @@ void insert_generic_point_inventory(std::ifstream& ifs,MySQL::Server& server,std
 	  }
 	}
     }
-    else if (std::regex_search(sline,std::regex("\\|"))) {
+    else if (regex_search(sline,regex("\\|"))) {
 	auto iparts=strutils::split(sline,"|");
 	auto idparts=strutils::split(id_table.at(iparts[2]),"|");
-	int min_lat_i=std::stoi(idparts[1]);
+	int min_lat_i=stoi(idparts[1]);
 	if (min_lat_i < d_min_lat_i) {
 	  d_min_lat_i=min_lat_i;
 	}
-	int min_lon_i=std::stoi(idparts[2]);
+	int min_lon_i=stoi(idparts[2]);
 	if (min_lon_i < d_min_lon_i) {
 	  d_min_lon_i=min_lon_i;
 	}
-	int max_lat_i=std::stoi(idparts[3]);
+	int max_lat_i=stoi(idparts[3]);
 	if (max_lat_i > d_max_lat_i) {
 	  d_max_lat_i=max_lat_i;
 	}
-	int max_lon_i=std::stoi(idparts[4]);
+	int max_lon_i=stoi(idparts[4]);
 	if (max_lon_i > d_max_lon_i) {
 	  d_max_lon_i=max_lon_i;
 	}
-	std::shared_ptr<std::unordered_map<size_t,size_t>> p;
+	shared_ptr<unordered_map<size_t,size_t>> p;
 	auto e=datatypes_table.find(idparts[0]);
 	if (e == datatypes_table.end()) {
-	  p.reset(new std::unordered_map<size_t,size_t>);
+	  p.reset(new unordered_map<size_t,size_t>);
 	  datatypes_table.emplace(idparts[0],p);
 	}
 	else {
 	  p=e->second;
 	}
-	std::vector<size_t> ivals,dvals;
+	vector<size_t> ivals,dvals;
 	bitmap::uncompress_values(iparts[3],ivals);
 	size_t min_dval=0xffffffff,max_dval=0;
 	for (auto val : ivals) {
@@ -1459,7 +1474,7 @@ void insert_generic_point_inventory(std::ifstream& ifs,MySQL::Server& server,std
 	    p->emplace(val,field_len);
 	  }
 	}
-	std::string bitmap;
+	string bitmap;
 	bitmap::compress_values(dvals,bitmap);
 	for (int n=min_lat_i; n <= max_lat_i; ++n) {
 	  for (int m=min_lon_i; m <= max_lon_i; ++m) {
@@ -1494,12 +1509,12 @@ void insert_generic_point_inventory(std::ifstream& ifs,MySQL::Server& server,std
 void insert_obml_inventory()
 {
   std::ifstream ifs;
-  std::string sdum,sdum2,format_code,error;
-  std::vector<std::string> ID_codes;
+  string sdum,sdum2,format_code,error;
+  vector<string> ID_codes;
   my::map<StringEntry> latlon_table,unique_lines(99999);
   StringEntry se;
-  std::list<std::string> inventory_tables;
-  std::string lockstring;
+  list<string> inventory_tables;
+  string lockstring;
   my::map<InventoryEntry> inventory_table;
   InventoryEntry ie;
   struct stat buf;
@@ -1531,21 +1546,21 @@ void insert_obml_inventory()
   tindex=row[2];
   char line[32768];
   ifs.getline(line,32768);
-  if (std::regex_search(line,std::regex("^netCDF:timeSeries"))) {
-    std::string sline=line;
-    insert_obml_netcdf_time_series_inventory(ifs,server,web_ID_code,std::stoi(sline.substr(sline.find("|")+1)));
+  if (regex_search(line,regex("^netCDF:timeSeries"))) {
+    string sline=line;
+    insert_obml_netcdf_time_series_inventory(ifs,server,web_ID_code,stoi(sline.substr(sline.find("|")+1)));
   }
-  else if (std::regex_search(line,std::regex("^netCDF:point"))) {
-    std::string sline=line;
-    insert_obml_netcdf_point_inventory(ifs,server,web_ID_code,std::stoi(sline.substr(sline.find("|")+1)));
+  else if (regex_search(line,regex("^netCDF:point"))) {
+    string sline=line;
+    insert_obml_netcdf_point_inventory(ifs,server,web_ID_code,stoi(sline.substr(sline.find("|")+1)));
   }
   else {
     insert_generic_point_inventory(ifs,server,web_ID_code);
   }
 /*
   while (!ifs.eof()) {
-    std::string sline=line;
-    if (std::regex_search(sline,std::regex("<!>"))) {
+    string sline=line;
+    if (regex_search(sline,regex("<!>"))) {
 	auto sp=strutils::split(sline,"<!>");
 	switch (sp[0][0]) {
 	  case 'O':
@@ -1574,10 +1589,10 @@ void insert_obml_inventory()
 	  }
 	}
     }
-    else if (std::regex_search(sline,std::regex("\\|"))) {
+    else if (regex_search(sline,regex("\\|"))) {
 	if (first) {
 	  if (!MySQL::table_exists(server,"IObML.ds"+local_args.dsnum2+"_inventory_summary")) {
-	    std::string result;
+	    string result;
 	    if (server.command("create table IObML.ds"+local_args.dsnum2+"_inventory_summary like IObML.template_inventory_summary",result) < 0) {
 		metautils::log_error("insert_obml_inventory() returned error: "+server.error()+" while trying to create 'ds"+local_args.dsnum2+"_inventory_summary'","iinv",USER);
 	    }
@@ -1588,7 +1603,7 @@ void insert_obml_inventory()
 	  inventory_tables=MySQL::table_names(server,"IObML","ds"+local_args.dsnum2+"_inventory_%",error);
 	  lockstring="IObML.ds"+local_args.dsnum2+"_inventory_summary write";
 	  for (auto& table : inventory_tables) {
-	    if (!regex_search(table,std::regex("_summary$"))) {
+	    if (!regex_search(table,regex("_summary$"))) {
 		if (server._delete("IObML."+table,"webID_code = "+web_ID_code) < 0) {
 		  metautils::log_error("insert_obml_inventory() returned error: "+server.error()+" while trying to delete web_ID_code "+web_ID_code+" from 'IObML."+table+"'","iinv",USER);
 		}
@@ -1596,20 +1611,20 @@ void insert_obml_inventory()
 	    }
 	  }
 	  lockstring+=", IObML.template_inventory_lati_loni write";
-	  std::string result;
+	  string result;
 	  if (server.command("lock tables "+lockstring,result) < 0) {
 	    metautils::log_error("unable to lock tables "+lockstring+"; error: "+server.error(),"iinv",USER);
 	  }
 	  first=false;
 	}
 	auto sp=strutils::split(sline,"|");
-	total_bytes+=std::stoll(sp[1]);
-	if (convert_lat_lon_to_box(36,std::stof(sp[6]),std::stof(sp[7]),lat_i,lon_i) < 0)
+	total_bytes+=stoll(sp[1]);
+	if (convert_lat_lon_to_box(36,stof(sp[6]),stof(sp[7]),lat_i,lon_i) < 0)
 	  metautils::log_error("insert_obml_inventory() was not able to convert lat/lon: "+sp[6]+","+sp[7]+" to a 36-degree box","iinv",USER);
 	sdum="IObML.ds"+local_args.dsnum2+"_inventory_"+strutils::itos(lat_i)+"_"+strutils::itos(lon_i);
 	if (!latlon_table.found(sdum,se)) {
 	  if (!MySQL::table_exists(server,sdum)) {
-	    std::string result;
+	    string result;
 	    server.command("unlock tables",result);
 	    if (server.command("create table "+sdum+" like IObML.template_inventory_lati_loni",result) < 0) {
 		metautils::log_error("insert_obml_inventory() returned error: "+server.error()+" while trying to create '"+sdum+"'","iinv",USER);
@@ -1622,15 +1637,15 @@ void insert_obml_inventory()
 	  se.key=sdum;
 	  latlon_table.insert(se);
 	}
-	n=std::stoi(sp[5]);
-	m=std::stoi(sp[8]);
-	sdum2=web_ID_code+","+sp[0]+","+sp[1]+","+sp[2]+","+ID_codes[n]+","+strutils::itos(lroundf(std::stof(sp[6])*10000.))+","+strutils::itos(lroundf(std::stof(sp[7])*10000.))+",'"+datatype_codes[m]+"'";
+	n=stoi(sp[5]);
+	m=stoi(sp[8]);
+	sdum2=web_ID_code+","+sp[0]+","+sp[1]+","+sp[2]+","+ID_codes[n]+","+strutils::itos(lroundf(stof(sp[6])*10000.))+","+strutils::itos(lroundf(stof(sp[7])*10000.))+",'"+datatype_codes[m]+"'";
 	se.key=web_ID_code+","+sp[2]+","+ID_codes[n]+","+datatype_codes[m];
 	if (!unique_lines.found(se.key,se)) {
 	  unique_lines.insert(se);
 	  if (!inventory_table.found(sdum,ie)) {
 	    ie.key=sdum;
-	    ie.list.reset(new std::list<std::string>);
+	    ie.list.reset(new list<string>);
 	    inventory_table.insert(ie);
 	  }
 	  ie.list->emplace_back(sdum2);
@@ -1653,11 +1668,11 @@ void insert_obml_inventory()
   }
   if (server.insert("IObML.ds"+local_args.dsnum2+"_inventory_summary",web_ID_code+","+strutils::lltos(total_bytes)) < 0) {
     error=server.error();
-    if (!std::regex_search(error,std::regex("Duplicate entry"))) {
+    if (!regex_search(error,regex("Duplicate entry"))) {
 	metautils::log_error("insert_obml_inventory() returned error: "+server.error()+" while inserting row '"+web_ID_code+","+strutils::lltos(total_bytes)+"'","iinv",USER);
     }
   }
-  std::string result;
+  string result;
   server.command("unlock tables",result);
   if (num_dupes > 0) {
     metautils::log_warning(strutils::itos(num_dupes)+" duplicate observations were ignored","iinv_dupes",USER);
@@ -1687,15 +1702,15 @@ void insert_inventory()
 int main(int argc,char **argv)
 {
   if (argc < 4) {
-    std::cerr << "usage: iinv -d [ds]nnn.n [options...] -f file" << std::endl;
-    std::cerr << "\nrequired:" << std::endl;
-    std::cerr << "-d nnn.n   specifies the dataset number" << std::endl;
-    std::cerr << "-f file    summarize information for inventory file <file>" << std::endl;
-    std::cerr << "\noptions:" << std::endl;
-    std::cerr << "-c/-C       create (default)/don't create file list cache" << std::endl;
-    std::cerr << "-N          notify with a message when " << argv[0] << " completes" << std::endl;
-    std::cerr << "-V          verbose mode" << std::endl;
-    std::cerr << "--wms-only  only generate the WMS capabilities document for the file" << std::endl;
+    cerr << "usage: iinv -d [ds]nnn.n [options...] -f file" << endl;
+    cerr << "\nrequired:" << endl;
+    cerr << "-d nnn.n   specifies the dataset number" << endl;
+    cerr << "-f file    summarize information for inventory file <file>" << endl;
+    cerr << "\noptions:" << endl;
+    cerr << "-c/-C       create (default)/don't create file list cache" << endl;
+    cerr << "-N          notify with a message when " << argv[0] << " completes" << endl;
+    cerr << "-V          verbose mode" << endl;
+    cerr << "--wms-only  only generate the WMS capabilities document for the file" << endl;
     exit(1);
   }
   auto t1=time(nullptr);
@@ -1721,7 +1736,7 @@ exit(0);
     }
   }
   if (local_args.notify) {
-    std::cout << argv[0] << " has completed successfully" << std::endl;
+    cout << argv[0] << " has completed successfully" << endl;
   }
   auto t2=time(nullptr);
   metautils::log_warning("execution time: "+strutils::ftos(t2-t1)+" seconds","iinv.time",USER);
