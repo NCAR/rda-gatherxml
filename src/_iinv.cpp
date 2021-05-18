@@ -89,23 +89,17 @@ void parse_args(int argc,char **argv)
         metautils::args.dsnum=metautils::args.dsnum.substr(2);
       }
       local_args.dsnum2=substitute(metautils::args.dsnum,".","");
-    }
-    else if (sp[n] == "-f") {
+    } else if (sp[n] == "-f") {
       metautils::args.filename=sp[++n];
-    }
-    else if (sp[n] == "-C") {
+    } else if (sp[n] == "-C") {
       local_args.create_cache=false;
-    }
-    else if (sp[n] == "-N") {
+    } else if (sp[n] == "-N") {
       local_args.notify=true;
-    }
-    else if (sp[n] == "-t") {
+    } else if (sp[n] == "-t") {
       local_args.temp_directory=sp[++n];
-    }
-    else if (sp[n] == "-V") {
+    } else if (sp[n] == "-V") {
       local_args.verbose=true;
-    }
-    else if (sp[n] == "--wms-only") {
+    } else if (sp[n] == "--wms-only") {
       local_args.wms_only=true;
       local_args.create_cache=false;
     }
@@ -130,14 +124,11 @@ string grid_definition_parameters(const XMLElement& e)
   auto definition=e.attribute_value("definition");
   if (definition == "latLon") {
     def_params=e.attribute_value("numX")+":"+e.attribute_value("numY")+":"+e.attribute_value("startLat")+":"+e.attribute_value("startLon")+":"+e.attribute_value("endLat")+":"+e.attribute_value("endLon")+":"+e.attribute_value("xRes")+":"+e.attribute_value("yRes");
-  }
-  else if (definition == "gaussLatLon") {
+  } else if (definition == "gaussLatLon") {
     def_params=e.attribute_value("numX")+":"+e.attribute_value("numY")+":"+e.attribute_value("startLat")+":"+e.attribute_value("startLon")+":"+e.attribute_value("endLat")+":"+e.attribute_value("endLon")+":"+e.attribute_value("xRes")+":"+e.attribute_value("circles");
-  }
-  else if (definition == "polarStereographic") {
+  } else if (definition == "polarStereographic") {
     def_params=e.attribute_value("numX")+":"+e.attribute_value("numY")+":"+e.attribute_value("startLat")+":"+e.attribute_value("startLon")+":"+e.attribute_value("resLat")+":"+e.attribute_value("projLon")+":"+e.attribute_value("pole")+":"+e.attribute_value("xRes")+":"+e.attribute_value("yRes");
-  }
-  else if (definition == "lambertConformal") {
+  } else if (definition == "lambertConformal") {
     def_params=e.attribute_value("numX")+":"+e.attribute_value("numY")+":"+e.attribute_value("startLat")+":"+e.attribute_value("startLon")+":"+e.attribute_value("resLat")+":"+e.attribute_value("projLon")+":"+e.attribute_value("pole")+":"+e.attribute_value("xRes")+":"+e.attribute_value("yRes")+":"+e.attribute_value("stdParallel1")+":"+e.attribute_value("stdParallel2");
   }
   return def_params;
@@ -200,8 +191,7 @@ void build_wms_capabilities()
   MySQL::Row row;
   if (query.submit(server) == 0 && query.fetch_row(row)) {
     data_format_code=row[0];
-  }
-  else {
+  } else {
     log_error2("build_wms_capabilities(): query '" + query.show() + "' failed",
         F, "iinv", USER);
   }
@@ -221,8 +211,7 @@ void build_wms_capabilities()
     string grid_definition_code;
     if (query.submit(server) == 0 && query.fetch_row(row)) {
       grid_definition_code=row[0];
-    }
-    else {
+    } else {
       log_error2("build_wms_capabilities(): query '" + query.show() +
           "' failed", F, "iinv", USER);
     }
@@ -255,8 +244,7 @@ void build_wms_capabilities()
     string time_range_code;
     if (query.submit(server) == 0 && query.fetch_row(row)) {
       time_range_code=row[0];
-    }
-    else {
+    } else {
       log_error2("build_wms_capabilities(): query '" + query.show() +
           "' failed", F, "iinv", USER);
     }
@@ -271,16 +259,14 @@ void build_wms_capabilities()
       string level_code;
       if (query.submit(server) == 0 && query.fetch_row(row)) {
           level_code=row[0];
-      }
-      else {
+      } else {
           log_error2("build_wms_capabilities(): query '" + query.show() +
               "' failed", F, "iinv", USER);
       }
       auto level_title=lmapper.description(data_format,ltype,lmap);
       if (level_title.empty()) {
           level_title=vlevel.attribute_value("type")+":"+vlevel.attribute_value("value");
-      }
-      else if (vlevel.attribute_value("value") != "0") {
+      } else if (vlevel.attribute_value("value") != "0") {
           level_title+=": "+vlevel.attribute_value("value")+lmapper.units(data_format,ltype,lmap);
       }
       ofs << "        <Layer>" << endl;
@@ -307,8 +293,7 @@ void build_wms_capabilities()
               ofs << "              </Style>" << endl;
               ofs << "            </Layer>" << endl;
             }
-          }
-          else {
+          } else {
             log_error2("build_wms_capabilities(): query '" + query.show() +
                 "' failed", F, "iinv", USER);
           }
@@ -326,16 +311,14 @@ void build_wms_capabilities()
       string layer_code;
       if (query.submit(server) == 0 && query.fetch_row(row)) {
           layer_code=row[0];
-      }
-      else {
+      } else {
           log_error2("build_wms_capabilities(): query '" + query.show() +
               "' failed", F, "iinv", USER);
       }
       auto layer_title=lmapper.description(data_format,ltype,lmap);
       if (layer_title.empty()) {
           layer_title=vlayer.attribute_value("type")+":"+vlayer.attribute_value("value");
-      }
-      else if (vlayer.attribute_value("value") != "0") {
+      } else if (vlayer.attribute_value("value") != "0") {
           auto tparts=split(ltype,"-");
           if (tparts.size() == 1) {
             tparts.emplace_back(tparts.front());
@@ -366,8 +349,7 @@ void build_wms_capabilities()
               ofs << "              </Style>" << endl;
               ofs << "            </Layer>" << endl;
             }
-          }
-          else {
+          } else {
             log_error2("build_wms_capabilities(): query '" + query.show() +
                 "' failed", F, "iinv", USER);
           }
@@ -446,16 +428,13 @@ void insert_grml_inventory()
           TimeRangeEntry tre;
           if (line_parts[2] == "Analysis" || regex_search(line_parts[2],regex("^0-hour")) || line_parts[2] == "Monthly Mean") {
             tre.hour_diff=0;
-          }
-          else if (regex_search(line_parts[2],regex("-hour Forecast$"))) {
+          } else if (regex_search(line_parts[2],regex("-hour Forecast$"))) {
             tre.hour_diff=stoi(line_parts[2].substr(0,line_parts[2].find("-")));
-          }
-          else if (regex_search(line_parts[2],regex("to initial\\+"))) {
+          } else if (regex_search(line_parts[2],regex("to initial\\+"))) {
             auto hr=line_parts[2].substr(line_parts[2].find("to initial+")+11);
             chop(hr);
             tre.hour_diff=stoi(hr);
-          }
-          else {
+          } else {
             metautils::log_warning("insert_grml_inventory() does not recognize product '"+line_parts[2]+"'","iinv",USER);
           }
           query.set("code","WGrML.timeRanges","timeRange = '"+line_parts[2]+"'");
@@ -482,8 +461,7 @@ void insert_grml_inventory()
             case static_cast<int>(Grid::Type::gaussianLatitudeLongitude): {
               if (stoi(gdef_params[0]) == static_cast<int>(Grid::Type::latitudeLongitude)) {
                 definition="latLon";
-              }
-              else if (stoi(gdef_params[0]) == static_cast<int>(Grid::Type::gaussianLatitudeLongitude)) {
+              } else if (stoi(gdef_params[0]) == static_cast<int>(Grid::Type::gaussianLatitudeLongitude)) {
                 definition="gaussLatLon";
               }
               if (gdef_params[0].back() == 'C') {
@@ -492,26 +470,22 @@ void insert_grml_inventory()
               definition_parameters=gdef_params[1]+":"+gdef_params[2]+":";
               if (gdef_params[3][0] == '-') {
                 definition_parameters+=gdef_params[3].substr(1)+"S:";
-              }
-              else {
+              } else {
                 definition_parameters+=gdef_params[3]+"N:";
               }
               if (gdef_params[4][0] == '-') {
                 definition_parameters+=gdef_params[4].substr(1)+"W:";
-              }
-              else {
+              } else {
                 definition_parameters+=gdef_params[4]+"E:";
               }
               if (gdef_params[5][0] == '-') {
                 definition_parameters+=gdef_params[5].substr(1)+"S:";
-              }
-              else {
+              } else {
                 definition_parameters+=gdef_params[5]+"N:";
               }
               if (gdef_params[6][0] == '-') {
                 definition_parameters+=gdef_params[6].substr(1)+"W:";
-              }
-              else {
+              } else {
                 definition_parameters+=gdef_params[6]+"E:";
               }
               definition_parameters+=gdef_params[7]+":"+gdef_params[8];
@@ -522,26 +496,22 @@ void insert_grml_inventory()
               definition_parameters=gdef_params[1]+":"+gdef_params[2]+":";
               if (gdef_params[3][0] == '-') {
                 definition_parameters+=gdef_params[3].substr(1)+"S:";
-              }
-              else {
+              } else {
                 definition_parameters+=gdef_params[3]+"N:";
               }
               if (gdef_params[4][0] == '-') {
                 definition_parameters+=gdef_params[4].substr(1)+"W:";
-              }
-              else {
+              } else {
                 definition_parameters+=gdef_params[4]+"E:";
               }
               if (gdef_params[5][0] == '-') {
                 definition_parameters+=gdef_params[5].substr(1)+"S:";
-              }
-              else {
+              } else {
                 definition_parameters+=gdef_params[5]+"N:";
               }
               if (gdef_params[6][0] == '-') {
                 definition_parameters+=gdef_params[6].substr(1)+"W:";
-              }
-              else {
+              } else {
                 definition_parameters+=gdef_params[6]+"E:";
               }
               definition_parameters+=gdef_params[9]+":"+gdef_params[7]+":"+gdef_params[8];
@@ -552,33 +522,28 @@ void insert_grml_inventory()
               definition_parameters=gdef_params[1]+":"+gdef_params[2]+":";
               if (gdef_params[3][0] == '-') {
                 definition_parameters+=gdef_params[3].substr(1)+"S:";
-              }
-              else {
+              } else {
                 definition_parameters+=gdef_params[3]+"N:";
               }
               if (gdef_params[4][0] == '-') {
                 definition_parameters+=gdef_params[4].substr(1)+"W:";
-              }
-              else {
+              } else {
                 definition_parameters+=gdef_params[4]+"E:";
               }
               if (gdef_params[5][0] == '-') {
                 definition_parameters+=gdef_params[5].substr(1)+"S:";
-              }
-              else {
+              } else {
                 definition_parameters+=gdef_params[5]+"N:";
               }
               if (gdef_params[6][0] == '-') {
                 definition_parameters+=gdef_params[6].substr(1)+"W:";
-              }
-              else {
+              } else {
                 definition_parameters+=gdef_params[6]+"E:";
               }
               definition_parameters+=gdef_params[7]+":"+gdef_params[8]+":";
               if (gdef_params[9][0] == '-') {
                 definition_parameters+=gdef_params[9].substr(1)+"S";
-              }
-              else {
+              } else {
                 definition_parameters+=gdef_params[9]+"N";
               }
               break;
@@ -588,39 +553,33 @@ void insert_grml_inventory()
               definition_parameters=gdef_params[1]+":"+gdef_params[2]+":";
               if (gdef_params[3][0] == '-') {
                 definition_parameters+=gdef_params[3].substr(1)+"S:";
-              }
-              else {
+              } else {
                 definition_parameters+=gdef_params[3]+"N:";
               }
               if (gdef_params[4][0] == '-') {
                 definition_parameters+=gdef_params[4].substr(1)+"W:";
-              }
-              else {
+              } else {
                 definition_parameters+=gdef_params[4]+"E:";
               }
               if (gdef_params[5][0] == '-') {
                 definition_parameters+=gdef_params[5].substr(1)+"S:";
-              }
-              else {
+              } else {
                 definition_parameters+=gdef_params[5]+"N:";
               }
               if (gdef_params[6][0] == '-') {
                 definition_parameters+=gdef_params[6].substr(1)+"W:";
-              }
-              else {
+              } else {
                 definition_parameters+=gdef_params[6]+"E:";
               }
               definition_parameters+=gdef_params[9]+":"+gdef_params[7]+":"+gdef_params[8]+":";
               if (gdef_params[10][0] == '-') {
                 definition_parameters+=gdef_params[10].substr(1)+"S:";
-              }
-              else {
+              } else {
                 definition_parameters+=gdef_params[10]+"N:";
               }
               if (gdef_params[11][0] == '-') {
                 definition_parameters+=gdef_params[11].substr(1)+"S";
-              }
-              else {
+              } else {
                 definition_parameters+=gdef_params[11]+"N";
               }
               break;
@@ -661,8 +620,7 @@ void insert_grml_inventory()
             auto idx=lev_parts[0].find(",");
             map=lev_parts[0].substr(0,idx);
             type=lev_parts[0].substr(idx+1);
-          }
-          else {
+          } else {
             map="";
             type=lev_parts[0];
           }
@@ -704,8 +662,7 @@ void insert_grml_inventory()
                     .error() + " while trying to create parameter inventory "
                     "table", F, "iinv", USER);
               }
-            }
-            else {
+            } else {
               if (server.command("create table IGrML.`ds"+local_args.dsnum2+"_inventory_"+pcode+"` like IGrML.template_inventory_p",result) < 0) {
                 log_error2("insert_grml_inventory() returned error: " + server
                     .error() + " while trying to create parameter inventory "
@@ -727,8 +684,7 @@ void insert_grml_inventory()
           break;
         }
       }
-    }
-    else if (regex_search(sline,regex("\\|"))) {
+    } else if (regex_search(sline,regex("\\|"))) {
 /*
       if (first) {
         sdum="lock tables ";
@@ -763,26 +719,22 @@ void insert_grml_inventory()
           se.key=time_range_codes[tr_index].code;
           if (!ite.time_range_codes->found(se.key,se)) {
             ite.time_range_codes->insert(se);
-          }
-          else if (ite.time_range_codes->size() > 1) {
+          } else if (ite.time_range_codes->size() > 1) {
             dupe_vdates="Y";
           }
         }
-      }
-      else {
+      } else {
         init_date="0";
       }
       auto insert_string=web_id_code+","+inv_parts[0]+","+inv_parts[1]+","+inv_parts[2]+","+init_date+","+time_range_codes[tr_index].code+","+grid_definition_codes[stoi(inv_parts[4])]+","+level_codes[stoi(inv_parts[5])]+",";
       if (inv_parts.size() > 7 && !inv_parts[7].empty()) {
         insert_string+="'"+processes[stoi(inv_parts[7])]+"',";
-      }
-      else {
+      } else {
         insert_string+="'',";
       }
       if (inv_parts.size() > 8 && !inv_parts[8].empty()) {
         insert_string+="'"+ensembles[stoi(inv_parts[8])]+"'";
-      }
-      else {
+      } else {
         insert_string+="''";
       }
       insert_string+=",'"+uflag+"'";
@@ -792,19 +744,16 @@ void insert_grml_inventory()
           log_error2("insert_grml_inventory() returned error: " + server
               .error() + " while inserting row '" + insert_string + "'", F,
               "iinv", USER);
-        }
-        else {
+        } else {
           string dupe_where="webID_code = "+web_id_code+" and valid_date = "+inv_parts[2]+" and timeRange_code = "+time_range_codes[tr_index].code+" and gridDefinition_code = "+grid_definition_codes[stoi(inv_parts[4])]+" and level_code = "+level_codes[stoi(inv_parts[5])];
           if (inv_parts.size() > 7 && !inv_parts[7].empty()) {
             dupe_where+=" and process = '"+processes[stoi(inv_parts[7])]+"'";
-          }
-          else {
+          } else {
             dupe_where+=" and process = ''";
           }
           if (inv_parts.size() > 8 && !inv_parts[8].empty()) {
             dupe_where+=" and ensemble = '"+ensembles[stoi(inv_parts[8])]+"'";
-          }
-          else {
+          } else {
             dupe_where+=" and ensemble = ''";
           }
           query.set("uflag","IGrML.`ds"+local_args.dsnum2+"_inventory_"+pcode+"`",dupe_where);
@@ -818,8 +767,7 @@ void insert_grml_inventory()
             if (local_args.verbose) {
               cout << "**duplicate ignored - line " << nlines << endl;
             }
-          }
-          else {
+          } else {
             if (server.update("IGrML.`ds"+local_args.dsnum2+"_inventory_"+pcode+"`","byte_offset = "+inv_parts[0]+", byte_length = "+inv_parts[1]+",init_date = "+init_date+",uflag = '"+uflag+"'",dupe_where) < 0) {
               log_error2("insert_grml_inventory() returned error: " + server
                   .error() + " while updating duplicate row: '" + dupe_where +
@@ -884,8 +832,7 @@ void process_IDs(string type,MySQL::Server& server,string ID_index,string ID_dat
   geoutils::convert_lat_lon_to_box(36,stof(id_parts[2]),stof(id_parts[3]),min_lat_i,min_lon_i);
   if (id_parts.size() > 4) {
     geoutils::convert_lat_lon_to_box(36,stof(id_parts[4]),stof(id_parts[5]),max_lat_i,max_lon_i);
-  }
-  else {
+  } else {
     max_lat_i=min_lat_i;
     max_lon_i=min_lon_i;
   }
@@ -966,8 +913,7 @@ void insert_obml_netcdf_time_series_inventory(std::ifstream& ifs,MySQL::Server& 
           server.error() + " while trying to create 'ds" + local_args.dsnum2 +
           "_dataTypes'", F, "iinv", USER);
     }
-  }
-  else {
+  } else {
 /*
     if (server._delete("IObML.ds"+local_args.dsnum2+"_dataTypes","webID_code = "+web_ID_code) < 0) {
       log_error2("insert_obml_netcdf_time_series_inventory() returned error: "+server.error()+" while trying to delete from 'ds"+local_args.dsnum2+"_dataTypes' where webID_code = "+web_ID_code,"iinv",USER);
@@ -1058,8 +1004,7 @@ void insert_obml_netcdf_time_series_inventory(std::ifstream& ifs,MySQL::Server& 
           break;
         }
       }
-    }
-    else if (regex_search(line,missing_line)) {
+    } else if (regex_search(line,missing_line)) {
       se.key=line;
       missing_table.insert(se);
       auto idx=se.key.rfind("|");
@@ -1096,13 +1041,11 @@ void insert_obml_netcdf_time_series_inventory(std::ifstream& ifs,MySQL::Server& 
       if (dve.data->missing_table.size() == 0) {
 // no times are missing
         missing_ind="0";
-      }
-      else {
+      } else {
         if ( (times_list.size()-dve.data->missing_table.size()) < dve.data->missing_table.size()) {
 // times specified are non-missing
           missing_ind="1";
-        }
-        else {
+        } else {
 // times specified are missing
           missing_ind="2";
         }
@@ -1307,8 +1250,7 @@ void insert_obml_netcdf_point_inventory(std::ifstream& ifs,MySQL::Server& server
           break;
         }
       }
-    }
-    else if (regex_search(line,missing_line)) {
+    } else if (regex_search(line,missing_line)) {
       se.key=line;
       missing_table.insert(se);
       auto idx=se.key.rfind("|");
@@ -1343,13 +1285,11 @@ void insert_obml_netcdf_point_inventory(std::ifstream& ifs,MySQL::Server& server
       if (dve.data->missing_table.size() == 0) {
 // no times are missing
         missing_ind="0";
-      }
-      else {
+      } else {
         if ( (times_list.size()-dve.data->missing_table.size()) < dve.data->missing_table.size()) {
 // times specified are non-missing
           missing_ind="1";
-        }
-        else {
+        } else {
 // times specified are missing
           missing_ind="2";
         }
@@ -1538,8 +1478,7 @@ void insert_generic_point_inventory(std::ifstream& ifs,MySQL::Server& server,str
             string scale;
             if (dparts.size() > 4) {
               scale=dparts[4];
-            }
-            else {
+            } else {
               scale="1";
             }
             if (server.insert("IObML.ds"+local_args.dsnum2+"_dataTypesList_b",row[0]+",'"+value_type+"',"+scale+","+dparts[3].substr(1)+",NULL") < 0) {
@@ -1554,8 +1493,7 @@ void insert_generic_point_inventory(std::ifstream& ifs,MySQL::Server& server,str
           break;
         }
       }
-    }
-    else if (regex_search(sline,regex("\\|"))) {
+    } else if (regex_search(sline,regex("\\|"))) {
       auto iparts=split(sline,"|");
       auto idparts=split(id_table.at(iparts[2]),"|");
       int min_lat_i=stoi(idparts[1]);
@@ -1579,8 +1517,7 @@ void insert_generic_point_inventory(std::ifstream& ifs,MySQL::Server& server,str
       if (e == datatypes_table.end()) {
         p.reset(new unordered_map<size_t,size_t>);
         datatypes_table.emplace(idparts[0],p);
-      }
-      else {
+      } else {
         p=e->second;
       }
       vector<size_t> ivals,dvals;
@@ -1665,8 +1602,7 @@ void insert_obml_inventory()
   if (stat(sdum.c_str(),&buf) == 0) {
     system(("gunzip "+sdum).c_str());
     chop(sdum,3);
-  }
-  else {
+  } else {
     sdum=unixutils::remote_web_file("https://rda.ucar.edu/datasets/ds"+metautils::args.dsnum+"/metadata/inv/"+metautils::args.filename,temp_dir.name());
   }
   ifs.open(sdum.c_str());
@@ -1692,12 +1628,10 @@ void insert_obml_inventory()
   if (regex_search(line,regex("^netCDF:timeSeries"))) {
     string sline=line;
     insert_obml_netcdf_time_series_inventory(ifs,server,web_ID_code,stoi(sline.substr(sline.find("|")+1)));
-  }
-  else if (regex_search(line,regex("^netCDF:point"))) {
+  } else if (regex_search(line,regex("^netCDF:point"))) {
     string sline=line;
     insert_obml_netcdf_point_inventory(ifs,server,web_ID_code,stoi(sline.substr(sline.find("|")+1)));
-  }
-  else {
+  } else {
     insert_generic_point_inventory(ifs,server,web_ID_code);
   }
 /*
@@ -1731,8 +1665,7 @@ void insert_obml_inventory()
           break;
         }
       }
-    }
-    else if (regex_search(sline,regex("\\|"))) {
+    } else if (regex_search(sline,regex("\\|"))) {
       if (first) {
         if (!MySQL::table_exists(server,"IObML.ds"+local_args.dsnum2+"_inventory_summary")) {
           string result;
@@ -1792,8 +1725,7 @@ void insert_obml_inventory()
           inventory_table.insert(ie);
         }
         ie.m_list->emplace_back(sdum2);
-      }
-      else {
+      } else {
         ++num_dupes;
       }
     }
@@ -1833,11 +1765,9 @@ void insert_inventory()
       insert_grml_inventory();
     }
 //    build_wms_capabilities();
-  }
-  else if (ext == "ObML_inv") {
+  } else if (ext == "ObML_inv") {
     insert_obml_inventory();
-  }
-  else {
+  } else {
     log_error2("insert_inventory() does not recognize inventory extension " +
         ext, this_function_label(__func__), "iinv", USER);
   }
