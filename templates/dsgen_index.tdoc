@@ -38,7 +38,13 @@ __JSON_LD__
   }
 ?>
 <tr valign="top"><td rowspan="2" width="1"><img style="float: left; margin-right: 5px" src="/images/ds_logos/__LOGO_IMAGE__" width="__LOGO_WIDTH__" height="70" /></td><td><span class="fs24px bold">__TITLE__</span><br /><span class="fs16px bold"><span class="blue">ds__DSNUM__</span>__DOI_SPAN__</span><div id="ds_bookmark" style="display: inline; margin-left: 2px"><?php if ($can_bookmark) { $dsid="__DSNUM__"; if ($is_bookmarked) { include("dsbookmarks/showunset.inc"); } else { include("dsbookmarks/showset.inc"); } } ?></div></td></tr>
-<tr valign="bottom"><td align="right"><span class="fs16px">For assistance, contact <a class="blue" href="mailto:__CONTACT_LOGIN__@ucar.edu">__CONTACT_NAME__</a> <span class="mediumGrayText">(__CONTACT_PHONE__).</span></span></td></tr>
+<!--
+<tr valign="bottom"><td align="right"><span class="fs16px">For assistance, submit a request on the <a class="blue" href="https://helpdesk.ucar.edu/plugins/servlet/desk/portal/6">RDA Support Portal</a>.</span></span></td></tr>
+-->
+<!--
+<tr valign="bottom"><td align="right"><span class="fs16px">For assistance, submit a request to <a class="blue" href="mailto:rdahelp@ucar.edu">rdahelp@ucar.edu</a>.</span></span></td></tr>
+-->
+<tr valign="bottom"><td align="right"><span class="fs16px">For help with this dataset, <a href="javascript:void(0)" onclick="popModalWindowWithURL('/php/rdahelp.php?d=__DSNUM__', 700, 500)">send us a message</a>.</span></span></td></tr>
 </table>
 #IF __IS_DEAD_DATASET__
 <?php include("main/dstabs-dead.inc"); ?>
