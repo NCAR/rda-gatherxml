@@ -44,7 +44,7 @@ __JSON_LD__
 <!--
 <tr valign="bottom"><td align="right"><span class="fs16px">For assistance, submit a request to <a class="blue" href="mailto:rdahelp@ucar.edu">rdahelp@ucar.edu</a>.</span></span></td></tr>
 -->
-<tr valign="bottom"><td align="right"><span class="fs16px">For help with this dataset, <a href="javascript:void(0)" onclick="popModalWindowWithURL('/php/rdahelp.php?d=__DSNUM__', 700, 500)">send us a message</a>.</span></span></td></tr>
+<tr valign="bottom"><td align="right"><span class="fs16px">For help with this dataset, <a href="javascript:void(0)" onclick="popModalWindowWithURL('/php/rdahelp.php?d=__DSNUM__', 800, 500)">send us a message</a>.</span></span></td></tr>
 </table>
 #IF __IS_DEAD_DATASET__
 <?php include("main/dstabs-dead.inc"); ?>
