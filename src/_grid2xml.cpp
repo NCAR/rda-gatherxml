@@ -293,24 +293,24 @@ void scan_file()
 	  reinterpret_cast<CMORPH025Grid *>(grid)->set_latitudes(reinterpret_cast<InputCMORPH025GridStream *>(istream.get())->start_latitude(),reinterpret_cast<InputCMORPH025GridStream *>(istream.get())->end_latitude());
 	}
 	else if (metautils::args.data_format == "gpcp") {
-	  grid->fill(buffer.get(),Grid::full_grid);
+	  grid->fill(buffer.get(),Grid::FULL_GRID);
 	}
 	else {
-	  grid->fill(buffer.get(),Grid::header_only);
+	  grid->fill(buffer.get(),Grid::HEADER_ONLY);
 	}
     }
     griddef=grid->definition();
 	if (metautils::args.data_format == "gpcp" && reinterpret_cast<GPCPGrid *>(grid)->is_empty_grid()) {
-	griddef.type=0;
+	griddef.type = Grid::Type::not_set;
     }
-    if (griddef.type > 0) {
+    if (griddef.type != Grid::Type::not_set) {
 	first_valid_date_time=grid->valid_date_time();
-	gentry.key=strutils::itos(griddef.type)+"<!>";
-	if (griddef.type != Grid::sphericalHarmonicsType) {
+	gentry.key=strutils::itos(static_cast<int>(griddef.type))+"<!>";
+	if (griddef.type != Grid::Type::sphericalHarmonics) {
 	  griddim=grid->dimensions();
 	  gentry.key+=strutils::itos(griddim.x)+"<!>"+strutils::itos(griddim.y)+"<!>"+strutils::ftos(griddef.slatitude,3)+"<!>"+strutils::ftos(griddef.slongitude,3)+"<!>"+strutils::ftos(griddef.elatitude,3)+"<!>"+strutils::ftos(griddef.elongitude,3)+"<!>"+strutils::ftos(griddef.loincrement,3)+"<!>";
 	  switch (griddef.type) {
-	    case Grid::gaussianLatitudeLongitudeType: {
+	    case Grid::Type::gaussianLatitudeLongitude: {
 		gentry.key+=strutils::itos(griddef.num_circles);
 		break;
 	    }
@@ -318,10 +318,10 @@ void scan_file()
 		gentry.key+=strutils::ftos(griddef.laincrement,3);
 	    }
 	  }
-	  if (griddef.type == Grid::polarStereographicType || griddef.type == Grid::lambertConformalType) {
+	  if (griddef.type == Grid::Type::polarStereographic || griddef.type == Grid::Type::lambertConformal) {
 	    auto pole= (griddef.projection_flag ==  0) ? "N" : "S";
 	    gentry.key+=std::string("<!>")+pole;
-	    if (griddef.type == Grid::lambertConformalType) {
+	    if (griddef.type == Grid::Type::lambertConformal) {
 		gentry.key+="<!>"+strutils::ftos(griddef.stdparallel1,3)+"<!>"+strutils::ftos(griddef.stdparallel2);
 	    }
 	  }
@@ -431,10 +431,8 @@ void scan_file()
 	  }
 	}
 	else if (metautils::args.data_format == "grib2") {
-/*
-	  last_valid_date_time=first_valid_date_time;
-first_valid_date_time=grid->reference_date_time().hours_added(grid->forecast_time()/10000);
-*/
+//	  last_valid_date_time=first_valid_date_time;
+//first_valid_date_time=grid->reference_date_time().hours_added(grid->forecast_time()/10000);
 	  lentry.key=strutils::ftos(grid->source())+"-"+strutils::ftos((reinterpret_cast<GRIB2Grid *>(grid))->sub_center_id());
 	  pentry.key=lentry.key+"."+strutils::ftos((reinterpret_cast<GRIB2Grid *>(grid))->parameter_table_code())+"-"+strutils::ftos((reinterpret_cast<GRIB2Grid *>(grid))->local_table_code())+":"+strutils::ftos((reinterpret_cast<GRIB2Grid *>(grid))->discipline())+"."+strutils::ftos((reinterpret_cast<GRIB2Grid *>(grid))->parameter_category())+"."+strutils::ftos(grid->parameter());
 	  pe.key=lentry.key+":"+strutils::itos((reinterpret_cast<GRIBGrid *>(grid))->process())+"."+strutils::itos((reinterpret_cast<GRIB2Grid *>(grid))->background_process())+"."+strutils::itos((reinterpret_cast<GRIB2Grid *>(grid))->forecast_process());
@@ -443,14 +441,14 @@ first_valid_date_time=grid->reference_date_time().hours_added(grid->forecast_tim
 	  lentry.key+=",";
 	  if (n != 255) {
 	    lentry.key+=level_type+"-"+strutils::itos(n)+":";
-	    if (!floatutils::myequalf(grid->first_level_value(),Grid::missing_value)) {
+	    if (!floatutils::myequalf(grid->first_level_value(),Grid::MISSING_VALUE)) {
 		lentry.key+=strutils::ftos(grid->first_level_value(),5);
 	    }
 	    else {
 		lentry.key+="0";
 	    }
 	    lentry.key+=":";
-	    if (!floatutils::myequalf(grid->second_level_value(),Grid::missing_value)) {
+	    if (!floatutils::myequalf(grid->second_level_value(),Grid::MISSING_VALUE)) {
 		lentry.key+=strutils::ftos(grid->second_level_value(),5);
 	    }
 	    else {
@@ -459,7 +457,7 @@ first_valid_date_time=grid->reference_date_time().hours_added(grid->forecast_tim
 	  }
 	  else {
 	    lentry.key+=level_type+":";
-	    if (!floatutils::myequalf(grid->first_level_value(),Grid::missing_value)) {
+	    if (!floatutils::myequalf(grid->first_level_value(),Grid::MISSING_VALUE)) {
 		lentry.key+=strutils::ftos(grid->first_level_value(),5);
 	    }
 	    else {
