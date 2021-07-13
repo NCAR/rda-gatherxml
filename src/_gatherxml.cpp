@@ -44,8 +44,8 @@ bool showinfo = false;
 
 string webhome() {
   if (!metautils::directives.data_root_alias.empty()) {
-    return metautils::directives.data_root_alias + "/ds" + metautils::args
-        .dsnum;
+    return metautils::directives.data_root_alias + "/ds" + metautils::args.
+        dsnum;
   }
   return metautils::web_home();
 }
@@ -59,8 +59,8 @@ void *do_inventory(void *ts) {
 void inventory_all() {
   const string F = miscutils::this_function_label(__func__);
   if (metautils::args.data_format != "grib" && metautils::args.data_format !=
-      "grib2" && metautils::args.data_format != "grib0" && metautils::args
-      .data_format != "cfnetcdf" && metautils::args.data_format != "hdf5nc4") {
+      "grib2" && metautils::args.data_format != "grib0" && metautils::args.
+      data_format != "cfnetcdf" && metautils::args.data_format != "hdf5nc4") {
     log_error2("unable to inventory '" + metautils::args.data_format +
         "' files", F, "gatherxml", USER);
   }
@@ -109,8 +109,8 @@ void inventory_all() {
       f = "hdf5nc4";
     }
     ++n;
-    if (f == metautils::args.data_format || (f == "netcdf" && metautils::args
-        .data_format == "cfnetcdf")) {
+    if (f == metautils::args.data_format || (f == "netcdf" && metautils::args.
+        data_format == "cfnetcdf")) {
       while (num_t == MAX_T) {
         for (int m = 0; m < num_t; ++m) {
           if (pthread_kill(tids[m], 0) != 0) {
@@ -126,8 +126,8 @@ void inventory_all() {
       if (n != q.num_rows() && n % 100 != 0) {
         cmds[ti] += " -R -S";
       }
-      cmds[ti] += " -d " + metautils::args.dsnum + " -f " + metautils::args
-          .data_format + " -I https://rda.ucar.edu" + webhome() + "/" + row[0];
+      cmds[ti] += " -d " + metautils::args.dsnum + " -f " + metautils::args.
+          data_format + " -I https://rda.ucar.edu" + webhome() + "/" + row[0];
       pthread_create(&tids[ti], nullptr, do_inventory, reinterpret_cast<void *>(
           &cmds[ti]));
       t_idx[ti] = 0;
@@ -144,8 +144,10 @@ void inventory_all() {
 
 int main(int argc, char **argv) {
   if (argc < 6 && argc != 2 && argc != 3) {
-    cerr << "For command usage, see the \"Metadata Utilities\" man pages, which are accessible" << endl;
-    cerr << "  from the dashboard under \"Dataset Stewardship Tools and Documentation\"." << endl;
+    cerr << "For command usage, see the \"Metadata Utilities\" man pages, "
+        "which are accessible" << endl;
+    cerr << "  from the dashboard under \"Dataset Stewardship Tools and "
+        "Documentation\"." << endl;
     exit(1);
   }
   string sep;
@@ -204,8 +206,8 @@ int main(int argc, char **argv) {
   }
   if (showinfo) {
     for (const auto& e : util_set) {
-      auto p = popen((metautils::directives.decs_bindir + "/" + e + " 2>&1")
-          .c_str(), "r");
+      auto p = popen((metautils::directives.decs_bindir + "/" + e + " 2>&1").
+          c_str(), "r");
       cerr << "\nutility:" << strutils::substitute(e, "_", " ") << endl;
       cerr << "supported formats (\"-f\" flag):" << endl;
       while (fgets(line, 256, p) != nullptr) {
@@ -296,8 +298,8 @@ exit(1);
       if (it != aka_map.end()) {
         auto it2 = util_map.find(it->second);
         if (it2 != util_map.end()) {
-          replace_all(metautils::args.args_string, "-f%" + metautils::args
-              .data_format, "-f%" + it2->first);
+          replace_all(metautils::args.args_string, "-f%" + metautils::args.
+              data_format, "-f%" + it2->first);
           auto t1 = std::time(nullptr);
           stringstream oss, ess;
           auto stat = mysystem2(metautils::directives.decs_bindir + "/" +
