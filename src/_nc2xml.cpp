@@ -893,20 +893,18 @@ void scan_cf_point_netcdf_file(InputNetCDFStream& istream, string platform_type,
   NetCDF::VariableData yvd;
   if (dgd.indexes.lat_var == MISSING_FLAG) {
     log_error2("unable to determine latitude variable", F, "nc2xml", USER);
-  } else {
-    if (istream.variable_data(vars[dgd.indexes.lat_var].name, yvd) == NetCDF::
-        DataType::_NULL) {
-      log_error2("unable to get latitude data", F, "nc2xml", USER);
-    }
+  }
+  if (istream.variable_data(vars[dgd.indexes.lat_var].name, yvd) == NetCDF::
+      DataType::_NULL) {
+    log_error2("unable to get latitude data", F, "nc2xml", USER);
   }
   NetCDF::VariableData xvd;
   if (dgd.indexes.lon_var == MISSING_FLAG) {
     log_error2("unable to determine longitude variable", F, "nc2xml", USER);
-  } else {
-    if (istream.variable_data(vars[dgd.indexes.lon_var].name, xvd) == NetCDF::
-        DataType::_NULL) {
-      log_error2("unable to get longitude data", F, "nc2xml", USER);
-    }
+  }
+  if (istream.variable_data(vars[dgd.indexes.lon_var].name, xvd) == NetCDF::
+      DataType::_NULL) {
+    log_error2("unable to get longitude data", F, "nc2xml", USER);
   }
   vector<DateTime> dtv;
   vector<string> idv, dtypv;
@@ -1666,65 +1664,62 @@ void scan_cf_time_series_netcdf_file(InputNetCDFStream& istream, string
     if (dgd.indexes.stn_id_var == MISSING_FLAG) {
       log_error2("unable to determine timeseries_id variable", F, "nc2xml",
           USER);
-    } else {
-      for (size_t n = 0; n < vars[dgd.indexes.stn_id_var].attrs.size(); ++n) {
-        if (regex_search(vars[dgd.indexes.stn_id_var].attrs[n].name, regex(
-            "network", std::regex_constants::icase))) {
-          auto s = *(reinterpret_cast<string *>(vars[dgd.indexes.stn_id_var].
-              attrs[n].values));
-          if (gatherxml::verbose_operation) {
-            cout << "   ...found network: '" << s << "'" << endl;
-          }
-          for (size_t m = 0; m < vars.size(); ++m) {
-            if (vars[m].name == s) {
-              dgd.indexes.network_var = m;
-              break;
-            }
-          }
-          break;
+    }
+    for (size_t n = 0; n < vars[dgd.indexes.stn_id_var].attrs.size(); ++n) {
+      if (regex_search(vars[dgd.indexes.stn_id_var].attrs[n].name, regex(
+          "network", std::regex_constants::icase))) {
+        auto s = *(reinterpret_cast<string *>(vars[dgd.indexes.stn_id_var].
+            attrs[n].values));
+        if (gatherxml::verbose_operation) {
+          cout << "   ...found network: '" << s << "'" << endl;
         }
+        for (size_t m = 0; m < vars.size(); ++m) {
+          if (vars[m].name == s) {
+            dgd.indexes.network_var = m;
+            break;
+          }
+        }
+        break;
       }
     }
     if (dgd.indexes.lat_var == MISSING_FLAG) {
       log_error2("unable to determine latitude variable", F, "nc2xml", USER);
-    } else {
-      for (size_t n = 0; n < vars[dgd.indexes.lat_var].attrs.size(); ++n) {
-        if (regex_search(vars[dgd.indexes.lat_var].attrs[n].name, regex(
-            "bounds", std::regex_constants::icase))) {
-          auto s = *(reinterpret_cast<string *>(vars[dgd.indexes.lat_var].attrs[
-              n].values));
-          if (gatherxml::verbose_operation) {
-            cout << "   ...found latitude bounds: '" << s << "'" << endl;
-          }
-          for (size_t m = 0; m < vars.size(); ++m) {
-            if (vars[m].name == s) {
-              dgd.indexes.lat_var_bounds = m;
-              break;
-            }
-          }
-          break;
+    }
+    for (size_t n = 0; n < vars[dgd.indexes.lat_var].attrs.size(); ++n) {
+      if (regex_search(vars[dgd.indexes.lat_var].attrs[n].name, regex("bounds",
+          std::regex_constants::icase))) {
+        auto s = *(reinterpret_cast<string *>(vars[dgd.indexes.lat_var].attrs[
+            n].values));
+        if (gatherxml::verbose_operation) {
+          cout << "   ...found latitude bounds: '" << s << "'" << endl;
         }
+        for (size_t m = 0; m < vars.size(); ++m) {
+          if (vars[m].name == s) {
+            dgd.indexes.lat_var_bounds = m;
+            break;
+          }
+        }
+        break;
       }
     }
     if (dgd.indexes.lon_var == MISSING_FLAG) {
       log_error2("unable to determine longitude variable", F, "nc2xml", USER);
-    } else {
-      for (size_t n = 0; n < vars[dgd.indexes.lon_var].attrs.size(); ++n) {
-        if (regex_search(vars[dgd.indexes.lon_var].attrs[n].name, regex(
-            "bounds", std::regex_constants::icase))) {
-          auto s = *(reinterpret_cast<string *>(vars[dgd.indexes.lon_var].attrs[
-              n].values));
-          if (gatherxml::verbose_operation) {
-            cout << "   ...found latitude bounds: '" << s << "'" << endl;
-          }
-          for (size_t m = 0; m < vars.size(); ++m) {
-            if (vars[m].name == s) {
-              dgd.indexes.lon_var_bounds = m;
-              break;
-            }
-          }
-          break;
+    }
+    for (size_t n = 0; n < vars[dgd.indexes.lon_var].attrs.size(); ++n) {
+      if (regex_search(vars[dgd.indexes.lon_var].attrs[n].name, regex("bounds",
+          std::regex_constants::icase))) {
+        auto s = *(reinterpret_cast<string *>(vars[dgd.indexes.lon_var].attrs[
+            n].values));
+        if (gatherxml::verbose_operation) {
+          cout << "   ...found latitude bounds: '" << s << "'" << endl;
         }
+        for (size_t m = 0; m < vars.size(); ++m) {
+          if (vars[m].name == s) {
+            dgd.indexes.lon_var_bounds = m;
+            break;
+          }
+        }
+        break;
       }
     }
     scan_cf_non_orthogonal_time_series_netcdf_file(istream, platform_type, dgd,
@@ -2167,15 +2162,14 @@ void process_vertical_coordinate_variable(const vector<NetCDF::Attribute>&
   if (dgd.z_pos.empty()) {
     log_error2("process_vertical_coordinate_variable() returned error: unable "
         "to determine vertical coordinate direction", F, "nc2xml", USER);
-  } else if (otyp.empty()) {
-    if (dgd.z_pos == "up") {
+  }
+  if (dgd.z_pos == "up") {
+    otyp = "upper_air";
+  } else if (dgd.z_pos == "down") {
+    auto l = to_lower(dgd.z_units);
+    if (dgd.z_pos == "down" && (regex_search(dgd.z_units, regex("Pa$")) ||
+        regex_search(l, regex("^mb(ar){0,1}$")) || l == "millibars")) {
       otyp = "upper_air";
-    } else if (dgd.z_pos == "down") {
-      auto l = to_lower(dgd.z_units);
-      if (dgd.z_pos == "down" && (regex_search(dgd.z_units, regex("Pa$")) ||
-          regex_search(l, regex("^mb(ar){0,1}$")) || l == "millibars")) {
-        otyp = "upper_air";
-      }
     }
   }
 }
@@ -2195,10 +2189,9 @@ void scan_cf_profile_netcdf_file(InputNetCDFStream& istream, string
   if (dgd.indexes.z_var == MISSING_FLAG) {
     log_error2("unable to determine vertical coordinate variable", F, "nc2xml",
         USER);
-  } else {
-    process_vertical_coordinate_variable(vars[dgd.indexes.z_var].attrs, dgd,
-        otyp);
   }
+  process_vertical_coordinate_variable(vars[dgd.indexes.z_var].attrs, dgd,
+      otyp);
   if (otyp.empty()) {
     log_error2("unable to determine observation type", F, "nc2xml", USER);
   }
@@ -2544,10 +2537,9 @@ void scan_cf_time_series_profile_netcdf_file(InputNetCDFStream& istream, string
   if (dgd.indexes.z_var == MISSING_FLAG) {
     log_error2("unable to determine vertical coordinate variable", F, "nc2xml",
         USER);
-  } else {
-    process_vertical_coordinate_variable(vars[dgd.indexes.z_var].attrs, dgd,
-        otyp);
   }
+  process_vertical_coordinate_variable(vars[dgd.indexes.z_var].attrs, dgd,
+        otyp);
   if (otyp.empty()) {
     log_error2("unable to determine observation type", F, "nc2xml", USER);
   }
@@ -3680,10 +3672,9 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
     if (!grid_data.time.id.empty()) {
       log_error2("no grids found - no content metadata will be generated", F,
            "nc2xml", USER);
-    } else {
-      log_error2("time coordinate variable not found - no content metadata "
-          "will be generated", F, "nc2xml", USER);
     }
+    log_error2("time coordinate variable not found - no content metadata will "
+        "be generated", F, "nc2xml", USER);
   }
   scan_data.write_type = ScanData::GrML_type;
   delete[] time_s.times;
@@ -5184,11 +5175,14 @@ void scan_samos_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data,
   }
   if (!tm_b) {
     log_error2("could not find the 'time' variable", F, "nc2xml", USER);
-  } else if (!lt_b) {
+  }
+  if (!lt_b) {
     log_error2("could not find the 'latitude' variable", F, "nc2xml", USER);
-  } else if (!ln_b) {
+  }
+  if (!ln_b) {
     log_error2("could not find the 'longitude' variable", F, "nc2xml", USER);
-  } else if (ientry.key.empty()) {
+  }
+  if (ientry.key.empty()) {
     log_error2("could not find the vessel ID", F, "nc2xml", USER);
   }
   gatherxml::fileInventory::open(inv_file, &inv_dir, inv_stream, "ObML",
