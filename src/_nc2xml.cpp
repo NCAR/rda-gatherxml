@@ -5201,31 +5201,30 @@ void scan_samos_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data,
   unordered_map<size_t, string> T_map;
   unordered_set<string> vset;
   float mn = 99., mx = -99.;
-  for (size_t n = 0; n < vars.size(); ++n) {
-    if (vars[n].name != tvn && vars[n].name != yvn && vars[n].name != xvn) {
+  for (const auto& v : vars) {
+    if (v.name != tvn && v.name != yvn && v.name != xvn) {
       NetCDFVariableAttributeData ad;
-      extract_from_variable_attribute(vars[n].attrs, vars[n].data_type, ad);
+      extract_from_variable_attribute(v.attrs, v.data_type, ad);
       NetCDF::VariableData var_data;
-      if (istream.variable_data(vars[n].name, var_data) == NetCDF::DataType::
-          _NULL) {
-        log_error2("unable to get data for variable '" + vars[n].name + "'", F,
+      if (istream.variable_data(v.name, var_data) == NetCDF::DataType::_NULL) {
+        log_error2("unable to get data for variable '" + v.name + "'", F,
             "nc2xml", USER);
       }
-      if (scan_data.datatype_map.description(vars[n].name).empty()) {
-        auto s = vars[n].name + "<!>" + ad.long_name + "<!>" + ad.units + "<!>"
-            + ad.cf_keyword;
+      if (scan_data.datatype_map.description(v.name).empty()) {
+        auto s = v.name + "<!>" + ad.long_name + "<!>" + ad.units + "<!>" + ad.
+            cf_keyword;
         if (vset.find(s) == vset.end()) {
           scan_data.netcdf_variables.emplace_back(s);
           vset.emplace(s);
         }
       }
-      if (D_map.find(vars[n].name) == D_map.end()) {
+      if (D_map.find(v.name) == D_map.end()) {
         auto byts = 1;
         auto dims = istream.dimensions();
-        for (size_t l = 1; l < vars[n].dimids.size(); ++l) {
-          byts *= dims[vars[n].dimids[l]].length;
+        for (size_t l = 1; l < v.dimids.size(); ++l) {
+          byts *= dims[v.dimids[l]].length;
         }
-        switch (vars[n].data_type) {
+        switch (v.data_type) {
           case NetCDF::DataType::SHORT: {
             byts *= 2;
             break;
@@ -5241,11 +5240,11 @@ void scan_samos_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data,
           }
           default: { }
         }
-        D_map.emplace(vars[n].name, make_pair(D_map.size(), "|" + lltos(vars[n].
-            offset) + "|" + NetCDF::data_type_str[static_cast<int>(vars[n].
-            data_type)] + "|" + itos(byts)));
+        D_map.emplace(v.name, make_pair(D_map.size(), "|" + lltos(v.offset) +
+            "|" + NetCDF::data_type_str[static_cast<int>(v.data_type)] + "|" +
+            itos(byts)));
       }
-      vector<string> v;
+      vector<string> sv;
       for (size_t m = 0; m < tvd.size(); ++m) {
         if (!found_missing(tvd[m], nullptr, var_data[m], ad.missing_value)) {
           ++scan_data.num_not_missing;
@@ -5260,7 +5259,7 @@ void scan_samos_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data,
                   m], 4) + "[!]" + ftos(lon, 4));
             }
           }
-          if (!obs_data.added_to_ids("surface", ientry, vars[n].name, "", yvd[
+          if (!obs_data.added_to_ids("surface", ientry, v.name, "", yvd[
               m], lon, tvd[m], &dt)) {
             auto e = move(myerror);
             log_error2(e + "' when adding ID " + ientry.key, F, "nc2xml", USER);
@@ -5277,21 +5276,19 @@ void scan_samos_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data,
           }
         } else {
           if (inv_stream.is_open()) {
-            auto s = itos(m);
-            s += "|0|" + itos(P_map[ptyp].first) + "|" + itos(I_map[ientry.key.
-                substr(ientry.key.find("[!]") + 3)].first) + "|" + itos(D_map[
-                vars[n].name].first);
-            v.emplace_back(s);
+            sv.emplace_back(itos(m) + "|0|" + itos(P_map[ptyp].first) + "|" +
+                itos(I_map[ientry.key.substr(ientry.key.find("[!]") + 3)].first)
+                + "|" + itos(D_map[v.name].first));
           }
         }
       }
       if (inv_stream.is_open()) {
-        if (v.size() != tvd.size()) {
-          for (const auto& e : v) {
+        if (sv.size() != tvd.size()) {
+          for (const auto& e : sv) {
             inv_lines2.writeln(e);
           }
         } else {
-          D_map.erase(vars[n].name);
+          D_map.erase(v.name);
         }
       }
     }
