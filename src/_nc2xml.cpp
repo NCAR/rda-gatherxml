@@ -5324,6 +5324,70 @@ void scan_samos_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data,
   }
 }
 
+void write_parameter_map(string tempdir_name, ScanData& scan_data, const vector<
+    string>& map_list, string map_type) {
+  static const string F = this_function_label(__func__);
+  scan_data.map_name = tempdir_name + "/metadata/ParameterTables/netCDF.ds" +
+      metautils::args.dsnum + ".xml";
+  std::ofstream ofs(scan_data.map_name.c_str());
+  if (!ofs.is_open()) {
+    log_error2("can't open parameter map file for output", F, "nc2xml", USER);
+  }
+  if (!scan_data.map_filled) {
+    ofs << "<?xml version=\"1.0\" ?>" << endl;
+    ofs << "<" << map_type << "Map>" << endl;
+  } else {
+    auto no_write = false;
+    for (const auto& e : map_list) {
+      if (regex_search(e, regex(" code=\""))) {
+        auto sp = split(e, "\"");
+        if (scan_data.changed_variables.find(sp[1]) != scan_data.
+            changed_variables.end()) {
+          no_write = true;
+        }
+      }
+      if (!no_write) {
+        ofs << e << endl;
+      }
+      if (regex_search(e, regex("</" + map_type + ">"))) {
+        no_write = false;
+      }
+    }
+  }
+  for (const auto& v : scan_data.netcdf_variables) {
+    auto sp = split(v, "<!>");
+    if (scan_data.write_type == ScanData::GrML_type) {
+      ofs << "  <parameter code=\"" << sp[0] << "\">" << endl;
+      ofs << "    <shortName>" << sp[0] << "</shortName>" << endl;
+      if (!sp[1].empty()) {
+        ofs << "    <description>" << sp[1] << "</description>" << endl;
+      }
+      if (!sp[2].empty()) {
+        ofs << "    <units>" << substitute(sp[2], "-", "^-") << "</units>" <<
+            endl;
+      }
+      if (sp.size() > 3 && !sp[3].empty()) {
+        ofs << "    <standardName>" << sp[3] << "</standardName>" << endl;
+      }
+      ofs << "  </parameter>" << endl;
+    } else if (scan_data.write_type == ScanData::ObML_type) {
+      ofs << "  <dataType code=\"" << sp[0] << "\">" << endl;
+      ofs << "    <description>" << sp[1];
+      if (!sp[2].empty()) {
+        ofs << " (" << sp[2] << ")";
+      }
+      ofs << "</description>" << endl;
+      ofs << "  </dataType>" << endl;
+    }
+  }
+  if (scan_data.write_type == ScanData::GrML_type) {
+    ofs << "</parameterMap>" << endl;
+  } else if (scan_data.write_type == ScanData::ObML_type) {
+    ofs << "</dataTypeMap>" << endl;
+  }
+  ofs.close();
+}
+
 void scan_file(ScanData& scan_data, gatherxml::markup::ObML::ObservationData&
      obs_data) {
   static const string F = this_function_label(__func__);
@@ -5418,65 +5482,7 @@ void scan_file(ScanData& scan_data, gatherxml::markup::ObML::ObservationData&
       log_error2("can't create directory tree for netCDF variables", F,
           "nc2xml", USER);
     }
-    scan_data.map_name = tdir->name() + "/metadata/ParameterTables/netCDF.ds" +
-        metautils::args.dsnum + ".xml";
-    std::ofstream ofs(scan_data.map_name.c_str());
-    if (!ofs.is_open()) {
-      log_error2("can't open parameter map file for output", F, "nc2xml", USER);
-    }
-    if (!scan_data.map_filled) {
-      ofs << "<?xml version=\"1.0\" ?>" << endl;
-      ofs << "<" << mtyp << "Map>" << endl;
-    } else {
-      auto no_write = false;
-      for (const auto& e : v) {
-        if (regex_search(e, regex(" code=\""))) {
-          auto sp = split(e, "\"");
-          if (scan_data.changed_variables.find(sp[1]) != scan_data.
-              changed_variables.end()) {
-            no_write = true;
-          }
-        }
-        if (!no_write) {
-          ofs << e << endl;
-        }
-        if (regex_search(e, regex("</" + mtyp + ">"))) {
-          no_write = false;
-        }
-      }
-    }
-    for (const auto& v : scan_data.netcdf_variables) {
-      auto sp = split(v, "<!>");
-      if (scan_data.write_type == ScanData::GrML_type) {
-        ofs << "  <parameter code=\"" << sp[0] << "\">" << endl;
-        ofs << "    <shortName>" << sp[0] << "</shortName>" << endl;
-        if (!sp[1].empty()) {
-          ofs << "    <description>" << sp[1] << "</description>" << endl;
-        }
-        if (!sp[2].empty()) {
-          ofs << "    <units>" << substitute(sp[2], "-", "^-") << "</units>" <<
-              endl;
-        }
-        if (sp.size() > 3 && !sp[3].empty()) {
-          ofs << "    <standardName>" << sp[3] << "</standardName>" << endl;
-        }
-        ofs << "  </parameter>" << endl;
-      } else if (scan_data.write_type == ScanData::ObML_type) {
-        ofs << "  <dataType code=\"" << sp[0] << "\">" << endl;
-        ofs << "    <description>" << sp[1];
-        if (!sp[2].empty()) {
-          ofs << " (" << sp[2] << ")";
-        }
-        ofs << "</description>" << endl;
-        ofs << "  </dataType>" << endl;
-      }
-    }
-    if (scan_data.write_type == ScanData::GrML_type) {
-      ofs << "</parameterMap>" << endl;
-    } else if (scan_data.write_type == ScanData::ObML_type) {
-      ofs << "</dataTypeMap>" << endl;
-    }
-    ofs.close();
+    write_parameter_map(tdir->name(), scan_data, v, mtyp);
     string e;
     if (unixutils::rdadata_sync(tdir->name(), "metadata/ParameterTables/",
         "/data/web", metautils::directives.rdadata_home, e) < 0) {
