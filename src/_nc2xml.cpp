@@ -824,6 +824,57 @@ void process_units_attribute(const vector<NetCDF::Variable>& vars, size_t
   }
 }
 
+void process_variable_attributes(const vector<NetCDF::Variable>& vars,
+    const vector<NetCDF::Dimension>& dims, DiscreteGeometriesData& dgd) {
+  static const string F = this_function_label(__func__);
+  for (size_t n = 0; n < vars.size(); ++n) {
+    for (size_t m = 0; m < vars[n].attrs.size(); ++m) {
+      if (vars[n].attrs[m].data_type == NetCDF::DataType::CHAR) {
+        if (vars[n].attrs[m].name == "units") {
+          process_units_attribute(vars, n, m, dgd);
+        } else if (vars[n].attrs[m].name == "cf_role") {
+          auto r = *(reinterpret_cast<string *>(vars[n].attrs[m].values));
+          r = to_lower(r);
+          if (r == "timeseries_id" || r == "profile_id") {
+            if (dgd.indexes.stn_id_var != MISSING_FLAG) {
+              log_error2("station ID was already identified - don't know what "
+                  "to do with variable: " + vars[n].name, F, "nc2xml", USER);
+            }
+            dgd.indexes.stn_id_var = n;
+          }
+        } else if (vars[n].attrs[m].name == "sample_dimension") {
+          dgd.indexes.sample_dim_var = n;
+        } else if (vars[n].attrs[m].name == "instance_dimension") {
+          dgd.indexes.instance_dim_var = n;
+        } else if (vars[n].attrs[m].name == "axis") {
+          auto axis = *(reinterpret_cast<string *>(vars[n].attrs[m].values));
+          if (axis == "Z") {
+            dgd.indexes.z_var = n;
+          }
+        }
+      }
+    }
+  }
+  if (dgd.indexes.time_var == MISSING_FLAG) {
+    log_error2("unable to determine time variable", F, "nc2xml", USER);
+  }
+  for (size_t n = 0; n < vars[dgd.indexes.time_var].attrs.size(); ++n) {
+    if (vars[dgd.indexes.time_var].attrs[n].name == "calendar") {
+      time_data.calendar = *(reinterpret_cast<string *>(vars[dgd.indexes.
+          time_var].attrs[n].values));
+    } else if (vars[dgd.indexes.time_var].attrs[n].name == "bounds") {
+      auto s = *(reinterpret_cast<string *>(vars[dgd.indexes.time_var].attrs[n].
+          values));
+      for (size_t m = 0; m < vars.size(); ++m) {
+        if (vars[m].name == s && dims[vars[m].dimids.back()].length == 2) {
+          dgd.indexes.time_bounds_var = m;
+          break;
+        }
+      }
+    }
+  }
+}
+
 void scan_cf_point_netcdf_file(InputNetCDFStream& istream, string platform_type,
     ScanData& scan_data, gatherxml::markup::ObML::ObservationData& obs_data) {
   static const string F = this_function_label(__func__);
@@ -831,30 +882,13 @@ void scan_cf_point_netcdf_file(InputNetCDFStream& istream, string platform_type,
     cout << "...beginning function " << F << " ..." << endl;
   }
   auto vars = istream.variables();
+  auto dims = istream.dimensions();
   DiscreteGeometriesData dgd;
-  for (size_t n = 0; n < vars.size(); ++n) {
-    for (size_t m = 0; m < vars[n].attrs.size(); ++m) {
-      if (vars[n].attrs[m].data_type == NetCDF::DataType::CHAR) {
-        if (vars[n].attrs[m].name == "units") {
-          process_units_attribute(vars, n, m, dgd);
-        }
-      }
-    }
-  }
+  process_variable_attributes(vars, dims, dgd);
   NetCDF::VariableData tvd;
-  if (dgd.indexes.time_var == MISSING_FLAG) {
-    log_error2("unable to determine time variable", F, "nc2xml", USER);
-  } else {
-    for (size_t n = 0; n < vars[dgd.indexes.time_var].attrs.size(); ++n) {
-      if (vars[dgd.indexes.time_var].attrs[n].name == "calendar") {
-        time_data.calendar = *(reinterpret_cast<string *>(vars[dgd.indexes.
-            time_var].attrs[n].values));
-      }
-    }
-    if (istream.variable_data(vars[dgd.indexes.time_var].name, tvd) == NetCDF::
-        DataType::_NULL) {
-      log_error2("unable to get time data", F, "nc2xml", USER);
-    }
+  if (istream.variable_data(vars[dgd.indexes.time_var].name, tvd) == NetCDF::
+      DataType::_NULL) {
+    log_error2("unable to get time data", F, "nc2xml", USER);
   }
   NetCDF::VariableData yvd;
   if (dgd.indexes.lat_var == MISSING_FLAG) {
@@ -1614,51 +1648,9 @@ void scan_cf_time_series_netcdf_file(InputNetCDFStream& istream, string
     cout << "...beginning function " << F << "..." << endl;
   }
   auto vars = istream.variables();
+  auto dims = istream.dimensions();
   DiscreteGeometriesData dgd;
-  for (size_t  n =0; n < vars.size(); ++n) {
-    for (size_t m = 0; m < vars[n].attrs.size(); ++m) {
-      if (vars[n].attrs[m].data_type == NetCDF::DataType::CHAR) {
-        if (vars[n].attrs[m].name == "units") {
-          process_units_attribute(vars, n, m, dgd);
-        } else if (vars[n].attrs[m].name == "cf_role") {
-          auto r = *(reinterpret_cast<string *>(vars[n].attrs[m].values));
-          r = to_lower(r);
-          if (r == "timeseries_id") {
-            if (dgd.indexes.stn_id_var != MISSING_FLAG) {
-              log_error2("station ID was already identified - don't know what "
-                  "to do with variable: " + vars[n].name, F, "nc2xml", USER);
-            }
-            dgd.indexes.stn_id_var = n;
-          }
-        } else if (vars[n].attrs[m].name == "sample_dimension") {
-          dgd.indexes.sample_dim_var = n;
-        } else if (vars[n].attrs[m].name == "instance_dimension") {
-          dgd.indexes.instance_dim_var = n;
-        }
-      }
-    }
-  }
-  if (dgd.indexes.time_var == MISSING_FLAG) {
-    log_error2("unable to determine time variable", F, "nc2xml", USER);
-  } else {
-    for (size_t n = 0; n < vars[dgd.indexes.time_var].attrs.size(); ++n) {
-      if (vars[dgd.indexes.time_var].attrs[n].name == "calendar") {
-        time_data.calendar = *(reinterpret_cast<string *>(vars[dgd.indexes.
-            time_var].attrs[n].values));
-      } else if (vars[dgd.indexes.time_var].attrs[n].name == "bounds") {
-        auto bounds_name = *(reinterpret_cast<string *>(vars[dgd.indexes.
-            time_var].attrs[n].values));
-        auto dims = istream.dimensions();
-        for (size_t m = 0; m < vars.size(); ++m) {
-          if (vars[m].name == bounds_name && dims[vars[m].dimids.back()].length
-              == 2) {
-            dgd.indexes.time_bounds_var = m;
-            break;
-          }
-        }
-      }
-    }
-  }
+  process_variable_attributes(vars, dims, dgd);
   unordered_map<size_t, string> T_map;
   if (vars[dgd.indexes.time_var].is_coord) {
 
@@ -2196,45 +2188,9 @@ void scan_cf_profile_netcdf_file(InputNetCDFStream& istream, string
     cout << "...beginning function " << F << " ..." << endl;
   }
   auto vars = istream.variables();
+  auto dims = istream.dimensions();
   DiscreteGeometriesData dgd;
-  for (size_t n = 0; n < vars.size(); ++n) {
-    for (size_t m = 0; m < vars[n].attrs.size(); ++m) {
-      if (vars[n].attrs[m].data_type == NetCDF::DataType::CHAR) {
-        if (vars[n].attrs[m].name == "units") {
-          process_units_attribute(vars, n, m, dgd);
-        } else if (vars[n].attrs[m].name == "cf_role") {
-          auto r = *(reinterpret_cast<string *>(vars[n].attrs[m].values));
-          r = to_lower(r);
-          if (r == "profile_id") {
-            if (dgd.indexes.stn_id_var != MISSING_FLAG) {
-              log_error2("station ID was already identified - don't know what "
-                  "to do with variable: " + vars[n].name, F, "nc2xml", USER);
-            }
-            dgd.indexes.stn_id_var = n;
-          }
-        } else if (vars[n].attrs[m].name == "sample_dimension") {
-          dgd.indexes.sample_dim_var = n;
-        } else if (vars[n].attrs[m].name == "instance_dimension") {
-          dgd.indexes.instance_dim_var = n;
-        } else if (vars[n].attrs[m].name == "axis") {
-          auto axis = *(reinterpret_cast<string *>(vars[n].attrs[m].values));
-          if (axis == "Z") {
-            dgd.indexes.z_var = n;
-          }
-        }
-      }
-    }
-  }
-  if (dgd.indexes.time_var == MISSING_FLAG) {
-    log_error2("unable to determine time variable", F, "nc2xml", USER);
-  } else {
-    for (size_t n = 0; n < vars[dgd.indexes.time_var].attrs.size(); ++n) {
-      if (vars[dgd.indexes.time_var].attrs[n].name == "calendar") {
-        time_data.calendar = *(reinterpret_cast<string *>(vars[dgd.indexes.
-            time_var].attrs[n].values));
-      }
-    }
-  }
+  process_variable_attributes(vars, dims, dgd);
   string otyp;
   if (dgd.indexes.z_var == MISSING_FLAG) {
     log_error2("unable to determine vertical coordinate variable", F, "nc2xml",
@@ -2581,45 +2537,9 @@ void scan_cf_time_series_profile_netcdf_file(InputNetCDFStream& istream, string
     cout << "...beginning function " << F << " ..." << endl;
   }
   auto vars = istream.variables();
+  auto dims = istream.dimensions();
   DiscreteGeometriesData dgd;
-  for (size_t n = 0; n < vars.size(); ++n) {
-    for (size_t m = 0; m < vars[n].attrs.size(); ++m) {
-      if (vars[n].attrs[m].data_type == NetCDF::DataType::CHAR) {
-        if (vars[n].attrs[m].name == "units") {
-          process_units_attribute(vars, n, m, dgd);
-        } else if (vars[n].attrs[m].name == "cf_role") {
-          auto r = *(reinterpret_cast<string *>(vars[n].attrs[m].values));
-          r = to_lower(r);
-          if (r == "timeseries_id") {
-            if (dgd.indexes.stn_id_var != MISSING_FLAG) {
-              log_error2("station ID was already identified - don't know what "
-                  "to do with variable: " + vars[n].name, F, "nc2xml", USER);
-            }
-            dgd.indexes.stn_id_var = n;
-          }
-        } else if (vars[n].attrs[m].name == "sample_dimension") {
-          dgd.indexes.sample_dim_var = n;
-        } else if (vars[n].attrs[m].name == "instance_dimension") {
-          dgd.indexes.instance_dim_var = n;
-        } else if (vars[n].attrs[m].name == "axis") {
-          auto axis = *(reinterpret_cast<string *>(vars[n].attrs[m].values));
-          if (axis == "Z") {
-            dgd.indexes.z_var = n;
-          }
-        }
-      }
-    }
-  }
-  if (dgd.indexes.time_var == MISSING_FLAG) {
-    log_error2("unable to determine time variable", F, "nc2xml", USER);
-  } else {
-    for (size_t n = 0; n < vars[dgd.indexes.time_var].attrs.size(); ++n) {
-      if (vars[dgd.indexes.time_var].attrs[n].name == "calendar") {
-        time_data.calendar = *(reinterpret_cast<string *>(vars[dgd.indexes.
-            time_var].attrs[n].values));
-      }
-    }
-  }
+  process_variable_attributes(vars, dims, dgd);
   string otyp;
   if (dgd.indexes.z_var == MISSING_FLAG) {
     log_error2("unable to determine vertical coordinate variable", F, "nc2xml",
