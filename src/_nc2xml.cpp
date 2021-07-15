@@ -5324,9 +5324,39 @@ void scan_samos_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data,
   }
 }
 
-void write_parameter_map(string tempdir_name, ScanData& scan_data, const vector<
-    string>& map_list, string map_type) {
+void write_parameter_map(string tempdir_name, ScanData& scan_data) {
   static const string F = this_function_label(__func__);
+  if (gatherxml::verbose_operation) {
+    cout << "Writing parameter map..." << endl;
+  }
+  string mtyp;
+  if (scan_data.write_type == ScanData::GrML_type) {
+    mtyp = "parameter";
+  } else if (scan_data.write_type == ScanData::ObML_type) {
+    mtyp = "dataType";
+  } else {
+    log_error2("unknown map type", F, "nc2xml", USER);
+  }
+  vector<string> v;
+  if (scan_data.map_filled) {
+    std::ifstream ifs(scan_data.map_name.c_str());
+    char l[32768];
+    ifs.getline(l, 32768);
+    while (!ifs.eof()) {
+      v.emplace_back(l);
+      ifs.getline(l, 32768);
+    }
+    ifs.close();
+    v.pop_back();
+    stringstream oss, ess;
+    mysystem2("/bin/rm " + scan_data.map_name, oss, ess);
+  }
+  stringstream oss, ess;
+  if (mysystem2("/bin/mkdir -p " + tempdir_name + "/metadata/ParameterTables",
+      oss, ess) < 0) {
+    log_error2("can't create directory tree for netCDF variables", F, "nc2xml",
+        USER);
+  }
   scan_data.map_name = tempdir_name + "/metadata/ParameterTables/netCDF.ds" +
       metautils::args.dsnum + ".xml";
   std::ofstream ofs(scan_data.map_name.c_str());
@@ -5335,10 +5365,10 @@ void write_parameter_map(string tempdir_name, ScanData& scan_data, const vector<
   }
   if (!scan_data.map_filled) {
     ofs << "<?xml version=\"1.0\" ?>" << endl;
-    ofs << "<" << map_type << "Map>" << endl;
+    ofs << "<" << mtyp << "Map>" << endl;
   } else {
     auto no_write = false;
-    for (const auto& e : map_list) {
+    for (const auto& e : v) {
       if (regex_search(e, regex(" code=\""))) {
         auto sp = split(e, "\"");
         if (scan_data.changed_variables.find(sp[1]) != scan_data.
@@ -5349,7 +5379,7 @@ void write_parameter_map(string tempdir_name, ScanData& scan_data, const vector<
       if (!no_write) {
         ofs << e << endl;
       }
-      if (regex_search(e, regex("</" + map_type + ">"))) {
+      if (regex_search(e, regex("</" + mtyp + ">"))) {
         no_write = false;
       }
     }
@@ -5386,6 +5416,18 @@ void write_parameter_map(string tempdir_name, ScanData& scan_data, const vector<
     ofs << "</dataTypeMap>" << endl;
   }
   ofs.close();
+  string e;
+  if (unixutils::rdadata_sync(tempdir_name, "metadata/ParameterTables/",
+      "/data/web", metautils::directives.rdadata_home, e) < 0) {
+    log_warning("parameter map was not synced - error(s): '" + e + "'",
+        "nc2xml", USER);
+  }
+  mysystem2("/bin/cp " + scan_data.map_name + " /glade/u/home/rdadata/share"
+      "/metadata/ParameterTables/netCDF.ds" + metautils::args.dsnum + ".xml",
+      oss, ess);
+  if (gatherxml::verbose_operation) {
+    cout << "...finished writing parameter map." << endl;
+  }
 }
 
 void scan_file(ScanData& scan_data, gatherxml::markup::ObML::ObservationData&
@@ -5451,50 +5493,7 @@ void scan_file(ScanData& scan_data, gatherxml::markup::ObML::ObservationData&
   metautils::args.data_format = "netcdf";
   if (!metautils::args.inventory_only && scan_data.netcdf_variables.size() >
       0) {
-    if (gatherxml::verbose_operation) {
-      cout << "Writing parameter map..." << endl;
-    }
-    string mtyp;
-    if (scan_data.write_type == ScanData::GrML_type) {
-      mtyp = "parameter";
-    } else if (scan_data.write_type == ScanData::ObML_type) {
-      mtyp = "dataType";
-    } else {
-      log_error2("unknown map type", F, "nc2xml", USER);
-    }
-    vector<string> v;
-    if (scan_data.map_filled) {
-      std::ifstream ifs(scan_data.map_name.c_str());
-      char l[32768];
-      ifs.getline(l, 32768);
-      while (!ifs.eof()) {
-        v.emplace_back(l);
-        ifs.getline(l, 32768);
-      }
-      ifs.close();
-      v.pop_back();
-      stringstream oss, ess;
-      mysystem2("/bin/rm " + scan_data.map_name, oss, ess);
-    }
-    stringstream oss, ess;
-    if (mysystem2("/bin/mkdir -p " + tdir->name() + "/metadata/ParameterTables",
-        oss, ess) < 0) {
-      log_error2("can't create directory tree for netCDF variables", F,
-          "nc2xml", USER);
-    }
-    write_parameter_map(tdir->name(), scan_data, v, mtyp);
-    string e;
-    if (unixutils::rdadata_sync(tdir->name(), "metadata/ParameterTables/",
-        "/data/web", metautils::directives.rdadata_home, e) < 0) {
-      log_warning("parameter map was not synced - error(s): '" + e + "'",
-          "nc2xml", USER);
-    }
-    mysystem2("/bin/cp " + scan_data.map_name + " /glade/u/home/rdadata/share"
-        "/metadata/ParameterTables/netCDF.ds" + metautils::args.dsnum + ".xml",
-        oss, ess);
-    if (gatherxml::verbose_operation) {
-      cout << "...finished writing parameter map." << endl;
-    }
+    write_parameter_map(tdir->name(), scan_data);
   }
 }
 
