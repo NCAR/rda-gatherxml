@@ -174,7 +174,7 @@ void sort_inventory_map(unordered_map<string, pair<int, string>>& inv_table,
   });
 }
 
-void fill_nc_time_data(const InputNetCDFStream::Attribute& attr) {
+void fill_nc_time_data(const NetCDF::Attribute& attr) {
   static const string F = this_function_label(__func__);
   auto u = *(reinterpret_cast<string *>(attr.values));
   if (gatherxml::verbose_operation) {
@@ -278,7 +278,7 @@ DateTime compute_nc_time(NetCDF::VariableData& times, size_t index) {
   return dt;
 }
 
-void extract_from_variable_attribute(const vector<InputNetCDFStream::Attribute>&
+void extract_from_variable_attribute(const vector<NetCDF::Attribute>&
     attribute_list, NetCDF::DataType data_type, NetCDFVariableAttributeData&
     nc_attribute_data) {
   nc_attribute_data.long_name = "";
@@ -4218,8 +4218,7 @@ if (yvd[n] >= -90. && yvd[n] <= 90. && xvd[n] >= -180. && xvd[n] <= 180.) {
 }
 
 void set_time_missing_value(NetCDF::DataValue& time_miss_val, const vector<
-    InputNetCDFStream::Attribute>& attr, size_t index, NetCDF::DataType
-    time_type) {
+    NetCDF::Attribute>& attr, size_t index, NetCDF::DataType time_type) {
   static const string F = this_function_label(__func__);
   time_miss_val.resize(time_type);
   switch (time_type) {
