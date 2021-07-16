@@ -870,6 +870,16 @@ void process_variable_attributes(const vector<NetCDF::Variable>& vars,
   }
 }
 
+void add_to_netcdf_variables(string s, ScanData& scan_data) {
+  auto d = scan_data.datatype_map.description(s.substr(0, s.find("<!>")));
+  if (d.empty()) {
+    if (find(scan_data.netcdf_variables.begin(), scan_data.netcdf_variables.
+        end(), s) == scan_data.netcdf_variables.end()) {
+      scan_data.netcdf_variables.emplace_back(s);
+    }
+  }
+}
+
 void scan_cf_point_netcdf_file(InputNetCDFStream& istream, string platform_type,
     ScanData& scan_data, gatherxml::markup::ObML::ObservationData& obs_data) {
   static const string F = this_function_label(__func__);
@@ -900,7 +910,7 @@ void scan_cf_point_netcdf_file(InputNetCDFStream& istream, string platform_type,
     log_error2("unable to get longitude data", F, "nc2xml", USER);
   }
   vector<DateTime> dtv;
-  vector<string> idv, dtypv;
+  vector<string> idv;
   for (const auto& v : vars) {
     if (v.name != vars[dgd.indexes.time_var].name && v.name != vars[dgd.indexes.
         lat_var].name && v.name != vars[dgd.indexes.lon_var].name) {
@@ -911,8 +921,8 @@ void scan_cf_point_netcdf_file(InputNetCDFStream& istream, string platform_type,
       }
       NetCDFVariableAttributeData ad;
       extract_from_variable_attribute(v.attrs, v.data_type, ad);
-      dtypv.emplace_back(v.name + "<!>" + ad.long_name + "<!>" + ad.units +
-          "<!>" + ad.cf_keyword);
+      add_to_netcdf_variables(v.name + "<!>" + ad.long_name + "<!>" + ad.units +
+          "<!>" + ad.cf_keyword, scan_data);
       for (size_t n = 0; n < tvd.size(); ++n) {
         if (n == dtv.size()) {
           dtv.emplace_back(compute_nc_time(tvd, n));
@@ -947,15 +957,6 @@ void scan_cf_point_netcdf_file(InputNetCDFStream& istream, string platform_type,
           }
           ++scan_data.num_not_missing;
         }
-      }
-    }
-  }
-  for (const auto& t : dtypv) {
-    auto d = scan_data.datatype_map.description(t.substr(0, t.find("<!>")));
-    if (d.empty()) {
-      if (find(scan_data.netcdf_variables.begin(), scan_data.netcdf_variables.
-          end(), t) == scan_data.netcdf_variables.end()) {
-        scan_data.netcdf_variables.emplace_back(t);
       }
     }
   }
@@ -1138,7 +1139,6 @@ void scan_cf_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,
     }
   }
   vector<DateTime> dtv;
-  vector<string> dtypv;
   for (const auto& v : vars) {
     if (v.name != vars[dgd.indexes.time_var].name && v.dimids.size() > 0 && ((v.
         dimids[0] == vars[dgd.indexes.time_var].dimids[0] && (sd == -1 || (v.
@@ -1183,8 +1183,8 @@ void scan_cf_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,
       }
       NetCDFVariableAttributeData ad;
       extract_from_variable_attribute(v.attrs, v.data_type, ad);
-      dtypv.emplace_back(v.name + "<!>" + ad.long_name + "<!>" + ad.units +
-          "<!>" + ad.cf_keyword);
+      add_to_netcdf_variables(v.name + "<!>" + ad.long_name + "<!>" + ad.units +
+          "<!>" + ad.cf_keyword, scan_data);
       size_t nt;
       if (dims[vars[dgd.indexes.time_var].dimids[0]].is_rec) {
         nt = istream.num_records();
@@ -1231,15 +1231,6 @@ void scan_cf_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,
             D_map.erase(v.name);
           }
         }
-      }
-    }
-  }
-  for (const auto& t : dtypv) {
-    auto d = scan_data.datatype_map.description(t.substr(0, t.find("<!>")));
-    if (d.empty()) {
-      if (find(scan_data.netcdf_variables.begin(), scan_data.netcdf_variables.
-          end(), t) == scan_data.netcdf_variables.end()) {
-        scan_data.netcdf_variables.emplace_back(t);
       }
     }
   }
@@ -1379,7 +1370,6 @@ void scan_cf_non_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,
   } else {
     log_error2("unable to determine platform type", F, "nc2xml", USER);
   }
-  vector<string> dtypv;
   auto od = vars[dgd.indexes.time_var].dimids[0] == sd ? vars[dgd.indexes.
       time_var].dimids[1] : vars[dgd.indexes.time_var].dimids[0];
   if (dgd.indexes.sample_dim_var != MISSING_FLAG) {
@@ -1403,8 +1393,8 @@ void scan_cf_non_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,
         }
         NetCDFVariableAttributeData ad;
         extract_from_variable_attribute(v.attrs, v.data_type, ad);
-        dtypv.emplace_back(v.name + "<!>" + ad.long_name + "<!>" + ad.units +
-            "<!>" + ad.cf_keyword);
+        add_to_netcdf_variables(v.name + "<!>" + ad.long_name + "<!>" + ad.units
+            + "<!>" + ad.cf_keyword, scan_data);
         long long off = 0;
         for (size_t n = 0; n < dims[sd].length; ++n) {
           auto end = off + rvd[n];
@@ -1468,8 +1458,8 @@ void scan_cf_non_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,
         }
         NetCDFVariableAttributeData ad;
         extract_from_variable_attribute(v.attrs, v.data_type, ad);
-        dtypv.emplace_back(v.name + "<!>" + ad.long_name + "<!>" + ad.units +
-            "<!>" + ad.cf_keyword);
+        add_to_netcdf_variables(v.name + "<!>" + ad.long_name + "<!>" + ad.units
+            + "<!>" + ad.cf_keyword, scan_data);
         for (size_t n = 0; n < svd.size(); ++n) {
           size_t idx = svd[n];
           ientry.key = pfms[idx] + "[!]" + ityps[idx] + "[!]";
@@ -1547,8 +1537,8 @@ void scan_cf_non_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,
         }
         NetCDFVariableAttributeData ad;
         extract_from_variable_attribute(v.attrs, v.data_type, ad);
-        dtypv.emplace_back(v.name + "<!>" + ad.long_name + "<!>" + ad.units +
-            "<!>" + ad.cf_keyword);
+        add_to_netcdf_variables(v.name + "<!>" + ad.long_name + "<!>" + ad.units
+            + "<!>" + ad.cf_keyword, scan_data);
         if (v.dimids.front() == sd) {
           for (size_t n = 0; n < ns; ++n) {
             ientry.key = pfms[n] + "[!]" + ityps[n] + "[!]";
@@ -1610,15 +1600,6 @@ void scan_cf_non_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,
             }
           }
         }
-      }
-    }
-  }
-  for (const auto& t : dtypv) {
-    auto d = scan_data.datatype_map.description(t.substr(0, t.find("<!>")));
-    if (d.empty()) {
-      if (find(scan_data.netcdf_variables.begin(), scan_data.netcdf_variables.
-          end(), t) == scan_data.netcdf_variables.end()) {
-        scan_data.netcdf_variables.emplace_back(t);
       }
     }
   }
@@ -1770,7 +1751,6 @@ void scan_cf_orthogonal_profile_netcdf_file(InputNetCDFStream& istream, string
   NetCDFVariableAttributeData ad;
   extract_from_variable_attribute(vars[dgd.indexes.time_var].attrs, vars[dgd.
       indexes.time_var].data_type, ad);
-  vector<string> dtypv;
   for (const auto& v : vars) {
     if (v.name != vars[dgd.indexes.z_var].name && v.dimids.size() > 0 && v.
         dimids.back() == vars[dgd.indexes.z_var].dimids.front()) {
@@ -1781,8 +1761,8 @@ void scan_cf_orthogonal_profile_netcdf_file(InputNetCDFStream& istream, string
       }
       NetCDFVariableAttributeData ad;
       extract_from_variable_attribute(v.attrs, v.data_type, ad);
-      dtypv.emplace_back(v.name + "<!>" + ad.long_name + "<!>" + ad.units +
-          "<!>" + ad.cf_keyword);
+      add_to_netcdf_variables(v.name + "<!>" + ad.long_name + "<!>" + ad.units +
+          "<!>" + ad.cf_keyword, scan_data);
       for (size_t n = 0; n < tvd.size(); ++n) {
         auto nlv = 0, llv = -1;
         auto avg = 0.;
@@ -1857,15 +1837,6 @@ void scan_cf_orthogonal_profile_netcdf_file(InputNetCDFStream& istream, string
           ++dte.data->vdata->res_cnt;
           ++scan_data.num_not_missing;
         }
-      }
-    }
-  }
-  for (const auto& t : dtypv) {
-    auto d = scan_data.datatype_map.description(t.substr(0, t.find("<!>")));
-    if (d.empty()) {
-      if (find(scan_data.netcdf_variables.begin(), scan_data.netcdf_variables.
-          end(), t) == scan_data.netcdf_variables.end()) {
-        scan_data.netcdf_variables.emplace_back(t);
       }
     }
   }
@@ -2000,7 +1971,6 @@ ityps.emplace_back("unknown");
   NetCDFVariableAttributeData td;
   extract_from_variable_attribute(vars[dgd.indexes.time_var].attrs, vars[dgd.
       indexes.time_var].data_type, td);
-  vector<string> dtypv;
   if (dgd.indexes.sample_dim_var != MISSING_FLAG) {
 
     // continuous ragged array H.10
@@ -2019,8 +1989,8 @@ ityps.emplace_back("unknown");
         }
         NetCDFVariableAttributeData ad;
         extract_from_variable_attribute(v.attrs, v.data_type, ad);
-        dtypv.emplace_back(v.name + "<!>" + ad.long_name + "<!>" + ad.units +
-            "<!>" + ad.cf_keyword);
+        add_to_netcdf_variables(v.name + "<!>" + ad.long_name + "<!>" + ad.units
+            + "<!>" + ad.cf_keyword, scan_data);
         auto x = 0;
         for (size_t n = 0; n < tvd.size(); ++n) {
           vector<double> lv;
@@ -2074,8 +2044,8 @@ ityps.emplace_back("unknown");
         }
         NetCDFVariableAttributeData ad;
         extract_from_variable_attribute(v.attrs, v.data_type, ad);
-        dtypv.emplace_back(v.name + "<!>" + ad.long_name + "<!>" + ad.units +
-            "<!>" + ad.cf_keyword);
+        add_to_netcdf_variables(v.name + "<!>" + ad.long_name + "<!>" + ad.units
+            + "<!>" + ad.cf_keyword, scan_data);
         for (size_t n = 0; n < tvd.size(); ++n) {
           vector<double> lv;
           for (size_t m = 0; m < pvd.size(); ++m) {
@@ -2106,15 +2076,6 @@ ityps.emplace_back("unknown");
             ++scan_data.num_not_missing;
           }
         }
-      }
-    }
-  }
-  for (const auto& t : dtypv) {
-    auto d = scan_data.datatype_map.description(t.substr(0, t.find("<!>")));
-    if (d.empty()) {
-      if (find(scan_data.netcdf_variables.begin(), scan_data.netcdf_variables.
-          end(), t) == scan_data.netcdf_variables.end()) {
-        scan_data.netcdf_variables.emplace_back(t);
       }
     }
   }
@@ -2254,7 +2215,6 @@ ityps.emplace_back("unknown");
       DataType::_NULL) {
     log_error2("unable to get level data", F, "nc2xml", USER);
   }
-  vector<string> dtypv;
   for (const auto& v : vars) {
     if (v.dimids.size() == 3 && v.dimids[0] == vars[dgd.indexes.time_var].
         dimids[0] && v.dimids[1] == vars[dgd.indexes.z_var].dimids[0] && v.
@@ -2266,8 +2226,8 @@ ityps.emplace_back("unknown");
       }
       NetCDFVariableAttributeData ad;
       extract_from_variable_attribute(v.attrs, v.data_type, ad);
-      dtypv.emplace_back(v.name + "<!>" + ad.long_name + "<!>" + ad.units +
-          "<!>" + ad.cf_keyword);
+      add_to_netcdf_variables(v.name + "<!>" + ad.long_name + "<!>" + ad.units +
+          "<!>" + ad.cf_keyword, scan_data);
       for (size_t n = 0; n < tvd.size(); ++n) {
         auto dt = compute_nc_time(tvd, n);
         size_t ns = ivd.size() / ilen;
@@ -2295,15 +2255,6 @@ ityps.emplace_back("unknown");
             ++scan_data.num_not_missing;
           }
         }
-      }
-    }
-  }
-  for (const auto& t : dtypv) {
-    auto d = scan_data.datatype_map.description(t.substr(0, t.find("<!>")));
-    if (d.empty()) {
-      if (find(scan_data.netcdf_variables.begin(), scan_data.netcdf_variables.
-          end(), t) == scan_data.netcdf_variables.end()) {
-        scan_data.netcdf_variables.emplace_back(t);
       }
     }
   }
@@ -2367,7 +2318,6 @@ ityps.emplace_back("unknown");
       DataType::_NULL) {
     log_error2("unable to get level data", F, "nc2xml", USER);
   }
-  vector<string> dtypv;
   if (dgd.indexes.sample_dim_var != MISSING_FLAG) {
 
     // H.19
@@ -2398,8 +2348,8 @@ ityps.emplace_back("unknown");
         }
         NetCDFVariableAttributeData ad;
         extract_from_variable_attribute(v.attrs, v.data_type, ad);
-        dtypv.emplace_back(v.name + "<!>" + ad.long_name + "<!>" + ad.units +
-            "<!>" + ad.cf_keyword);
+        add_to_netcdf_variables(v.name + "<!>" + ad.long_name + "<!>" + ad.units
+            + "<!>" + ad.cf_keyword, scan_data);
         auto x = 0;
         for (size_t n = 0; n < rvd.size(); ++n) {
           auto dt = compute_nc_time(tvd, n);
@@ -2447,8 +2397,8 @@ ityps.emplace_back("unknown");
         }
         NetCDFVariableAttributeData ad;
         extract_from_variable_attribute(v.attrs, v.data_type, ad);
-        dtypv.emplace_back(v.name + "<!>" + ad.long_name + "<!>" + ad.units +
-            "<!>" + ad.cf_keyword);
+        add_to_netcdf_variables(v.name + "<!>" + ad.long_name + "<!>" + ad.units
+            + "<!>" + ad.cf_keyword, scan_data);
         for (size_t n = 0; n < vd.size(); ) {
           auto x = n / ssz;
           for (size_t m = 0; m < nt; ++m) {
@@ -2491,15 +2441,6 @@ ityps.emplace_back("unknown");
             }
           }
         }
-      }
-    }
-  }
-  for (const auto& t : dtypv) {
-    auto d = scan_data.datatype_map.description(t.substr(0, t.find("<!>")));
-    if (d.empty()) {
-      if (find(scan_data.netcdf_variables.begin(), scan_data.netcdf_variables.
-          end(), t) == scan_data.netcdf_variables.end()) {
-        scan_data.netcdf_variables.emplace_back(t);
       }
     }
   }
@@ -4442,12 +4383,8 @@ void scan_npn_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data,
           if (ad.units.length() == 1 && ad.units.front() == 0x1) {
             ad.units = "";
           }
-          auto s = v.name + "<!>" + ad.long_name + "<!>" + ad.units + "<!>" +
-              ad.cf_keyword;
-          if (find(scan_data.netcdf_variables.begin(), scan_data.
-              netcdf_variables.end(), s) == scan_data.netcdf_variables.end()) {
-            scan_data.netcdf_variables.emplace_back(s);
-          }
+          add_to_netcdf_variables(v.name + "<!>" + ad.long_name + "<!>" + ad.
+              units + "<!>" + ad.cf_keyword, scan_data);
         }
       }
     }
@@ -4708,13 +4645,8 @@ void scan_idd_metar_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data,
                 id);
             auto d = scan_data.datatype_map.description(v.name);
             if (d.empty()) {
-              auto var = v.name + "<!>" + ad.long_name + "<!>" + ad.units +
-                  "<!>" + ad.cf_keyword;
-              if (find(scan_data.netcdf_variables.begin(), scan_data.
-                  netcdf_variables.end(), var) == scan_data.netcdf_variables.
-                  end()) {
-                scan_data.netcdf_variables.emplace_back(var);
-              }
+              add_to_netcdf_variables(v.name + "<!>" + ad.long_name + "<!>" +
+                  ad.units + "<!>" + ad.cf_keyword, scan_data);
             }
             if (yvd[i] >= -90. && yvd[i] <= 90. && xvd[i] >= -180. && xvd[i] <=
                 180.) {
@@ -4817,13 +4749,8 @@ void scan_idd_buoy_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data,
           auto dt = compute_nc_time(tvd, m);
           auto d = scan_data.datatype_map.description(v.name);
           if (d.empty()) {
-            auto s = v.name + "<!>" + ad.long_name + "<!>" + ad.units + "<!>" +
-                ad.cf_keyword;
-            if (find(scan_data.netcdf_variables.begin(), scan_data.
-                netcdf_variables.end(), s) == scan_data.netcdf_variables.
-                end()) {
-              scan_data.netcdf_variables.emplace_back(s);
-            }
+            add_to_netcdf_variables(v.name + "<!>" + ad.long_name + "<!>" + ad.
+                units + "<!>" + ad.cf_keyword, scan_data);
           }
           if (yvd[m] >= -90. && yvd[m] <= 90. && xvd[m] >= -180. && xvd[m] <=
               180.) {
@@ -4905,13 +4832,8 @@ void scan_idd_surface_synoptic_netcdf_file(InputNetCDFStream& istream, ScanData&
           auto dt = compute_nc_time(tvd, m);
           auto d = scan_data.datatype_map.description(v.name);
           if (d.empty()) {
-            auto s = v.name + "<!>" + ad.long_name + "<!>" + ad.units + "<!>" +
-                ad.cf_keyword;
-            if (find(scan_data.netcdf_variables.begin(), scan_data.
-                netcdf_variables.end(), s) == scan_data.netcdf_variables.
-                end()) {
-              scan_data.netcdf_variables.emplace_back(s);
-            }
+            add_to_netcdf_variables(v.name + "<!>" + ad.long_name + "<!>" + ad.
+                units + "<!>" + ad.cf_keyword, scan_data);
           }
           if (yvd[m] >= -90. && yvd[m] <= 90. && xvd[m] >= -180. && xvd[m] <=
               180.) {
@@ -4999,7 +4921,7 @@ void scan_idd_upper_air_netcdf_file(InputNetCDFStream& istream, ScanData&
         cout << "    - attributes extracted" << endl;
       }
       auto nm = 0;
-      for (size_t m = 0; m < static_cast<size_t>(tvd.size()); ++m) {
+      for (size_t m = 0; m < tvd.size(); ++m) {
         if (!found_missing(tvd[m], &tfv, vd[m], ad.missing_value)) {
           ++nm;
           ++scan_data.num_not_missing;
@@ -5025,13 +4947,8 @@ void scan_idd_upper_air_netcdf_file(InputNetCDFStream& istream, ScanData&
           auto dt = compute_nc_time(tvd, m);
           auto d = scan_data.datatype_map.description(v.name);
           if (d.empty()) {
-            auto s = v.name + "<!>" + ad.long_name + "<!>" + ad.units + "<!>" +
-                ad.cf_keyword;
-            if (find(scan_data.netcdf_variables.begin(), scan_data.
-                netcdf_variables.end(), s) == scan_data.netcdf_variables.
-                end()) {
-              scan_data.netcdf_variables.emplace_back(s);
-            }
+            add_to_netcdf_variables(v.name + "<!>" + ad.long_name + "<!>" + ad.
+                units + "<!>" + ad.cf_keyword, scan_data);
           }
           if (yvd[m] >= -90. && yvd[m] <= 90. && xvd[m] >= -180. && xvd[m] <=
               180.) {
