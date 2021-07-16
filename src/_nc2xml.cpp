@@ -174,67 +174,63 @@ void sort_inventory_map(unordered_map<string, pair<int, string>>& inv_table,
   });
 }
 
-void fill_nc_time_data(const NetCDF::Attribute& attr) {
+void fill_nc_time_data(string time_units) {
   static const string F = this_function_label(__func__);
-  auto u = *(reinterpret_cast<string *>(attr.values));
-  if (gatherxml::verbose_operation) {
-    cout << "  Time units: '" << u << "'" << endl;
+  if (!regex_search(time_units, regex("since"))) {
+    log_error2("not a CF time units value", F, "nc2xml", USER);
   }
-  if (regex_search(u, regex("since"))) {
-    time_data.units = to_lower(u.substr(0, u.find("since")));
-    trim(time_data.units);
-    u = u.substr(u.find("since") + 5);
-    while (!u.empty() && (u[0] < '0' || u[0] > '9')) {
-      u = u.substr(1);
-    }
-    auto n = u.length() - 1;
-    while (n > 0 && (u[n] < '0' || u[n] > '9')) {
-      --n;
-    }
-    ++n;
-    if (n < u.length()) {
-      u = u.substr(0, n);
-    }
-    trim(u);
-    auto sp = split(u);
-    if (sp.size() < 1 || sp.size() > 3) {
-      log_error2("unable to get reference time from units specified as: '" +
-          *(reinterpret_cast<string *>(attr.values)) + "'", F, "nc2xml", USER);
-    }
-    auto sp2 = split(sp[0], "-");
-    if (sp2.size() != 3) {
-      log_error2("unable to get reference time from units specified as: '" +
-          *(reinterpret_cast<string *>(attr.values)) + "'", F, "nc2xml", USER);
-    }
-    time_data.reference.set_year(stoi(sp2[0]));
-    time_data.reference.set_month(stoi(sp2[1]));
-    time_data.reference.set_day(stoi(sp2[2]));
-    if (sp.size() > 1) {
-      auto sp3 = split(sp[1], ":");
-      switch (sp3.size()) {
-        case 1: {
-          time_data.reference.set_time(stoi(sp3[0]) * 10000);
-          break;
-        }
-        case 2: {
-          time_data.reference.set_time(stoi(sp3[0]) * 10000 + stoi(sp3[1]) *
-              100);
-          break;
-        }
-        case 3: {
-          time_data.reference.set_time(stoi(sp3[0]) * 10000 + stoi(sp3[1]) * 100
-              + static_cast<int>(stof(sp3[2])));
-          break;
-        }
+  if (gatherxml::verbose_operation) {
+    cout << "  Time units: '" << time_units << "'" << endl;
+  }
+  time_data.units = to_lower(time_units.substr(0, time_units.find("since")));
+  trim(time_data.units);
+  time_units = time_units.substr(time_units.find("since") + 5);
+  while (!time_units.empty() && (time_units[0] < '0' || time_units[0] > '9')) {
+    time_units = time_units.substr(1);
+  }
+  auto n = time_units.length() - 1;
+  while (n > 0 && (time_units[n] < '0' || time_units[n] > '9')) {
+    --n;
+  }
+  ++n;
+  if (n < time_units.length()) {
+    time_units = time_units.substr(0, n);
+  }
+  trim(time_units);
+  auto sp = split(time_units);
+  if (sp.size() < 1 || sp.size() > 3) {
+    log_error2("unable to get reference time from units specified as: '" +
+        time_units + "'", F, "nc2xml", USER);
+  }
+  auto sp2 = split(sp[0], "-");
+  if (sp2.size() != 3) {
+    log_error2("unable to get reference time from units specified as: '" +
+        time_units + "'", F, "nc2xml", USER);
+  }
+  time_data.reference.set_year(stoi(sp2[0]));
+  time_data.reference.set_month(stoi(sp2[1]));
+  time_data.reference.set_day(stoi(sp2[2]));
+  if (sp.size() > 1) {
+    auto sp3 = split(sp[1], ":");
+    switch (sp3.size()) {
+      case 1: {
+        time_data.reference.set_time(stoi(sp3[0]) * 10000);
+        break;
+      }
+      case 2: {
+        time_data.reference.set_time(stoi(sp3[0]) * 10000 + stoi(sp3[1]) * 100);
+        break;
+      }
+      case 3: {
+        time_data.reference.set_time(stoi(sp3[0]) * 10000 + stoi(sp3[1]) * 100 +
+            static_cast<int>(stof(sp3[2])));
+        break;
       }
     }
-    if (gatherxml::verbose_operation) {
-      cout << "  Reference time set to: " << time_data.reference.to_string(
-          "%Y-%m-%d %H:%MM:%SS") << endl;
-    }
-  } else {
-    log_error2("unable to get CF time from time variable units", F, "nc2xml",
-        USER);
+  }
+  if (gatherxml::verbose_operation) {
+    cout << "  Reference time set to: " << time_data.reference.to_string(
+        "%Y-%m-%d %H:%MM:%SS") << endl;
   }
 }
 
@@ -788,7 +784,7 @@ void process_units_attribute(const vector<NetCDF::Variable>& vars, size_t
       log_error2("time was already identified - don't know what to do with "
           "variable: " + vars[var_index].name, F, "nc2xml", USER);
     }
-    fill_nc_time_data(vars[var_index].attrs[attr_index]);
+    fill_nc_time_data(vars[var_index].attrs[attr_index].to_string());
     dgd.indexes.time_var = var_index;
   } else if (regex_search(u, regex("^degree(s){0,1}(_){0,1}((north)|N)$"))) {
     if (dgd.indexes.lat_var == MISSING_FLAG) {
@@ -4603,7 +4599,7 @@ void scan_idd_metar_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data,
           cout << "    found attribute: '" << v.attrs[m].name << "'" << endl;
         }
         if (v.attrs[m].name == "units") {
-          fill_nc_time_data(v.attrs[m]);
+          fill_nc_time_data(v.attrs[m].to_string());
         } else if (v.attrs[m].name == "_FillValue") {
           set_time_missing_value(tfv, v.attrs, m, tvd.type());
         }
@@ -4703,7 +4699,7 @@ void scan_idd_buoy_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data,
     if (v.name == "time_obs") {
       for (size_t m = 0; m < v.attrs.size(); ++m) {
         if (v.attrs[m].name == "units") {
-          fill_nc_time_data(v.attrs[m]);
+          fill_nc_time_data(v.attrs[m].to_string());
         } else if (v.attrs[m].name == "_FillValue") {
           set_time_missing_value(tfv, v.attrs, m, tvd.type());
         }
@@ -4793,7 +4789,7 @@ void scan_idd_surface_synoptic_netcdf_file(InputNetCDFStream& istream, ScanData&
     if (v.name == "time_obs") {
       for (size_t m = 0; m < v.attrs.size(); ++m) {
         if (v.attrs[m].name == "units") {
-          fill_nc_time_data(v.attrs[m]);
+          fill_nc_time_data(v.attrs[m].to_string());
         } else if (v.attrs[m].name == "_FillValue") {
           set_time_missing_value(tfv, v.attrs, m, tvd.type());
         }
@@ -4893,7 +4889,7 @@ void scan_idd_upper_air_netcdf_file(InputNetCDFStream& istream, ScanData&
           cout << "    found attribute: '" << v.attrs[m].name << "'" << endl;
         }
         if (v.attrs[m].name == "units") {
-          fill_nc_time_data(v.attrs[m]);
+          fill_nc_time_data(v.attrs[m].to_string());
         } else if (v.attrs[m].name == "_FillValue") {
           set_time_missing_value(tfv, v.attrs, m, tvd.type());
         }
@@ -5022,7 +5018,7 @@ void scan_samos_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data,
             log_error2("time was already identified - don't know what to do "
                 "with variable: " + v.name, F, "nc2xml", USER);
           }
-          fill_nc_time_data(a);
+          fill_nc_time_data(a.to_string());
           tm_b = true;
           tvn = v.name;
           if (istream.variable_data(v.name, tvd) == NetCDF::DataType::_NULL) {
