@@ -1842,20 +1842,6 @@ void scan_cf_orthogonal_profile_netcdf_file(InputNetCDFStream& istream, string
   }
 }
 
-bool compare_z_down(const double& left, const double& right) {
-  if (left >= right) {
-    return true;
-  }
-  return false;
-}
-
-bool compare_z_up(const double& left, const double& right) {
-  if (left <= right) {
-    return true;
-  }
-  return false;
-}
-
 void fill_vertical_resolution_data(vector<double>& lvls, string z_pos, string
     z_units, gatherxml::markup::ObML::DataTypeEntry& datatype_entry) {
   auto mn = 1.e38, mx = -1.e38;
@@ -1872,7 +1858,13 @@ void fill_vertical_resolution_data(vector<double>& lvls, string z_pos, string
         DataTypeEntry::Data::VerticalData);
   }
   if (z_pos == "down") {
-    sort(lvls.begin(), lvls.end(), compare_z_down);
+    sort(lvls.begin(), lvls.end(),
+    [](const double& left, const double& right) -> bool {
+      if (left >= right) {
+        return true;
+      }
+      return false;
+    });
     if (datatype_entry.data->vdata->min_altitude > 1.e37) {
       datatype_entry.data->vdata->min_altitude = -datatype_entry.data->vdata->
           min_altitude;
@@ -1888,7 +1880,13 @@ void fill_vertical_resolution_data(vector<double>& lvls, string z_pos, string
       datatype_entry.data->vdata->max_altitude = mn;
     }
   } else {
-    sort(lvls.begin(), lvls.end(), compare_z_up);
+    sort(lvls.begin(), lvls.end(),
+    [](const double& left, const double& right) -> bool {
+      if (left <= right) {
+        return true;
+      }
+      return false;
+    });
     if (mn < datatype_entry.data->vdata->min_altitude) {
       datatype_entry.data->vdata->min_altitude = mn;
     }
@@ -2798,11 +2796,8 @@ bool filled_grid_projection(const unique_ptr<double[]>& la, const unique_ptr<
     } else {
       auto la1 = la[0];
       auto la2 = la[d.size - 1];
-      if (la1 >= 0. && la2 >= 0.) {
-      } else if (la1 < 0. && la2 < 0.) {
-      } else {
-        if (fabs(la1) > fabs(la2)) {
-        } else {
+      if ((la1 >= 0. && la2 < 0.) || (la1 < 0. && la2 >= 0.)) {
+        if (fabs(la1) <= fabs(la2)) {
           const double PI = 3.141592654;
           if (fabs(cos(la2 * PI / 180.) - (nla / xla)) < 0.01) {
             f.type = Grid::Type::mercator;
