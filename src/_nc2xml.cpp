@@ -116,14 +116,6 @@ TempDir *inv_dir = nullptr;
 std::ofstream inv_stream;
 unordered_map<string, pair<int, string>> D_map, G_map, I_map, L_map, O_map,
     P_map, R_map, U_map;
-
-struct InvTimeEntry {
-  InvTimeEntry() : key(), dt() { }
-
-  size_t key;
-  string dt;
-};
-
 vector<string> inv_lines;
 TempFile inv_lines2("/tmp");
 unordered_set<string> unknown_IDs;
