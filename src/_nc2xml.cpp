@@ -1256,9 +1256,8 @@ void scan_cf_non_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,
   if (gatherxml::verbose_operation) {
     cout << "...beginning function " << F << "..." << endl;
   }
-  size_t ilen = 0;
   auto vars = istream.variables();
-  NetCDF::VariableData tvd;
+  NetCDF::VariableData tvd, yvd, xvd, ids, nvd;
   if (istream.variable_data(vars[dgd.indexes.time_var].name, tvd) == NetCDF::
       DataType::_NULL) {
     log_error2("unable to get time data", F, "nc2xml", USER);
@@ -1271,7 +1270,6 @@ void scan_cf_non_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,
       log_error2("unable to get time bounds data", F, "nc2xml", USER);
     }
   }
-  NetCDF::VariableData yvd, xvd, ids, nvd;
   if (dgd.indexes.lat_var_bounds == MISSING_FLAG) {
     if (istream.variable_data(vars[dgd.indexes.lat_var].name, yvd) == NetCDF::
         DataType::_NULL) {
@@ -1309,6 +1307,7 @@ void scan_cf_non_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,
   } else {
     ns = dims[sd].length;
   }
+  size_t ilen = 0;
   vector<string> pfms, ityps;
   size_t nl = 1;
   if (dgd.indexes.lat_var_bounds != MISSING_FLAG && dgd.indexes.lon_var_bounds
@@ -1735,7 +1734,6 @@ void scan_cf_orthogonal_profile_netcdf_file(InputNetCDFStream& istream, string
      platform_type, DiscreteGeometriesData& dgd, ScanData& scan_data,
      gatherxml::markup::ObML::ObservationData& obs_data, string obs_type) {
   static const string F = this_function_label(__func__);
-  size_t ilen = 1;
   string ityp = "unknown";
   NetCDF::VariableData tvd, yvd, xvd, ivd, lvd;
   auto vars = istream.variables();
@@ -1760,6 +1758,7 @@ void scan_cf_orthogonal_profile_netcdf_file(InputNetCDFStream& istream, string
     log_error2("unable to get level data", F, "nc2xml", USER);
   }
   auto dims = istream.dimensions();
+  size_t ilen = 1;
   if (ivd.type() == NetCDF::DataType::CHAR) {
     ilen = dims[vars[dgd.indexes.stn_id_var].dimids.back()].length;
   }
@@ -1940,7 +1939,6 @@ void scan_cf_non_orthogonal_profile_netcdf_file(InputNetCDFStream& istream,
     string platform_type, DiscreteGeometriesData& dgd, ScanData& scan_data,
     gatherxml::markup::ObML::ObservationData& obs_data, string obs_type) {
   static const string F = this_function_label(__func__);
-  size_t ilen = 1;
   auto vars = istream.variables();
   NetCDF::VariableData tvd, yvd, xvd, ivd, lvd;
   if (istream.variable_data(vars[dgd.indexes.time_var].name, tvd) == NetCDF::
@@ -1960,6 +1958,7 @@ void scan_cf_non_orthogonal_profile_netcdf_file(InputNetCDFStream& istream,
     log_error2("unable to get station ID data", F, "nc2xml", USER);
   }
   auto dims = istream.dimensions();
+  size_t ilen = 1;
   vector<string> pfms, ityps;
   if (ivd.type() == NetCDF::DataType::INT || ivd.type() == NetCDF::DataType::
       FLOAT || ivd.type() == NetCDF::DataType::DOUBLE) {
@@ -2202,7 +2201,6 @@ void scan_cf_orthogonal_time_series_profile_netcdf_file(InputNetCDFStream&
      scan_data, gatherxml::markup::ObML::ObservationData& obs_data, string
      obs_type) {
   static const string F = this_function_label(__func__);
-  size_t ilen = 1;
   NetCDF::VariableData tvd, yvd, xvd, ivd, lvd;
   auto vars = istream.variables();
   if (istream.variable_data(vars[dgd.indexes.time_var].name, tvd) == NetCDF::
@@ -2222,6 +2220,7 @@ void scan_cf_orthogonal_time_series_profile_netcdf_file(InputNetCDFStream&
     log_error2("unable to get station ID data", F, "nc2xml", USER);
   }
   auto dims = istream.dimensions();
+  size_t ilen = 1;
   vector<string> pfms, ityps, ids;
   if (ivd.type() == NetCDF::DataType::INT || ivd.type() == NetCDF::DataType::
       FLOAT || ivd.type() == NetCDF::DataType::DOUBLE) {
@@ -2315,7 +2314,6 @@ void scan_cf_non_orthogonal_time_series_profile_netcdf_file(InputNetCDFStream&
      scan_data, gatherxml::markup::ObML::ObservationData& obs_data, string
      obs_type) {
   static const string F = this_function_label(__func__);
-  size_t ilen = 1;
   NetCDF::VariableData tvd, yvd, xvd, ivd, lvd;
   auto vars=istream.variables();
   if (istream.variable_data(vars[dgd.indexes.time_var].name, tvd) == NetCDF::
@@ -2335,6 +2333,7 @@ void scan_cf_non_orthogonal_time_series_profile_netcdf_file(InputNetCDFStream&
     log_error2("unable to get station ID data", F, "nc2xml", USER);
   }
   auto dims = istream.dimensions();
+  size_t ilen = 1;
   vector<string> pfms, ityps, ids;
   if (ivd.type() == NetCDF::DataType::INT || ivd.type() == NetCDF::DataType::
       FLOAT || ivd.type() == NetCDF::DataType::DOUBLE) {
