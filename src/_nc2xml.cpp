@@ -65,8 +65,8 @@ static const size_t MISSING_FLAG = 0xffffffff;
 
 struct ScanData {
   ScanData() : num_not_missing(0), write_type(-1), map_name(), parameter_map(),
-      datatype_map(), netcdf_variables(), changed_variables(), map_filled(false)
-      { }
+      datatype_map(), netcdf_variables(), changed_variables(), grids(nullptr),
+      map_filled(false) { }
 
   enum { GrML_type = 1, ObML_type };
   size_t num_not_missing;
@@ -76,6 +76,7 @@ struct ScanData {
   DataTypeMap datatype_map;
   vector<string> netcdf_variables;
   unordered_set<string> changed_variables;
+  unique_ptr<my::map<gatherxml::markup::GrML::GridEntry>> grids;
   bool map_filled;
 };
 
@@ -107,7 +108,6 @@ metautils::NcTime::Time time_s;
 metautils::NcTime::TimeBounds time_bounds_s;
 metautils::NcTime::TimeData time_data;
 gatherxml::markup::ObML::IDEntry ientry;
-unique_ptr<my::map<gatherxml::markup::GrML::GridEntry>> gridtbl_p;
 unique_ptr<gatherxml::markup::GrML::GridEntry> gentry_p;
 unique_ptr<gatherxml::markup::GrML::LevelEntry> lentry_p;
 unique_ptr<gatherxml::markup::GrML::ParameterEntry> pentry_p;
@@ -142,9 +142,9 @@ extern "C" void int_handler(int) {
   metautils::cmd_unregister();
 }
 
-void grid_initialize() {
-  if (gridtbl_p == nullptr) {
-    gridtbl_p.reset(new my::map<gatherxml::markup::GrML::GridEntry>);
+void grid_initialize(ScanData& scan_data) {
+  if (scan_data.grids == nullptr) {
+    scan_data.grids.reset(new my::map<gatherxml::markup::GrML::GridEntry>);
     gentry_p.reset(new gatherxml::markup::GrML::GridEntry);
     lentry_p.reset(new gatherxml::markup::GrML::LevelEntry);
     pentry_p.reset(new gatherxml::markup::GrML::ParameterEntry);
@@ -2817,7 +2817,7 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
   if (gatherxml::verbose_operation) {
     cout << "...beginning function " << F << " ..." << endl;
   }
-  grid_initialize();
+  grid_initialize(scan_data);
 
   // open a file inventory unless this is a test run
   if (metautils::args.dsnum < "999.0") {
@@ -3318,7 +3318,7 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
             if (U_map.find(U_key) == U_map.end()) {
               U_map.emplace(U_key, make_pair(U_map.size(), ""));
             }
-            if (!gridtbl_p->found(gentry_p->key, *gentry_p)) {
+            if (!scan_data.grids->found(gentry_p->key, *gentry_p)) {
 
               // new grid
               gentry_p->level_table.clear();
@@ -3359,7 +3359,7 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
                 }
               }
               if (gentry_p->level_table.size() > 0) {
-                gridtbl_p->insert(*gentry_p);
+                scan_data.grids->insert(*gentry_p);
               }
             } else {
 
@@ -3494,7 +3494,7 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
                   }
                 }
               }
-              gridtbl_p->replace(*gentry_p);
+              scan_data.grids->replace(*gentry_p);
             }
           }
         }
@@ -3570,7 +3570,7 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
       cout << "... done scanning netCDF variables" << endl;
     }
   }
-  if (gridtbl_p->size() == 0) {
+  if (scan_data.grids->size() == 0) {
     if (!grid_data.time.id.empty()) {
       log_error2("no grids found - no content metadata will be generated", F,
            "nc2xml", USER);
@@ -3815,7 +3815,7 @@ void scan_wrf_simulation_netcdf_file(InputNetCDFStream& istream,bool& found_map,
     if (U_map.find(U_key) == U_map.end()) {
       U_map.emplace(U_key,make_pair(U_map.size(),""));
     }
-    if (!gridtbl_p->found(gentry_p->key,*gentry_p)) {
+    if (!scan_data.grids->found(gentry_p->key,*gentry_p)) {
 // new grid
       gentry_p->level_table.clear();
       lentry_p->parameter_code_table.clear();
@@ -3861,7 +3861,7 @@ void scan_wrf_simulation_netcdf_file(InputNetCDFStream& istream,bool& found_map,
         }
       }
       if (gentry_p->level_table.size() > 0) {
-        gridtbl_p->insert(*gentry_p);
+        scan_data.grids->insert(*gentry_p);
       }
     } else {
 // existing grid - needs update
@@ -3921,7 +3921,7 @@ void scan_wrf_simulation_netcdf_file(InputNetCDFStream& istream,bool& found_map,
       }
     }
   }
-  if (gridtbl_p->size() == 0) {
+  if (scan_data.grids->size() == 0) {
     metautils::log_error("No grids found - no content metadata will be generated",F,"nc2xml",USER);
   }
   write_type=GrML_type;
@@ -5425,7 +5425,7 @@ int main(int argc, char **argv) {
   if (sd.write_type == ScanData::GrML_type) {
     ext = "GrML";
     if (!metautils::args.inventory_only) {
-      tdir = gatherxml::markup::GrML::write(*gridtbl_p, "nc2xml", USER);
+      tdir = gatherxml::markup::GrML::write(*sd.grids, "nc2xml", USER);
     }
   } else if (sd.write_type == ScanData::ObML_type) {
     ext = "ObML";
