@@ -2761,64 +2761,186 @@ bool found_alternate_lat_lon_coordinates(vector<NetCDF::Variable>& vars,
       size();
 }
 
-bool filled_grid_projection(const unique_ptr<double[]>& la, const unique_ptr<
-    double[]>& lo, Grid::GridDimensions& d, Grid::GridDefinition& f) {
+bool filled_grid_projection(const unique_ptr<double[]>& lats, const unique_ptr<
+    double[]>& lons, Grid::GridDimensions& d, Grid::GridDefinition& f, size_t
+    nlats, size_t nlons) {
   static const string F = this_function_label(__func__);
-  double nla = 99999., xla = 0.;
+
+  // check as one-dimensional coordinates
+  double ndy = 99999., xdy = 0.;
   for (int n = 1, m = d.x; n < d.y; ++n, m += d.x) {
-    double a = fabs(la[m] - la[m - d.x]);
-    if (a < nla) {
-      nla = a;
+    double dy = fabs(lats[m] - lats[m - d.x]);
+    if (dy < ndy) {
+      ndy = dy;
     }
-    if (a > xla) {
-      xla = a;
+    if (dy > xdy) {
+      xdy = dy;
     }
   }
-  double nlo = 99999., xlo = 0.;
+  double ndx = 99999., xdx = 0.;
   for (int n = 1; n < d.x; ++n) {
-    double a = fabs(lo[n] - lo[n - 1]);
-    if (a < nlo) {
-      nlo = a;
+    double dx = fabs(lons[n] - lons[n - 1]);
+    if (dx < ndx) {
+      ndx = dx;
     }
-    if (a > xlo) {
-      xlo = a;
+    if (dx > xdx) {
+      xdx = dx;
     }
   }
   f.type = Grid::Type::not_set;
   d.size = d.x * d.y;
-  if (fabs(xlo - nlo) < 0.0001) {
-    if (fabs(xla - nla) < 0.0001) {
+  if (fabs(xdx - ndx) < 0.0001) {
+    if (fabs(xdy - ndy) < 0.0001) {
       f.type = Grid::Type::latitudeLongitude;
-      f.elatitude = la[d.size - 1];
-      f.elongitude = lo[d.size - 1];
-      f.laincrement = xla;
-      f.loincrement = xlo;
+      f.elatitude = lats[d.size - 1];
+      f.elongitude = lons[d.size - 1];
+      f.laincrement = xdy;
+      f.loincrement = xdx;
     } else {
-      auto la1 = la[0];
-      auto la2 = la[d.size - 1];
+      auto la1 = lats[0];
+      auto la2 = lats[d.size - 1];
       if ((la1 >= 0. && la2 < 0.) || (la1 < 0. && la2 >= 0.)) {
         if (fabs(la1) <= fabs(la2)) {
           const double PI = 3.141592654;
-          if (fabs(cos(la2 * PI / 180.) - (nla / xla)) < 0.01) {
+          if (fabs(cos(la2 * PI / 180.) - (ndy / xdy)) < 0.01) {
             f.type = Grid::Type::mercator;
-            f.elatitude = la[d.size - 1];
-            f.elongitude = lo[d.size - 1];
+            f.elatitude = lats[d.size - 1];
+            f.elongitude = lons[d.size - 1];
             double ma = 99999.;
             int l = -1;
             for (int n = 0, m = 0; n < d.y; ++n, m += d.x) {
-              double a = fabs(la[m] - lround(la[m]));
+              double a = fabs(lats[m] - lround(lats[m]));
               if (a < ma) {
                 ma = a;
                 l = m;
               }
             }
-            f.dx = lround(cos(la[l] * PI / 180.) * nlo * 111.2);
-            f.dy = lround((fabs(la[l + d.x] - la[l]) + fabs(la[l] - la[l - d.
-                x])) / 2. * 111.2);
-            f.stdparallel1 = la[l];
+            f.dx = lround(cos(lats[l] * PI / 180.) * ndx * 111.2);
+            f.dy = lround((fabs(lats[l + d.x] - lats[l]) + fabs(lats[l] - lats[
+                l - d.x])) / 2. * 111.2);
+            f.stdparallel1 = lats[l];
           }
         }
       }
+    }
+  }
+  if (f.type == Grid::Type::not_set) {
+
+    // check as two-dimensional coordinates
+    auto dx = fabs(lons[1] - lons[0]);
+    for (short n = 0; n < d.y; ++n) {
+      for (short m = 1; m < d.x; ++m) {
+        auto x = n * d.x + m;
+        if (!myequalf(fabs(lons[x] - lons[x - 1]), dx, 0.000001)) {
+          dx = 1.e36;
+          n = d.y;
+          m = d.x;
+        }
+      }
+    }
+    if (!myequalf(dx, 1.e36)) {
+      auto dy = fabs(lats[1] - lats[0]);
+      for (short m = 0; m < d.x; ++m) {
+        for (short n = 1; n < d.y; ++n) {
+          auto x = m * d.y + n;
+          if (!myequalf(fabs(lats[x] - lats[x - 1]), dy, 0.000001)) {
+            dy = 1.e36;
+            m = d.x;
+            n = d.y;
+          }
+        }
+      }
+      if (!myequalf(dy, 1.e36)) {
+        f.type = Grid::Type::latitudeLongitude;
+        f.elatitude = lats[nlats - 1];
+        f.elongitude = lons[nlons - 1];
+        f.laincrement = dy;
+        f.loincrement = dx;
+      } else {
+        for (short n = 0; n < d.y; ++n) {
+          auto x = n * d.x;
+          dy = fabs(lats[x + 1] - lats[x]);
+          for (short m = 2; m < d.x; ++m) {
+            auto x = n * d.x + m;
+            if (!myequalf(fabs(lats[x] - lats[x - 1]), dy, 0.000001)) {
+              dy = 1.e36;
+              n = d.y;
+              m = d.x;
+            }
+          }
+        }
+        if (!myequalf(dy, 1.e36)) {
+          const double PI = 3.141592654;
+          auto ny2 = d.y / 2 - 1;
+          auto a = log(tan(PI / 4. + lats[0] * PI / 360.));
+          auto b = log(tan(PI / 4. + lats[ny2 * d.x] * PI / 360.));
+          auto c = log(tan(PI / 4. + lats[ny2 * 2 * d.x] * PI / 360.));
+          if (myequalf((b - a) / ny2, (c - a) / (ny2 * 2), 0.000001)) {
+            f.type = Grid::Type::mercator;
+            f.elatitude = lats[nlats - 1];
+            f.elongitude = lons[nlons - 1];
+            f.laincrement = (f.elatitude - f.slatitude) / (d.y - 1);
+            f.loincrement = dx;
+          }
+        }
+      }
+    }
+  }
+  if (f.type == Grid::Type::not_set) {
+
+    // check for a polar-stereographic grid
+    auto ny2 = d.y / 2 - 1;
+    auto nx2 = d.x / 2 - 1;
+
+    // check the four points that surround the center of the grid to see if the
+    //    center is the pole:
+    //        1) all four latitudes must be the same
+    //        2) the sum of the absolute values of opposing longitudes must
+    //           equal 180.
+    if (myequalf(lats[ny2 * d.x + nx2], lats[(ny2 + 1) * d.x + nx2], 0.00001) &&
+        myequalf(lats[(ny2 + 1) * d.x + nx2], lats[(ny2 + 1) * d.x + nx2 + 1],
+        0.00001) && myequalf(lats[(ny2 + 1) * d.x + nx2 + 1], lats[ny2 * d.x +
+        nx2 + 1], 0.00001) && myequalf(fabs(lons[ny2 * d.x + nx2]) + fabs(lons[(
+        ny2 + 1) * d.x + nx2 + 1]), 180., 0.001) && myequalf(fabs(lons[(ny2 + 1)
+        * d.x + nx2]) + fabs(lons[ny2 * d.x + nx2 + 1]), 180., 0.001)) {
+      f.type = Grid::Type::polarStereographic;
+      if (lats[ny2 * d.x + nx2] > 0) {
+        f.projection_flag = 0;
+        f.llatitude = 60.;
+      } else {
+        f.projection_flag = 1;
+        f.llatitude = -60.;
+      }
+      f.olongitude = lroundf((lons[nx2] + lons[nx2 + 1]) / 2.);
+      if (f.olongitude > 180.) {
+        f.olongitude -= 360.;
+      }
+
+      // look for dx and dy at the 60-degree parallel
+      // great circle formula:
+      //    theta = 2 * arcsin[ sqrt( sin^2( delta_phi / 2 ) + cos(phi_1) *
+      //        cos(phi_2) * sin^2( delta_lambda / 2 ) ) ]
+      //    phi_1 and phi_2 are latitudes
+      //    lambda_1 and lambda_2 are longitudes
+      //    dist = 6372.8 * theta
+      //    6372.8 is radius of Earth in km
+      double a, na = 999.;
+      int nm = 0;
+      for (size_t m = 0; m < nlats; ++m) {
+        if ( (a = fabs(f.llatitude - lats[m])) < na) {
+          na = a;
+          nm = m;
+        }
+      }
+      const double RAD = 3.141592654 / 180.;
+      f.dx = lroundf(asin(sqrt(sin(fabs(lats[nm] - lats[nm + 1]) / 2. * RAD) *
+          sin(fabs(lats[nm] - lats[nm + 1]) / 2. * RAD) + sin(fabs(lons[nm] -
+          lons[nm + 1]) / 2. * RAD) * sin(fabs(lons[nm] - lons[nm + 1]) / 2. *
+          RAD) * cos(lats[nm] * RAD) * cos(lats[nm + 1] * RAD))) * 12745.6);
+      f.dy = lroundf(asin(sqrt(sin(fabs(lats[nm] - lats[nm + d.x]) / 2. * RAD) *
+          sin(fabs(lats[nm] - lats[nm + d.x]) / 2. * RAD) + sin(fabs(lons[nm] -
+          lons[nm + d.x]) / 2. * RAD) * sin(fabs(lons[nm] - lons[nm + d.x]) / 2.
+          * RAD) * cos(lats[nm] * RAD) * cos(lats[nm + d.x] * RAD))) * 12745.6);
     }
   }
   return !(f.type == Grid::Type::not_set);
@@ -2901,145 +3023,11 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
         d.x = dims[grid_dims.back().x].length;
         d.y = dims[grid_dims.back().y].length;
         Grid::GridDefinition f;
-        if (filled_grid_projection(lats, lons, d, f)) {
+        if (filled_grid_projection(lats, lons, d, f, nlats, nlons)) {
           grid_dims.back() = d;
           grid_defs.back() = f;
         } else {
-          auto& xd = grid_dims.back().x;
-          auto& nx = dims[xd].length;
-          auto& yd = grid_dims.back().y;
-          auto& ny = dims[yd].length;
-          auto ny2 = ny / 2 - 1;
-          auto nx2 = nx / 2 - 1;
-
-          // check the four points that surround the center of the grid to see
-          //    if the center is the pole:
-          //        1) all four latitudes must be the same
-          //        2) the sum of the absolute values of opposing longitudes
-          //           must equal 180.
-          if (myequalf(lats[ny2 * nx + nx2], lats[(ny2 + 1) * nx + nx2],
-              0.00001) && myequalf(lats[(ny2 + 1) * nx + nx2], lats[(ny2 + 1) *
-              nx + nx2 + 1], 0.00001) && myequalf(lats[(ny2 + 1) * nx + nx2 +
-              1], lats[ny2 * nx + nx2 + 1], 0.00001) && myequalf(fabs(lons[ny2 *
-              nx + nx2]) + fabs(lons[(ny2 + 1) * nx + nx2 + 1]), 180., 0.001) &&
-              myequalf(fabs(lons[(ny2 + 1) * nx + nx2]) + fabs(lons[ny2 * nx +
-              nx2 + 1]), 180., 0.001)) {
-            grid_defs.back().type = Grid::Type::polarStereographic;
-            if (lats[ny2 * nx + nx2] > 0) {
-              grid_defs.back().projection_flag = 0;
-              grid_defs.back().llatitude = 60.;
-            } else {
-              grid_defs.back().projection_flag = 1;
-              grid_defs.back().llatitude = -60.;
-            }
-            grid_defs.back().olongitude = lroundf((lons[nx2] + lons[nx2 + 1]) /
-                2.);
-            if (grid_defs.back().olongitude > 180.) {
-              grid_defs.back().olongitude -= 360.;
-            }
-
-            // look for dx and dy at the 60-degree parallel
-            // great circle formula:
-            //    theta = 2 * arcsin[ sqrt( sin^2( delta_phi / 2 ) +
-            //        cos(phi_1) * cos(phi_2) * sin^2( delta_lambda / 2 ) ) ]
-            //    phi_1 and phi_2 are latitudes
-            //    lambda_1 and lambda_2 are longitudes
-            //    dist = 6372.8 * theta
-            //    6372.8 is radius of Earth in km
-            xd = nx;
-            yd = ny;
-            double min_fabs = 999., f;
-            int min_m = 0;
-            for (size_t m = 0; m < nlats; ++m) {
-              if ( (f = fabs(grid_defs.back().llatitude - lats[m])) <
-                min_fabs) {
-                min_fabs = f;
-                min_m = m;
-              }
-            }
-            const double RAD = 3.141592654 / 180.;
-            grid_defs.back().dx = lroundf(asin(sqrt(sin(fabs(lats[min_m] - lats[
-                min_m + 1]) / 2. * RAD) * sin(fabs(lats[min_m] - lats[min_m +
-                1]) / 2. * RAD) + sin(fabs(lons[min_m] - lons[min_m + 1]) / 2. *
-                RAD) * sin(fabs(lons[min_m] - lons[min_m + 1]) / 2. * RAD) *
-                cos(lats[min_m] * RAD) * cos(lats[min_m + 1] * RAD))) *
-                12745.6);
-            grid_defs.back().dy = lroundf(asin(sqrt(sin(fabs(lats[min_m] - lats[
-                min_m + xd]) / 2. * RAD) * sin(fabs(lats[min_m] - lats[min_m +
-                xd]) / 2. * RAD) + sin(fabs(lons[min_m] - lons[min_m + xd]) / 2.
-                * RAD) * sin(fabs(lons[min_m] - lons[min_m + xd]) / 2. * RAD) *
-                cos(lats[min_m] * RAD) * cos(lats[min_m + xd] * RAD))) *
-                12745.6);
-          } else {
-            auto londiff = fabs(lons[1] - lons[0]);
-            for (size_t n = 0; n < ny; ++n) {
-              for (size_t m = 1; m < nx; ++m) {
-                auto x = n * nx + m;
-                if (!myequalf(fabs(lons[x] - lons[x - 1]), londiff, 0.000001)) {
-                  londiff = 1.e36;
-                  n = ny;
-                  m = nx;
-                }
-              }
-            }
-            if (!myequalf(londiff, 1.e36)) {
-              auto latdiff = fabs(lats[1] - lats[0]);
-              for (size_t m = 0; m < nx; ++m) {
-                for (size_t n = 1; n < ny; ++n) {
-                  auto x = m * ny + n;
-                  if (!myequalf(fabs(lats[x] - lats[x - 1]), latdiff,
-                      0.000001)) {
-                    latdiff = 1.e36;
-                    m = nx;
-                    n = ny;
-                  }
-                }
-              }
-              if (!myequalf(latdiff, 1.e36)) {
-                grid_defs.back().type = Grid::Type::latitudeLongitude;
-                xd = nx;
-                yd = ny;
-                grid_defs.back().elatitude = lats[nlats - 1];
-                grid_defs.back().elongitude = lons[nlons - 1];
-                grid_defs.back().laincrement = latdiff;
-                grid_defs.back().loincrement = londiff;
-              } else {
-                for (size_t n = 0; n < ny; ++n) {
-                  auto x = n * nx;
-                  latdiff = fabs(lats[x + 1] - lats[x]);
-                  for (size_t m = 2; m < nx; ++m) {
-                    auto x = n * nx + m;
-                    if (!myequalf(fabs(lats[x] - lats[x - 1]), latdiff,
-                        0.000001)) {
-                      latdiff = 1.e36;
-                      n = ny;
-                      m = nx;
-                    }
-                  }
-                }
-                if (!myequalf(latdiff, 1.e36)) {
-                  const double PI = 3.141592654;
-                  auto a = log(tan(PI / 4. + lats[0] * PI / 360.));
-                  auto b = log(tan(PI / 4. + lats[ny2 * nx] * PI / 360.));
-                  auto c = log(tan(PI / 4. + lats[ny2 * 2 * nx] * PI / 360.));
-                  if (myequalf((b - a) / ny2, (c - a) / (ny2 * 2), 0.000001)) {
-                    grid_defs.back().type = Grid::Type::mercator;
-                    xd = nx;
-                    yd = ny;
-                    grid_defs.back().elatitude = lats[nlats - 1];
-                    grid_defs.back().elongitude = lons[nlons - 1];
-                    grid_defs.back().laincrement = (grid_defs.back().
-                        elatitude - grid_defs.back().slatitude) / (yd - 1);
-                    grid_defs.back().loincrement = londiff;
-                  }
-                }
-              }
-            }
-          }
-          if (grid_defs.back().type == Grid::Type::not_set) {
-            log_error2("unable to determine grid projection", F, "nc2xml",
-                USER);
-          }
+          log_error2("unable to determine grid projection", F, "nc2xml", USER);
         }
       }
     }
@@ -3512,72 +3500,16 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
         }
       }
     }
-    unique_ptr<TempDir> tdir(new TempDir);
-    if (!tdir->create(metautils::directives.temp_path)) {
-      log_error2("can't create temporary directory for netCDF levels", F,
-          "nc2xml", USER);
+    if (gatherxml::verbose_operation) {
+      cout << "Writing level map..." << endl;
     }
-    auto level_map_file = unixutils::remote_web_file("https://rda.ucar.edu/"
-        "metadata/LevelTables/netCDF.ds" + metautils::args.dsnum + ".xml",
-        tdir->name());
-    LevelMap level_map;
-    vector<string> map_contents;
-    if (level_map.fill(level_map_file)) {
-      std::ifstream ifs(level_map_file.c_str());
-      char line[32768];
-      ifs.getline(line, 32768);
-      while (!ifs.eof()) {
-        map_contents.emplace_back(line);
-        ifs.getline(line, 32768);
-      }
-      ifs.close();
-      map_contents.pop_back();
-    } else {
-      map_contents.clear();
+    auto e = metautils::NcLevel::write_level_map(grid_data.levdata);
+    if (!e.empty()) {
+      log_error2(e, "metautils::NcLevel::write_level_map()", "nc2xml", USER);
     }
-    stringstream oss, ess;
-    if (mysystem2("/bin/mkdir -p " + tdir->name() + "/metadata/LevelTables",
-        oss, ess) < 0) {
-      log_error2("can't create directory tree for netCDF levels", F, "nc2xml",
-          USER);
+    if (gatherxml::verbose_operation) {
+      cout << "...finished writing level map." << endl;
     }
-    std::ofstream ofs((tdir->name() + "/metadata/LevelTables/netCDF.ds" +
-        metautils::args.dsnum + ".xml").c_str());
-    if (!ofs.is_open()) {
-      log_error2("can't open output for writing netCDF levels", F, "nc2xml",
-          USER);
-    }
-    if (map_contents.size() > 0) {
-      for (const auto& line : map_contents) {
-        ofs << line << endl;
-      }
-    } else {
-      ofs << "<?xml version=\"1.0\" ?>" << endl;
-      ofs << "<levelMap>" << endl;
-    }
-    for (size_t m = 0; m < grid_data.levdata.write.size(); ++m) {
-      if (grid_data.levdata.write[m] && (map_contents.size() == 0 ||
-          (map_contents.size() > 0 && level_map.is_layer(grid_data.levdata.ID[
-          m]) < 0))) {
-        ofs << "  <level code=\"" << grid_data.levdata.ID[m] << "\">" << endl;
-        ofs << "    <description>" << grid_data.levdata.description[m] <<
-            "</description>" << endl;
-        ofs << "    <units>" << grid_data.levdata.units[m] << "</units>" <<
-            endl;
-        ofs << "  </level>" << endl;
-      }
-    }
-    ofs << "</levelMap>" << endl;
-    ofs.close();
-    string error;
-    if (unixutils::rdadata_sync(tdir->name(), "metadata/LevelTables/",
-        "/data/web", metautils::directives.rdadata_home, error) < 0) {
-      log_warning("level map was not synced - error(s): '" + error + "'",
-          "nc2xml", USER);
-    }
-    mysystem2("/bin/cp " + tdir->name() + "/metadata/LevelTables/netCDF.ds" +
-        metautils::args.dsnum + ".xml /glade/u/home/rdadata/share/metadata/"
-        "LevelTables/", oss, ess);
     if (gatherxml::verbose_operation) {
       cout << "... done scanning netCDF variables" << endl;
     }
