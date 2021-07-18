@@ -2969,6 +2969,9 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
   GridData grid_data;
   my::map<metautils::NcTime::TimeRangeEntry> tr_table;
   find_coordinate_variables(istream, vars, grid_data, tr_table);
+  if (grid_data.time.id.empty()) {
+    log_error2("time coordinate not found", F, "nc2xml", USER);
+  }
   vector<Grid::GridDimensions> grid_dims;
   vector<Grid::GridDefinition> grid_defs;
   if (grid_data.lats.size() == 0 || grid_data.lons.size() == 0) {
@@ -3032,7 +3035,7 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
       }
     }
   }
-  if (!grid_data.time.id.empty() && grid_data.levdata.ID.size() == 0) {
+  if (grid_data.levdata.ID.size() == 0) {
 
     // look for a level coordinate that is not a coordinate variable
     if (gatherxml::verbose_operation) {
@@ -3128,8 +3131,7 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
   grid_data.levdata.units.emplace_back();
   grid_data.levdata.write.emplace_back(false);
   unordered_set<string> parameter_table;
-  if (!grid_data.time.id.empty() && grid_data.lats.size() > 0 && grid_data.lons.
-      size() > 0) {
+  if (grid_data.lats.size() > 0 && grid_data.lons.size() > 0) {
     if (gatherxml::verbose_operation) {
       cout << "found coordinates, ready to scan netCDF variables ..." << endl;
     }
@@ -3143,7 +3145,7 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
       }
       tre.data.reset(new metautils::NcTime::TimeRangeEntry::Data);
 
-      // get t number of time steps and the temporal range
+      // get number of time steps and the temporal range
       NetCDF::VariableData vd;
       istream.variable_data(grid_data.time.id, vd);
       time_s.t1 = vd.front();
@@ -3513,12 +3515,8 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
     }
   }
   if (scan_data.grids->size() == 0) {
-    if (!grid_data.time.id.empty()) {
-      log_error2("no grids found - no content metadata will be generated", F,
-           "nc2xml", USER);
-    }
-    log_error2("time coordinate variable not found - no content metadata will "
-        "be generated", F, "nc2xml", USER);
+    log_error2("no grids found - no content metadata will be generated", F,
+         "nc2xml", USER);
   }
   scan_data.write_type = ScanData::GrML_type;
   delete[] time_s.times;
