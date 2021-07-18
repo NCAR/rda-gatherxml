@@ -3038,7 +3038,7 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
     if (gatherxml::verbose_operation) {
       cout << "looking for an alternate level coordinate ..." << endl;
     }
-    unordered_set<size_t> already_identified_levdimids;
+    unordered_set<size_t> u;
     for (const auto& y : grid_data.lats) {
       if (y.dim > 100) {
         size_t m = y.dim / 10000 - 1;
@@ -3059,11 +3059,9 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
             // check netCDF variables for what they are using as a level
             //    dimension
             if (grid_data.levels.back().dim == MISSING_FLAG) {
-              if (already_identified_levdimids.find(v.dimids[1]) ==
-                  already_identified_levdimids.end()) {
+              if (u.find(v.dimids[1]) == u.end()) {
                 grid_data.levels.back().dim = v.dimids[1];
-                already_identified_levdimids.emplace(grid_data.levels.back().
-                    dim);
+                u.emplace(grid_data.levels.back().dim);
               }
             } else if (grid_data.levels.back().dim != v.dimids[1]) {
               log_error2("found multiple level dimensions for the gridded "
@@ -3239,21 +3237,21 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
       }
       tr_table.insert(tre);
     }
-    for (size_t n = 0; n < grid_data.lats.size(); ++n) {
-      if (grid_data.lats[n].dim < 100) {
+    for (size_t x = 0; x < grid_data.lats.size(); ++x) {
+      if (grid_data.lats[x].dim < 100) {
         grid_defs.emplace_back(Grid::GridDefinition());
         grid_defs.back().type = Grid::Type::latitudeLongitude;
 
         // get the latitude range
         NetCDF::VariableData vd;
-        istream.variable_data(grid_data.lats[n].id, vd);
+        istream.variable_data(grid_data.lats[x].id, vd);
         grid_dims.emplace_back(Grid::GridDimensions());
         grid_dims.back().y = vd.size();
         grid_defs.back().slatitude = vd.front();
         grid_defs.back().elatitude = vd.back();
         grid_defs.back().laincrement = fabs((grid_defs.back().elatitude -
             grid_defs.back().slatitude) / (vd.size() - 1));
-        if (grid_data.lons[n].dim != MISSING_FLAG) {
+        if (grid_data.lons[x].dim != MISSING_FLAG) {
 
           // check for gaussian lat-lon
           if (!myequalf(fabs(vd[1] - vd[0]), grid_defs.back().laincrement,
@@ -3262,42 +3260,42 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
             grid_defs.back().type = Grid::Type::gaussianLatitudeLongitude;
             grid_defs.back().laincrement = vd.size() / 2;
           }
-          if (!grid_data.lats_b[n].id.empty()) {
-            if (grid_data.lons_b[n].id.empty()) {
+          if (!grid_data.lats_b[x].id.empty()) {
+            if (grid_data.lons_b[x].id.empty()) {
               log_error2("found a lat bounds but no lon bounds", F, "nc2xml",
                   USER);
             }
-            istream.variable_data(grid_data.lats_b[n].id, vd);
+            istream.variable_data(grid_data.lats_b[x].id, vd);
             grid_defs.back().slatitude = vd.front();
             grid_defs.back().elatitude = vd.back();
             grid_defs.back().is_cell = true;
           }
 
           // get the longitude range
-          istream.variable_data(grid_data.lons[n].id, vd);
+          istream.variable_data(grid_data.lons[x].id, vd);
           grid_dims.back().x = vd.size();
           grid_defs.back().slongitude = vd.front();
           grid_defs.back().elongitude = vd.back();
           grid_defs.back().loincrement = fabs((grid_defs.back().elongitude -
               grid_defs.back().slongitude) / (vd.size() - 1));
-          if (!grid_data.lons_b[n].id.empty()) {
-            if (grid_data.lats_b[n].id.empty()) {
+          if (!grid_data.lons_b[x].id.empty()) {
+            if (grid_data.lats_b[x].id.empty()) {
               log_error2("found a lon bounds but no lat bounds", F, "nc2xml",
                   USER);
             }
-            istream.variable_data(grid_data.lons_b[n].id, vd);
+            istream.variable_data(grid_data.lons_b[x].id, vd);
             grid_defs.back().slongitude = vd.front();
             grid_defs.back().elongitude = vd.back();
           }
         }
       }
     }
-    for (size_t m = 0; m < grid_data.levels.size(); ++m) {
-      auto levid = grid_data.levdata.ID[m].substr(0, grid_data.levdata.ID[m].
+    for (size_t z = 0; z < grid_data.levels.size(); ++z) {
+      auto levid = grid_data.levdata.ID[z].substr(0, grid_data.levdata.ID[z].
           find("@@"));
       NetCDF::VariableData lvd;
       size_t nl;
-      if (grid_data.levels[m].type == NetCDF::DataType::_NULL) {
+      if (grid_data.levels[z].type == NetCDF::DataType::_NULL) {
         nl = 1;
       } else {
         istream.variable_data(levid, lvd);
@@ -3306,17 +3304,17 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
       for (const auto& tr_key : tr_table.keys()) {
         metautils::NcTime::TimeRangeEntry tre;
         tr_table.found(tr_key, tre);
-        for (size_t k = 0; k < grid_data.lats.size(); ++k) {
-          vector<string> gentry_keys;
-          add_gridded_lat_lon_keys(gentry_keys, grid_dims[k], grid_defs[k],
-              grid_data.time.id, grid_data.time.dim, grid_data.levels[m].dim,
-              grid_data.lats[k].dim, grid_data.lons[k].dim, tre, vars);
-          for (const auto& g_key : gentry_keys) {
-            gentry_p->key = g_key;
+        for (size_t y = 0; y < grid_data.lats.size(); ++y) {
+          vector<string> v;
+          add_gridded_lat_lon_keys(v, grid_dims[y], grid_defs[y],
+              grid_data.time.id, grid_data.time.dim, grid_data.levels[z].dim,
+              grid_data.lats[y].dim, grid_data.lons[y].dim, tre, vars);
+          for (const auto& e : v) {
+            gentry_p->key = e;
             auto idx = gentry_p->key.rfind("<!>");
-            auto U_key = gentry_p->key.substr(idx + 3);
-            if (U_map.find(U_key) == U_map.end()) {
-              U_map.emplace(U_key, make_pair(U_map.size(), ""));
+            auto k = gentry_p->key.substr(idx + 3);
+            if (U_map.find(k) == U_map.end()) {
+              U_map.emplace(k, make_pair(U_map.size(), ""));
             }
             if (!scan_data.grids->found(gentry_p->key, *gentry_p)) {
 
@@ -3325,13 +3323,13 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
               lentry_p->parameter_code_table.clear();
               pentry_p->num_time_steps = 0;
               add_gridded_parameters_to_netcdf_level_entry(vars, gentry_p->key,
-                  grid_data.time.id, grid_data.time.dim, grid_data.levels[m].
-                  dim, grid_data.lats[k].dim, grid_data.lons[k].dim, tre,
+                  grid_data.time.id, grid_data.time.dim, grid_data.levels[z].
+                  dim, grid_data.lats[y].dim, grid_data.lons[y].dim, tre,
                   parameter_table, scan_data);
               for (size_t n = 0; n < nl; ++n) {
                 lentry_p->key = "ds" + metautils::args.dsnum + "," + grid_data.
-                    levdata.ID[m] + ":";
-                switch (grid_data.levels[m].type) {
+                    levdata.ID[z] + ":";
+                switch (grid_data.levels[z].type) {
                   case NetCDF::DataType::INT: {
                     lentry_p->key += itos(lvd[n]);
                     break;
@@ -3352,10 +3350,10 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
                   gentry_p->level_table.insert(*lentry_p);
                   if (inv_stream.is_open()) {
                     add_level_to_inventory(lentry_p->key, gentry_p->key,
-                        grid_data.time.dim, grid_data.levels[m].dim, grid_data.
-                        lats[k].dim, grid_data.lons[k].dim, istream);
+                        grid_data.time.dim, grid_data.levels[z].dim, grid_data.
+                        lats[y].dim, grid_data.lons[y].dim, istream);
                   }
-                  grid_data.levdata.write[m] = true;
+                  grid_data.levdata.write[z] = true;
                 }
               }
               if (gentry_p->level_table.size() > 0) {
@@ -3366,8 +3364,8 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
               // existing grid - needs update
               for (size_t n = 0; n < nl; ++n) {
                 lentry_p->key = "ds" + metautils::args.dsnum + "," + grid_data.
-                    levdata.ID[m] + ":";
-                switch (grid_data.levels[m].type) {
+                    levdata.ID[z] + ":";
+                switch (grid_data.levels[z].type) {
                   case NetCDF::DataType::INT: {
                     lentry_p->key += itos(lvd[n]);
                     break;
@@ -3388,29 +3386,29 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
                   lentry_p->parameter_code_table.clear();
                   add_gridded_parameters_to_netcdf_level_entry(vars, gentry_p->
                       key, grid_data.time.id, grid_data.time.dim, grid_data.
-                      levels[m].dim, grid_data.lats[k].dim, grid_data.lons[k].
+                      levels[z].dim, grid_data.lats[y].dim, grid_data.lons[y].
                       dim, tre, parameter_table, scan_data);
                   if (lentry_p->parameter_code_table.size() > 0) {
                     gentry_p->level_table.insert(*lentry_p);
                     if (inv_stream.is_open()) {
                       add_level_to_inventory(lentry_p->key, gentry_p->key,
-                          grid_data.time.dim, grid_data.levels[m].dim,
-                          grid_data.lats[k].dim, grid_data.lons[k].dim,
+                          grid_data.time.dim, grid_data.levels[z].dim,
+                          grid_data.lats[y].dim, grid_data.lons[y].dim,
                           istream);
                     }
-                    grid_data.levdata.write[m] = true;
+                    grid_data.levdata.write[z] = true;
                   }
                 } else {
 
                   // run through all of the parameters
                   for (const auto& v : vars) {
                     if (!v.is_coord && v.dimids[0] == grid_data.time.dim && ((v.
-                        dimids.size() == 4 && grid_data.levels[m].dim >= 0 && v.
-                        dimids[1] == grid_data.levels[m].dim && v.dimids[2] ==
-                        grid_data.lats[k].dim && v.dimids[3] == grid_data.lons[
-                        k].dim) || (v.dimids.size() == 3 && grid_data.levels[m].
-                        dim < 0 && v.dimids[1] == grid_data.lats[k].dim && v.
-                        dimids[2] == grid_data.lons[k].dim))) {
+                        dimids.size() == 4 && grid_data.levels[z].dim >= 0 && v.
+                        dimids[1] == grid_data.levels[z].dim && v.dimids[2] ==
+                        grid_data.lats[y].dim && v.dimids[3] == grid_data.lons[
+                        y].dim) || (v.dimids.size() == 3 && grid_data.levels[z].
+                        dim < 0 && v.dimids[1] == grid_data.lats[y].dim && v.
+                        dimids[2] == grid_data.lons[y].dim))) {
                       pentry_p->key = "ds" + metautils::args.dsnum + ":" + v.
                           name;
                       auto time_method = gridded_time_method(v, grid_data.time.
@@ -3438,8 +3436,8 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
                         gentry_p->level_table.replace(*lentry_p);
                         if (inv_stream.is_open()) {
                           add_level_to_inventory(lentry_p->key, gentry_p->key,
-                              grid_data.time.dim, grid_data.levels[m].dim,
-                              grid_data.lats[k].dim, grid_data.lons[k].dim,
+                              grid_data.time.dim, grid_data.levels[z].dim,
+                              grid_data.lats[y].dim, grid_data.lons[y].dim,
                               istream);
                         }
                       } else {
@@ -3483,13 +3481,13 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
                           gentry_p->level_table.replace(*lentry_p);
                           if (inv_stream.is_open()) {
                             add_level_to_inventory(lentry_p->key, gentry_p->key,
-                            grid_data.time.dim, grid_data.levels[m].dim,
-                            grid_data.lats[k].dim, grid_data.lons[k].dim,
+                            grid_data.time.dim, grid_data.levels[z].dim,
+                            grid_data.lats[y].dim, grid_data.lons[y].dim,
                             istream);
                           }
                         }
                       }
-                      grid_data.levdata.write[m] = true;
+                      grid_data.levdata.write[z] = true;
                     }
                   }
                 }
