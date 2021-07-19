@@ -2972,8 +2972,8 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
   if (grid_data.time.id.empty()) {
     log_error2("time coordinate not found", F, "nc2xml", USER);
   }
-  vector<Grid::GridDimensions> grid_dims;
-  vector<Grid::GridDefinition> grid_defs;
+  vector<Grid::GridDimensions> gdm;
+  vector<Grid::GridDefinition> gdf;
   if (grid_data.lats.size() == 0 || grid_data.lons.size() == 0) {
     if (grid_data.lats.size() > 0) {
 
@@ -3003,32 +3003,32 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
           log_error2("alternate latitude and longitude coordinate variables (" +
               itos(n) + ") do not have the same dimensions", F, "nc2xml", USER);
         }
-        grid_dims.emplace_back();
-        grid_dims.back().y = grid_data.lats[n].dim / 10000 - 1;
-        grid_dims.back().x = (grid_data.lats[n].dim % 10000) / 100 - 1;
-        grid_defs.emplace_back();
+        gdm.emplace_back();
+        gdm.back().y = grid_data.lats[n].dim / 10000 - 1;
+        gdm.back().x = (grid_data.lats[n].dim % 10000) / 100 - 1;
+        gdf.emplace_back();
         NetCDF::VariableData vd;
         istream.variable_data(grid_data.lats[n].id, vd);
-        grid_defs.back().slatitude = vd.front();
+        gdf.back().slatitude = vd.front();
         auto nlats = vd.size();
         unique_ptr<double[]> lats(new double[nlats]);
         for (size_t m = 0; m < nlats; ++m) {
           lats[m] = vd[m];
         }
         istream.variable_data(grid_data.lons[n].id, vd);
-        grid_defs.back().slongitude = vd.front();
+        gdf.back().slongitude = vd.front();
         auto nlons = vd.size();
         unique_ptr<double[]> lons(new double[nlons]);
         for (size_t m = 0; m < nlons; ++m) {
           lons[m] = vd[m];
         }
         Grid::GridDimensions d;
-        d.x = dims[grid_dims.back().x].length;
-        d.y = dims[grid_dims.back().y].length;
+        d.x = dims[gdm.back().x].length;
+        d.y = dims[gdm.back().y].length;
         Grid::GridDefinition f;
         if (filled_grid_projection(lats, lons, d, f, nlats, nlons)) {
-          grid_dims.back() = d;
-          grid_defs.back() = f;
+          gdm.back() = d;
+          gdf.back() = f;
         } else {
           log_error2("unable to determine grid projection", F, "nc2xml", USER);
         }
@@ -3131,223 +3131,267 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
   grid_data.levdata.units.emplace_back();
   grid_data.levdata.write.emplace_back(false);
   unordered_set<string> parameter_table;
-  if (grid_data.lats.size() > 0 && grid_data.lons.size() > 0) {
-    if (gatherxml::verbose_operation) {
-      cout << "found coordinates, ready to scan netCDF variables ..." << endl;
+  if (grid_data.lats.size() == 0 || grid_data.lons.size() == 0) {
+    log_error2("unable to determined horizontal coordinates", F, "nc2xml",
+        USER);
+  }
+  if (gatherxml::verbose_operation) {
+    cout << "found coordinates, ready to scan netCDF variables ..." << endl;
+  }
+  if (tr_table.size() == 0) {
+    metautils::NcTime::TimeRangeEntry tre;
+    tre.key = -1;
+
+    // set key for climate model simulations
+    if (source == "CAM") {
+      tre.key = -11;
     }
-    if (tr_table.size() == 0) {
-      metautils::NcTime::TimeRangeEntry tre;
-      tre.key = -1;
+    tre.data.reset(new metautils::NcTime::TimeRangeEntry::Data);
 
-      // set key for climate model simulations
-      if (source == "CAM") {
-        tre.key = -11;
+    // get number of time steps and the temporal range
+    NetCDF::VariableData vd;
+    istream.variable_data(grid_data.time.id, vd);
+    time_s.t1 = vd.front();
+    time_s.t2 = vd.back();
+    time_s.num_times = vd.size();
+    if (inv_stream.is_open()) {
+      time_s.times = new double[time_s.num_times];
+      for (size_t m = 0; m < vd.size(); ++m) {
+        time_s.times[m] = vd[m];
       }
-      tre.data.reset(new metautils::NcTime::TimeRangeEntry::Data);
-
-      // get number of time steps and the temporal range
-      NetCDF::VariableData vd;
-      istream.variable_data(grid_data.time.id, vd);
-      time_s.t1 = vd.front();
-      time_s.t2 = vd.back();
-      time_s.num_times = vd.size();
-      if (inv_stream.is_open()) {
-        time_s.times = new double[time_s.num_times];
-        for (size_t m = 0; m < vd.size(); ++m) {
-          time_s.times[m] = vd[m];
+    }
+    string e;
+    tre.data->instantaneous.first_valid_datetime = metautils::NcTime::
+        actual_date_time(time_s.t1, time_data, e);
+    if (!e.empty()) {
+      log_error2(e, F, "nc2xml", USER);
+    }
+    tre.data->instantaneous.last_valid_datetime = metautils::NcTime::
+        actual_date_time(time_s.t2, time_data, e);
+    if (!e.empty()) {
+      log_error2(e, F, "nc2xml", USER);
+    }
+    if (gatherxml::verbose_operation) {
+      cout << "   ...setting temporal range to:" << endl;
+      cout << "      " << tre.data->instantaneous.first_valid_datetime.
+          to_string() << " to " << tre.data->instantaneous.last_valid_datetime.
+          to_string() << endl;
+    }
+    tre.data->num_steps = vd.size();
+    if (!grid_data.time_bounds.id.empty()) {
+      if (gatherxml::verbose_operation) {
+        cout << "   ...adjusting times for time bounds" << endl;
+      }
+      for (const auto& v : vars) {
+        if (v.name == grid_data.time_bounds.id) {
+          grid_data.time_bounds.type = v.data_type;
+          break;
         }
       }
+      if (grid_data.time_bounds.type == NetCDF::DataType::_NULL) {
+        log_error2("unable to determine type of time bounds", F, "nc2xml",
+            USER);
+      }
+      istream.variable_data(grid_data.time_bounds.id, vd);
+      if (vd.size() != time_s.num_times * 2) {
+        log_error2("unable to handle more than two time bounds values per time",
+            F, "nc2xml", USER);
+      }
+      time_bounds_s.t1 = vd.front();
+      time_bounds_s.diff = vd[1] - time_bounds_s.t1;
+      for (size_t l = 2; l < vd.size(); l += 2) {
+        double diff = vd[l + 1] - vd[l];
+        if (!myequalf(diff, time_bounds_s.diff)) {
+          if (time_data.units != "days" || time_bounds_s.diff < 28 ||
+              time_bounds_s.diff > 31 || diff < 28 || diff > 31) {
+            time_bounds_s.changed = true;
+          }
+        }
+      }
+      time_bounds_s.t2 = vd.back();
       string e;
-      tre.data->instantaneous.first_valid_datetime = metautils::NcTime::
-          actual_date_time(time_s.t1, time_data, e);
+      tre.data->bounded.first_valid_datetime = metautils::NcTime::
+          actual_date_time(time_bounds_s.t1, time_data, e);
       if (!e.empty()) {
         log_error2(e, F, "nc2xml", USER);
       }
-      tre.data->instantaneous.last_valid_datetime = metautils::NcTime::
-          actual_date_time(time_s.t2, time_data, e);
+      tre.data->bounded.last_valid_datetime = metautils::NcTime::
+          actual_date_time(time_bounds_s.t2, time_data, e);
       if (!e.empty()) {
         log_error2(e, F, "nc2xml", USER);
       }
       if (gatherxml::verbose_operation) {
-        cout << "   ...setting temporal range to:" << endl;
-        cout << "      " << tre.data->instantaneous.first_valid_datetime.
-            to_string() << " to " << tre.data->instantaneous.
-            last_valid_datetime.to_string() << endl;
+        cout << "      ...now temporal range is:" << endl;
+        cout << "         " << tre.data->bounded.first_valid_datetime.
+            to_string() << " to " << tre.data->bounded.last_valid_datetime.
+            to_string() << endl;
       }
-      tre.data->num_steps = vd.size();
-      if (!grid_data.time_bounds.id.empty()) {
-        if (gatherxml::verbose_operation) {
-          cout << "   ...adjusting times for time bounds" << endl;
-        }
-        for (const auto& v : vars) {
-          if (v.name == grid_data.time_bounds.id) {
-            grid_data.time_bounds.type = v.data_type;
-            break;
-          }
-        }
-        if (grid_data.time_bounds.type == NetCDF::DataType::_NULL) {
-          log_error2("unable to determine type of time bounds", F, "nc2xml",
-              USER);
-        }
-        istream.variable_data(grid_data.time_bounds.id, vd);
-        if (vd.size() != time_s.num_times * 2) {
-          log_error2("unable to handle more than two time bounds values per "
-              "time", F, "nc2xml", USER);
-        }
-        time_bounds_s.t1 = vd.front();
-        time_bounds_s.diff = vd[1] - time_bounds_s.t1;
-        for (size_t l = 2; l < vd.size(); l += 2) {
-          double diff = vd[l + 1] - vd[l];
-          if (!myequalf(diff, time_bounds_s.diff)) {
-            if (time_data.units != "days" || time_bounds_s.diff < 28 ||
-                time_bounds_s.diff > 31 || diff < 28 || diff > 31) {
-              time_bounds_s.changed = true;
-            }
-          }
-        }
-        time_bounds_s.t2 = vd.back();
-        string e;
-        tre.data->bounded.first_valid_datetime = metautils::NcTime::
-            actual_date_time(time_bounds_s.t1, time_data, e);
-        if (!e.empty()) {
-          log_error2(e, F, "nc2xml", USER);
-        }
-        tre.data->bounded.last_valid_datetime = metautils::NcTime::
-            actual_date_time(time_bounds_s.t2, time_data, e);
-        if (!e.empty()) {
-          log_error2(e, F, "nc2xml", USER);
-        }
-        if (gatherxml::verbose_operation) {
-          cout << "      ...now temporal range is:" << endl;
-          cout << "         " << tre.data->bounded.first_valid_datetime.
-              to_string() << " to " << tre.data->bounded.last_valid_datetime.
-              to_string() << endl;
-        }
-      }
-      if (time_data.units == "months") {
-        if ((tre.data->instantaneous.first_valid_datetime).day() == 1) {
+    }
+    if (time_data.units == "months") {
+      if ((tre.data->instantaneous.first_valid_datetime).day() == 1) {
 //          (tre.instantaneous->last_valid_datetime).addDays(dateutils::days_in_month((tre.instantaneous->last_valid_datetime).year(),(tre.instantaneous->last_valid_datetime).month(),time_data.calendar)-1,time_data.calendar);
 (tre.data->instantaneous.last_valid_datetime).add_months(1);
-        }
+      }
 /*
-        if (!grid_data.time_bounds.id.empty()) {
-          if ((tre.data->bounded.first_valid_datetime).day() == 1) {
-            (tre.data->bounded.last_valid_datetime).add_months(1);
-          }
+      if (!grid_data.time_bounds.id.empty()) {
+        if ((tre.data->bounded.first_valid_datetime).day() == 1) {
+          (tre.data->bounded.last_valid_datetime).add_months(1);
         }
+      }
 */
       }
-      tr_table.insert(tre);
-    }
-    for (size_t x = 0; x < grid_data.lats.size(); ++x) {
-      if (grid_data.lats[x].dim < 100) {
-        grid_defs.emplace_back(Grid::GridDefinition());
-        grid_defs.back().type = Grid::Type::latitudeLongitude;
+    tr_table.insert(tre);
+  }
+  for (size_t x = 0; x < grid_data.lats.size(); ++x) {
+    if (grid_data.lats[x].dim < 100) {
+      gdf.emplace_back(Grid::GridDefinition());
+      gdf.back().type = Grid::Type::latitudeLongitude;
 
-        // get the latitude range
-        NetCDF::VariableData vd;
-        istream.variable_data(grid_data.lats[x].id, vd);
-        grid_dims.emplace_back(Grid::GridDimensions());
-        grid_dims.back().y = vd.size();
-        grid_defs.back().slatitude = vd.front();
-        grid_defs.back().elatitude = vd.back();
-        grid_defs.back().laincrement = fabs((grid_defs.back().elatitude -
-            grid_defs.back().slatitude) / (vd.size() - 1));
-        if (grid_data.lons[x].dim != MISSING_FLAG) {
+      // get the latitude range
+      NetCDF::VariableData vd;
+      istream.variable_data(grid_data.lats[x].id, vd);
+      gdm.emplace_back(Grid::GridDimensions());
+      gdm.back().y = vd.size();
+      gdf.back().slatitude = vd.front();
+      gdf.back().elatitude = vd.back();
+      gdf.back().laincrement = fabs((gdf.back().elatitude - gdf.back().
+          slatitude) / (vd.size() - 1));
+      if (grid_data.lons[x].dim != MISSING_FLAG) {
 
-          // check for gaussian lat-lon
-          if (!myequalf(fabs(vd[1] - vd[0]), grid_defs.back().laincrement,
-              0.001) && myequalf(vd.size() / 2., vd.size() / 2,
-              0.00000000001)) {
-            grid_defs.back().type = Grid::Type::gaussianLatitudeLongitude;
-            grid_defs.back().laincrement = vd.size() / 2;
+        // check for gaussian lat-lon
+        if (!myequalf(fabs(vd[1] - vd[0]), gdf.back().laincrement, 0.001) &&
+            myequalf(vd.size() / 2., vd.size() / 2, 0.00000000001)) {
+          gdf.back().type = Grid::Type::gaussianLatitudeLongitude;
+          gdf.back().laincrement = vd.size() / 2;
+        }
+        if (!grid_data.lats_b[x].id.empty()) {
+          if (grid_data.lons_b[x].id.empty()) {
+            log_error2("found a lat bounds but no lon bounds", F, "nc2xml",
+                USER);
           }
-          if (!grid_data.lats_b[x].id.empty()) {
-            if (grid_data.lons_b[x].id.empty()) {
-              log_error2("found a lat bounds but no lon bounds", F, "nc2xml",
-                  USER);
-            }
-            istream.variable_data(grid_data.lats_b[x].id, vd);
-            grid_defs.back().slatitude = vd.front();
-            grid_defs.back().elatitude = vd.back();
-            grid_defs.back().is_cell = true;
-          }
+          istream.variable_data(grid_data.lats_b[x].id, vd);
+          gdf.back().slatitude = vd.front();
+          gdf.back().elatitude = vd.back();
+          gdf.back().is_cell = true;
+        }
 
-          // get the longitude range
-          istream.variable_data(grid_data.lons[x].id, vd);
-          grid_dims.back().x = vd.size();
-          grid_defs.back().slongitude = vd.front();
-          grid_defs.back().elongitude = vd.back();
-          grid_defs.back().loincrement = fabs((grid_defs.back().elongitude -
-              grid_defs.back().slongitude) / (vd.size() - 1));
-          if (!grid_data.lons_b[x].id.empty()) {
-            if (grid_data.lats_b[x].id.empty()) {
-              log_error2("found a lon bounds but no lat bounds", F, "nc2xml",
-                  USER);
-            }
-            istream.variable_data(grid_data.lons_b[x].id, vd);
-            grid_defs.back().slongitude = vd.front();
-            grid_defs.back().elongitude = vd.back();
+        // get the longitude range
+        istream.variable_data(grid_data.lons[x].id, vd);
+        gdm.back().x = vd.size();
+        gdf.back().slongitude = vd.front();
+        gdf.back().elongitude = vd.back();
+        gdf.back().loincrement = fabs((gdf.back().elongitude - gdf.back().
+            slongitude) / (vd.size() - 1));
+        if (!grid_data.lons_b[x].id.empty()) {
+          if (grid_data.lats_b[x].id.empty()) {
+            log_error2("found a lon bounds but no lat bounds", F, "nc2xml",
+                USER);
           }
+          istream.variable_data(grid_data.lons_b[x].id, vd);
+          gdf.back().slongitude = vd.front();
+          gdf.back().elongitude = vd.back();
         }
       }
     }
-    for (size_t z = 0; z < grid_data.levels.size(); ++z) {
-      auto levid = grid_data.levdata.ID[z].substr(0, grid_data.levdata.ID[z].
-          find("@@"));
-      NetCDF::VariableData lvd;
-      size_t nl;
-      if (grid_data.levels[z].type == NetCDF::DataType::_NULL) {
-        nl = 1;
-      } else {
-        istream.variable_data(levid, lvd);
-        nl = lvd.size();
-      }
-      for (const auto& tr_key : tr_table.keys()) {
-        metautils::NcTime::TimeRangeEntry tre;
-        tr_table.found(tr_key, tre);
-        for (size_t y = 0; y < grid_data.lats.size(); ++y) {
-          vector<string> v;
-          add_gridded_lat_lon_keys(v, grid_dims[y], grid_defs[y],
-              grid_data.time.id, grid_data.time.dim, grid_data.levels[z].dim,
-              grid_data.lats[y].dim, grid_data.lons[y].dim, tre, vars);
-          for (const auto& e : v) {
-            gentry_p->key = e;
-            auto idx = gentry_p->key.rfind("<!>");
-            auto k = gentry_p->key.substr(idx + 3);
-            if (U_map.find(k) == U_map.end()) {
-              U_map.emplace(k, make_pair(U_map.size(), ""));
-            }
-            if (!scan_data.grids->found(gentry_p->key, *gentry_p)) {
+  }
+  for (size_t z = 0; z < grid_data.levels.size(); ++z) {
+    auto levid = grid_data.levdata.ID[z].substr(0, grid_data.levdata.ID[z].find(
+        "@@"));
+    NetCDF::VariableData lvd;
+    size_t nl;
+    if (grid_data.levels[z].type == NetCDF::DataType::_NULL) {
+      nl = 1;
+    } else {
+      istream.variable_data(levid, lvd);
+      nl = lvd.size();
+    }
+    for (const auto& tr_key : tr_table.keys()) {
+      metautils::NcTime::TimeRangeEntry tre;
+      tr_table.found(tr_key, tre);
+      for (size_t y = 0; y < grid_data.lats.size(); ++y) {
+        vector<string> v;
+        add_gridded_lat_lon_keys(v, gdm[y], gdf[y], grid_data.time.id,
+            grid_data.time.dim, grid_data.levels[z].dim, grid_data.lats[y].dim,
+            grid_data.lons[y].dim, tre, vars);
+        for (const auto& e : v) {
+          gentry_p->key = e;
+          auto idx = gentry_p->key.rfind("<!>");
+          auto k = gentry_p->key.substr(idx + 3);
+          if (U_map.find(k) == U_map.end()) {
+            U_map.emplace(k, make_pair(U_map.size(), ""));
+          }
+          if (!scan_data.grids->found(gentry_p->key, *gentry_p)) {
 
-              // new grid
-              gentry_p->level_table.clear();
-              lentry_p->parameter_code_table.clear();
-              pentry_p->num_time_steps = 0;
-              add_gridded_parameters_to_netcdf_level_entry(vars, gentry_p->key,
-                  grid_data.time.id, grid_data.time.dim, grid_data.levels[z].
-                  dim, grid_data.lats[y].dim, grid_data.lons[y].dim, tre,
-                  parameter_table, scan_data);
-              for (size_t n = 0; n < nl; ++n) {
-                lentry_p->key = "ds" + metautils::args.dsnum + "," + grid_data.
-                    levdata.ID[z] + ":";
-                switch (grid_data.levels[z].type) {
-                  case NetCDF::DataType::INT: {
-                    lentry_p->key += itos(lvd[n]);
-                    break;
-                  }
-                  case NetCDF::DataType::FLOAT:
-                  case NetCDF::DataType::DOUBLE: {
-                    lentry_p->key += ftos(lvd[n], floatutils::precision(lvd[n])
-                        + 2);
-                    break;
-                  }
-                  case NetCDF::DataType::_NULL: {
-                    lentry_p->key += "0";
-                     break;
-                  }
-                  default: { }
+            // new grid
+            gentry_p->level_table.clear();
+            lentry_p->parameter_code_table.clear();
+            pentry_p->num_time_steps = 0;
+            add_gridded_parameters_to_netcdf_level_entry(vars, gentry_p->key,
+                grid_data.time.id, grid_data.time.dim, grid_data.levels[z].dim,
+                grid_data.lats[y].dim, grid_data.lons[y].dim, tre,
+                parameter_table, scan_data);
+            for (size_t n = 0; n < nl; ++n) {
+              lentry_p->key = "ds" + metautils::args.dsnum + "," + grid_data.
+                  levdata.ID[z] + ":";
+              switch (grid_data.levels[z].type) {
+                case NetCDF::DataType::INT: {
+                  lentry_p->key += itos(lvd[n]);
+                  break;
                 }
+                case NetCDF::DataType::FLOAT:
+                case NetCDF::DataType::DOUBLE: {
+                  lentry_p->key += ftos(lvd[n], floatutils::precision(lvd[n]) +
+                      2);
+                  break;
+                }
+                case NetCDF::DataType::_NULL: {
+                  lentry_p->key += "0";
+                   break;
+                }
+                default: { }
+              }
+              if (lentry_p->parameter_code_table.size() > 0) {
+                gentry_p->level_table.insert(*lentry_p);
+                if (inv_stream.is_open()) {
+                  add_level_to_inventory(lentry_p->key, gentry_p->key,
+                      grid_data.time.dim, grid_data.levels[z].dim, grid_data.
+                      lats[y].dim, grid_data.lons[y].dim, istream);
+                }
+                grid_data.levdata.write[z] = true;
+              }
+            }
+            if (gentry_p->level_table.size() > 0) {
+              scan_data.grids->insert(*gentry_p);
+            }
+          } else {
+
+            // existing grid - needs update
+            for (size_t n = 0; n < nl; ++n) {
+              lentry_p->key = "ds" + metautils::args.dsnum + "," + grid_data.
+                  levdata.ID[z] + ":";
+              switch (grid_data.levels[z].type) {
+                case NetCDF::DataType::INT: {
+                  lentry_p->key += itos(lvd[n]);
+                  break;
+                }
+                case NetCDF::DataType::FLOAT:
+                case NetCDF::DataType::DOUBLE: {
+                  lentry_p->key += ftos(lvd[n], floatutils::precision(lvd[n]) +
+                      2);
+                  break;
+                }
+                case NetCDF::DataType::_NULL: {
+                  lentry_p->key += "0";
+                  break;
+                }
+                default: { }
+              }
+              if (!gentry_p->level_table.found(lentry_p->key, *lentry_p)) {
+                lentry_p->parameter_code_table.clear();
+                add_gridded_parameters_to_netcdf_level_entry(vars, gentry_p->
+                    key, grid_data.time.id, grid_data.time.dim, grid_data.
+                    levels[z].dim, grid_data.lats[y].dim, grid_data.lons[y].dim,
+                    tre, parameter_table, scan_data);
                 if (lentry_p->parameter_code_table.size() > 0) {
                   gentry_p->level_table.insert(*lentry_p);
                   if (inv_stream.is_open()) {
@@ -3357,145 +3401,98 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
                   }
                   grid_data.levdata.write[z] = true;
                 }
-              }
-              if (gentry_p->level_table.size() > 0) {
-                scan_data.grids->insert(*gentry_p);
-              }
-            } else {
+              } else {
 
-              // existing grid - needs update
-              for (size_t n = 0; n < nl; ++n) {
-                lentry_p->key = "ds" + metautils::args.dsnum + "," + grid_data.
-                    levdata.ID[z] + ":";
-                switch (grid_data.levels[z].type) {
-                  case NetCDF::DataType::INT: {
-                    lentry_p->key += itos(lvd[n]);
-                    break;
-                  }
-                  case NetCDF::DataType::FLOAT:
-                  case NetCDF::DataType::DOUBLE: {
-                    lentry_p->key += ftos(lvd[n], floatutils::precision(lvd[n])
-                        + 2);
-                    break;
-                  }
-                  case NetCDF::DataType::_NULL: {
-                    lentry_p->key += "0";
-                    break;
-                  }
-                  default: { }
-                }
-                if (!gentry_p->level_table.found(lentry_p->key, *lentry_p)) {
-                  lentry_p->parameter_code_table.clear();
-                  add_gridded_parameters_to_netcdf_level_entry(vars, gentry_p->
-                      key, grid_data.time.id, grid_data.time.dim, grid_data.
-                      levels[z].dim, grid_data.lats[y].dim, grid_data.lons[y].
-                      dim, tre, parameter_table, scan_data);
-                  if (lentry_p->parameter_code_table.size() > 0) {
-                    gentry_p->level_table.insert(*lentry_p);
-                    if (inv_stream.is_open()) {
-                      add_level_to_inventory(lentry_p->key, gentry_p->key,
-                          grid_data.time.dim, grid_data.levels[z].dim,
-                          grid_data.lats[y].dim, grid_data.lons[y].dim,
-                          istream);
-                    }
-                    grid_data.levdata.write[z] = true;
-                  }
-                } else {
-
-                  // run through all of the parameters
-                  for (const auto& v : vars) {
-                    if (!v.is_coord && v.dimids[0] == grid_data.time.dim && ((v.
-                        dimids.size() == 4 && grid_data.levels[z].dim >= 0 && v.
-                        dimids[1] == grid_data.levels[z].dim && v.dimids[2] ==
-                        grid_data.lats[y].dim && v.dimids[3] == grid_data.lons[
-                        y].dim) || (v.dimids.size() == 3 && grid_data.levels[z].
-                        dim < 0 && v.dimids[1] == grid_data.lats[y].dim && v.
-                        dimids[2] == grid_data.lons[y].dim))) {
-                      pentry_p->key = "ds" + metautils::args.dsnum + ":" + v.
-                          name;
-                      auto time_method = gridded_time_method(v, grid_data.time.
-                          id);
-                      time_method = strutils::capitalize(time_method);
-                      if (!lentry_p->parameter_code_table.found(pentry_p->key,
-                          *pentry_p)) {
-                        if (time_method.empty() || (myequalf(time_bounds_s.t1,
-                            0, 0.0001) && myequalf(time_bounds_s.t1,
-                            time_bounds_s.t2, 0.0001))) {
-                          add_gridded_netcdf_parameter(v, tre.data->
-                              instantaneous.first_valid_datetime, tre.data->
-                              instantaneous.last_valid_datetime, tre.data->
-                              num_steps, parameter_table, scan_data);
-                        } else {
-                          if (time_bounds_s.changed) {
-                            log_error2("time bounds changed", F, "nc2xml",
-                                USER);
-                          }
-                          add_gridded_netcdf_parameter(v, tre.data->bounded.
-                              first_valid_datetime, tre.data->bounded.
-                              last_valid_datetime, tre.data->num_steps,
-                              parameter_table, scan_data);
-                        }
-                        gentry_p->level_table.replace(*lentry_p);
-                        if (inv_stream.is_open()) {
-                          add_level_to_inventory(lentry_p->key, gentry_p->key,
-                              grid_data.time.dim, grid_data.levels[z].dim,
-                              grid_data.lats[y].dim, grid_data.lons[y].dim,
-                              istream);
-                        }
+                // run through all of the parameters
+                for (const auto& v : vars) {
+                  if (!v.is_coord && v.dimids[0] == grid_data.time.dim && ((v.
+                      dimids.size() == 4 && grid_data.levels[z].dim >= 0 && v.
+                      dimids[1] == grid_data.levels[z].dim && v.dimids[2] ==
+                      grid_data.lats[y].dim && v.dimids[3] == grid_data.lons[y].
+                      dim) || (v.dimids.size() == 3 && grid_data.levels[z].dim <
+                      0 && v.dimids[1] == grid_data.lats[y].dim && v.dimids[2]
+                      == grid_data.lons[y].dim))) {
+                    pentry_p->key = "ds" + metautils::args.dsnum + ":" + v.name;
+                    auto time_method = gridded_time_method(v, grid_data.time.
+                        id);
+                    time_method = strutils::capitalize(time_method);
+                    if (!lentry_p->parameter_code_table.found(pentry_p->key,
+                        *pentry_p)) {
+                      if (time_method.empty() || (myequalf(time_bounds_s.t1, 0,
+                          0.0001) && myequalf(time_bounds_s.t1, time_bounds_s.
+                          t2, 0.0001))) {
+                        add_gridded_netcdf_parameter(v, tre.data->
+                            instantaneous.first_valid_datetime, tre.data->
+                            instantaneous.last_valid_datetime, tre.data->
+                            num_steps, parameter_table, scan_data);
                       } else {
-                        string error;
-                        auto tr_description=metautils::NcTime::
-                            gridded_netcdf_time_range_description(tre,
-                            time_data, time_method, error);
-                        if (!error.empty()) {
-                          log_error2(error, F, "nc2xml", USER);
+                        if (time_bounds_s.changed) {
+                          log_error2("time bounds changed", F, "nc2xml", USER);
                         }
-                        tr_description = strutils::capitalize(tr_description);
-                        if (strutils::has_ending(gentry_p->key,
-                            tr_description)) {
-                          if (time_method.empty() || (myequalf(time_bounds_s.t1,
-                              0, 0.0001) && myequalf(time_bounds_s.t1,
-                              time_bounds_s.t2, 0.0001))) {
-                            if (tre.data->instantaneous.first_valid_datetime <
-                                pentry_p->start_date_time) {
-                              pentry_p->start_date_time = tre.data->
-                                  instantaneous.first_valid_datetime;
-                            }
-                            if (tre.data->instantaneous.last_valid_datetime >
-                                pentry_p->end_date_time) {
-                              pentry_p->end_date_time = tre.data->
-                                  instantaneous.last_valid_datetime;
-                            }
-                          } else {
-                            if (tre.data->bounded.first_valid_datetime <
-                                pentry_p->start_date_time) {
-                              pentry_p->start_date_time = tre.data->
-                                  bounded.first_valid_datetime;
-                            }
-                            if (tre.data->bounded.last_valid_datetime >
-                                pentry_p->end_date_time) {
-                              pentry_p->end_date_time=tre.data->bounded.
-                                  last_valid_datetime;
-                            }
-                          }
-                          pentry_p->num_time_steps += tre.data->num_steps;
-                          lentry_p->parameter_code_table.replace(*pentry_p);
-                          gentry_p->level_table.replace(*lentry_p);
-                          if (inv_stream.is_open()) {
-                            add_level_to_inventory(lentry_p->key, gentry_p->key,
+                        add_gridded_netcdf_parameter(v, tre.data->bounded.
+                            first_valid_datetime, tre.data->bounded.
+                            last_valid_datetime, tre.data->num_steps,
+                            parameter_table, scan_data);
+                      }
+                      gentry_p->level_table.replace(*lentry_p);
+                      if (inv_stream.is_open()) {
+                        add_level_to_inventory(lentry_p->key, gentry_p->key,
                             grid_data.time.dim, grid_data.levels[z].dim,
                             grid_data.lats[y].dim, grid_data.lons[y].dim,
                             istream);
+                      }
+                    } else {
+                      string error;
+                      auto tr_description=metautils::NcTime::
+                          gridded_netcdf_time_range_description(tre, time_data,
+                          time_method, error);
+                      if (!error.empty()) {
+                        log_error2(error, F, "nc2xml", USER);
+                      }
+                      tr_description = strutils::capitalize(tr_description);
+                      if (strutils::has_ending(gentry_p->key, tr_description)) {
+                        if (time_method.empty() || (myequalf(time_bounds_s.t1,
+                            0, 0.0001) && myequalf(time_bounds_s.t1,
+                            time_bounds_s.t2, 0.0001))) {
+                          if (tre.data->instantaneous.first_valid_datetime <
+                              pentry_p->start_date_time) {
+                            pentry_p->start_date_time = tre.data->
+                                instantaneous.first_valid_datetime;
+                          }
+                          if (tre.data->instantaneous.last_valid_datetime >
+                              pentry_p->end_date_time) {
+                            pentry_p->end_date_time = tre.data->
+                                instantaneous.last_valid_datetime;
+                          }
+                        } else {
+                          if (tre.data->bounded.first_valid_datetime <
+                              pentry_p->start_date_time) {
+                            pentry_p->start_date_time = tre.data->bounded.
+                                first_valid_datetime;
+                          }
+                          if (tre.data->bounded.last_valid_datetime > pentry_p->
+                              end_date_time) {
+                            pentry_p->end_date_time=tre.data->bounded.
+                                last_valid_datetime;
                           }
                         }
+                        pentry_p->num_time_steps += tre.data->num_steps;
+                        lentry_p->parameter_code_table.replace(*pentry_p);
+                        gentry_p->level_table.replace(*lentry_p);
+                        if (inv_stream.is_open()) {
+                          add_level_to_inventory(lentry_p->key, gentry_p->key,
+                          grid_data.time.dim, grid_data.levels[z].dim,
+                          grid_data.lats[y].dim, grid_data.lons[y].dim,
+                          istream);
+                        }
                       }
-                      grid_data.levdata.write[z] = true;
                     }
+                    grid_data.levdata.write[z] = true;
                   }
                 }
               }
-              scan_data.grids->replace(*gentry_p);
             }
+            scan_data.grids->replace(*gentry_p);
           }
         }
       }
