@@ -601,59 +601,54 @@ void update_gridded_parameters_in_netcdf_level_entry(const vector<NetCDF::
       if (!lentry_p->parameter_code_table.found(pentry_p->key, *pentry_p)) {
         if (time_method.empty() || (myequalf(time_bounds_s.t1, 0, 0.0001) &&
             myequalf(time_bounds_s.t1, time_bounds_s.t2, 0.0001))) {
-          add_gridded_netcdf_parameter(v, tre.data->
-              instantaneous.first_valid_datetime, tre.data->
-              instantaneous.last_valid_datetime, tre.data->
-              num_steps, parameter_table, scan_data);
+          add_gridded_netcdf_parameter(v, tre.data->instantaneous.
+              first_valid_datetime, tre.data->instantaneous.last_valid_datetime,
+              tre.data->num_steps, parameter_table, scan_data);
         } else {
           if (time_bounds_s.changed) {
             log_error2("time bounds changed", F, "nc2xml", USER);
           }
           add_gridded_netcdf_parameter(v, tre.data->bounded.
-              first_valid_datetime, tre.data->bounded.
-              last_valid_datetime, tre.data->num_steps,
-              parameter_table, scan_data);
+              first_valid_datetime, tre.data->bounded.last_valid_datetime, tre.
+              data->num_steps, parameter_table, scan_data);
         }
         gentry_p->level_table.replace(*lentry_p);
         if (inv_stream.is_open()) {
-          add_level_to_inventory(lentry_p->key, gentry_p->key,
-              grid_data.time.dim, grid_data.levels[z].dim,
-              grid_data.lats[y].dim, grid_data.lons[y].dim,
-              istream);
+          add_level_to_inventory(lentry_p->key, gentry_p->key, grid_data.time.
+              dim, grid_data.levels[z].dim, grid_data.lats[y].dim, grid_data.
+              lons[y].dim, istream);
         }
       } else {
         string error;
         auto tr_description=metautils::NcTime::
-            gridded_netcdf_time_range_description(tre, time_data,
-            time_method, error);
+            gridded_netcdf_time_range_description(tre, time_data, time_method,
+                error);
         if (!error.empty()) {
           log_error2(error, F, "nc2xml", USER);
         }
         tr_description = strutils::capitalize(tr_description);
         if (strutils::has_ending(gentry_p->key, tr_description)) {
-          if (time_method.empty() || (myequalf(time_bounds_s.t1,
-              0, 0.0001) && myequalf(time_bounds_s.t1,
-              time_bounds_s.t2, 0.0001))) {
-            if (tre.data->instantaneous.first_valid_datetime <
-                pentry_p->start_date_time) {
-              pentry_p->start_date_time = tre.data->
-                  instantaneous.first_valid_datetime;
+          if (time_method.empty() || (myequalf(time_bounds_s.t1, 0, 0.0001) &&
+              myequalf(time_bounds_s.t1, time_bounds_s.t2, 0.0001))) {
+            if (tre.data->instantaneous.first_valid_datetime < pentry_p->
+                start_date_time) {
+              pentry_p->start_date_time = tre.data->instantaneous.
+                  first_valid_datetime;
             }
-            if (tre.data->instantaneous.last_valid_datetime >
-                pentry_p->end_date_time) {
-              pentry_p->end_date_time = tre.data->
-                  instantaneous.last_valid_datetime;
+            if (tre.data->instantaneous.last_valid_datetime > pentry_p->
+                end_date_time) {
+              pentry_p->end_date_time = tre.data->instantaneous.
+                  last_valid_datetime;
             }
           } else {
-            if (tre.data->bounded.first_valid_datetime <
-                pentry_p->start_date_time) {
+            if (tre.data->bounded.first_valid_datetime < pentry_p->
+                start_date_time) {
               pentry_p->start_date_time = tre.data->bounded.
                   first_valid_datetime;
             }
             if (tre.data->bounded.last_valid_datetime > pentry_p->
                 end_date_time) {
-              pentry_p->end_date_time=tre.data->bounded.
-                  last_valid_datetime;
+              pentry_p->end_date_time=tre.data->bounded.last_valid_datetime;
             }
           }
           pentry_p->num_time_steps += tre.data->num_steps;
