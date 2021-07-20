@@ -5410,7 +5410,7 @@ int main(int argc, char **argv) {
     if (gatherxml::verbose_operation) {
       cout << "...'scm' finished." << endl;
     }
-  } else if (metautils::args.dsnum == "999.9") {
+  } else if (metautils::args.dsnum == "test") {
     cout << "Output is in:" << endl;
     cout << "  " << tdir << "/" << metautils::args.filename << ".";
     switch (sd.write_type) {
