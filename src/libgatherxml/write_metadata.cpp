@@ -141,7 +141,9 @@ void write_finalize(std::string filename,std::string ext,std::string tdir_name,s
   ofs.close();
   if (ext != "GrML") {
     std::string metadata_path="metadata/wfmd";
-    system(("gzip "+tdir_name+"/"+metadata_path+"/"+filename+"."+ext).c_str());
+    if (system(("gzip "+tdir_name+"/"+metadata_path+"/"+filename+"."+ext).c_str()) != 0) {
+	metautils::log_error(THIS_FUNC+"(): unable to gzip metadata file",caller,user);
+    }
     std::string error;
     if (unixutils::rdadata_sync(tdir_name,metadata_path+"/","/data/web/datasets/ds"+metautils::args.dsnum,metautils::directives.rdadata_home,error) < 0) {
 	metautils::log_warning(THIS_FUNC+"(): unable to sync '"+filename+"."+ext+"' - rdadata_sync error(s): '"+error+"'",caller,user);
@@ -153,9 +155,13 @@ void write_finalize(std::string filename,std::string ext,std::string tdir_name,s
 void write_initialize(std::string& filename,std::string ext,std::string tdir_name,std::ofstream& ofs,std::string caller,std::string user)
 {
   const std::string THIS_FUNC=__func__;
-  filename=metautils::args.path+"/"+metautils::args.filename;
-  filename=metautils::relative_web_filename(filename);
-  strutils::replace_all(filename,"/","%");
+  if (metautils::args.dsnum == "test") {
+    filename=metautils::args.filename;
+  } else {
+    filename=metautils::args.path+"/"+metautils::args.filename;
+    filename=metautils::relative_web_filename(filename);
+    strutils::replace_all(filename,"/","%");
+  }
 
   if (ext == "GrML") {
 // gridded content metadata is not stored on the server; it goes into a temp
@@ -673,12 +679,12 @@ std::string write(my::map<GridEntry>& grid_table,std::string caller,std::string 
 // print out <grid> element
     write_grid(gentry.key,ofs,caller,user);
 // print out <process> elements
-    for (const auto& key : gentry.process_table.keys()) {
-	ofs << "    <process value=\"" << key << "\" />" << std::endl;
+    for (const auto& e : gentry.process_table) {
+	ofs << "    <process value=\"" << e << "\" />" << std::endl;
     }
 // print out <ensemble> elements
-    for (const auto& e_key : gentry.ensemble_table.keys()) {
-	auto e_parts=strutils::split(e_key,"<!>");
+    for (const auto& e : gentry.ensemble_table) {
+	auto e_parts=strutils::split(e,"<!>");
 	ofs << "    <ensemble type=\"" << e_parts[0] << "\"";
 	if (!e_parts[1].empty()) {
 	  ofs << " ID=\"" << e_parts[1] << "\"";
