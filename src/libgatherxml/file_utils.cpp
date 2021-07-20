@@ -41,7 +41,8 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile, TempDir& tdir, list<
     // HPSS file
     error = "Terminating - HPSS files are no longer supported";
     return false;
-  } else if (regex_search(args.path, regex("^https://rda.ucar.edu"))) {
+  } else if (regex_search(args.path, regex("^https://rda.ucar.edu")) || args.
+      dsnum == "test") {
 
     // Web file
     auto w = metautils::relative_web_filename(args.path + "/" + args.filename);
@@ -65,59 +66,68 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile, TempDir& tdir, list<
       file_format = row[1];
       loc = row[2][0];
     }
-    string lnm;
+    string lnm = args.path;
     if (!args.override_primary_check) {
-      lnm = args.path;
       replace_all(lnm, "https://rda.ucar.edu", "");
       if (regex_search(lnm, regex("^" + directives.data_root_alias))) {
-        if (loc == 'G') {
+        if (loc == 'B' || loc == 'G') {
           lnm = directives.data_root + lnm.substr(directives.data_root_alias
               .length());
         } else if (loc == 'O') {
           lnm = lnm.substr(directives.data_root_alias.length() + 1);
         }
       }
-      lnm += "/" + args.filename;
-    } else {
-      lnm = args.filename;
     }
-    struct stat64 statbuf;
-    if ( (stat64(lnm.c_str(), &statbuf)) != 0) {
+    lnm += "/" + args.filename;
+    struct stat64 s64;
+    if (stat64(lnm.c_str(), &s64) != 0 && args.dsnum != "test") {
 
       // file is not in local directory, so get it from it's archive location
-      if (loc == 'G') {
+      switch (loc) {
+        case 'B':
+        case 'G': {
 
-        // file is on glade
-        TempDir t;
-        if (!t.create(directives.temp_path)) {
-          error = "Error creating temporary directory";
-          return false;
+          // file is on glade
+          TempDir t;
+          if (!t.create(directives.temp_path)) {
+            error = "Error creating temporary directory";
+            return false;
+          }
+          auto gnm = args.path + "/" + args.filename;
+          replace_all(gnm, "https://rda.ucar.edu/data", directives.data_root);
+          if (system(("cp " + gnm + " " + tfile.name()).c_str()) != 0) {
+            error = "error copying glade file " + gnm;
+            return false;
+          }
+          if ( (stat64(tfile.name().c_str(), &s64)) != 0 || s64.st_size == 0) {
+            error = "Web file '" + args.path + "/" + args.filename + "' not "
+                "found or unable to transfer";
+            return false;
+          }
+          break;
         }
-        lnm = unixutils::remote_web_file(args.path + "/" + args.filename,
-            t.name());
-        if (lnm.empty()) {
-          error = "Web file '" + args.path + "/" + args.filename + "' not "
-              "found or unable to transfer";
-          return false;
-        }
-        system(("mv " + lnm + " " + tfile.name()).c_str());
-      } else if (loc == 'O') {
+        case 'O': {
 
-        // file is on object storage
-        s3::Session s3("stratus.ucar.edu", "AK06XKLYCIANHSDVOSL6",
-            "bN3i7jcp3avElZ1/cSI1zTloy50Lbqcwz04ajD5Q", "us-east-1",
-            "aws4_request");
-        if (!s3.download_file("rda-data", lnm, tfile.name())) {
-          error = "Object store file '" + lnm + "' not found or unable to "
-              "transfer";
-          return false;
+          // file is on object storage
+          s3::Session s3("stratus.ucar.edu", "AK06XKLYCIANHSDVOSL6",
+              "bN3i7jcp3avElZ1/cSI1zTloy50Lbqcwz04ajD5Q", "us-east-1",
+              "aws4_request");
+          if (!s3.download_file("rda-data", lnm, tfile.name())) {
+            error = "Object store file '" + lnm + "' not found or unable to "
+                "transfer";
+            return false;
+          }
+          break;
         }
       }
     } else {
 
       // make a copy of the local file because we might need to remove blocking,
       //    uncompress, etc.
-      system(("cp " + lnm + " " + tfile.name()).c_str());
+      if (system(("cp " + lnm + " " + tfile.name()).c_str()) != 0) {
+        error = "error copying local file " + lnm + " to temporary";
+        return false;
+      }
     }
   } else {
     error = "path of file '" + args.path + "' not recognized";
@@ -132,10 +142,15 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile, TempDir& tdir, list<
 
       // check to see if file is COS-blocked
       stringstream oss, ess;
-      mysystem2(directives.decs_bindir + "/cosfile " + tf, oss, ess);
+
+      if (mysystem2(directives.decs_bindir + "/cosfile " + tf, oss,
+          ess)) { } // suppress compiler warning
       if (ess.str().empty()) {
-        system((directives.decs_bindir + "/cosconvert -b " + tf + " 1> /dev"
-            "/null").c_str());
+        if (system((directives.decs_bindir + "/cosconvert -b " + tf + " 1> /dev"
+            "/null").c_str()) != 0) {
+          error = "error cosconverting " + tf + " to a binary file";
+          return false;
+        }
       } else if (!regex_search(ess.str(), regex("error on record 1"))) {
         error = "unable to open '" + tf + "'; error: " + ess.str();
         return false;
@@ -169,7 +184,10 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile, TempDir& tdir, list<
               error = ess.str();
               return false;
             } else {
-              system(("mv " + tf + ".bi " + tf).c_str());
+              if (system(("mv " + tf + ".bi " + tf).c_str()) != 0) {
+                error = "error overwriting " + tf + " with binary version";
+                return false;
+              }
             }
           }
         }
@@ -177,8 +195,11 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile, TempDir& tdir, list<
         if (args.data_format == "grib" || args.data_format == "grib2" ||
             regex_search(args.data_format, bufr_re) || args.data_format ==
             "mcidas") {
-          system((directives.decs_bindir + "/cosconvert -c " + tf + " 1> /dev"
-              "/null").c_str());
+          if (system((directives.decs_bindir + "/cosconvert -c " + tf + " 1> "
+              "/dev/null").c_str()) != 0) {
+            error = "error cosconverting " + tf;
+            return false;
+          }
         }
       } else if (ff[n] == "GZ" || ff[n] == "BZ2") {
         string cmd, ext = strutils::to_lower(ff[n]);
@@ -188,8 +209,11 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile, TempDir& tdir, list<
           cmd = "bunzip2";
         }
         if (ff[n] == ff.back()) {
-          system(("mv " + tf + " " + tf + "." + ext + "; " + cmd + " -f " + tf +
-              "." + ext).c_str());
+          if (system(("mv " + tf + " " + tf + "." + ext + "; " + cmd + " -f " +
+              tf + "." + ext).c_str()) != 0) {
+            error = "error uncompressing " + tf;
+            return false;
+          }
         } else if (ff[n] == ff.front()) {
           if ((args.data_format == "cxml" || args.data_format == "tcvitals" ||
               regex_search(args.data_format, netcdf_re) || regex_search(args
@@ -202,7 +226,10 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile, TempDir& tdir, list<
           }
           auto ofs = fopen64(tf.c_str(), "w");
           for (auto f : flist) {
-            system((cmd + " -f " + f).c_str());
+            if (system((cmd + " -f " + f).c_str()) != 0) {
+              error = "error uncompressing " + f;
+              return false;
+            }
             replace_all(f, "." + ext, "");
             if (args.data_format != "cxml" && args.data_format != "tcvitals" &&
                 !regex_search(args.data_format, netcdf_re) && !regex_search(
@@ -280,43 +307,66 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile, TempDir& tdir, list<
           }
           pclose(p);
           auto tar_file = tf.substr(tf.rfind("/") + 1);
-          system(("mv " + tf + " " + tdir.name() + "/; cd " + tdir.name() + "; "
-              "tar xvf " + tar_file + " 1> /dev/null 2>&1").c_str());
+          if (system(("mv " + tf + " " + tdir.name() + "/; cd " + tdir.name() +
+              "; tar xvf " + tar_file + " 1> /dev/null 2>&1").c_str()) != 0) {
+            error = "error untarring " + tar_file;
+            return false;
+          }
         } else {
           error = "archive file format is too complicated";
           return false;
         }
       } else if (ff[n] == "VBS") {
         if (static_cast<int>(ff.size()) >= (n + 2) && ff[n + 1] == "BI") {
-          system((directives.decs_bindir + "/cosconvert -v " + tf + " " + tf +
-              ".vbs 1> /dev/null;mv " + tf + ".vbs " + tf).c_str());
+          if (system((directives.decs_bindir + "/cosconvert -v " + tf + " " + tf
+              + ".vbs 1> /dev/null;mv " + tf + ".vbs " + tf).c_str()) != 0) {
+            error = "error cosconverting " + tf + " to a .vbs file";
+            return false;
+          }
         }
       } else if (ff[n] == "LVBS") {
         if (static_cast<int>(ff.size()) >= (n + 2) && ff[n + 1] == "BI") {
-          system((directives.decs_root + "/bin/cossplit -p " + tf + " " + tf)
-              .c_str());
+          if (system((directives.decs_root + "/bin/cossplit -p " + tf + " " +
+              tf) .c_str()) != 0) {
+            error = "error cosspliting " + tf;
+            return false;
+          }
           auto fnum = 2;
           string cos = directives.decs_root + "/bin/coscombine noeof";
           auto f = tf + ".f" + ftos(fnum, 3, 0, '0');
-          struct stat64 statbuf;
-          while (stat64(f.c_str(), &statbuf) == 0) {
+          struct stat64 s64;
+          while (stat64(f.c_str(), &s64) == 0) {
             cos += " " + f;
             fnum += 3;
             f = tf + ".f" + ftos(fnum, 3, 0, '0');
           }
           cos += " " + tf + " 1> /dev/null";
-          system(cos.c_str());
-          system(("rm -f " + tf + ".f*").c_str());
-          system((directives.decs_bindir + "/cosconvert -v " + tf + " " + tf +
-              ".vbs 1> /dev/null;mv " + tf + ".vbs " + tf).c_str());
+          if (system(cos.c_str()) != 0) {
+            error = "coscombine error for '" + cos + "'";
+            return false;
+          }
+          if (system(("rm -f " + tf + ".f*").c_str()))
+              { } // suppress compiler warning
+          if (system((directives.decs_bindir + "/cosconvert -v " + tf + " " + tf
+              + ".vbs 1> /dev/null;mv " + tf + ".vbs " + tf).c_str()) != 0) {
+            error = "error cosconverting " + tf + " to a .vbs file";
+            return false;
+          }
         }
       } else if (ff[n] == "Z") {
         if (n == static_cast<int>(ff.size() - 1)) {
-          system(("mv " + tf + " " + tf + ".Z; uncompress " + tf).c_str());
+          if (system(("mv " + tf + " " + tf + ".Z; uncompress " + tf).c_str())
+              != 0) {
+            error = "error Z-uncompressing " + tf + ".Z";
+            return false;
+          }
         } else if (n == 0) {
           auto ofs = fopen64(tf.c_str(), "w");
           for (auto f : flist) {
-            system(("uncompress " + f).c_str());
+            if (system(("uncompress " + f).c_str()) != 0) {
+              error = "error Z-uncompressing " + f;
+              return false;
+            }
             replace_all(f, ".Z", "");
             if (!regex_search(args.data_format, netcdf_re) && !regex_search(args
                 .data_format, hdf_re)) {
