@@ -3380,6 +3380,10 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
   for (size_t z = 0; z < grid_data.levels.size(); ++z) {
     auto levid = grid_data.levdata.ID[z].substr(0, grid_data.levdata.ID[z].find(
         "@@"));
+    if (gatherxml::verbose_operation) {
+      cout << "Scanning netCDF variables for level '" << levid << "' ..." <<
+          endl;
+    }
     NetCDF::VariableData lvd;
     size_t nl;
     if (grid_data.levels[z].type == NetCDF::DataType::_NULL) {
@@ -3495,15 +3499,17 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
         }
       }
     }
-    if (gatherxml::verbose_operation) {
-      cout << "Writing level map..." << endl;
-    }
-    auto e = metautils::NcLevel::write_level_map(grid_data.levdata);
-    if (!e.empty()) {
-      log_error2(e, "metautils::NcLevel::write_level_map()", "nc2xml", USER);
-    }
-    if (gatherxml::verbose_operation) {
-      cout << "...finished writing level map." << endl;
+    if (metautils::args.dsnum != "test") {
+      if (gatherxml::verbose_operation) {
+        cout << "Writing level map..." << endl;
+      }
+      auto e = metautils::NcLevel::write_level_map(grid_data.levdata);
+      if (!e.empty()) {
+        log_error2(e, "metautils::NcLevel::write_level_map()", "nc2xml", USER);
+      }
+      if (gatherxml::verbose_operation) {
+        cout << "...finished writing level map." << endl;
+      }
     }
     if (gatherxml::verbose_operation) {
       cout << "... done scanning netCDF variables" << endl;
@@ -5292,7 +5298,7 @@ void scan_file(ScanData& scan_data, gatherxml::markup::ObML::ObservationData&
   }
   metautils::args.data_format = "netcdf";
   if (!metautils::args.inventory_only && scan_data.netcdf_variables.size() >
-      0) {
+      0 && metautils::args.dsnum != "test") {
     write_parameter_map(tdir->name(), scan_data);
   }
 }
