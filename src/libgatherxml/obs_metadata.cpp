@@ -449,7 +449,7 @@ bool ObservationData::added_to_ids(std::string observation_type,IDEntry& ientry,
   if (unique_timestamp < 0.) {
     unique_timestamp=start_datetime->seconds_since(base);
   }
-  auto true_lon= (lon <= 180.) ? lon : (360.-lon);
+  auto true_lon= (lon <= 180.) ? lon : (lon-360.);
   if (!id_tables[o->second]->found(ientry.key,ientry)) {
     ientry.data.reset(new IDEntry::Data);
     ientry.data->S_lat=ientry.data->N_lat=lat;
