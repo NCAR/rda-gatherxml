@@ -53,12 +53,12 @@ void parse_args(char arg_delimiter) {
         metautils::args.overwrite_only = true;
       }
     } else  {
-      cerr << "invalid flag '" << sp[n] << "'" << endl;
+      cerr << "fatal: invalid flag '" << sp[n] << "'" << endl;
       exit(1);
     }
   }
   if (metautils::args.data_format.empty()) {
-    cerr << "no format specified" << endl;
+    cerr << "fatal: no format specified" << endl;
     exit(1);
   } else {
     metautils::args.data_format = to_lower(metautils::args.data_format);
@@ -67,22 +67,21 @@ void parse_args(char arg_delimiter) {
     metautils::args.data_format = "grib";
   }
   if (metautils::args.dsnum.empty()) {
-    cerr << "no dataset number specified" << endl;
+    cerr << "fatal: no dataset number specified" << endl;
     exit(1);
   }
+  auto idx = sp.back().rfind("/");
+  metautils::args.path = sp.back().substr(0, idx);
+  metautils::args.filename = sp.back().substr(idx + 1);
   if (metautils::args.dsnum == "test") {
+    if (metautils::args.path[0] != '/') {
+      cerr << "fatal: full path of test files must be specified" << endl;
+      exit(1);
+    }
     metautils::args.override_primary_check = true;
     metautils::args.update_db = false;
     metautils::args.update_summary = false;
     metautils::args.regenerate = false;
-  }
-  auto idx = sp.back().rfind("/");
-  if (idx != string::npos) {
-    metautils::args.path = sp.back().substr(0, idx);
-    metautils::args.filename = sp.back().substr(idx + 1);
-  } else {
-    metautils::args.path = ".";
-    metautils::args.filename = sp.back();
   }
 }
 
