@@ -1,6 +1,8 @@
 #include <gatherxml.hpp>
 #include <strutils.hpp>
+#include <utils.hpp>
 
+using miscutils::this_function_label;
 using std::cerr;
 using std::endl;
 using std::string;
@@ -13,6 +15,7 @@ namespace gatherxml {
 extern bool verbose_operation;
 
 void parse_args(char arg_delimiter) {
+  static const string F = this_function_label(__func__);
   verbose_operation = false;
   metautils::args.temp_loc = metautils::directives.temp_path;
   auto sp = strutils::split(metautils::args.args_string, string(1,
@@ -53,12 +56,12 @@ void parse_args(char arg_delimiter) {
         metautils::args.overwrite_only = true;
       }
     } else  {
-      cerr << "fatal: invalid flag '" << sp[n] << "'" << endl;
+      cerr << "fatal error: " + F + ": invalid flag '" << sp[n] << "'" << endl;
       exit(1);
     }
   }
   if (metautils::args.data_format.empty()) {
-    cerr << "fatal: no format specified" << endl;
+    cerr << "fatal error: " + F + ": no format specified" << endl;
     exit(1);
   } else {
     metautils::args.data_format = to_lower(metautils::args.data_format);
@@ -67,7 +70,7 @@ void parse_args(char arg_delimiter) {
     metautils::args.data_format = "grib";
   }
   if (metautils::args.dsnum.empty()) {
-    cerr << "fatal: no dataset number specified" << endl;
+    cerr << "fatal error: " + F + ": no dataset number specified" << endl;
     exit(1);
   }
   auto idx = sp.back().rfind("/");
@@ -75,7 +78,8 @@ void parse_args(char arg_delimiter) {
   metautils::args.filename = sp.back().substr(idx + 1);
   if (metautils::args.dsnum == "test") {
     if (metautils::args.path[0] != '/') {
-      cerr << "fatal: full path of test files must be specified" << endl;
+      cerr << "fatal error: " + F + ": full path of test files must be "
+          "specified" << endl;
       exit(1);
     }
     metautils::args.override_primary_check = true;
