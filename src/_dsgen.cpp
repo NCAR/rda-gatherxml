@@ -22,6 +22,7 @@
 
 using metautils::log_error2;
 using miscutils::this_function_label;
+using std::cout;
 using std::endl;
 using std::get;
 using std::list;
@@ -1749,13 +1750,17 @@ void generate_description(string type, string tdir_name) {
   delete t;
 }
 
+void show_usage() {
+  cout << "usage: dsgen nnn.n" << endl;
+  cout << "\noptions:" << endl;
+  cout << "  --no-dset-waf  don't add the dataset to the queue for the DSET WAF"
+      << endl;
+}
+
 int main(int argc, char **argv) {
   if (argc != 2 && argc != 3) {
-    std::cerr << "usage: dsgen nnn.n" << endl;
-    std::cerr << "\noptions:" << endl;
-    std::cerr << "--no-dset-waf  don't add the dataset to the queue for the "
-        "DSET WAF" << endl;
-    exit(1);
+    show_usage();
+    exit(0);
   }
   const string F = this_function_label(__func__);
   auto next = 1;
@@ -1764,6 +1769,10 @@ int main(int argc, char **argv) {
     ++next;
   }
   metautils::args.dsnum = argv[next];
+  if (metautils::args.dsnum == "--help") {
+    show_usage();
+    exit(0);
+  }
   if (regex_search(metautils::args.dsnum, regex("^ds"))) {
     metautils::args.dsnum = metautils::args.dsnum.substr(2);
   }
