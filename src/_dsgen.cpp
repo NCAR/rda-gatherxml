@@ -115,7 +115,6 @@ void generate_index(string type, string tdir_name) {
     auto e = xdoc.element("dsOverview/title");
     auto ti = e.content();
     tdoc.add_replacement("__TITLE__", ti);
-    stringstream ss;
     if (!metadataExport::export_to_json_ld(ss, metautils::args.dsnum, xdoc,
         0)) {
       log_error2("unable to export JSON-LD metadata", F, "dsgen", USER);
