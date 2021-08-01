@@ -17,8 +17,9 @@
 #include <metadata.hpp>
 #include <netcdf.hpp>
 #include <MySQL.hpp>
-#include <myerror.hpp>
 #include <bufr.hpp>
+#include <timer.hpp>
+#include <myerror.hpp>
 
 using floatutils::myequalf;
 using metautils::log_error2;
@@ -5160,7 +5161,7 @@ void write_parameter_map(string tempdir_name, ScanData& scan_data) {
   }
   stringstream oss, ess;
   if (mysystem2("/bin/mkdir -p " + tempdir_name + "/metadata/ParameterTables",
-      oss, ess) < 0) {
+      oss, ess) != 0) {
     log_error2("can't create directory tree for netCDF variables", F, "nc2xml",
         USER);
   }
@@ -5264,7 +5265,10 @@ void scan_file(ScanData& scan_data, gatherxml::markup::ObML::ObservationData&
       cout << "Beginning scan of " << f << "..." << endl;
     }
     InputNetCDFStream istream;
-    istream.open(f.c_str());
+    if (!istream.open(f)) {
+      auto e = move(myerror);
+      log_error2("Terminating - " + e, F, "nc2xml", USER);
+    }
     auto gattrs = istream.global_attributes();
     for (const auto& a : gattrs) {
       if (a.name == "Conventions") {
@@ -5360,6 +5364,8 @@ int main(int argc, char **argv) {
     metautils::check_for_existing_cmd("GrML");
     metautils::check_for_existing_cmd("ObML");
   }
+  Timer tmr;
+  tmr.start();
   ScanData sd;
   gatherxml::markup::ObML::ObservationData od;
   scan_file(sd, od);
@@ -5410,8 +5416,8 @@ int main(int argc, char **argv) {
     stringstream oss, ess;
     if (mysystem2(metautils::directives.local_root + "/bin/scm -d " +
         metautils::args.dsnum + " " + f + " " + metautils::args.filename + "." +
-            ext, oss, ess) < 0) {
-      log_error2(ess.str(), "main() running scm", "nc2xml", USER);
+            ext, oss, ess) != 0) {
+      log_error2(ess.str(), "main(): running scm", "nc2xml", USER);
     }
     if (gatherxml::verbose_operation) {
       cout << "...'scm' finished." << endl;
@@ -5509,4 +5515,7 @@ int main(int argc, char **argv) {
     }
     log_warning("unknown ID(s):\n" + ss.str(), "nc2xml", USER);
   }
+  tmr.stop();
+  log_warning("execution time: " + ftos(tmr.elapsed_time()) + " seconds",
+      "gatherxml.time", USER);
 }
