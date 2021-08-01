@@ -1,0 +1,30 @@
+BootStrap: localimage
+From: /glade/u/home/rdadata/lib/singularity/gatherxml-utils-ubuntu.sif
+Stage: compile
+
+BootStrap: library
+From: ubuntu:16.04
+Stage: binary
+
+%files from compile
+    /usr/lib64/mylibs
+    /usr/lib/x86_64-linux-gnu /usr/lib
+    /lib/x86_64-linux-gnu /lib
+    /usr/local/bin /usr/local
+    /etc/ssl
+    /usr/bin/rsync
+    /usr/bin/ssh
+
+%environment
+    export LC_ALL=C
+
+%labels
+    Author dattore@ucar.edu
+
+%help
+    necessary bind paths:
+      /glade/u/home/dattore/conf
+      /glade/scratch/rdadata
+      /glade/u/home/rdadata
+      /glade/collections/rda/data
+      /gpfs/fs1/collections/rda/work/logs/md

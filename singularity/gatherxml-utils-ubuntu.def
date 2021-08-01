@@ -1,0 +1,29 @@
+BootStrap: localimage
+From: /glade/u/home/rdadata/lib/singularity/gatherxml-libs-ubuntu.sif
+Stage: compile
+
+%setup
+    cp /glade/u/home/dattore/gatherxml/Makefile ${SINGULARITY_ROOTFS}/gatherxml/
+    cp -p /glade/u/home/dattore/gatherxml/src/_dsgen.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
+    cp -p /glade/u/home/dattore/gatherxml/src/_grid2xml.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
+    cp -p /glade/u/home/dattore/gatherxml/src/_iinv.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
+    cp -p /glade/u/home/dattore/gatherxml/src/_nc2xml.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
+    cp -p /glade/u/home/dattore/gatherxml/src/_scm.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
+
+%post
+    cd /gatherxml
+    make HOST=singularity VERSION=ubuntu _dsgen
+    make HOST=singularity VERSION=ubuntu _grid2xml
+    make HOST=singularity VERSION=ubuntu _iinv
+    make HOST=singularity VERSION=ubuntu _nc2xml
+    make HOST=singularity VERSION=ubuntu _scm
+    cd /usr/local/bin
+    ln -s _dsgen dsgen
+    ln -s _iinv iinv
+    ln -s _scm scm
+
+%environment
+    export LC_ALL=C
+
+%labels
+    Author dattore@ucar.edu

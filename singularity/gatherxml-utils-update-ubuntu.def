@@ -1,0 +1,19 @@
+BootStrap: localimage
+From: /glade/u/home/rdadata/lib/singularity/gatherxml-utils-ubuntu.sif
+Stage: compile
+
+%setup
+    cp /glade/u/home/dattore/gatherxml/Makefile ${SINGULARITY_ROOTFS}/gatherxml/
+    cp -p /glade/u/home/dattore/gatherxml/src/$UTILITY.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
+    echo $UTILITY > ${SINGULARITY_ROOTFS}/gatherxml/utility
+
+%post
+    cd /gatherxml
+    export UTILITY=`cat utility`
+    make HOST=singularity VERSION=ubuntu $UTILITY
+
+%environment
+    export LC_ALL=C
+
+%labels
+    Author dattore@ucar.edu

@@ -1,0 +1,101 @@
+BootStrap: localimage
+From: /glade/u/home/rdadata/lib/singularity/gatherxml-libs-ubuntu.sif
+
+%setup
+    mkdir -p ${SINGULARITY_ROOTFS}/usr/include/jasper
+    cp -p -r /glade/u/home/rdadata/gnu/include/jasper/* ${SINGULARITY_ROOTFS}/usr/include/jasper/
+    mkdir -p ${SINGULARITY_ROOTFS}/usr/include/myincludes
+    cp -p -r /glade/u/home/dattore/cpp/lib/include/* ${SINGULARITY_ROOTFS}/usr/include/myincludes/
+    mkdir -p ${SINGULARITY_ROOTFS}/src/libbitmap/singularity
+    cp -p /glade/u/home/dattore/cpp/lib/source/libbitmap/*.cpp ${SINGULARITY_ROOTFS}/src/libbitmap/
+    mkdir -p ${SINGULARITY_ROOTFS}/src/libbufr/singularity
+    cp -p /glade/u/home/dattore/cpp/lib/source/libbufr/*.cpp ${SINGULARITY_ROOTFS}/src/libbufr/
+    mkdir -p ${SINGULARITY_ROOTFS}/src/libcitation/singularity
+    cp -p /glade/u/home/dattore/cpp/lib/source/libcitation/*.cpp ${SINGULARITY_ROOTFS}/src/libcitation/
+    mkdir -p ${SINGULARITY_ROOTFS}/src/libdatetime/singularity
+    cp -p /glade/u/home/dattore/cpp/lib/source/libdatetime/*.cpp ${SINGULARITY_ROOTFS}/src/libdatetime/
+    mkdir -p ${SINGULARITY_ROOTFS}/src/liberror/singularity
+    cp -p /glade/u/home/dattore/cpp/lib/source/liberror/*.cpp ${SINGULARITY_ROOTFS}/src/liberror/
+    mkdir -p ${SINGULARITY_ROOTFS}/src/libgrids/singularity
+    cp -p /glade/u/home/dattore/cpp/lib/source/libgrids/*.cpp ${SINGULARITY_ROOTFS}/src/libgrids/
+    mkdir -p ${SINGULARITY_ROOTFS}/src/libgridutils/singularity
+    cp -p /glade/u/home/dattore/cpp/lib/source/libgridutils/*.cpp ${SINGULARITY_ROOTFS}/src/libgridutils/
+    mkdir -p ${SINGULARITY_ROOTFS}/src/libhdf/singularity
+    cp -p /glade/u/home/dattore/cpp/lib/source/libhdf/*.cpp ${SINGULARITY_ROOTFS}/src/libhdf/
+    mkdir -p ${SINGULARITY_ROOTFS}/src/libio/singularity
+    cp -p /glade/u/home/dattore/cpp/lib/source/libio/*.cpp ${SINGULARITY_ROOTFS}/src/libio/
+    mkdir -p ${SINGULARITY_ROOTFS}/src/libmetautils/singularity
+    cp -p /glade/u/home/dattore/cpp/lib/source/libmetautils/*.cpp ${SINGULARITY_ROOTFS}/src/libmetautils/
+    mkdir -p ${SINGULARITY_ROOTFS}/src/libmetaexport/singularity
+    cp -p /glade/u/home/dattore/cpp/lib/source/libmetaexport/*.cpp ${SINGULARITY_ROOTFS}/src/libmetaexport/
+    mkdir -p ${SINGULARITY_ROOTFS}/src/libmetaexporthelpers/singularity
+    cp -p /glade/u/home/dattore/cpp/lib/source/libmetaexporthelpers/*.cpp ${SINGULARITY_ROOTFS}/src/libmetaexporthelpers/
+    mkdir -p ${SINGULARITY_ROOTFS}/src/libmetahelpers/singularity
+    cp -p /glade/u/home/dattore/cpp/lib/source/libmetahelpers/*.cpp ${SINGULARITY_ROOTFS}/src/libmetahelpers/
+    mkdir -p ${SINGULARITY_ROOTFS}/src/libmysql/singularity
+    cp -p /glade/u/home/dattore/cpp/lib/source/libmysql/*.cpp ${SINGULARITY_ROOTFS}/src/libmysql/
+    mkdir -p ${SINGULARITY_ROOTFS}/src/libmyssl/singularity
+    cp -p /glade/u/home/dattore/cpp/lib/source/libmyssl/*.cpp ${SINGULARITY_ROOTFS}/src/libmyssl/
+    mkdir -p ${SINGULARITY_ROOTFS}/src/libio/singularity
+    cp -p /glade/u/home/dattore/cpp/lib/source/libio/*.cpp ${SINGULARITY_ROOTFS}/src/libio/
+    mkdir -p ${SINGULARITY_ROOTFS}/src/libs3/singularity
+    cp -p /glade/u/home/dattore/cpp/lib/source/libs3/*.cpp ${SINGULARITY_ROOTFS}/src/libs3/
+    mkdir -p ${SINGULARITY_ROOTFS}/src/libsearch/singularity
+    cp -p /glade/u/home/dattore/cpp/lib/source/libsearch/*.cpp ${SINGULARITY_ROOTFS}/src/libsearch/
+    mkdir -p ${SINGULARITY_ROOTFS}/src/libutils/singularity
+    cp -p /glade/u/home/dattore/cpp/lib/source/libutils/*.cpp ${SINGULARITY_ROOTFS}/src/libutils/
+    mkdir -p ${SINGULARITY_ROOTFS}/src/libutilsthread/singularity
+    cp -p /glade/u/home/dattore/cpp/lib/source/libutilsthread/*.cpp ${SINGULARITY_ROOTFS}/src/libutilsthread/
+    mkdir -p ${SINGULARITY_ROOTFS}/src/libxml/singularity
+    cp -p /glade/u/home/dattore/cpp/lib/source/libxml/*.cpp ${SINGULARITY_ROOTFS}/src/libxml/
+    cp /glade/u/home/dattore/cpp/lib/singularity/Makefile ${SINGULARITY_ROOTFS}/
+    mkdir -p ${SINGULARITY_ROOTFS}/gatherxml/include
+    mkdir -p ${SINGULARITY_ROOTFS}/gatherxml/src/libgatherxml
+    cp /glade/u/home/dattore/gatherxml/Makefile ${SINGULARITY_ROOTFS}/gatherxml/
+    cp -p -r /glade/u/home/dattore/gatherxml/include/* ${SINGULARITY_ROOTFS}/gatherxml/include/
+    cp -p -r /glade/u/home/dattore/gatherxml/src/libgatherxml/* ${SINGULARITY_ROOTFS}/gatherxml/src/libgatherxml/
+    cp -p /glade/u/home/dattore/util/cosfile.cpp ${SINGULARITY_ROOTFS}/src/
+    cp -p /glade/u/home/dattore/util/cosconvert.cpp ${SINGULARITY_ROOTFS}/src/
+
+%post
+    mkdir -p /usr/lib64/mylibs
+    cd /
+    make HOST=singularity libbitmap.so
+    make HOST=singularity libbufr.so
+    make HOST=singularity libcitation.so
+    make HOST=singularity libdatetime.so
+    make HOST=singularity liberror.so
+    make HOST=singularity libgrids.so
+    make HOST=singularity libgridutils.so
+    make HOST=singularity libhdf.so
+    make HOST=singularity libio.so
+    make HOST=singularity libmetaexport.so
+    make HOST=singularity libmetaexporthelpers.so
+    make HOST=singularity libmetahelpers.so
+    make HOST=singularity libmetautils.so
+    make HOST=singularity libmysql.so
+    make HOST=singularity libmyssl.so
+    make HOST=singularity libsearch.so
+    make HOST=singularity libutils.so
+    make HOST=singularity libutilsthread.so
+    make HOST=singularity libs3.so
+    make HOST=singularity libxml.so
+    cd /gatherxml
+    make VERSION=1.0.0 HOST=singularity libgatherxml.so
+    cd /src
+    if [ ! -f "/usr/local/bin/cosfile" ] || [ "cosfile.cpp" -nt "/usr/local/bin/cosfile" ]; then
+      g++ -std=c++14 -Wall -Wold-style-cast -O3 -Weffc++ -Wl,-rpath,/usr/lib64/mylibs cosfile.cpp -I/usr/include/myincludes -L/usr/lib64/mylibs -lio -lutils -ldatetime -ls3 -lmyssl -lxml -lcurl -o /usr/local/bin/cosfile
+    fi
+    if [ ! -f "/usr/local/bin/cosconvert" ] || [ "cosconvert.cpp" -nt "/usr/local/bin/cosconvert" ]; then
+      g++ -std=c++14 -Wall -Wold-style-cast -O3 -Weffc++ -Wl,-rpath,/usr/lib64/mylibs cosconvert.cpp -I/usr/include/myincludes -L/usr/lib64/mylibs -lio -lutils -ldatetime -ls3 -lmyssl -lxml -lgrids -lgridutils -ljasper -lcurl -o /usr/local/bin/cosconvert
+    fi
+
+%environment
+    export LC_ALL=C
+
+%runscript
+
+%labels
+    Author dattore@ucar.edu
+
+%help
