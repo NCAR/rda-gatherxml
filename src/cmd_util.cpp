@@ -20,9 +20,10 @@ using std::regex_search;
 using std::string;
 using std::stringstream;
 using strutils::chop;
-using strutils::to_lower;
 using strutils::split;
 using strutils::substitute;
+using strutils::replace_all;
+using strutils::to_lower;
 using strutils::trim;
 using unixutils::mysystem2;
 
@@ -30,6 +31,7 @@ metautils::Directives metautils::directives;
 metautils::Args metautils::args;
 string myerror = "";
 string mywarning = "";
+const char ARG_DELIMITER = '!';
 
 string whereis_singularity() {
   string s; // return value
@@ -47,35 +49,49 @@ string whereis_singularity() {
 }
 
 void show_gatherxml_usage() {
-  cout << "usage: (1) gatherxml -f <format> -d [ds]<nnn.n> [-R] [-S] { URL | "
+  cout << "usage: (1) gatherxml -d [ds]<nnn.n> -f <format> [-R] [-S] { URL | "
        "WF } " << endl;
   cout << "   or: (2) gatherxml --showinfo" << endl;
-  cout << "   or: (3) gatherxml -f <format> -d <[ds]nnn.n> -I { URL | invall }"
+  cout << "   or: (3) gatherxml -d <[ds]nnn.n> -f <format> -I { URL | invall }"
       << endl;
-  cout << "   or: (4) gatherxml -f <format> -d test PATH" << endl;
+  cout << "   or: (4) gatherxml -d test -f <format> PATH" << endl;
   cout << "\nrequired:" << endl;
-  cout << "-f <format>     the data format of the file being scanned. Use (2) "
-      "to see a list" << endl;
-  cout << "                of all supported data formats. (1), (3), (4)" <<
+  cout << "  -d [ds]<nnn.n>  (1), (3): the dataset number, optionally "
+      "prepended with \"ds\"" << endl;
+  cout << "  -d test         (4): perform a test run to see if gatherxml will "
+      "handle a" << endl;
+  cout << "                    particular file" << endl;
+  cout << "  -f <format>     (1), (3), (4): the data format of the file being "
+      "scanned. Use" << endl;
+  cout << "                    (2) to see a list of all supported data formats."
+      << endl;
+  cout << "  -I              (3): inventory only. Use this flag when metadata "
+      "have already" << endl;
+  cout << "                    been scanned for the file, but an inventory "
+      "does not" << endl;
+  cout << "                    currently exist." << endl;
+  cout << "  --showinfo      (2): show a list of supported data formats" <<
       endl;
-  cout << "-d [ds]<nnn.n>  the dataset number, optionally prepended with "
-      "\"ds\" (1), (3)" << endl;
-  cout << "-d test         perform a test run to see if gatherxml will handle "
-      "a particular" << endl;
-  cout << "                file (4)" << endl;
-  cout << "-I              inventory only. Use this flag when metadata have "
-      "already been" << endl;
-  cout << "                scanned for the file, but an inventory does "
-      "not currently" << endl;
-  cout << "                exist. (3)" << endl;
-  cout << "--showinfo      show a list of supported data formats (2)" << endl;
+  cout << endl;
+  cout << "  URL             (1), (3): the URL of the data file, beginning with"
+      << endl;
+  cout << "                    https://rda.ucar.edu/" << endl;
+  cout << "  WF              (1): the path of the web file, as for the -WF "
+      "option of dsarch" << endl;
+  cout << "  invall          (3): with this specified, gatherxml will "
+      "determine which files" << endl;
+  cout << "                    in the dataset do not have inventories and "
+      "generate all of" << endl;
+  cout << "                    them in a single call" << endl;
+  cout << "  PATH            (4): this is the full path of the file to be "
+      "tested" << endl;
   cout << "\noptions:" << endl;
-  cout << "-R              save time by not regenerating the dataset web "
-      "description (see " << endl;
-  cout << "                NOTES below) (1)" << endl;
-  cout << "-S              save time by not rebuilding the metadata caches for "
-      "the dataset" << endl;
-  cout << "                (see NOTES below) (1)" << endl;
+  cout << "  -R              (1): save time by not regenerating the dataset "
+      "web description" << endl;
+  cout << "                    (see NOTES below)" << endl;
+  cout << "  -S              (1): save time by not rebuilding the metadata "
+      "caches for the" << endl;
+  cout << "                    dataset (see NOTES below)" << endl;
   cout << "\nNOTES:" << endl;
   cout << "  - Using the -R and -S options are particularly useful when "
       "backfilling file" << endl;
@@ -120,20 +136,33 @@ void show_gatherxml_info(const unordered_set<string>& util_set, const
   }
 }
 
+string webhome() {
+  if (!metautils::directives.data_root_alias.empty()) {
+    return metautils::directives.data_root_alias + "/ds" + metautils::args.
+        dsnum;
+  }
+  return metautils::web_home();
+}
+
 string gatherxml_utility(string user) {
   if (metautils::args.args_string.empty()) {
     show_gatherxml_usage();
     exit(0);
   }
   static const string F = this_function_label(__func__);
-  auto sp = split(metautils::args.args_string, "!");
-  for (size_t n = 0; n < sp.size(); ++n) {
-    if (sp[n] == "-f") {
-      metautils::args.data_format = to_lower(sp[++n]);
-    } else if (sp[n] == "--help") {
+  auto sp_a = split(metautils::args.args_string, "!");
+  for (size_t n = 0; n < sp_a.size(); ++n) {
+    if (sp_a[n] == "-d") {
+      metautils::args.dsnum = sp_a[++n];
+      if (metautils::args.dsnum.substr(0, 2) == "ds") {
+        metautils::args.dsnum = metautils::args.dsnum.substr(2);
+      }
+    } else if (sp_a[n] == "-f") {
+      metautils::args.data_format = sp_a[++n];
+    } else if (sp_a[n] == "--help") {
       metautils::args.data_format = "showhelp";
       break;
-    } else if (sp[n] == "--showinfo") {
+    } else if (sp_a[n] == "--showinfo") {
       metautils::args.data_format = "showinfo";
       break;
     }
@@ -160,10 +189,10 @@ string gatherxml_utility(string user) {
       util_map.emplace(sp[0], sp[1]);
       if (sp.size() > 2) {
         auto sp2 = split(sp[2], ",");
-        for (const auto& s : sp) {
+        for (const auto& s : sp2) {
           aka_map.emplace(s, sp[0]);
+          r_aka_map.emplace(sp[0], s);
         }
-        r_aka_map.emplace(sp[0], sp[2]);
       }
     }
     ifs.getline(l, 256);
@@ -177,23 +206,38 @@ string gatherxml_utility(string user) {
     exit(0);
   }
   string util; // return value
-  auto it = util_map.find(metautils::args.data_format);
+  auto k = to_lower(metautils::args.data_format);
+  auto it = util_map.find(k);
   if (it != util_map.end()) {
     util = it->second;
   } else {
-    it = aka_map.find(metautils::args.data_format);
+    it = aka_map.find(k);
     if (it != aka_map.end() && util_map.find(it->second) != util_map.end()) {
       util = util_map[it->second];
+      auto f = "-f" + string(1, ARG_DELIMITER);
+      replace_all(metautils::args.args_string, f + metautils::args.data_format,
+          f + it->second);
     }
   }
   if (util.empty()) {
     log_error2("unable to determine gatherxml utility", F, "gatherxml", user);
   }
+  if (sp_a.back()[0] != '/') {
+    auto idx = metautils::args.args_string.rfind("!");
+    if (idx == string::npos) {
+      log_error2("bad arguments string: '" + metautils::args.args_string, F,
+          "gatherxml", user);
+    }
+    metautils::args.args_string = metautils::args.args_string.substr(0, idx + 1)
+        + "https://rda.ucar.edu" + webhome() + "/" + metautils::args.
+        args_string.substr(idx + 1);
+  }
   return util.substr(1);
 }
 
 int main(int argc, char **argv) {
-  metautils::args.args_string = unixutils::unix_args_string(argc, argv, '!');
+  metautils::args.args_string = unixutils::unix_args_string(argc, argv,
+      ARG_DELIMITER);
   string util = argv[0];
   auto idx = util.rfind("/");
   if (idx != string::npos) {
@@ -230,16 +274,17 @@ int main(int argc, char **argv) {
       log_error2("unable to find singularity", "main()", util, u);
     }
     unordered_map<string, string> umap{
-        { "dsgen", "gatherxml-utils-ubuntu" },
-        { "grid2xml", "gatherxml-utils-ubuntu" },
-        { "nc2xml", "gatherxml-utils-ubuntu" },
+        { "dsgen", "gatherxml-exec-ubuntu" },
+        { "grid2xml", "gatherxml-exec-ubuntu" },
+        { "nc2xml", "gatherxml-exec-ubuntu" },
+        { "iinv", "gatherxml-exec-ubuntu" },
     };
     auto it = umap.find(util);
     if (it == umap.end()) {
       log_error2("no sif map entry for utility '" + util + "'", "main()", util,
           u);
     }
-    unordered_map<string, string> bmap{ { "gatherxml-utils-ubuntu",
+    unordered_map<string, string> bmap{ { "gatherxml-exec-ubuntu",
         "/glade/u/home/dattore/conf,/glade/scratch/rdadata,/glade/u/home/"
         "rdadata,/glade/collections/rda/data,/gpfs/fs1/collections/rda/work/"
         "logs/md" } };
@@ -249,14 +294,14 @@ int main(int argc, char **argv) {
     }
     auto b = it2->second;
     auto sp = split(metautils::args.args_string, "!");
-    if (sp.back()[0] == '/') {
+    if (sp.size() > 0 && sp.back()[0] == '/') {
 
       // test run must specify full path, so bind that path
       auto idx = sp.back().rfind("/");
       b += "," + sp.back().substr(0, idx);
     }
     cmd = s + " -s exec -B " + b + " /glade/u/home/rdadata/bin/singularity/" +
-        it->second + ".sif /_" + util;
+        it->second + ".sif /usr/local/bin/_" + util;
   } else {
     cmd = metautils::directives.decs_bindir + "/_" + util;
   }
