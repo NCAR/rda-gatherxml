@@ -278,6 +278,7 @@ int main(int argc, char **argv) {
         { "grid2xml", "gatherxml-exec-ubuntu" },
         { "nc2xml", "gatherxml-exec-ubuntu" },
         { "iinv", "gatherxml-exec-ubuntu" },
+        { "scm", "gatherxml-exec-ubuntu" },
     };
     auto it = umap.find(util);
     if (it == umap.end()) {
@@ -300,6 +301,7 @@ int main(int argc, char **argv) {
       auto idx = sp.back().rfind("/");
       b += "," + sp.back().substr(0, idx);
     }
+    b += metautils::directives.decs_root + "/bin";
     cmd = s + " -s exec -B " + b + " /glade/u/home/rdadata/bin/singularity/" +
         it->second + ".sif /usr/local/bin/_" + util;
   } else {
