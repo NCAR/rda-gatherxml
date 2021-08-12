@@ -14,6 +14,7 @@
 #include <search.hpp>
 #include <xml.hpp>
 #include <gridutils.hpp>
+#include <myerror.hpp>
 
 namespace gatherxml {
 
@@ -157,7 +158,7 @@ void fill_level_code_table(std::string db,my::map<LevelCodeEntry>& level_code_ta
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   MySQL::LocalQuery query("code,map,type,value",db+".levels");
   if (query.submit(server) < 0) {
-    std::cerr << query.error() << std::endl;
+    myerror = query.error();
     exit(1);
   }
   for (const auto& res : query) {
@@ -186,13 +187,13 @@ void generate_parameter_cross_reference(std::string format,std::string title,std
   }
 // create the directory tree in the temp directory
   std::stringstream oss,ess;
-  if (unixutils::mysystem2("/bin/mkdir -p "+tdir.name()+"/metadata",oss,ess) < 0) {
+  if (unixutils::mysystem2("/bin/mkdir -p "+tdir.name()+"/metadata",oss,ess) != 0) {
     metautils::log_error("generate_parameter_cross_reference(): unable to create temporary directory tree",caller,user);
   }
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   MySQL::LocalQuery query("select distinct parameter from GrML.summary as s left join GrML.formats as f on f.code = s.format_code where s.dsid = '"+metautils::args.dsnum+"' and f.format = '"+format+"'");
   if (query.submit(server) < 0) {
-    std::cerr << query.error() << std::endl;
+    myerror = query.error();
     exit(1);
   }
   if (query.num_rows() > 0) {
@@ -312,10 +313,10 @@ void generate_parameter_cross_reference(std::string format,std::string title,std
 // remove a parameter table if it exists and there are no parameters for this
 //   format
     std::string error;
-    if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+html_file,metautils::directives.rdadata_home,error) < 0) {
+    if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+html_file, tdir.name(), metautils::directives.rdadata_home,error) < 0) {
 	metautils::log_warning("generate_parameter_cross_reference() tried to but couldn't delete '"+html_file+"' - error: '"+error+"'",caller,user);
     }
-    if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+strutils::substitute(html_file,".html",".xml"),metautils::directives.rdadata_home,error) < 0) {
+    if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+strutils::substitute(html_file,".html",".xml"), tdir.name(), metautils::directives.rdadata_home,error) < 0) {
 	metautils::log_warning("generate_parameter_cross_reference() tried to but couldn't delete '"+strutils::substitute(html_file,".html",".xml")+"' - error: '"+error+"'",caller,user);
     }
   }
@@ -329,7 +330,7 @@ void generate_level_cross_reference(std::string format,std::string title,std::st
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   MySQL::LocalQuery query("select distinct levelType_codes from GrML.summary as s left join GrML.formats as f on f.code = s.format_code where s.dsid = '"+metautils::args.dsnum+"' and f.format = '"+format+"'");
   if (query.submit(server) < 0) {
-    std::cerr << query.error() << std::endl;
+    myerror = query.error();
     exit(1);
   }
   std::list<std::string> levels,layers;
@@ -357,14 +358,14 @@ void generate_level_cross_reference(std::string format,std::string title,std::st
 	}
     }
   }
+  TempDir tdir;
+  if (!tdir.create(metautils::directives.temp_path)) {
+    metautils::log_error("generate_level_cross_reference(): unable to create temporary directory",caller,user);
+  }
   if (levels.size() > 0 || layers.size() > 0) {
-    TempDir tdir;
-    if (!tdir.create(metautils::directives.temp_path)) {
-	metautils::log_error("generate_level_cross_reference(): unable to create temporary directory",caller,user);
-    }
 // create the directory tree in the temp directory
     std::stringstream oss,ess;
-    if (unixutils::mysystem2("/bin/mkdir -p "+tdir.name()+"/metadata",oss,ess) < 0) {
+    if (unixutils::mysystem2("/bin/mkdir -p "+tdir.name()+"/metadata",oss,ess) != 0) {
 	metautils::log_error("generate_level_cross_reference(): unable to create temporary directory tree",caller,user);
     }
     std::ofstream ofs((tdir.name()+"/metadata/"+html_file).c_str());
@@ -403,7 +404,7 @@ void generate_level_cross_reference(std::string format,std::string title,std::st
   else {
 // remove the level table if it exists and there are no levels for this format
     std::string error;
-    if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+html_file,metautils::directives.rdadata_home,error) < 0) {
+    if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+html_file, tdir.name(), metautils::directives.rdadata_home,error) < 0) {
 	metautils::log_warning("generate_level_cross_reference() tried to but couldn't delete '"+html_file+"' - error: '"+error+"'",caller,user);
     }
   }
@@ -797,7 +798,7 @@ std::cerr << "should write table" << std::endl;
 	}
 // create the directory tree in the temp directory
 	std::stringstream oss,ess;
-	if (unixutils::mysystem2("/bin/mkdir -p "+tdir.name()+"/metadata",oss,ess) < 0) {
+	if (unixutils::mysystem2("/bin/mkdir -p "+tdir.name()+"/metadata",oss,ess) != 0) {
 	  error="Unable to create temporary directory tree - '"+ess.str()+"'";
 	  return;
 	}
@@ -867,7 +868,7 @@ std::cerr << "should write table" << std::endl;
 	ofs << std::endl;
 	ofs << "#" << std::endl;
 	ofs << "#  Vtable for NCAR/Research Data Archive dataset " << dsnum << std::endl;
-	ofs << "#  http://rda.ucar.edu/datasets/ds" << dsnum << "/" << std::endl;
+	ofs << "#  https://rda.ucar.edu/datasets/ds" << dsnum << "/" << std::endl;
 	ofs << "#  rdahelp@ucar.edu" << std::endl;
 	ofs << "#" << std::endl;
 	ofs.close();
@@ -1070,7 +1071,7 @@ std::string output,error;
   }
 // create the directory tree in the temp directory
   std::stringstream oss,ess;
-  if (unixutils::mysystem2("/bin/mkdir -p "+tdir.name()+"/metadata",oss,ess) < 0) {
+  if (unixutils::mysystem2("/bin/mkdir -p "+tdir.name()+"/metadata",oss,ess) != 0) {
     metautils::log_error("generate_detailed_grid_summary(): unable to create temporary directory tree - '"+ess.str()+"'",caller,user);
   }
   ofs_p.open((tdir.name()+"/metadata/parameter-detail.html").c_str());
@@ -2037,7 +2038,7 @@ void generate_detailed_metadata_view(std::string caller,std::string user)
     xml_file=metautils::directives.server_root+"/web/metadata/FormatReferences.xml";
   }
   else {
-    xml_file=unixutils::remote_web_file("http://rda.ucar.edu/metadata/FormatReferences.xml",temp_dir.name());
+    xml_file=unixutils::remote_web_file("https://rda.ucar.edu/metadata/FormatReferences.xml",temp_dir.name());
   }
   XMLDocument xdoc(xml_file);
   if (!xdoc) {
@@ -2065,7 +2066,7 @@ void generate_detailed_metadata_view(std::string caller,std::string user)
 	auto& format_query=std::get<2>(entry);
 	format_query.set("select distinct f.format,f.code from "+std::get<0>(entry)+".formats as f left join "+primaries_table+" as p on p.format_code = f.code where !isnull(p.format_code)");
 	if (format_query.submit(server_m) < 0) {
-	  std::cerr << format_query.error() << std::endl;
+	  myerror = format_query.error();
 	  exit(1);
 	}
 	add_to_formats(xdoc,format_query,format_list,formats);
@@ -2076,7 +2077,7 @@ void generate_detailed_metadata_view(std::string caller,std::string user)
     xml_file=metautils::directives.server_root+"/web/datasets/ds"+metautils::args.dsnum+"/metadata/dsOverview.xml";
   }
   else {
-    xml_file=unixutils::remote_web_file("http://rda.ucar.edu/datasets/ds"+metautils::args.dsnum+"/metadata/dsOverview.xml",temp_dir.name());
+    xml_file=unixutils::remote_web_file("https://rda.ucar.edu/datasets/ds"+metautils::args.dsnum+"/metadata/dsOverview.xml",temp_dir.name());
   }
   xdoc.open(xml_file);
   if (!xdoc) {
@@ -2119,7 +2120,7 @@ void generate_detailed_metadata_view(std::string caller,std::string user)
     }
 // create the directory tree in the temp directory
     std::stringstream oss,ess;
-    if (unixutils::mysystem2("/bin/mkdir -p "+tdir.name()+"/metadata",oss,ess) < 0) {
+    if (unixutils::mysystem2("/bin/mkdir -p "+tdir.name()+"/metadata",oss,ess) != 0) {
 	metautils::log_error("generate_detailed_metadata_view(): unable to create temporary directory tree - '"+ess.str()+"'",caller,user);
     }
     std::ofstream ofs((tdir.name()+"/metadata/detailed.html").c_str());
@@ -2179,7 +2180,7 @@ void generate_detailed_metadata_view(std::string caller,std::string user)
     ofs << "?>" << std::endl;
     MySQL::LocalQuery query("primary_size","dataset","dsid = 'ds"+metautils::args.dsnum+"'");
     if (query.submit(server_d) < 0) {
-	std::cerr << query.error() << std::endl;
+	myerror = query.error();
 	exit(1);
     }
     double volume;
