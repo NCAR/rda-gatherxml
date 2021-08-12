@@ -11,6 +11,7 @@
 #include <utils.hpp>
 #include <search.hpp>
 #include <xml.hpp>
+#include <myerror.hpp>
 
 namespace gatherxml {
 
@@ -52,14 +53,14 @@ void cmd_dates(std::string database,size_t date_left_padding,std::list<CMDDateRa
 {
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   if (!server) {
-    std::cerr << "Error: unable to connect to metadata server" << std::endl;
+    myerror = "Error: unable to connect to metadata server";
     exit(1);
   }
   std::string table=database+".ds"+strutils::substitute(metautils::args.dsnum,".","")+"_webfiles2";
   if (table_exists(server,table)) {
     MySQL::LocalQuery query("select min(w.start_date),max(w.end_date),wf.gindex from "+table+" as w left join dssdb.wfile as wf on wf.wfile = w.webID where wf.dsid = 'ds"+metautils::args.dsnum+"' and wf.type = 'D' and wf.status = 'P' and w.start_date > 0 group by wf.gindex");
     if (query.submit(server) < 0) {
-	std::cerr << "Error (A): " << query.error() << std::endl;
+	myerror = "Error (A): " + query.error();
 	exit(1);
     }
     MySQL::Row row;
@@ -68,7 +69,7 @@ void cmd_dates(std::string database,size_t date_left_padding,std::list<CMDDateRa
 	auto lpad=strutils::itos(date_left_padding);
 	query.set("select lpad(start_date,"+lpad+",'0'),lpad(end_date,"+lpad+",'0'),0 from "+table+" where start_date != 0 order by start_date,end_date");
 	if (query.submit(server) < 0) {
-	  std::cerr << "Error (B): " << query.error() << std::endl;
+	  myerror = "Error (B): " + query.error();
 	  exit(1);
 	}
 	if (query.num_rows() > 0) {
@@ -785,8 +786,6 @@ void create_non_cmd_file_list_cache(std::string file_type,my::map<CodeEntry>& fi
     ifs.close();
   }
   if ( (cmdcnt+cache_list.size()) != filecnt) {
-    std::stringstream output,error;
-    unixutils::mysystem2("/bin/tcsh -c \"dsarch -ds ds"+metautils::args.dsnum+" "+dsarch_flag+" -wn -md\"",output,error);
     query.set(cnt_field,"dataset","dsid = 'ds"+metautils::args.dsnum+"'");
     if (query.submit(server) < 0) {
 	metautils::log_error("create_non_cmd_file_list_cache(): "+query.error()+" from query: "+query.show(),caller,user);
@@ -824,13 +823,9 @@ void create_non_cmd_file_list_cache(std::string file_type,my::map<CodeEntry>& fi
     }
   }
   if (noncmdcnt != cache_list.size()) {
-    TempDir tdir;
-    if (!tdir.create(metautils::directives.temp_path)) {
-	metautils::log_error("create_non_cmd_file_list_cache(): unable to create temporary directory",caller,user);
-    }
 // create the directory tree in the temp directory
     std::stringstream output,error;
-    if (unixutils::mysystem2("/bin/mkdir -p "+tdir.name()+"/metadata",output,error) < 0) {
+    if (unixutils::mysystem2("/bin/mkdir -p "+tdir.name()+"/metadata",output,error) != 0) {
 	metautils::log_error("write_initialize(): unable to create a temporary directory (1) - '"+error.str()+"'",caller,user);
     }
     std::ofstream ofs((tdir.name()+"/metadata/"+cache_name).c_str());
@@ -850,7 +845,7 @@ void create_non_cmd_file_list_cache(std::string file_type,my::map<CodeEntry>& fi
   }
   else if (noncmdcnt == 0) {
     std::string herror;
-    if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+cache_name,metautils::directives.rdadata_home,herror) < 0) {
+    if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+cache_name, tdir.name(), metautils::directives.rdadata_home,herror) < 0) {
 	metautils::log_warning("createNonCMDFileCache couldn't unsync '"+cache_name+"' - hostSync error(s): '"+herror+"'",caller,user);
     }
   }
@@ -1388,7 +1383,7 @@ void create_file_list_cache(std::string file_type,std::string caller,std::string
 	}
 // create the directory tree in the temp directory
 	std::stringstream oss,ess;
-	if (unixutils::mysystem2("/bin/mkdir -p "+tdir.name()+"/metadata",oss,ess) < 0) {
+	if (unixutils::mysystem2("/bin/mkdir -p "+tdir.name()+"/metadata",oss,ess) != 0) {
 	  metautils::log_error(THIS_FUNC+"(): unable to create a temporary directory tree (1) - '"+ess.str()+"'",caller,user);
 	}
 	ofs.open((tdir.name()+"/metadata/"+filename).c_str());
@@ -1412,7 +1407,7 @@ void create_file_list_cache(std::string file_type,std::string caller,std::string
 	}
 	ofs.close();
 	if (max == "0") {
-	  if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+filename,metautils::directives.rdadata_home,error) < 0) {
+	  if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+filename, tdir.name(), metautils::directives.rdadata_home,error) < 0) {
 	    metautils::log_warning(THIS_FUNC+"() couldn't unsync '"+filename+"' - rdadata_unsync error(s): '"+error+"'",caller,user);
 	  }
 	}
@@ -1452,7 +1447,7 @@ void create_file_list_cache(std::string file_type,std::string caller,std::string
 	}
 // create the directory tree in the temp directory
 	std::stringstream oss,ess;
-	if (unixutils::mysystem2("/bin/mkdir -p "+tdir.name()+"/metadata",oss,ess) < 0) {
+	if (unixutils::mysystem2("/bin/mkdir -p "+tdir.name()+"/metadata",oss,ess) != 0) {
 	  metautils::log_error(THIS_FUNC+"(): unable to create a temporary directory tree (2) - '"+ess.str()+"'",caller,user);
 	}
 	ofs.open((tdir.name()+"/metadata/"+filename).c_str());
@@ -1725,7 +1720,7 @@ void create_file_list_cache(std::string file_type,std::string caller,std::string
     }
 // create the directory tree in the temp directory
     std::stringstream oss,ess;
-    if (unixutils::mysystem2("/bin/mkdir -p "+tdir.name()+"/metadata",oss,ess) < 0) {
+    if (unixutils::mysystem2("/bin/mkdir -p "+tdir.name()+"/metadata",oss,ess) != 0) {
 	metautils::log_error(THIS_FUNC+"(): unable to create a temporary directory tree (3) - '"+ess.str()+"'",caller,user);
     }
     ofs.open((tdir.name()+"/metadata/"+filename).c_str());
@@ -1764,7 +1759,11 @@ metautils::log_warning(THIS_FUNC+"() returned warning: empty data size for '"+ar
     else if (file_type == "Web") {
 	filename="getWebList.cache";
     }
-    if (!filename.empty() && unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+filename,metautils::directives.rdadata_home,error) < 0) {
+    TempDir tdir;
+    if (!tdir.create(metautils::directives.temp_path)) {
+	metautils::log_error("create file_list_cache(): unable to create temporary directory (4)",caller,user);
+    }
+    if (!filename.empty() && unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+filename, tdir.name(), metautils::directives.rdadata_home,error) < 0) {
 	metautils::log_warning(THIS_FUNC+"() couldn't unsync '"+filename+"' - rdadata_unsync error(s): '"+error+"'",caller,user);
     }
   }
