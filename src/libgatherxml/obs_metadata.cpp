@@ -81,7 +81,7 @@ void check_point(double latp,double lonp,MySQL::Server& server,my::map<CodeEntry
     }
     MySQL::Query query("select name,AsText(bounds) from search.political_boundaries where "+where_conditions);
     if (query.submit(server) < 0) {
-	std::cerr << "Error: " << query.error() << std::endl;
+	myerror = "Error: " + query.error();
 	exit(1);
     }
 //std::cerr << query.show() << std::endl;
@@ -122,7 +122,7 @@ void compress_locations(std::list<std::string>& location_list,my::map<ParentLoca
 
   TempDir temp_dir;
   if (!temp_dir.create("/tmp")) {
-    std::cerr << "Error creating temporary directory" << std::endl;
+    myerror = "Error creating temporary directory";
     exit(1);
   }
   std::string gcmd_locations;
@@ -135,7 +135,7 @@ void compress_locations(std::list<std::string>& location_list,my::map<ParentLoca
   }
   std::ifstream ifs(gcmd_locations.c_str());
   if (!ifs.is_open()) {
-    std::cerr << "Error opening gcmd_locations" << std::endl;
+    myerror = "Error opening gcmd_locations";
     exit(1);
   }
   char line[256];
@@ -250,7 +250,7 @@ bool summarize_obs_data(std::string caller,std::string user)
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   MySQL::Query formats_query("code,format_code","WObML.ds"+dsnum2+"_webfiles2");
   if (formats_query.submit(server) < 0) {
-    std::cerr << formats_query.error() << std::endl;
+    myerror = formats_query.error();
     exit(1);
   }
   std::unordered_map<std::string,std::string> data_file_formats_map;
