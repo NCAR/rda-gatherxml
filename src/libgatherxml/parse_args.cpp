@@ -1,6 +1,7 @@
 #include <gatherxml.hpp>
 #include <strutils.hpp>
 #include <utils.hpp>
+#include <myerror.hpp>
 
 using miscutils::this_function_label;
 using std::cerr;
@@ -56,12 +57,13 @@ void parse_args(char arg_delimiter) {
         metautils::args.overwrite_only = true;
       }
     } else  {
-      cerr << "fatal error: " + F + ": invalid flag '" << sp[n] << "'" << endl;
+      myerror = "Terminating - fatal error: " + F + ": invalid flag '" + sp[n] +
+          "'";
       exit(1);
     }
   }
   if (metautils::args.data_format.empty()) {
-    cerr << "fatal error: " + F + ": no format specified" << endl;
+    myerror = "Terminating - fatal error: " + F + ": no format specified";
     exit(1);
   } else {
     metautils::args.data_format = to_lower(metautils::args.data_format);
@@ -70,7 +72,8 @@ void parse_args(char arg_delimiter) {
     metautils::args.data_format = "grib";
   }
   if (metautils::args.dsnum.empty()) {
-    cerr << "fatal error: " + F + ": no dataset number specified" << endl;
+    myerror = "Terminating - fatal error: " + F + ": no dataset number "
+        "specified";
     exit(1);
   }
   auto idx = sp.back().rfind("/");
@@ -78,8 +81,8 @@ void parse_args(char arg_delimiter) {
   metautils::args.filename = sp.back().substr(idx + 1);
   if (metautils::args.dsnum == "test") {
     if (metautils::args.path[0] != '/') {
-      cerr << "fatal error: " + F + ": full path of test files must be "
-          "specified" << endl;
+      myerror = "Terminating - fatal error: " + F + ": full path of test files "
+          "must be specified";
       exit(1);
     }
     metautils::args.override_primary_check = true;
