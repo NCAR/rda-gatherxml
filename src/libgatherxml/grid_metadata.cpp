@@ -468,9 +468,9 @@ void aggregate_grids(string database, string caller, string user, string
     if (key != lkey) {
       if (!lkey.empty()) {
         if (!fileID_code.empty()) {
-          string b;
-          bitmap::compress_values(trv, b);
-          if (b.length() > 255) {
+          string trb;
+          bitmap::compress_values(trv, trb);
+          if (trb.length() > 255) {
             stringstream vss;
             for (const auto& value : trv) {
               if (!vss.str().empty()) {
@@ -480,7 +480,7 @@ void aggregate_grids(string database, string caller, string user, string
             }
             log_error2("aggregate_grids(): bitmap for time ranges is too long "
                 "(2) - fileID_code: " + fileID_code + " key: \"" + lkey + "\" "
-                "bitmap: '" + b + "'\nvalues: " + vss.str(), F, caller, user);
+                "bitmap: '" + trb + "'\nvalues: " + vss.str(), F, caller, user);
           }
           vector<size_t> gdv;
           gdv.reserve(gd_set.size());
@@ -492,16 +492,17 @@ void aggregate_grids(string database, string caller, string user, string
             }
           }
           std::sort(gdv.begin(), gdv.end(), std::less<size_t>());
-          bitmap::compress_values(gdv, b);
-          if (b.length() > 255) {
+          string gdb;
+          bitmap::compress_values(gdv, gdb);
+          if (gdb.length() > 255) {
             log_error2("aggregate_grids(): bitmap for grid definitions is too "
                 "long", F, caller, user);
           }
           if (srv.insert(database + ".ds" + d + "_agrids", fileID_code + ", '" +
-              sql_ready(b) + "', '" + sql_ready(b) + "', '" + lkey + "', " + d1
+              sql_ready(trb) + "', '" + sql_ready(gdb) + "', '" + lkey + "', " + d1
               + ", " + d2) < 0) {
             log_error2("aggregate_grids(): " + srv.error() + " while trying to "
-                "insert '" + fileID_code + ", '" + b + "', '" + b + "', '" +
+                "insert '" + fileID_code + ", '" + trb + "', '" + gdb + "', '" +
                 lkey + "', " + d1 + ", " + d2 + "'", F, caller, user);
           }
           stringstream ss;
@@ -514,7 +515,7 @@ void aggregate_grids(string database, string caller, string user, string
               ss << ", " << trv.back();
             }
           } else {
-            ss << sql_ready(b);
+            ss << sql_ready(trb);
           }
           ss << "', " << gdv.front() << ", " << gdv.back() << ", '";
           if (gdv.size() <= 2) {
@@ -523,7 +524,7 @@ void aggregate_grids(string database, string caller, string user, string
               ss << ", " << gdv.back();
             }
           } else {
-            ss << sql_ready(b);
+            ss << sql_ready(gdb);
           }
           auto sp = split(lkey, "','");
           vector<size_t> lv;
