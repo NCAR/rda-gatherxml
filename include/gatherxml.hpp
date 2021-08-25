@@ -1,4 +1,5 @@
 #include <list>
+#include <unordered_set>
 #include <tempfile.hpp>
 #include <datetime.hpp>
 #include <mymap.hpp>
@@ -88,7 +89,7 @@ struct SummaryEntry {
 
 extern void aggregate_grids(std::string database,std::string caller,std::string user,std::string file_ID_code = "");
 extern void check_point(double latp,double lonp,MySQL::Server& server,my::map<CodeEntry>& location_table);
-extern void compress_locations(std::list<std::string>& location_list,my::map<ParentLocation>& parent_location_table,std::vector<std::string>& sorted_array,std::string caller,std::string user);
+extern void compress_locations(std::unordered_set<std::string>& location_list,my::map<ParentLocation>& parent_location_table,std::vector<std::string>& sorted_array,std::string caller,std::string user);
 extern void create_file_list_cache(std::string file_type,std::string caller,std::string user,std::string gindex = "");
 extern void create_non_cmd_file_list_cache(std::string file_type,my::map<CodeEntry>& files_with_cmd_table,std::string caller,std::string user);
 extern void grids_per(size_t nsteps,DateTime start,DateTime end,double& gridsper,std::string& unit);
@@ -178,7 +179,7 @@ struct GridEntry {
 
   std::string key;
   my::map<LevelEntry> level_table;
-  my::map<metautils::StringEntry> process_table,ensemble_table;
+  std::unordered_set<std::string> process_table,ensemble_table;
 };
 
 extern std::string write(my::map<GridEntry>& grid_table,std::string caller,std::string user);
