@@ -116,7 +116,7 @@ void check_point(double latp,double lonp,MySQL::Server& server,my::map<CodeEntry
   }
 }
 
-void compress_locations(std::list<std::string>& location_list,my::map<ParentLocation>& parent_location_table,std::vector<std::string>& sorted_array,std::string caller,std::string user)
+void compress_locations(std::unordered_set<std::string>& location_list,my::map<ParentLocation>& parent_location_table,std::vector<std::string>& sorted_array,std::string caller,std::string user)
 {
   ParentLocation pl,pl2;
 
