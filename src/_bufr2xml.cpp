@@ -203,7 +203,9 @@ void process_ncep_prepbufr_observation(gatherxml::markup::ObML::ObservationData&
 	case 22:
 	case 23:
 	case 522:
-	case 523: {
+	case 523:
+	case 524:
+	case 525: {
 	  platform_type="roving_ship";
 	  break;
 	}
@@ -252,6 +254,7 @@ void process_ncep_prepbufr_observation(gatherxml::markup::ObML::ObservationData&
 	  platform_type="wind_profiler";
 	  break;
 	}
+	case 530:
 	case 531: {
 	  platform_type="CMAN_station";
 	  break;
@@ -336,7 +339,9 @@ void process_ncep_adp_bufr_observation(gatherxml::markup::ObML::ObservationData&
 	break;
     }
     case 1001:
-    case 1013: {
+    case 1013:
+    case 1101:
+    case 1113: {
 	obs_type="surface";
 	platform_type="roving_ship";
 	break;
@@ -353,7 +358,8 @@ void process_ncep_adp_bufr_observation(gatherxml::markup::ObML::ObservationData&
 	platform_type="moored_buoy";
 	break;
     }
-    case 1004: {
+    case 1004:
+    case 1104: {
 	obs_type="surface";
 	platform_type="CMAN_station";
 	break;
@@ -496,6 +502,7 @@ void process_ncep_adp_bufr_observation(gatherxml::markup::ObML::ObservationData&
     case 5069:
     case 5070:
     case 5071:
+    case 5072:
     case 5080:
     case 5090:
     case 5091:
@@ -598,10 +605,12 @@ void process_ncep_adp_bufr_observation(gatherxml::markup::ObML::ObservationData&
 	case 7:
 	case 102:
 	case 1001:
+	case 1101:
 	case 1004:
 	case 1005:
 	case 1007:
 	case 1013:
+	case 1113:
 	case 2003:
 	case 2004:
 	case 2103:
