@@ -123,9 +123,11 @@ void process_ncep_prepbufr_observation(BUFRReport& bufr_report, gatherxml::
   string otyp, ptyp, idtyp;
   std::tie(otyp, ptyp, idtyp) = bufr_types("ncep_prepbufr", 1000 + data[
       subset_number]->type.prepbufr, dt, data[subset_number]->stnid);
-  string x1, x2;
-  std::tie(x1, ptyp, x2) = bufr_types("ncep_prepbufr", 2000 + data[
-      subset_number]->type.ON29, dt, data[subset_number]->stnid);
+  if (ptyp.empty()) {
+    string x1, x2;
+    std::tie(x1, ptyp, x2) = bufr_types("ncep_prepbufr", 2000 + data[
+        subset_number]->type.ON29, dt, data[subset_number]->stnid);
+  }
   string id;
   if (!data[subset_number]->stnid.empty()) {
     id = data[subset_number]->stnid;
