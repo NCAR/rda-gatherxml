@@ -73,8 +73,8 @@ bool is_valid_date(DateTime& datetime) {
   return true;
 }
 
-tuple<string, string, string> bufr_types(size_t code, const DateTime&
-    report_datetime, string station_id) {
+tuple<string, string, string> bufr_types(string bufr_type, size_t code, const
+    DateTime& report_datetime, string station_id) {
   static const string F = this_function_label(__func__);
   static MySQL::Server mysrv;
   if (!mysrv) {
@@ -87,7 +87,7 @@ tuple<string, string, string> bufr_types(size_t code, const DateTime&
   static unordered_map<size_t, tuple<string, string, string>> map;
   if (map.find(code) == map.end()) {
     MySQL::LocalQuery q("observation_type, platform_type, id_type", "metautil."
-        "BUFRTypes", "code = " + itos(code));
+        "BUFRTypes", "BUFR_type = '" + bufr_type + "' and code = " + itos(code));
     if (q.submit(mysrv) < 0 || q.num_rows() > 1) {
       log_error2("'" + q.error() + "' from query '" + q.show() + "'", F,
           "bufr2xml", USER);
@@ -121,11 +121,11 @@ void process_ncep_prepbufr_observation(BUFRReport& bufr_report, gatherxml::
     dt.subtract_hours(-dhr);
   }
   string otyp, ptyp, idtyp;
-  std::tie(otyp, ptyp, idtyp) = bufr_types(1000 + data[subset_number]->type.
-      prepbufr, dt, data[subset_number]->stnid);
+  std::tie(otyp, ptyp, idtyp) = bufr_types("ncep_prepbufr", 1000 + data[
+      subset_number]->type.prepbufr, dt, data[subset_number]->stnid);
   string x1, x2;
-  std::tie(x1, ptyp, x2) = bufr_types(2000 + data[subset_number]->type.
-      prepbufr, dt, data[subset_number]->stnid);
+  std::tie(x1, ptyp, x2) = bufr_types("ncep_prepbufr", 2000 + data[
+      subset_number]->type.ON29, dt, data[subset_number]->stnid);
   string id;
   if (!data[subset_number]->stnid.empty()) {
     id = data[subset_number]->stnid;
@@ -186,8 +186,8 @@ void process_ncep_adp_bufr_observation(BUFRReport& bufr_report, gatherxml::
     data[subset_number]->datetime = bufr_report.date_time();
   }
   string otyp, ptyp, idtyp;
-  std::tie(otyp, ptyp, idtyp) = bufr_types(bufr_report.data_type() * 1000 +
-      bufr_report.data_subtype(), data[subset_number]->datetime, data[
+  std::tie(otyp, ptyp, idtyp) = bufr_types("ncep_adp", bufr_report.data_type() *
+      1000 + bufr_report.data_subtype(), data[subset_number]->datetime, data[
       subset_number]->rpid);
   g_ientry.key = "";
   if (ptyp == "satellite") {
@@ -262,9 +262,9 @@ void process_ncep_radiance_bufr_observation(BUFRReport& bufr_report, gatherxml::
   static const string F = this_function_label(__func__);
   auto **data = reinterpret_cast<NCEPRadianceBUFRData **>(bufr_report.data());
   string otyp, ptyp, idtyp;
-  std::tie(otyp, ptyp, idtyp) = bufr_types(bufr_report.data_type() * 1000 +
-      bufr_report.data_subtype(), bufr_report.date_time(), data[subset_number]->
-      satid);
+  std::tie(otyp, ptyp, idtyp) = bufr_types("ncep_radiance", bufr_report.
+      data_type() * 1000 + bufr_report.data_subtype(), bufr_report.date_time(),
+      data[subset_number]->satid);
   g_ientry.key.clear();
   if (!data[subset_number]->satid.empty()) {
     g_ientry.key = ptyp + "[!]" + idtyp + "[!]" + clean_id(data[subset_number]->
@@ -305,8 +305,8 @@ void process_ecmwf_bufr_observation(BUFRReport& bufr_report, gatherxml::markup::
     return;
   }
   string otyp, ptyp, idtyp;
-  std::tie(otyp, ptyp, idtyp) = bufr_types(data[subset_number]->ecmwf_os.
-      rdb_type * 1000 + data[subset_number]->ecmwf_os.rdb_subtype, data[
+  std::tie(otyp, ptyp, idtyp) = bufr_types("ecmwf", data[subset_number]->
+      ecmwf_os.rdb_type * 1000 + data[subset_number]->ecmwf_os.rdb_subtype, data[
       subset_number]->datetime, data[subset_number]->ecmwf_os.ID);
   if (idtyp == "WMO") {
     auto s = data[subset_number]->wmoid.substr(0, 2);
