@@ -6,1856 +6,1732 @@
 #include <gatherxml.hpp>
 #include <datetime.hpp>
 #include <MySQL.hpp>
-#include <bsort.hpp>
 #include <strutils.hpp>
 #include <utils.hpp>
 #include <search.hpp>
 #include <xml.hpp>
 #include <myerror.hpp>
 
+using metautils::log_error2;
+using miscutils::this_function_label;
+using std::endl;
+using std::make_pair;
+using std::make_tuple;
+using std::move;
+using std::ofstream;
+using std::pair;
+using std::regex;
+using std::regex_search;
+using std::sort;
+using std::stoi;
+using std::stoll;
+using std::string;
+using std::stringstream;
+using std::tie;
+using std::tuple;
+using std::unordered_map;
+using std::unordered_set;
+using std::vector;
+using strutils::itos;
+using strutils::replace_all;
+using strutils::split;
+using strutils::substitute;
+using unixutils::mysystem2;
+
 namespace gatherxml {
 
 namespace summarizeMetadata {
 
 struct CMDDateRange {
-  CMDDateRange() : start(),end(),gindex() {}
+  CMDDateRange() : start(), end(), gindex() { }
 
-  std::string start,end;
-  std::string gindex;
+  string start, end;
+  string gindex;
 };
-CMDDateRange cmd_date_range(std::string start,std::string end,std::string gindex,size_t& precision)
-{
+
+CMDDateRange cmd_date_range(string start, string end, string gindex, size_t&
+    precision) {
   CMDDateRange d;
-  d.start=start;
+  d.start = start;
   if (d.start.length() > precision) {
-    precision=d.start.length();
+    precision = d.start.length();
   }
   while (d.start.length() < 14) {
-    d.start+="00";
+    d.start += "00";
   }
-  d.end=end;
+  d.end = end;
   if (d.end.length() > precision) {
-    precision=d.end.length();
+    precision = d.end.length();
   }
   while (d.end.length() < 14) {
     if (d.end.length() < 10) {
-	d.end+="23";
-    }
-    else {
-	d.end+="59";
+      d.end += "23";
+    } else {
+      d.end += "59";
     }
   }
-  d.gindex=gindex;
+  d.gindex = gindex;
   return d;
 }
 
-void cmd_dates(std::string database,size_t date_left_padding,std::list<CMDDateRange>& range_list,size_t& precision)
-{
-  MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
-  if (!server) {
+void cmd_dates(string database, size_t date_left_padding, vector<CMDDateRange>&
+     ranges, size_t& precision) {
+  MySQL::Server mysrv(metautils::directives.database_server, metautils::
+      directives.metadb_username, metautils::directives.metadb_password, "");
+  if (!mysrv) {
     myerror = "Error: unable to connect to metadata server";
     exit(1);
   }
-  std::string table=database+".ds"+strutils::substitute(metautils::args.dsnum,".","")+"_webfiles2";
-  if (table_exists(server,table)) {
-    MySQL::LocalQuery query("select min(w.start_date),max(w.end_date),wf.gindex from "+table+" as w left join dssdb.wfile as wf on wf.wfile = w.webID where wf.dsid = 'ds"+metautils::args.dsnum+"' and wf.type = 'D' and wf.status = 'P' and w.start_date > 0 group by wf.gindex");
-    if (query.submit(server) < 0) {
-	myerror = "Error (A): " + query.error();
-	exit(1);
+  string s = database + ".ds" + substitute(metautils::args.dsnum, ".", "") +
+      "_webfiles2";
+  if (table_exists(mysrv, s)) {
+    MySQL::LocalQuery q("select min(w.start_date), max(w.end_date), wf.gindex "
+        "from " + s + " as w left join dssdb.wfile as wf on wf.wfile = w.webID "
+        "where wf.dsid = 'ds" + metautils::args.dsnum + "' and wf.type = 'D' "
+        "and wf.status = 'P' and w.start_date > 0 group by wf.gindex");
+    if (q.submit(mysrv) < 0) {
+      myerror = "Error (A): " + q.error();
+      exit(1);
     }
     MySQL::Row row;
-    auto fetched=query.fetch_row(row);
-    if (query.num_rows() < 2 && (!fetched || row[2] == "0")) {
-	auto lpad=strutils::itos(date_left_padding);
-	query.set("select lpad(start_date,"+lpad+",'0'),lpad(end_date,"+lpad+",'0'),0 from "+table+" where start_date != 0 order by start_date,end_date");
-	if (query.submit(server) < 0) {
-	  myerror = "Error (B): " + query.error();
-	  exit(1);
-	}
-	if (query.num_rows() > 0) {
-	  std::vector<CMDDateRange> darray;
-	  darray.reserve(query.num_rows());
-	  while (query.fetch_row(row)) {
-	    darray.emplace_back(cmd_date_range(row[0],row[1],row[2],precision));
-	  }
-	  binary_sort(darray,
-	  [](CMDDateRange& left,CMDDateRange& right) -> bool
-	  {
-	    if (left.start <= right.start) {
-		return true;
-	    }
-	    else {
-		return false;
-	    }
-	  });
-	  CMDDateRange d;
-	  d.gindex="0";
-	  DateTime sdt(std::stoll(darray[0].start));
-	  DateTime edt(std::stoll(darray[0].end));
-	  auto max_edt=edt;
-	  auto last_edt=darray[0].end;
-	  d.start=darray[0].start;
-	  for (size_t n=1; n < query.num_rows(); n++) {
-	    sdt.set(std::stoll(darray[n].start));
-	    if (sdt > max_edt && sdt.days_since(max_edt) > 180) {
-		d.end=last_edt;
-		range_list.emplace_back(d);
-		d.start=darray[n].start;
-	    }
-	    edt.set(std::stoll(darray[n].end));
-	    if (edt > max_edt) {
-		max_edt=edt;
-	    }
-	    if (darray[n].end > last_edt) {
-		last_edt=darray[n].end;
-	    }
-	  }
-	  d.end=last_edt;
-	  range_list.emplace_back(d);
-	}
-    }
-    else {
-	query.rewind();
-	while (query.fetch_row(row)) {
-	  range_list.emplace_back(cmd_date_range(row[0],row[1],row[2],precision));
-	}
+    auto b = q.fetch_row(row);
+    if (q.num_rows() < 2 && (!b || row[2] == "0")) {
+      auto i = itos(date_left_padding);
+      q.set("select lpad(start_date, " + i + ", '0'), lpad(end_date, " + i +
+          ", '0'), 0 from " + s + " where start_date != 0 order by start_date, "
+          "end_date");
+      if (q.submit(mysrv) < 0) {
+        myerror = "Error (B): " + q.error();
+        exit(1);
+      }
+      if (q.num_rows() > 0) {
+        vector<CMDDateRange> v;
+        v.reserve(q.num_rows());
+        for (const auto& r : q) {
+          v.emplace_back(cmd_date_range(r[0], r[1], r[2], precision));
+        }
+        sort(v.begin(), v.end(),
+        [](const CMDDateRange& left, const CMDDateRange& right) -> bool {
+          if (left.start <= right.start) {
+            return true;
+          }
+          return false;
+        });
+        CMDDateRange d;
+        d.gindex = "0";
+        DateTime sdt(stoll(v[0].start));
+        DateTime edt(stoll(v[0].end));
+        auto mxdt = edt;
+        auto last = v[0].end;
+        d.start = v[0].start;
+        for (size_t n = 1; n < q.num_rows(); ++n) {
+          sdt.set(stoll(v[n].start));
+          if (sdt > mxdt && sdt.days_since(mxdt) > 180) {
+            d.end = last;
+            ranges.emplace_back(d);
+            d.start = v[n].start;
+          }
+          edt.set(stoll(v[n].end));
+          if (edt > mxdt) {
+            mxdt = edt;
+          }
+          if (v[n].end > last) {
+            last = v[n].end;
+          }
+        }
+        d.end = last;
+        ranges.emplace_back(d);
+      }
+    } else {
+      q.rewind();
+      for (const auto& r: q) {
+        ranges.emplace_back(cmd_date_range(r[0], r[1], r[2], precision));
+      }
     }
   }
-  server.disconnect();
+  mysrv.disconnect();
 }
 
-void summarize_dates(std::string caller,std::string user)
-{
-  std::list<CMDDateRange> range_list;
-  size_t precision=0;
-  cmd_dates("WGrML",12,range_list,precision);
-  cmd_dates("WObML",8,range_list,precision);
-  cmd_dates("WFixML",12,range_list,precision);
-//  cmd_dates("SatML",14,range_list,precision);
-  MySQL::Server dssdb_server(metautils::directives.database_server,metautils::directives.rdadb_username,metautils::directives.rdadb_password,"dssdb");;
-  if (range_list.size() > 0) {
-    precision=(precision-2)/2;
-    std::vector<CMDDateRange> darray;
-    darray.reserve(range_list.size());
-    auto n=0;
-    auto found_groups=false;
-    for (const auto& item : range_list) {
-	darray.emplace_back(item);
-	if (darray[n].gindex != "0") {
-	  found_groups=true;
-	}
-	++n;
+void summarize_dates(string caller, string user) {
+  static const string F = this_function_label(__func__);
+  vector<CMDDateRange> v;
+  size_t precision = 0;
+  cmd_dates("WGrML", 12, v, precision);
+  cmd_dates("WObML", 8, v, precision);
+  cmd_dates("WFixML", 12, v, precision);
+//  cmd_dates("SatML", 14, v, precision);
+  MySQL::Server mysrv(metautils::directives.database_server, metautils::
+      directives.rdadb_username, metautils::directives.rdadb_password, "dssdb");
+  if (v.size() > 0) {
+    precision = (precision - 2) / 2;
+    vector<CMDDateRange> v2;
+    v2.reserve(v.size());
+    auto n = 0;
+    auto b = false;
+    for (const auto& e : v) {
+      v2.emplace_back(e);
+      if (v2[n].gindex != "0") {
+        b = true;
+      }
+      ++n;
     }
-    if (!found_groups) {
-	auto m=1;
-	dssdb_server._delete("dsperiod","dsid = 'ds"+metautils::args.dsnum+"'");
-	for (n=range_list.size()-1; n >= 0; n--,m++) {
-	  DateTime sdt(std::stoll(darray[n].start));
-	  DateTime edt(std::stoll(darray[n].end));
-	  std::string insert_string="'ds"+metautils::args.dsnum+"',0,"+strutils::itos(m)+",'"+sdt.to_string("%Y-%m-%d")+"','"+sdt.to_string("%T")+"',"+strutils::itos(precision)+",'"+edt.to_string("%Y-%m-%d")+"','"+edt.to_string("%T")+"',"+strutils::itos(precision)+",'"+sdt.to_string("%Z")+"'";
-	  if (dssdb_server.insert("dsperiod",insert_string) < 0) {
-	    auto error=dssdb_server.error();
-	    if (!std::regex_search(error,std::regex("^Duplicate entry"))) {
-		metautils::log_error("summarize_dates(): "+error+" when trying to insert into dsperiod(1) ("+insert_string+")",caller,user);
-	    }
-	  }
-	}
-    }
-    else {
-	binary_sort(darray,
-	[](CMDDateRange& left,CMDDateRange& right) -> bool
-	{
-	  if (left.end > right.end) {
-	    return true;
-	  }
-	  else if (left.end < right.end) {
-	    return false;
-	  }
-	  else {
-	    if (left.gindex <= right.gindex) {
-	        return true;
-	    }
-	    else {
-	        return false;
-	    }
-	  }
-	});
-	dssdb_server._delete("dsperiod","dsid = 'ds"+metautils::args.dsnum+"'");
-	for (size_t n=0; n < range_list.size(); ++n) {
-	  DateTime sdt(std::stoll(darray[n].start));
-	  DateTime edt(std::stoll(darray[n].end));
-	  std::string insert_string="'ds"+metautils::args.dsnum+"',"+darray[n].gindex+","+strutils::itos(n)+",'"+sdt.to_string("%Y-%m-%d")+"','"+sdt.to_string("%T")+"',"+strutils::itos(precision)+",'"+edt.to_string("%Y-%m-%d")+"','"+edt.to_string("%T")+"',"+strutils::itos(precision)+",'"+sdt.to_string("%Z")+"'";
-	  if (dssdb_server.insert("dsperiod",insert_string) < 0) {
-	    auto error=dssdb_server.error();
-	    auto num_retries=0;
-	    while (num_retries < 3 && strutils::has_beginning(error,"Deadlock")) {
-		error="";
-		sleep(30);
-		if (dssdb_server.insert("dsperiod",insert_string) < 0) {
-		  error=dssdb_server.error();
-		}
-		++num_retries;
-	    }
-	    if (!error.empty() && !strutils::has_beginning(error,"Duplicate entry")) {
-		metautils::log_error("summarize_dates(): "+error+" when trying to insert into dsperiod(2) ("+insert_string+")",caller,user);
-	    }
-	  }
-	}
+    if (!b) {
+      auto m = 1;
+      mysrv._delete("dsperiod", "dsid = 'ds" + metautils::args.dsnum + "'");
+      for (n = v.size() - 1; n >= 0; --n, ++m) {
+        DateTime sdt(stoll(v2[n].start));
+        DateTime edt(stoll(v2[n].end));
+        string s = "'ds" + metautils::args.dsnum + "', 0, " + itos(m) + ", '" +
+            sdt.to_string("%Y-%m-%d") + "', '" + sdt.to_string("%T") + "', " +
+            itos(precision) + ", '" + edt.to_string("%Y-%m-%d") + "', '" + edt.
+            to_string("%T") + "', " + itos(precision) + ", '" + sdt.to_string(
+            "%Z") + "'";
+        if (mysrv.insert("dsperiod", s) < 0) {
+          if (!regex_search(mysrv.error(), regex("^Duplicate entry"))) {
+            log_error2("'" + mysrv.error() + "' when trying to insert into "
+                "dsperiod(1) (" + s + ")", F, caller, user);
+          }
+        }
+      }
+    } else {
+      sort(v2.begin(), v2.end(),
+      [](const CMDDateRange& left, const CMDDateRange& right) -> bool {
+        if (left.end > right.end) {
+          return true;
+        } else if (left.end < right.end) {
+          return false;
+        } else {
+          if (left.gindex <= right.gindex) {
+            return true;
+          }
+          return false;
+        }
+      });
+      mysrv._delete("dsperiod", "dsid = 'ds" + metautils::args.dsnum + "'");
+      for (size_t n = 0; n < v.size(); ++n) {
+        DateTime sdt(stoll(v2[n].start));
+        DateTime edt(stoll(v2[n].end));
+        string s = "'ds" + metautils::args.dsnum + "', " + v2[n].gindex + ", " +
+            itos(n) + ", '" + sdt.to_string("%Y-%m-%d") + "', '" + sdt.
+            to_string("%T") + "', " + itos(precision) + ", '" + edt.to_string(
+            "%Y-%m-%d") + "', '" + edt.to_string("%T") + "', " + itos(precision)
+            + ", '" + sdt.to_string("%Z") + "'";
+        if (mysrv.insert("dsperiod", s) < 0) {
+          auto e = mysrv.error();
+          auto n = 0;
+          while (n < 3 && regex_search(e, regex("^Deadlock"))) {
+            e = "";
+            sleep(30);
+            if (mysrv.insert("dsperiod", s) < 0) {
+              e = mysrv.error();
+            }
+            ++n;
+          }
+          if (!e.empty() && !regex_search(e, regex("^Duplicate entry"))) {
+            log_error2("'" + e + "' when trying to insert into dsperiod(2) (" +
+                s + ")", F, caller, user);
+          }
+        }
+      }
     }
   }
-  dssdb_server.disconnect();
+  mysrv.disconnect();
 }
 
-bool inserted_time_resolution_keyword(MySQL::Server& server,std::string database,std::string keyword,std::string& error)
-{
-  if (server.insert("search.time_resolutions","'"+keyword+"','GCMD','"+metautils::args.dsnum+"','"+database+"'") < 0) {
-    error=server.error();
-    if (!strutils::contains(error,"Duplicate entry")) {
-	error+="\ntried to insert into search.time_resolutions ('"+keyword+"','GCMD','"+metautils::args.dsnum+"','"+database+"')";
-	return false;
+bool inserted_time_resolution_keyword(MySQL::Server& server, string database,
+    string keyword, string& error) {
+  if (server.insert("search.time_resolutions", "'" + keyword + "', 'GCMD', '" +
+      metautils::args.dsnum + "', '" + database + "'") < 0) {
+    auto e = server.error();
+    if (!regex_search(e, regex("Duplicate entry"))) {
+      e += "\ntried to insert into search.time_resolutions ('" + keyword +
+          "', 'GCMD', '" + metautils::args.dsnum + "', '" + database + "')";
+      return false;
     }
   }
   return true;
 }
 
-void grids_per(size_t nsteps,DateTime start,DateTime end,double& gridsper,std::string& unit)
-{
-  size_t num_days[]={0,31,28,31,30,31,30,31,31,30,31,30,31};
-  double nhrs,test;
-  const float TOLERANCE=0.15;
-
-  nhrs=end.hours_since(start);
-  if (floatutils::myequalf(nhrs,0.) || nsteps <= 1) {
-    unit="singletimestep";
+void grids_per(size_t nsteps, DateTime start, DateTime end, double& gridsper,
+    string& unit) {
+  size_t num_days[] = { 0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+  const float TOLERANCE = 0.15;
+  auto h = end.hours_since(start);
+  if (floatutils::myequalf(h, 0.) || nsteps <= 1) {
+    unit = "singletimestep";
     return;
   }
   if (dateutils::is_leap_year(end.year())) {
-    num_days[2]=29;
+    num_days[2] = 29;
   }
-  gridsper=(nsteps-1)/nhrs;
-  test=gridsper;
-  if ((test+TOLERANCE) > 1.) {
-    gridsper=test;
-    test/=60.;
-    if ((test+TOLERANCE) < 1.) {
-	unit="hour";
+  gridsper = (nsteps - 1) / h;
+  double test = gridsper;
+  if (test + TOLERANCE > 1.) {
+    gridsper = test;
+    test /= 60.;
+    if (test + TOLERANCE < 1.) {
+      unit = "hour";
+    } else {
+      gridsper = test;
+      test /= 60.;
+      if (test + TOLERANCE < 1.) {
+        unit = "minute";
+      } else {
+        gridsper = test;
+        unit = "second";
+      }
     }
-    else {
-	gridsper=test;
-	test/=60.;
-	if ((test+TOLERANCE) < 1.) {
-	  unit="minute";
-	}
-	else {
-	  gridsper=test;
-	  unit="second";
-	}
-    }
-  }
-  else {
-    gridsper*=24.;
-    if ((gridsper+TOLERANCE) > 1.) {
-	unit="day";
-    }
-    else {
-	gridsper*=7.;
-	if ((gridsper+TOLERANCE) > 1.) {
-	  unit="week";
-	}
-	else {
-	  gridsper*=(num_days[end.month()]/7.);
-	  if ((gridsper+TOLERANCE) > 1.) {
-	    unit="month";
-	  }
-	  else {
-	    gridsper*=12;
-	    if ((gridsper+TOLERANCE) > 1.) {
-		unit="year";
-	    }
-	    else {
-		unit="";
-		gridsper=0.;
-	    }
-	  }
-	}
+  } else {
+    gridsper *= 24.;
+    if (gridsper + TOLERANCE > 1.) {
+      unit = "day";
+    } else {
+      gridsper *= 7.;
+      if (gridsper + TOLERANCE > 1.) {
+        unit = "week";
+      } else {
+        gridsper *= num_days[end.month()] / 7.;
+        if (gridsper + TOLERANCE > 1.) {
+          unit = "month";
+        } else {
+          gridsper *= 12;
+          if (gridsper + TOLERANCE > 1.) {
+            unit = "year";
+          } else {
+            unit = "";
+            gridsper = 0.;
+          }
+        }
+      }
     }
   }
 }
 
-std::pair<std::string,std::string> gridded_frequency_data(std::string time_range)
-{
-  std::pair<std::string,std::string> frequency_data;
-  if (std::regex_search(time_range,std::regex("^Pentad"))) {
-    frequency_data.first=searchutils::time_resolution_keyword("regular",5,"day","");
-    frequency_data.second="regular<!>5<!>day";
-  }
-  else if (std::regex_search(time_range,std::regex("^Weekly"))) {
-    frequency_data.first=searchutils::time_resolution_keyword("regular",1,"week","");
-    frequency_data.second="regular<!>1<!>week";
-  }
-  else if (std::regex_search(time_range,std::regex("^Monthly"))) {
-    frequency_data.first=searchutils::time_resolution_keyword("regular",1,"month","");
-    frequency_data.second="regular<!>1<!>month";
-  }
-  else if (std::regex_search(time_range,std::regex("^30-year Climatology"))) {
-    frequency_data.first=searchutils::time_resolution_keyword("climatology",1,"30-year","");
-    frequency_data.second="climatology<!>1<!>30-year";
-  }
-  else if (std::regex_search(time_range,std::regex("-year Climatology"))) {
-    auto num_years=time_range.substr(0,time_range.find("-"));
-    if (std::regex_search(time_range,std::regex("of Monthly"))) {
-	frequency_data.first=searchutils::time_resolution_keyword("climatology",1,"month","");
-	frequency_data.second="climatology<!>1<!>"+num_years+"-year";
-    }
-    else {
-	frequency_data.second="<!>1<!>"+num_years+"-year";
+pair<string, string> gridded_frequency_data(string time_range) {
+  pair<string, string> data; // return value
+  if (regex_search(time_range, regex("^Pentad"))) {
+    data.first = searchutils::time_resolution_keyword("regular", 5, "day", "");
+    data.second = "regular<!>5<!>day";
+  } else if (regex_search(time_range, regex("^Weekly"))) {
+    data.first = searchutils::time_resolution_keyword("regular", 1, "week", "");
+    data.second = "regular<!>1<!>week";
+  } else if (regex_search(time_range, regex("^Monthly"))) {
+    data.first = searchutils::time_resolution_keyword("regular", 1, "month",
+        "");
+    data.second = "regular<!>1<!>month";
+  } else if (regex_search(time_range, regex("^30-year Climatology"))) {
+    data.first = searchutils::time_resolution_keyword("climatology", 1, "30-"
+        "year", "");
+    data.second = "climatology<!>1<!>30-year";
+  } else if (regex_search(time_range, regex("-year Climatology"))) {
+    auto num_years = time_range.substr(0, time_range.find("-"));
+    if (regex_search(time_range, regex("of Monthly"))) {
+      data.first = searchutils::time_resolution_keyword("climatology", 1,
+          "month", "");
+      data.second = "climatology<!>1<!>" + num_years + "-year";
+    } else {
+      data.second = "<!>1<!>" + num_years + "-year";
     }
   }
-  return std::move(frequency_data);
+  return move(data);
 }
 
-std::unordered_set<std::string> summarize_frequencies_from_wgrml_by_dataset(MySQL::Server& server,std::string caller,std::string user)
-{
-  const std::string THIS_FUNC=__func__;
-  std::unordered_set<std::string> tr_keyword_set;
-  std::string dsnum2=strutils::substitute(metautils::args.dsnum,".","");
-
-  MySQL::LocalQuery query("select distinct frequency_type,nsteps_per,unit from WGrML.ds"+dsnum2+"_frequencies where nsteps_per > 0");
-  if (query.submit(server) < 0) {
-    metautils::log_error(THIS_FUNC+"(): "+query.error()+" for '"+query.show()+"'",caller,user);
+unordered_set<string> summarize_frequencies_from_wgrml_by_dataset(MySQL::Server&
+    server, string caller, string user) {
+  static const string F = this_function_label(__func__);
+  unordered_set<string> sfreq; // return value
+  auto ds = substitute(metautils::args.dsnum, ".", "");
+  MySQL::LocalQuery q("select distinct frequency_type, nsteps_per, unit from "
+      "WGrML.ds" + ds + "_frequencies where nsteps_per > 0");
+  if (q.submit(server) < 0) {
+    log_error2("'" + q.error() + "' for '" + q.show() + "'", F, caller, user);
   }
-  server._delete("WGrML.frequencies","dsid =  '"+metautils::args.dsnum+"'");
-  for (const auto& row : query) {
-    if (server.insert("WGrML.frequencies","'"+metautils::args.dsnum+"',"+row[1]+",'"+row[2]+"'") < 0) {
-	auto error=server.error();
-	if (!strutils::contains(error,"Duplicate entry")) {
-	  metautils::log_error(THIS_FUNC+"(): "+error+" while trying to insert '"+metautils::args.dsnum+"',"+row[1]+",'"+row[2]+"'",caller,user);
-	}
+  server._delete("WGrML.frequencies", "dsid =  '" + metautils::args.dsnum +
+      "'");
+  for (const auto& r : q) {
+    if (server.insert("WGrML.frequencies", "'" + metautils::args.dsnum + "', " +
+        r[1] + ", '" + r[2] + "'") < 0) {
+      if (!regex_search(server.error(), regex("Duplicate entry"))) {
+        log_error2("'" + server.error() + "' while trying to insert '" +
+            metautils::args.dsnum + "', " + r[1] + ", '" + r[2] + "'", F,
+            caller, user);
+      }
     }
-    auto keyword=searchutils::time_resolution_keyword(row[0],std::stoi(row[1]),row[2],"");
-    if (!keyword.empty() && tr_keyword_set.find(keyword) == tr_keyword_set.end()) {
-	tr_keyword_set.emplace(keyword);
-    }
-  }
-  query.set("select min(distinct frequency_type),max(distinct frequency_type),count(distinct frequency_type) from WGrML.ds"+dsnum2+"_frequencies where nsteps_per = 0");
-  if (query.submit(server) < 0) {
-    metautils::log_error(THIS_FUNC+"(): "+query.error()+" for '"+query.show()+"'",caller,user);
-  }
-  for (const auto& row : query) {
-    if (row[2] != "0") {
-	double gridsper;
-	std::string frequency_unit;
-	grids_per(std::stoi(row[2]),DateTime(std::stoll(row[0])),DateTime(std::stoll(row[1])),gridsper,frequency_unit);
-	if (frequency_unit != "singletimestep") {
-	  auto nsteps_per=lround(gridsper);
-	  if (server.insert("WGrML.frequencies","'"+metautils::args.dsnum+"',"+strutils::itos(nsteps_per)+",'"+frequency_unit+"'") < 0) {
-	    auto error=server.error();
-	    if (!strutils::contains(error,"Duplicate entry")) {
-		metautils::log_error(THIS_FUNC+"(): "+error+" while trying to insert '"+metautils::args.dsnum+"',"+strutils::itos(nsteps_per)+",'"+frequency_unit+"'",caller,user);
-	    }
-	  }
-	  else {
-	    auto keyword=searchutils::time_resolution_keyword("irregular",nsteps_per,frequency_unit,"");
-	    if (!keyword.empty() && tr_keyword_set.find(keyword) == tr_keyword_set.end()) {
-		tr_keyword_set.emplace(keyword);
-	    }
-	  }
-	}
+    auto k = searchutils::time_resolution_keyword(r[0], stoi(r[1]), r[2], "");
+    if (!k.empty() && sfreq.find(k) == sfreq.end()) {
+      sfreq.emplace(k);
     }
   }
-  server._delete("search.time_resolutions","dsid = '"+metautils::args.dsnum+"' and origin = 'WGrML'");
-
-  return std::move(tr_keyword_set);
+  q.set("select min(distinct frequency_type), max(distinct frequency_type), "
+      "count(distinct frequency_type) from WGrML.ds" + ds + "_frequencies "
+      "where nsteps_per = 0");
+  if (q.submit(server) < 0) {
+    log_error2("'" + q.error() + "' for '" + q.show() + "'", F, caller, user);
+  }
+  for (const auto& r : q) {
+    if (r[2] != "0") {
+      double n;
+      string u;
+      grids_per(stoi(r[2]), DateTime(stoll(r[0])), DateTime(stoll(r[1])), n, u);
+      if (u != "singletimestep") {
+        auto l = lround(n);
+        if (server.insert("WGrML.frequencies", "'" + metautils::args.dsnum +
+            "', " + itos(l) + ", '" + u + "'") < 0) {
+          if (!regex_search(server.error(), regex("Duplicate entry"))) {
+            log_error2("'" + server.error() + "' while trying to insert '" +
+                metautils::args.dsnum + "', " + itos(l) + ", '" + u + "'", F,
+                caller, user);
+          }
+        } else {
+          auto k = searchutils::time_resolution_keyword("irregular", l, u, "");
+          if (!k.empty() && sfreq.find(k) == sfreq.end()) {
+            sfreq.emplace(k);
+          }
+        }
+      }
+    }
+  }
+  server._delete("search.time_resolutions", "dsid = '" + metautils::args.dsnum +
+      "' and origin = 'WGrML'");
+  return move(sfreq);
 }
 
-std::unordered_set<std::string> summarize_frequencies_from_wgrml_by_data_file(MySQL::Server& server,std::string file_id_code,std::string caller,std::string user)
-{
-  const std::string THIS_FUNC=__func__;
-  std::unordered_set<std::string> tr_keyword_set;
-  std::string dsnum2=strutils::substitute(metautils::args.dsnum,".","");
+unordered_set<string> summarize_frequencies_from_wgrml_by_data_file(MySQL::
+    Server& server, string file_id_code, string caller, string user) {
+  static const string F = this_function_label(__func__);
+  unordered_set<string> sfreq; // return value
+  auto ds = substitute(metautils::args.dsnum, ".", "");
 
-// get all of the time ranges for the given file ID
-  MySQL::LocalQuery time_ranges_query("select timeRange_code,min(start_date),max(end_date),sum(min_nsteps),sum(max_nsteps) from WGrML.ds"+dsnum2+"_grids where webID_code = "+file_id_code+" group by timeRange_code,parameter");
-  if (time_ranges_query.submit(server) < 0) {
-    return std::move(tr_keyword_set);
-  }
-
-// create a map of time range codes and their descriptions
-  MySQL::LocalQuery hash_query("code,timeRange","WGrML.timeRanges");
-  if (hash_query.submit(server) < 0) {
-    metautils::log_error(THIS_FUNC+"(): "+hash_query.error()+" while querying WGrML.timeRanges",caller,user);
-  }
-  std::unordered_map<std::string,std::string> time_range_map;
-  for (const auto& row : hash_query) {
-    time_range_map.emplace(row[0],row[1]);
+  // get all of the time ranges for the given file ID
+  MySQL::LocalQuery qt("select timeRange_code, min(start_date), max(end_date), "
+      "sum(min_nsteps), sum(max_nsteps) from WGrML.ds" + ds + "_grids where "
+      "webID_code = " + file_id_code + " group by timeRange_code, parameter");
+  if (qt.submit(server) < 0) {
+    return move(sfreq);
   }
 
-  std::unordered_set<std::string> frequencies_set,single_nsteps_set,unique_products_set;
-  size_t single_nsteps=0;
-  std::string min_start="30001231235959",max_end="10000101000000";
-  for (const auto& row : time_ranges_query) {
-    if (row[3] != "1" || row[4] != "1") {
-	auto time_range=time_range_map[row[0]];
-	std::string keyword,frequency;
-	std::tie(keyword,frequency)=gridded_frequency_data(time_range);
-	if (keyword.empty()) {
-	  auto start=row[1];
-	  while (start.length() < 14) {
-	    start+="00";
-	  }
-	  auto end=row[2];
-	  while (end.length() < 14) {
-	    end+="00";
-	  }
-	  DateTime d1(std::stoll(start));
-	  DateTime d2(std::stoll(end));
-	  if (std::regex_search(time_range,std::regex("Average$")) || std::regex_search(time_range,std::regex("Product$"))) {
-	    auto time_range_unit=time_range;
-	    if (strutils::contains(time_range_unit,"of")) {
-		time_range_unit=time_range_unit.substr(time_range_unit.rfind("of")+3);
-	    }
-	    time_range_unit=time_range_unit.substr(0,time_range_unit.find(" "));
-	    auto num=std::stoi(time_range_unit.substr(0,time_range_unit.find("-")));
-	    time_range_unit=time_range_unit.substr(time_range_unit.find("-"));
-	    if (time_range_unit == "hour") {
-		d2.subtract_hours(num);
-	    }
-	    else if (time_range_unit == "day") {
-		d2.subtract_days(num);
-	    }
-	  }
-	  else if (std::regex_search(time_range,std::regex(" (Accumulation|Average|Product) \\(initial\\+"))) {
-	    auto time_range_unit=time_range.substr(0,time_range.find(" "));
-	    auto idx=time_range_unit.find("-");
-	    auto num=std::stoi(time_range_unit.substr(0,idx));
-	    time_range_unit=time_range_unit.substr(idx+1);
-	    if (time_range_unit == "hour") {
-		d2.subtract_hours(num);
-	    }
-	  }
-	  std::string frequency_unit;
-	  size_t nsteps;
-	  double gridsper;
-	  if (row[3] != row[4]) {
-	    nsteps=std::stoi(row[3]);
-	    grids_per(nsteps,d1,d2,gridsper,frequency_unit);
-	    if (gridsper > 0.) {
-		if (frequency_unit != "singletimestep") {
-		  keyword=searchutils::time_resolution_keyword("irregular",lround(gridsper),frequency_unit,"");
-		  frequency="irregular<!>"+strutils::itos(lround(gridsper))+"<!>"+frequency_unit;
-		}
-	    }
-	  }
-	  nsteps=std::stoi(row[4]);
-	  grids_per(nsteps,d1,d2,gridsper,frequency_unit);
-	  if (gridsper > 0.) {
-	    if (frequency_unit != "singletimestep") {
-		keyword=searchutils::time_resolution_keyword("irregular",lround(gridsper),frequency_unit,"");
-		frequency="irregular<!>"+strutils::itos(lround(gridsper))+"<!>"+frequency_unit;
-	    }
-	    else if (nsteps > 0) {
-		if (single_nsteps_set.find(start) == single_nsteps_set.end()) {
-		  if (start < min_start) {
-		    min_start=start;
-		  }
-		  if (start > max_end) {
-		    max_end=start;
-		  }
-		  single_nsteps+=nsteps;
-		  single_nsteps_set.emplace(start);
-		}
-	    }
-	  }
-	}
-	if (!keyword.empty() && tr_keyword_set.find(keyword) == tr_keyword_set.end()) {
-	  tr_keyword_set.emplace(keyword);
-	}
-	if (!frequency.empty() && frequencies_set.find(frequency) == frequencies_set.end()) {
-	  frequencies_set.emplace(frequency);
-	}
-    }
-    else {
-	auto key=row[0]+"-"+row[1];
-	if (single_nsteps_set.find(key) == single_nsteps_set.end()) {
-	  auto date=row[1];
-	  if (date.length() < 14) {
-	    date.append(14-date.length(),'0');
-	  }
-	  if (date < min_start) {
-	    min_start=date;
-	  }
-	  if (date > max_end) {
-	    max_end=date;
-	  }
-	  ++single_nsteps;
-	  single_nsteps_set.emplace(key);
-	  if (unique_products_set.find(row[0]) == unique_products_set.end()) {
-	    unique_products_set.emplace(row[0]);
-	  }
-	}
-    }
+  // create a map of time range codes and their descriptions
+  MySQL::LocalQuery qc("code, timeRange", "WGrML.timeRanges");
+  if (qc.submit(server) < 0) {
+    log_error2("'" + qc.error() + "' while querying WGrML.timeRanges", F,
+        caller, user);
   }
-  if (single_nsteps > 0) {
-    if (unique_products_set.size() > 1) {
-	single_nsteps/=unique_products_set.size();
-    }
-    double gridsper;
-    std::string frequency_unit;
-    grids_per(single_nsteps,DateTime(std::stoll(min_start)),DateTime(std::stoll(max_end)),gridsper,frequency_unit);
-    if (gridsper > 0. && !frequency_unit.empty() && frequency_unit != "singletimestep") {
-	auto keyword=searchutils::time_resolution_keyword("irregular",lround(gridsper),frequency_unit,"");
-	if (!keyword.empty() && tr_keyword_set.find(keyword) == tr_keyword_set.end()) {
-	  tr_keyword_set.emplace(keyword);
-	}
-	auto frequency="irregular<!>"+strutils::itos(lround(gridsper))+"<!>"+frequency_unit;
-	if (!frequency.empty() && frequencies_set.find(frequency) == frequencies_set.end()) {
-	  frequencies_set.emplace(frequency);
-	}
-    }
-  }
-  if (!table_exists(server,"WGrML.ds"+dsnum2+"_frequencies")) {
-    std::string error;
-    if (server.command("create table WGrML.ds"+dsnum2+"_frequencies like WGrML.template_frequencies",error) < 0) {
-	metautils::log_error(THIS_FUNC+"(): "+server.error()+" while creating table WGrML.ds"+dsnum2+"_frequencies",caller,user);
-    }
-  }
-  else {
-    server._delete("WGrML.ds"+dsnum2+"_frequencies","webID_code = "+file_id_code);
-  }
-  if (frequencies_set.size() > 0) {
-    for (const auto& frequency : frequencies_set) {
-	auto frequency_parts=strutils::split(frequency,"<!>");
-	if (server.insert("WGrML.frequencies","'"+metautils::args.dsnum+"',"+frequency_parts[1]+",'"+frequency_parts[2]+"'") < 0) {
-	  auto error=server.error();
-	  if (!strutils::contains(error,"Duplicate entry")) {
-	    metautils::log_error(THIS_FUNC+"(): "+error+" while trying to insert '"+metautils::args.dsnum+"',"+frequency_parts[1]+",'"+frequency_parts[2]+"'",caller,user);
-	  }
-	}
-	if (server.insert("WGrML.ds"+dsnum2+"_frequencies",file_id_code+",'"+frequency_parts[0]+"',"+frequency_parts[1]+",'"+frequency_parts[2]+"'") < 0) {
-	  metautils::log_error(THIS_FUNC+"(): "+server.error()+" while trying to insert '"+file_id_code+",'"+frequency_parts[0]+"',"+frequency_parts[1]+",'"+frequency_parts[2]+"''",caller,user);
-	}
-    }
-  }
-  else {
-    if (server.insert("WGrML.ds"+dsnum2+"_frequencies",file_id_code+",'"+min_start+"',0,''") < 0) {
-	metautils::log_error(THIS_FUNC+"(): "+server.error()+" while trying to insert '"+file_id_code+",'"+min_start+"',0,''",caller,user);
-    }
+  unordered_map<string, string> map;
+  for (const auto& r : qc) {
+    map.emplace(r[0], r[1]);
   }
 
-  return std::move(tr_keyword_set);
+  unordered_set<string> fset, nset, tset;
+  size_t cnt = 0;
+  string smin = "30001231235959", smax = "10000101000000";
+  for (const auto& r : qt) {
+    if (r[3] != "1" || r[4] != "1") {
+      auto t = map[r[0]];
+      string k, f;
+      tie(k, f) = gridded_frequency_data(t);
+      if (k.empty()) {
+        auto dt1 = r[1];
+        while (dt1.length() < 14) {
+          dt1 += "00";
+        }
+        auto dt2 = r[2];
+        while (dt2.length() < 14) {
+          dt2 += "00";
+        }
+        DateTime d1(stoll(dt1));
+        DateTime d2(stoll(dt2));
+        if (regex_search(t, regex("Average$")) || regex_search(t, regex(
+            "Product$"))) {
+          auto u = t;
+          if (regex_search(u, regex("of"))) {
+            u = u.substr(u.rfind("of") + 3);
+          }
+          u = u.substr(0, u.find(" "));
+          auto n = stoi(u.substr(0, u.find("-")));
+          u = u.substr(u.find("-"));
+          if (u == "hour") {
+            d2.subtract_hours(n);
+          } else if (u == "day") {
+            d2.subtract_days(n);
+          }
+        } else if (regex_search(t, regex(" (Accumulation|Average|Product) "
+            "\\(initial\\+"))) {
+          auto u = t.substr(0, t.find(" "));
+          auto idx = u.find("-");
+          auto n = stoi(u.substr(0, idx));
+          u = u.substr(idx + 1);
+          if (u == "hour") {
+            d2.subtract_hours(n);
+          }
+        }
+        size_t n;
+        double d;
+        string u;
+        if (r[3] != r[4]) {
+          n = stoi(r[3]);
+          grids_per(n, d1, d2, d, u);
+          if (d > 0.) {
+            if (u != "singletimestep") {
+              k = searchutils::time_resolution_keyword("irregular", lround(d),
+                  u, "");
+              f = "irregular<!>" + itos(lround(d)) + "<!>" + u;
+            }
+          }
+        }
+        n = stoi(r[4]);
+        grids_per(n, d1, d2, d, u);
+        if (d > 0.) {
+          if (u != "singletimestep") {
+            k = searchutils::time_resolution_keyword("irregular", lround(d), u,
+                "");
+            f = "irregular<!>" + itos(lround(d)) + "<!>" + u;
+          } else if (n > 0) {
+            if (nset.find(dt1) == nset.end()) {
+              if (dt1 < smin) {
+                smin = dt1;
+              }
+              if (dt1 > smax) {
+                smax = dt1;
+              }
+              cnt += n;
+              nset.emplace(dt1);
+            }
+          }
+        }
+      }
+      if (!k.empty() && sfreq.find(k) == sfreq.end()) {
+        sfreq.emplace(k);
+      }
+      if (!f.empty() && fset.find(f) == fset.end()) {
+        fset.emplace(f);
+      }
+    } else {
+      auto k = r[0] + "-" + r[1];
+      if (nset.find(k) == nset.end()) {
+        auto dt = r[1];
+        if (dt.length() < 14) {
+          dt.append(14 - dt.length(), '0');
+        }
+        if (dt < smin) {
+          smin = dt;
+        }
+        if (dt > smax) {
+          smax = dt;
+        }
+        ++cnt;
+        nset.emplace(k);
+        if (tset.find(r[0]) == tset.end()) {
+          tset.emplace(r[0]);
+        }
+      }
+    }
+  }
+  if (cnt > 0) {
+    if (tset.size() > 1) {
+      cnt /= tset.size();
+    }
+    double d;
+    string u;
+    grids_per(cnt, DateTime(stoll(smin)), DateTime(stoll(smax)), d, u);
+    if (d > 0. && !u.empty() && u != "singletimestep") {
+      auto k = searchutils::time_resolution_keyword("irregular", lround(d), u,
+          "");
+      if (!k.empty() && sfreq.find(k) == sfreq.end()) {
+        sfreq.emplace(k);
+      }
+      auto f = "irregular<!>" + itos(lround(d)) + "<!>" + u;
+      if (!f.empty() && fset.find(f) == fset.end()) {
+        fset.emplace(f);
+      }
+    }
+  }
+  if (!table_exists(server, "WGrML.ds" + ds + "_frequencies")) {
+    string e;
+    if (server.command("create table WGrML.ds" + ds + "_frequencies like WGrML."
+        "template_frequencies", e) < 0) {
+      log_error2("'" + server.error() + "' while creating table WGrML.ds" + ds +
+          "_frequencies", F, caller, user);
+    }
+  } else {
+    server._delete("WGrML.ds" + ds + "_frequencies", "webID_code = " +
+        file_id_code);
+  }
+  if (fset.size() > 0) {
+    for (const auto& e : fset) {
+      auto sp = split(e, "<!>");
+      if (server.insert("WGrML.frequencies", "'" + metautils::args.dsnum + "', "
+          + sp[1] + ", '" + sp[2] + "'") < 0) {
+        if (!regex_search(server.error(), regex("Duplicate entry"))) {
+          log_error2("'" + server.error() + "' while trying to insert '" +
+              metautils::args.dsnum + "', " + sp[1] + ", '" + sp[2] + "'", F,
+              caller, user);
+        }
+      }
+      if (server.insert("WGrML.ds" + ds + "_frequencies", file_id_code + ", '" +
+          sp[0] + "', " + sp[1] + ", '" + sp[2] + "'") < 0) {
+        log_error2("'" + server.error() + "' while trying to insert '" +
+            file_id_code + ", '" + sp[0] + "', " + sp[1] + ", '" + sp[2] + "''",
+            F, caller, user);
+      }
+    }
+  } else {
+    if (server.insert("WGrML.ds" + ds + "_frequencies", file_id_code + ", '" +
+        smin + "', 0, ''") < 0) {
+      log_error2("'" + server.error() + "' while trying to insert '" +
+          file_id_code + ", '" + smin + "', 0, ''", F, caller, user);
+    }
+  }
+  return move(sfreq);
 }
 
-std::unordered_set<std::string> summarize_frequencies_from_wgrml(MySQL::Server& server,std::string file_id_code,std::string caller,std::string user)
-{
+unordered_set<string> summarize_frequencies_from_wgrml(MySQL::Server& server,
+    string file_id_code, string caller, string user) {
   if (file_id_code.empty()) {
-// no file ID provided, summarize for full dataset
-    auto tr_keyword_set=summarize_frequencies_from_wgrml_by_dataset(server,caller,user);
-    return std::move(tr_keyword_set);
-  }
-  else {
-// adding information from a given file ID
-    auto tr_keyword_set=summarize_frequencies_from_wgrml_by_data_file(server,file_id_code,caller,user);
-    return std::move(tr_keyword_set);
+
+    // no file ID provided, summarize for full dataset
+    return move(summarize_frequencies_from_wgrml_by_dataset(server, caller,
+        user));
+  } else {
+
+    // adding information from a given file ID
+    return move(summarize_frequencies_from_wgrml_by_data_file(server,
+        file_id_code, caller, user));
   }
 }
 
-std::unordered_set<std::string> summarize_frequencies_from_wobml(MySQL::Server& server,std::string file_id_code,std::string caller,std::string user)
-{
-  std::unordered_set<std::string> tr_keyword_set;
-  std::string dsnum2=strutils::substitute(metautils::args.dsnum,".","");
-  MySQL::LocalQuery query("select min(min_obs_per),max(max_obs_per),unit from ObML.ds"+dsnum2+"_frequencies group by unit");
-  if (query.submit(server) < 0) {
-    return std::move(tr_keyword_set);
+unordered_set<string> summarize_frequencies_from_wobml(MySQL::Server& server,
+    string file_id_code, string caller, string user) {
+  unordered_set<string> fset;
+  MySQL::LocalQuery q("select min(min_obs_per), max(max_obs_per), unit from "
+      "ObML.ds" + substitute(metautils::args.dsnum, ".", "") + "_frequencies "
+      "group by unit");
+  if (q.submit(server) < 0) {
+    return move(fset);
   }
   if (file_id_code.empty()) {
-    server._delete("search.time_resolutions","dsid = '"+metautils::args.dsnum+"' and origin = 'ObML'");
+    server._delete("search.time_resolutions", "dsid = '" + metautils::args.dsnum
+        + "' and origin = 'ObML'");
   }
-  for (const auto& row : query) {
-    auto num=std::stoi(row[0]);
-    auto frequency_unit=row[2];
-    std::string time_range;
-    if (num < 0) {
-	time_range="climatology";
-	if (num == -30) {
-	  frequency_unit="30-year";
-	}
+  for (const auto& r : q) {
+    auto n = stoi(r[0]);
+    auto u = r[2];
+    string s;
+    if (n < 0) {
+      s = "climatology";
+      if (n == -30) {
+        u = "30-year";
+      }
+    } else {
+      s = "irregular";
     }
-    else {
-	time_range="irregular";
+    auto k = searchutils::time_resolution_keyword(s, n, u, "");
+    if (fset.find(k) == fset.end()) {
+      fset.emplace(k);
     }
-    auto keyword=searchutils::time_resolution_keyword(time_range,num,frequency_unit,"");
-    if (tr_keyword_set.find(keyword) == tr_keyword_set.end()) {
-	tr_keyword_set.emplace(keyword);
+    n = stoi(r[1]);
+    u = r[2];
+    if (n < 0) {
+      s = "climatology";
+      if (n == -30) {
+        u = "30-year";
+      }
+    } else {
+      s = "irregular";
     }
-    num=std::stoi(row[1]);
-    frequency_unit=row[2];
-    if (num < 0) {
-	time_range="climatology";
-	if (num == -30) {
-	  frequency_unit="30-year";
-	}
-    }
-    else {
-	time_range="irregular";
-    }
-    keyword=searchutils::time_resolution_keyword(time_range,num,frequency_unit,"");
-    if (tr_keyword_set.find(keyword) == tr_keyword_set.end()) {
-	tr_keyword_set.emplace(keyword);
+    k = searchutils::time_resolution_keyword(s, n, u, "");
+    if (fset.find(k) == fset.end()) {
+      fset.emplace(k);
     }
   }
-
-  return std::move(tr_keyword_set);
+  return move(fset);
 }
 
-void summarize_frequencies(std::string caller,std::string user,std::string file_id_code)
-{
-  std::vector<std::pair<std::string,std::unordered_set<std::string>(*)(MySQL::Server&,std::string,std::string,std::string)>> summarizations{
-    std::make_pair("WGrML",summarize_frequencies_from_wgrml),
-    std::make_pair("WObML",summarize_frequencies_from_wobml)
+void summarize_frequencies(string caller, string user, string file_id_code) {
+  vector<pair<string, unordered_set<string>(*)(MySQL::Server&, string, string,
+      string)>> v{
+    make_pair("WGrML", summarize_frequencies_from_wgrml),
+    make_pair("WObML", summarize_frequencies_from_wobml),
   };
+  MySQL::Server mysrv(metautils::directives.database_server, metautils::
+      directives.metadb_username, metautils::directives.metadb_password, "");
+  for (const auto& e : v) {
+    auto t = e.first + ".ds" + substitute(metautils::args.dsnum, ".", "") +
+        "_frequencies";
+    if (MySQL::table_exists(mysrv, t)) {
+      auto e2 = e.second(mysrv, file_id_code, caller, user);
 
-  MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
-  for (const auto& summary : summarizations) {
-    auto frequency_table=summary.first+".ds"+strutils::substitute(metautils::args.dsnum,".","")+"_frequencies";
-    if (MySQL::table_exists(server,frequency_table)) {
-	auto tr_keyword_set=summary.second(server,file_id_code,caller,user);
-// update searchable time resolution keywords
-	for (const auto& keyword : tr_keyword_set) {
-	  std::string error;
-	  if (!inserted_time_resolution_keyword(server,summary.first,keyword,error)) {
-	    metautils::log_error("summarize_frequencies(): "+error,caller,user);
-	  }
-	}
+      // update searchable time resolution keywords
+      for (const auto& k : e2) {
+        string err;
+        if (!inserted_time_resolution_keyword(mysrv, e.first, k, err)) {
+          log_error2("'" + err + "'", "summarize_frequencies()" , caller, user);
+        }
+      }
     }
   }
-
-  server.disconnect();
+  mysrv.disconnect();
 }
 
-void summarize_data_formats(std::string caller,std::string user)
-{
-  std::string dsnum2=strutils::substitute(metautils::args.dsnum,".","");
-  auto cmd_databases=metautils::cmd_databases(caller,user);
-  if (cmd_databases.size() == 0) {
-    metautils::log_error("summarize_data_formats():  empty CMD database list",caller,user);
+void summarize_data_formats(string caller, string user) {
+  static const string F = this_function_label(__func__);
+  auto dblst = metautils::cmd_databases(caller, user);
+  if (dblst.size() == 0) {
+    log_error2("empty CMD database list", F, caller, user);
   }
-  MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
-  for (const auto& db : cmd_databases) {
-    auto db_name=std::get<0>(db);
-    auto table_name=db_name+".ds"+dsnum2+"_webfiles2";
-    if (table_name[0] != 'V' && table_exists(server,table_name)) {
-	MySQL::LocalQuery query("select distinct f.format from "+table_name+" as p left join "+db_name+".formats as f on f.code = p.format_code");
-	if (query.submit(server) < 0) {
-	  metautils::log_error("summarize_data_formats():  "+query.error(),caller,user);
-	}
-	std::string error;
-	if (server.command("lock tables search.formats write",error) < 0) {
-	  metautils::log_error("summarize_data_formats(): "+server.error(),caller,user);
-	}
-	server._delete("search.formats","dsid = '"+metautils::args.dsnum+"' and (vocabulary = '"+db_name+"' or vocabulary = 'dssmm')");
-	MySQL::Row row;
-	while (query.fetch_row(row)) {
-	  if (server.insert("search.formats","keyword,vocabulary,dsid","'"+row[0]+"','"+db_name+"','"+metautils::args.dsnum+"'","") < 0) {
-	    metautils::log_warning("summarize_data_formats() issued warning: "+server.error(),caller,user);
-	  }
-	}
-	if (server.command("unlock tables",error) < 0) {
-	  metautils::log_error("summarize_data_formats(): "+server.error(),caller,user);
-	}
+  MySQL::Server mysrv(metautils::directives.database_server, metautils::
+      directives.metadb_username, metautils::directives.metadb_password, "");
+  for (const auto& db : dblst) {
+    string nam, typ;
+    tie(nam, typ) = db;
+    auto t = nam + ".ds" + substitute(metautils::args.dsnum, ".", "") +
+        "_webfiles2";
+    if (t[0] != 'V' && table_exists(mysrv, t)) {
+      MySQL::LocalQuery q("select distinct f.format from " + t + " as p left "
+          "join " + nam + ".formats as f on f.code = p.format_code");
+      if (q.submit(mysrv) < 0) {
+        log_error2("'" + q.error() + "'", F, caller, user);
+      }
+      string e;
+      if (mysrv.command("lock tables search.formats write", e) < 0) {
+        log_error2("'" + mysrv.error() + "'", F, caller, user);
+      }
+      mysrv._delete("search.formats", "dsid = '" + metautils::args.dsnum +
+          "' and (vocabulary = '" + nam + "' or vocabulary = 'dssmm')");
+      for (const auto& r : q) {
+        if (mysrv.insert("search.formats", "keyword, vocabulary, dsid", "'" + r[0] + "', '" + nam + "', '" + metautils::args.dsnum + "'", "") < 0) {
+          metautils::log_warning("summarize_data_formats() issued warning: " +
+              mysrv.error(), caller, user);
+        }
+      }
+      if (mysrv.command("unlock tables", e) < 0) {
+        log_error2("'" + mysrv.error() + "'", F, caller, user);
+      }
     }
   }
-  server.disconnect();
+  mysrv.disconnect();
 }
 
-void create_non_cmd_file_list_cache(std::string file_type,my::map<CodeEntry>& files_with_cmd_table,std::string caller,std::string user)
-{
+void create_non_cmd_file_list_cache(string file_type, unordered_set<string>&
+    files_with_cmd_table, string caller, string user) {
+  static const string F = this_function_label(__func__);
+
+  // random sleep to minimize collisions from concurrent processes
+  sleep(getpid() % 15);
+  MySQL::Server mysrv(metautils::directives.database_server, metautils::
+      directives.rdadb_username, metautils::directives.rdadb_password, "dssdb");
+  if (!mysrv) {
+    log_error2("error connecting to database: '" + mysrv.error() + "'", F,
+        caller, user);
+  }
+  MySQL::LocalQuery q("version", "dataset", "dsid = 'ds" +
+      metautils::args.dsnum + "'");
+  if (q.submit(mysrv) < 0) {
+    log_error2("'" + q.error() + "' from query: " + q.show(), F, caller, user);
+  }
+  MySQL::Row row;
+  if (!q.fetch_row(row)) {
+    log_error2("unable to get dataset version", F, caller, user);
+  }
+  vector<string> v;
+  if (file_type == "Web") {
+    q.set("select w.wfile, w.data_format, w.file_format, w.data_size, w.note, "
+        "w.gindex from wfile as w where w.dsid = 'ds" + metautils::args.dsnum +
+        "' and w.type = 'D' and w.status = 'P'");
+  }
+  if (q.submit(mysrv) < 0) {
+    log_error2("'" + q.error() + "' from query: " + q.show(), F, caller, user);
+  }
+  for (const auto& r : q) {
+    if (files_with_cmd_table.find(r[0]) == files_with_cmd_table.end()) {
+      v.emplace_back(r[0] + "<!>" + r[1] + "<!>" + r[2] + "<!>" + r[3] + "<!>" +
+          r[4] + "<!>" + r[5]);
+    }
+  }
+  string f;
+  if (file_type == "Web") {
+    f = "getWebList_nonCMD.cache";
+  }
   TempDir tdir;
   if (!tdir.create(metautils::directives.temp_path)) {
-    metautils::log_error("create_non_cmd_file_list_cache(): unable to create temporary directory",caller,user);
+    log_error2("unable to create temporary directory", F, caller, user);
   }
-// random sleep to minimize collisions from concurrent processes
-  sleep( (getpid() % 15) );
-  std::string cache_name,CMD_cache,nonCMD_cache,cnt_field,dsarch_flag;
-  if (file_type == "MSS") {
-    cache_name="getMssList_nonCMD.cache";
-    CMD_cache=unixutils::remote_web_file("https://rda.ucar.edu/datasets/ds"+metautils::args.dsnum+"/metadata/getMssList.cache",tdir.name());
-    if (unixutils::exists_on_server(metautils::directives.web_server,"/data/web/datasets/ds"+metautils::args.dsnum+"/metadata/getMssList_nonCMD.cache",metautils::directives.rdadata_home)) {
-	nonCMD_cache=unixutils::remote_web_file("https://rda.ucar.edu/datasets/ds"+metautils::args.dsnum+"/metadata/getMssList_nonCMD.cache",tdir.name());
+  if (v.size() > 0) {
+
+    // create the directory tree in the temp directory
+    stringstream oss, ess;
+    if (mysystem2("/bin/mkdir -p " + tdir.name() + "/metadata", oss, ess) !=
+        0) {
+      log_error2("unable to create a temporary directory (1) - '" + ess.str() +
+          "'", F, caller, user);
     }
-    cnt_field="pmsscnt";
-    dsarch_flag="-sm";
-  }
-  else if (file_type == "Web") {
-    cache_name="getWebList_nonCMD.cache";
-    CMD_cache=unixutils::remote_web_file("https://rda.ucar.edu/datasets/ds"+metautils::args.dsnum+"/metadata/getWebList.cache",tdir.name());
-    if (unixutils::exists_on_server(metautils::directives.web_server,"/data/web/datasets/ds"+metautils::args.dsnum+"/metadata/getWebList_nonCMD.cache",metautils::directives.rdadata_home)) {
-	nonCMD_cache=unixutils::remote_web_file("https://rda.ucar.edu/datasets/ds"+metautils::args.dsnum+"/metadata/getWebList_nonCMD.cache",tdir.name());
-    }
-    cnt_field="dwebcnt";
-    dsarch_flag="-sw";
-  }
-  MySQL::Server server(metautils::directives.database_server,metautils::directives.rdadb_username,metautils::directives.rdadb_password,"dssdb");
-  MySQL::LocalQuery query("version,"+cnt_field,"dataset","dsid = 'ds"+metautils::args.dsnum+"'");
-  if (query.submit(server) < 0) {
-    metautils::log_error("create_non_cmd_file_list_cache(): "+query.error()+" from query: "+query.show(),caller,user);
-  }
-  MySQL::Row row;
-  if (!query.fetch_row(row)) {
-    metautils::log_error("create_non_cmd_file_list_cache(): unable to get dataset version number",caller,user);
-  }
-  auto version=row[0];
-  size_t filecnt=std::stoi(row[1]);
-  std::ifstream ifs(CMD_cache.c_str());
-  if (!ifs.is_open()) {
-    metautils::log_error("create_non_cmd_file_list_cache(): could not open the CMD cache",caller,user);
-  }
-  char line[32768];
-  ifs.getline(line,32768);
-  auto num_lines=std::stoi(line);
-  ifs.getline(line,32768);
-  std::list<std::string> cache_list;
-  size_t cmdcnt=0;
-  auto n=0;
-  while (!ifs.eof()) {
-    ++n;
-    if (n > num_lines) {
-	break;
-    }
-    auto line_parts=strutils::split(line,"<!>");
-    if (line_parts.size() != 9) {
-	metautils::log_error("create_non_cmd_file_list_cache(): bad line in cache (1)",caller,user);
-    }
-    CodeEntry e;
-    e.key=line_parts[0];
-    if (!files_with_cmd_table.found(e.key,e)) {
-	if (file_type == "MSS") {
-	  auto file_parts=strutils::split(e.key,"..m..");
-	  if (file_parts.size() > 1) {
-	    query.set("select h.data_size,h.note from htarfile as h left join mssfile as m on m.mssid = h.mssid where m.mssfile = '"+file_parts[0]+"' and h.hfile = '"+file_parts[1]+"'");
-	  }
-	  else {
-	    query.set("select data_size,note from mssfile where mssfile = '"+e.key+"'");
-	  }
-	}
-	else if (file_type == "Web") {
-	  query.set("select data_size,note from wfile where wfile = '"+e.key+"'");
-	}
-	if (query.submit(server) < 0) {
-	  metautils::log_error("create_non_cmd_file_list_cache(): "+query.error()+" from query: "+query.show(),caller,user);
-	}
-	if (!query.fetch_row(row)) {
-	  metautils::log_error("create_non_cmd_file_list_cache(): "+query.error()+" from query: "+query.show(),caller,user);
-	}
-	std::string cache_line=line_parts[0]+"<!>"+line_parts[1]+"<!>"+line_parts[5]+"<!>"+row[0]+"<!>"+row[1]+"<!>";
-	if (!line_parts[7].empty()) {
-	  auto group_parts=strutils::split(line_parts[7],"[!]");
-	  cache_line+=group_parts[0];
-	}
-	cache_list.emplace_back(cache_line);
-    }
-    else {
-	++cmdcnt;
-    }
-    ifs.getline(line,32768);
-  }
-  ifs.close();
-  ifs.clear();
-  size_t noncmdcnt=0;
-  ifs.open(nonCMD_cache.c_str());
-  if (ifs.is_open()) {
-    ifs.getline(line,32768);
-    if (strutils::is_numeric(line)) {
-	ifs.getline(line,32768);
-	ifs.getline(line,32768);
-	auto hpss_root_re=std::regex("^"+metautils::directives.hpss_root);
-	while (!ifs.eof()) {
-	  ++noncmdcnt;
-	  auto line_parts=strutils::split(line,"<!>");
-	  if (!std::regex_search(line_parts[0],hpss_root_re)) {
-	    cache_list.clear();
-	    break;
-	  }
-	  CodeEntry e;
-	  e.key=line_parts[0];
-	  if (!files_with_cmd_table.found(e.key,e)) {
-	    cache_list.emplace_back(line);
-	  }
-	  ifs.getline(line,32768);
-	}
-    }
-    ifs.close();
-  }
-  if ( (cmdcnt+cache_list.size()) != filecnt) {
-    query.set(cnt_field,"dataset","dsid = 'ds"+metautils::args.dsnum+"'");
-    if (query.submit(server) < 0) {
-	metautils::log_error("create_non_cmd_file_list_cache(): "+query.error()+" from query: "+query.show(),caller,user);
-    }
-    if (!query.fetch_row(row)) {
-	metautils::log_error("create_non_cmd_file_list_cache(): unable to get dataset file count",caller,user);
-    }
-    filecnt=std::stoi(row[0]);
-    if ( (cmdcnt+cache_list.size()) != filecnt) {
-	cache_list.clear();
-	noncmdcnt=0;
-	if (file_type == "MSS") {
-	  query.set("select m.mssfile,m.data_format,m.file_format,m.data_size,m.note,m.gindex,h.hfile,h.data_format,h.file_format,h.data_size,h.note from dssdb.mssfile as m left join dssdb.htarfile as h on h.mssid = m.mssid where m.dsid = 'ds"+metautils::args.dsnum+"' and m.type = 'P' and m.status = 'P'");
-	}
-	else if (file_type == "Web") {
-	  query.set("select w.wfile,w.data_format,w.file_format,w.data_size,w.note,w.gindex from wfile as w where w.dsid = 'ds"+metautils::args.dsnum+"' and w.type = 'D' and w.status = 'P'");
-	}
-	if (query.submit(server) < 0)
-	  metautils::log_error("create_non_cmd_file_list_cache(): "+query.error()+" from query: "+query.show(),caller,user);
-	while (query.fetch_row(row)) {
-	  CodeEntry e;
-	  e.key=row[0];
-	  if (file_type == "MSS" && !row[6].empty()) {
-	    e.key+="..m.."+row[6];
-	  }
-	  if (!files_with_cmd_table.found(e.key,e)) {
-	    if (file_type == "MSS" && !row[6].empty()) {
-		cache_list.emplace_back(e.key+"<!>"+row[7]+"<!>"+row[8]+"<!>"+row[9]+"<!>"+row[10]+"<!>"+row[5]);
-	    }
-	    else {
-		cache_list.emplace_back(e.key+"<!>"+row[1]+"<!>"+row[2]+"<!>"+row[3]+"<!>"+row[4]+"<!>"+row[5]);
-	    }
-	  }
-	}
-    }
-  }
-  if (noncmdcnt != cache_list.size()) {
-// create the directory tree in the temp directory
-    std::stringstream output,error;
-    if (unixutils::mysystem2("/bin/mkdir -p "+tdir.name()+"/metadata",output,error) != 0) {
-	metautils::log_error("write_initialize(): unable to create a temporary directory (1) - '"+error.str()+"'",caller,user);
-    }
-    std::ofstream ofs((tdir.name()+"/metadata/"+cache_name).c_str());
+    ofstream ofs((tdir.name() + "/metadata/" + f).c_str());
     if (!ofs.is_open()) {
-	metautils::log_error("create_non_cmd_file_list_cache(): unable to open output for "+cache_name,caller,user);
+      log_error2("unable to open output for " + f, F, caller, user);
     }
-    ofs << version << std::endl;
-    ofs << cache_list.size() << std::endl;
-    for (const auto& item : cache_list) {
-	ofs << item << std::endl;
+    ofs << row[0] << endl;
+    ofs << v.size() << endl;
+    for (const auto& e : v) {
+      ofs << e << endl;
     }
     ofs.close();
-    std::string herror;
-    if (unixutils::rdadata_sync(tdir.name(),"metadata/","/data/web/datasets/ds"+metautils::args.dsnum,metautils::directives.rdadata_home,herror) < 0) {
-	metautils::log_warning("create_non_cmd_file_list_cache() couldn't sync '"+cache_name+"' - rdadata_sync error(s): '"+herror+"'",caller,user);
+    string e;
+    if (unixutils::rdadata_sync(tdir.name(), "metadata/", "/data/web/datasets/"
+        "ds" + metautils::args.dsnum, metautils::directives.rdadata_home, e) <
+        0) {
+      metautils::log_warning("create_non_cmd_file_list_cache() couldn't sync '"
+          + f + "' - rdadata_sync error(s): '" + e + "'", caller, user);
+    }
+  } else {
+    string e;
+    if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds" + metautils::args.
+        dsnum + "/metadata/" + f,  tdir.name(),  metautils::directives.
+        rdadata_home, e) < 0) {
+      metautils::log_warning("createNonCMDFileCache couldn't unsync '" + f +
+          "' - hostSync error(s): '" + e + "'", caller, user);
     }
   }
-  else if (noncmdcnt == 0) {
-    std::string herror;
-    if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+cache_name, tdir.name(), metautils::directives.rdadata_home,herror) < 0) {
-	metautils::log_warning("createNonCMDFileCache couldn't unsync '"+cache_name+"' - hostSync error(s): '"+herror+"'",caller,user);
-    }
-  }
-  server.disconnect();
+  mysrv.disconnect();
 }
 
-struct XEntry {
-  XEntry() : key(),strings() {}
-
-  std::string key;
-  std::shared_ptr<std::vector<std::string>> strings;
-};
-
-void fill_gindex_table(MySQL::Server& server,my::map<XEntry>& gindex_table,std::string caller,std::string user)
-{
-  MySQL::Query query("select gindex,grpid from dssdb.dsgroup where dsid = 'ds"+metautils::args.dsnum+"'");
-  if (query.submit(server) < 0) {
-    metautils::log_error("fill_gindex_table(): "+query.error()+" while trying to get groups data",caller,user);
+void fill_gindex_map(MySQL::Server& server, unordered_map<string, string>&
+     gindex_map, string caller, string user) {
+  MySQL::Query q("select gindex, grpid from dssdb.dsgroup where dsid = 'ds" +
+      metautils::args.dsnum + "'");
+  if (q.submit(server) < 0) {
+    log_error2("'" + q.error() + "' while trying to get groups data",
+        "fill_gindex_map()", caller, user);
   }
-  MySQL::Row row;
-  while (query.fetch_row(row)) {
-    XEntry xe;
-    xe.key=row[0];
-    xe.strings.reset(new std::vector<std::string>);
-    xe.strings->emplace_back(row[1]);
-    gindex_table.insert(xe);
+  for (const auto& r : q) {
+    gindex_map.emplace(r[0], r[1]);
   }
 }
 
-void fill_rdadb_files_table(std::string file_type,MySQL::Server& server,my::map<XEntry>& rda_files_table,std::string caller,std::string user)
-{
-  MySQL::Query query;
-  MySQL::Row row;
-  XEntry xe;
-
-  if (file_type == "MSS") {
-    query.set("select m.mssfile,m.gindex,m.file_format,m.data_size,h.hfile,h.file_format,h.data_size from dssdb.mssfile as m left join dssdb.htarfile as h on h.mssid = m.mssid where m.dsid = 'ds"+metautils::args.dsnum+"' and m.type = 'P' and m.status = 'P'");
+void fill_rdadb_files_table(string file_type, MySQL::Server& server,
+    unordered_map<string, tuple<string, string, string>>& rda_files_table,
+    string caller, string user) {
+  MySQL::Query q("select wfile, gindex, file_format, data_size from dssdb."
+      "wfile where dsid = 'ds" + metautils::args.dsnum + "' and type = 'D' and "
+      "status = 'P'");
+  if (q.submit(server) < 0) {
+    log_error2("'" + q.error() + "' while trying to get RDA file data",
+        "fill_rdadb_files_table()", caller, user);
   }
-  else {
-    query.set("select wfile,gindex,file_format,data_size from dssdb.wfile where dsid = 'ds"+metautils::args.dsnum+"' and type = 'D' and status = 'P'");
-  }
-  if (query.submit(server) < 0) {
-    metautils::log_error("fill_rdadb_files_table(): "+query.error()+" while trying to get RDA file data",caller,user);
-  }
-  while (query.fetch_row(row)) {
-    xe.key=row[0];
-    xe.strings.reset(new std::vector<std::string>);
-    xe.strings->emplace_back(row[1]);
-    if (file_type == "MSS" && !row[4].empty()) {
-	xe.key+="..m.."+row[4];
-	xe.strings->emplace_back(row[5]);
-	xe.strings->emplace_back(row[6]);
-    }
-    else {
-	xe.strings->emplace_back(row[2]);
-	xe.strings->emplace_back(row[3]);
-    }
-    rda_files_table.insert(xe);
+  for (const auto& r : q) {
+    rda_files_table.emplace(r[0], make_tuple(r[1], r[2], r[3]));
   }
 }
 
-void fill_data_formats_table(std::string file_type,std::string db,MySQL::Server& server,my::map<XEntry>& data_formats,std::string caller,std::string user)
-{
-  MySQL::Query query;
-  if (file_type == "MSS") {
-    query.set("select code,format from "+db+".formats");
+void fill_data_formats_table(string file_type, string db, MySQL::Server& server,
+    unordered_map<string, string>& data_formats, string caller, string user) {
+  MySQL::Query q("select code, format from W" + db + ".formats");
+  if (q.submit(server) < 0) {
+    log_error2("'" + q.error() + "' while trying to get formats data",
+        "fill_data_formats_table()", caller, user);
   }
-  else {
-    query.set("select code,format from W"+db+".formats");
-  }
-  if (query.submit(server) < 0) {
-    metautils::log_error("fill_data_formats_table(): "+query.error()+" while trying to get formats data",caller,user);
-  }
-  MySQL::Row row;
-  while (query.fetch_row(row)) {
-    XEntry xe;
-    xe.key=row[0];
-    xe.strings.reset(new std::vector<std::string>);
-    xe.strings->emplace_back(row[1]);
-    data_formats.insert(xe);
+  for (const auto& r : q) {
+    data_formats.emplace(r[0], r[1]);
   }
 }
 
 struct FileEntry {
-  FileEntry() : key(),data_format(),units(),metafile_id(),start(),end(),file_format(),data_size(),group_id() {}
+  FileEntry() : data_format(), units(), metafile_id(), start(), end(),
+      file_format(), data_size(), group_id() { }
 
-  std::string key;
-  std::string data_format,units,metafile_id;
-  std::string start,end;
-  std::string file_format,data_size;
-  std::string group_id;
+  string data_format, units, metafile_id;
+  string start, end;
+  string file_format, data_size;
+  string group_id;
 };
-void get_file_data(MySQL::Server& server,MySQL::Query& query,std::string unit,std::string unit_plural,my::map<XEntry>& gindex_table,my::map<XEntry>& rda_files_table,my::map<XEntry>& data_formats,my::map<FileEntry>& table)
-{
+
+void get_file_data(MySQL::Server& server, MySQL::Query& query, string unit,
+    string unit_plural, unordered_map<string, string>& gindex_map,
+    unordered_map<string, tuple<string, string, string>>& rda_files_table,
+    unordered_map<string, string>& data_formats, unordered_map<string,
+    FileEntry>& table) {
   for (const auto& row : query) {
-    XEntry xe;
-    if (rda_files_table.found(row[0],xe)) {
-	FileEntry fe;
-	fe.key=row[0];
-	XEntry xe2;
-	data_formats.found(row[1],xe2);
-	fe.data_format=xe2.strings->at(0);
-	fe.units=row[2]+" "+unit;
-	if (row[2] != "1") {
-	  fe.units+=unit_plural;
-	}
-	fe.start=dateutils::string_ll_to_date_string(row[3]);
-	fe.end=dateutils::string_ll_to_date_string(row[4]);
-	if (gindex_table.found(xe.strings->at(0),xe2)) {
-	  if (!xe2.strings->at(0).empty()) {
-	    fe.group_id=xe2.strings->at(0);
-	  }
-	  else {
-	    fe.group_id=xe.strings->at(0);
-	  }
-	  fe.group_id+="[!]"+xe.strings->at(0);
-	}
-	else {
-	  fe.group_id="";
-	}
-	fe.file_format=xe.strings->at(1);
-	fe.data_size=xe.strings->at(2);
-	table.insert(fe);
+    auto it = rda_files_table.find(row[0]);
+    if (it != rda_files_table.end()) {
+      string g, f, s;
+      tie(g, f, s) = it->second;
+      FileEntry fe;
+      auto it2 = data_formats.find(row[1]);
+      fe.data_format = it2->second;
+      fe.units = row[2] + " " + unit;
+      if (row[2] != "1") {
+        fe.units += unit_plural;
+      }
+      fe.start = dateutils::string_ll_to_date_string(row[3]);
+      fe.end = dateutils::string_ll_to_date_string(row[4]);
+      auto it3 = gindex_map.find(g);
+      if (it3 != gindex_map.end()) {
+        if (!it3->second.empty()) {
+          fe.group_id = it3->second;
+        } else {
+          fe.group_id = g;
+        }
+        fe.group_id += "[!]" + g;
+      } else {
+        fe.group_id = "";
+      }
+      fe.file_format = f;
+      fe.data_size = s;
+      table.emplace(row[0], fe);
     }
   }
 }
 
-void grml_file_data(std::string file_type,my::map<XEntry>& gindex_table,my::map<XEntry>& rda_files_table,my::map<FileEntry>& grml_file_data_table,std::string& caller,std::string& user)
-{
-  std::string dsnum2=strutils::substitute(metautils::args.dsnum,".","");
-  MySQL::Query query;
-  my::map<XEntry> data_formats;
-  XEntry xe;
-
-  MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
-  if (!server) {
-    metautils::log_error("grml_file_data(): "+server.error()+" while trying to connect",caller,user);
+void grml_file_data(string file_type, unordered_map<string, string>&
+    gindex_map, unordered_map<string, tuple<string, string, string>>&
+    rda_files_table, unordered_map<string, FileEntry>& grml_file_data_table,
+    string& caller, string& user) {
+  static const string F = this_function_label(__func__);
+  auto d = substitute(metautils::args.dsnum, ".", "");
+  MySQL::Server mysrv(metautils::directives.database_server, metautils::
+      directives.metadb_username, metautils::directives.metadb_password, "");
+  if (!mysrv) {
+    log_error2("'" + mysrv.error() + "' while trying to connect", F, caller,
+        user);
   }
-  fill_data_formats_table(file_type,"GrML",server,data_formats,caller,user);
-  if (file_type == "MSS") {
-    query.set("select mssID,format_code,num_grids,start_date,end_date from GrML.ds"+dsnum2+"_primaries2 where num_grids > 0");
+  unordered_map<string, string> m;
+  fill_data_formats_table(file_type, "GrML", mysrv, m, caller, user);
+  MySQL::Query q;
+  q.set("select webID, format_code, num_grids, start_date, end_date from WGrML."
+      "ds" + d + "_webfiles2 where num_grids > 0");
+  if (q.submit(mysrv) < 0) {
+    log_error2("'" + q.error() + "' while trying to get metadata file data", F,
+        caller, user);
   }
-  else {
-    query.set("select webID,format_code,num_grids,start_date,end_date from WGrML.ds"+dsnum2+"_webfiles2 where num_grids > 0");
-  }
-  if (query.submit(server) < 0) {
-    metautils::log_error("grml_file_data(): "+query.error()+" while trying to get metadata file data",caller,user);
-  }
-  get_file_data(server,query,"Grid","s",gindex_table,rda_files_table,data_formats,grml_file_data_table);
-  server.disconnect();
+  get_file_data(mysrv, q, "Grid", "s", gindex_map, rda_files_table, m,
+      grml_file_data_table);
+  mysrv.disconnect();
 }
 
-void obml_file_data(std::string file_type,my::map<XEntry>& gindex_table,my::map<XEntry>& rda_files_table,my::map<FileEntry>& obml_file_data_table,std::string& caller,std::string& user)
-{
-  MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
-  my::map<XEntry> data_formats;
-  fill_data_formats_table(file_type,"ObML",server,data_formats,caller,user);
-  MySQL::Query query;
-  auto dsnum2=strutils::substitute(metautils::args.dsnum,".","");
-  if (file_type == "MSS") {
-    query.set("select mssID,format_code,num_observations,start_date,end_date from ObML.ds"+dsnum2+"_primaries2 where num_observations > 0");
+void obml_file_data(string file_type, unordered_map<string, string>&
+    gindex_map, unordered_map<string,  tuple<string,  string, string>>&
+    rda_files_table, unordered_map<string,  FileEntry>& obml_file_data_table,
+    string& caller, string& user) {
+  static const string F = this_function_label(__func__);
+  MySQL::Server mysrv(metautils::directives.database_server, metautils::
+      directives.metadb_username, metautils::directives.metadb_password, "");
+  unordered_map<string, string> map;
+  fill_data_formats_table(file_type, "ObML", mysrv, map, caller, user);
+  MySQL::Query q("select webID, format_code, num_observations, start_date, "
+      "end_date from WObML.ds" + substitute(metautils::args.dsnum, ".", "") +
+      "_webfiles2 where num_observations > 0");
+  if (q.submit(mysrv) < 0) {
+    log_error2("'" + q.error() + "' while trying to get metadata file data", F,
+        caller, user);
   }
-  else {
-    query.set("select webID,format_code,num_observations,start_date,end_date from WObML.ds"+dsnum2+"_webfiles2 where num_observations > 0");
-  }
-  if (query.submit(server) < 0) {
-    metautils::log_error("obml_file_data(): "+query.error()+" while trying to get metadata file data",caller,user);
-  }
-  get_file_data(server,query,"Observation","s",gindex_table,rda_files_table,data_formats,obml_file_data_table);
-  server.disconnect();
+  get_file_data(mysrv, q, "Observation", "s", gindex_map, rda_files_table,
+      map, obml_file_data_table);
+  mysrv.disconnect();
 }
 
-void fixml_file_data(std::string file_type,my::map<XEntry>& gindex_table,my::map<XEntry>& rda_files_table,my::map<FileEntry>& fixml_file_data_table,std::string& caller,std::string& user)
-{
-  std::string dsnum2=strutils::substitute(metautils::args.dsnum,".","");
-  MySQL::Query query;
-  my::map<XEntry> data_formats;
-  XEntry xe,xe2;
+void fixml_file_data(string file_type, unordered_map<string, string>&
+     gindex_map, unordered_map<string, tuple<string, string, string>>&
+     rda_files_table, unordered_map<string, FileEntry>& fixml_file_data_table,
+     string& caller, string& user) {
+  static const string F = this_function_label(__func__);
+  unordered_map<string, string> data_formats;
   FileEntry fe;
 
-  MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
-  if (!server) {
-    metautils::log_error("fixml_file_data(): "+server.error()+" while trying to connect",caller,user);
+  MySQL::Server mysrv(metautils::directives.database_server, metautils::
+      directives.metadb_username, metautils::directives.metadb_password, "");
+  if (!mysrv) {
+    log_error2("'" + mysrv.error() + "' while trying to connect", F, caller,
+        user);
   }
-  fill_data_formats_table(file_type,"FixML",server,data_formats,caller,user);
-  if (file_type == "MSS") {
-    query.set("select mssID,format_code,num_fixes,start_date,end_date from FixML.ds"+dsnum2+"_primaries2 where num_fixes > 0");
+  fill_data_formats_table(file_type, "FixML", mysrv, data_formats, caller,
+      user);
+  MySQL::Query q("select webID, format_code, num_fixes, start_date, end_date "
+      "from WFixML.ds" + substitute(metautils::args.dsnum, ".", "") +
+      "_webfiles2 where num_fixes > 0");
+  if (q.submit(mysrv) < 0) {
+    log_error2("'" + q.error() + "' while trying to get metadata file data", F,
+        caller, user);
   }
-  else {
-    query.set("select webID,format_code,num_fixes,start_date,end_date from WFixML.ds"+dsnum2+"_webfiles2 where num_fixes > 0");
-  }
-  if (query.submit(server) < 0) {
-    metautils::log_error("fixml_file_data(): "+query.error()+" while trying to get metadata file data",caller,user);
-  }
-  get_file_data(server,query,"Cyclone Fix","es",gindex_table,rda_files_table,data_formats,fixml_file_data_table);
-  server.disconnect();
+  get_file_data(mysrv, q, "Cyclone Fix", "es", gindex_map, rda_files_table,
+      data_formats, fixml_file_data_table);
+  mysrv.disconnect();
 }
 
 struct ParameterEntry {
-  ParameterEntry() : key(),description(),short_name(),count(0),selected(false) {}
+  ParameterEntry() : id(), short_name() { }
 
-  std::string key;
-  std::string description,short_name;
-  size_t count;
-  bool selected;
+  string id, short_name;
 };
-void write_grml_parameters(std::string& file_type,std::string& tindex,std::ofstream& ofs,std::string& caller,std::string& user,std::string& min,std::string& max,std::string& init_date_selection)
-{
-  std::string dsnum2=strutils::substitute(metautils::args.dsnum,".","");
-  MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
-  if (!server)
-    metautils::log_error("write_grml_parameters(): "+server.error()+" while trying to connect",caller,user);
-  std::string db_prefix,dssdb_filetable,metadata_filetable,where_conditions,id_type;
-  if (file_type == "MSS") {
-    db_prefix="";
-    dssdb_filetable="mssfile";
-    metadata_filetable="_primaries2";
-    where_conditions="type = 'P' and status = 'P'";
-    id_type="mss";
+
+void write_grml_parameters(string& file_type, string& tindex, ofstream& ofs,
+    string& caller, string& user, string& min, string& max, string&
+    init_date_selection) {
+  static const string F = this_function_label(__func__);
+  string d2 = substitute(metautils::args.dsnum, ".", "");
+  MySQL::Server mysrv(metautils::directives.database_server, metautils::
+      directives.metadb_username, metautils::directives.metadb_password, "");
+  if (!mysrv) {
+    log_error2("'" + mysrv.error() + "' while trying to connect", F, caller,
+        user);
   }
-  else if (file_type == "Web" || file_type == "inv") {
-    db_prefix="W";
-    dssdb_filetable="wfile";
-    metadata_filetable="_webfiles2";
-    where_conditions="type = 'D' and status = 'P'";
-    id_type="web";
+  string db, dssfil, mfil, wc, idtyp;
+  if (file_type == "Web" || file_type == "inv") {
+    db = "WGrML";
+    dssfil = "wfile";
+    mfil = "_webfiles2";
+    wc = "type = 'D' and status = 'P'";
+    idtyp = "web";
   }
-  MySQL::LocalQuery query("code,format",db_prefix+"GrML.formats");
-  if (query.submit(server) < 0) {
-    metautils::log_error("write_grml_parameters(): "+query.error()+" while trying to get formats",caller,user);
+  MySQL::LocalQuery q("code, format", db + ".formats");
+  if (q.submit(mysrv) < 0) {
+    log_error2("'" + q.error() + "' while trying to get formats", F, caller,
+        user);
   }
-  std::unordered_map<std::string,std::string> data_formats;
-  MySQL::Row row;
-  while (query.fetch_row(row)) {
-    data_formats.emplace(row[0],row[1]);
+  unordered_map<string, string> dfmap;
+  for (const auto& r : q) {
+    dfmap.emplace(r[0], r[1]);
   }
-  std::unordered_set<std::string> rda_files;
+  unordered_set<string> rdafs;
   if (!tindex.empty()) {
-    query.set(dssdb_filetable,"dssdb."+dssdb_filetable,"dsid = 'ds"+metautils::args.dsnum+"' and tindex = "+tindex+" and "+where_conditions);
-    if (query.submit(server) < 0)
-	metautils::log_error("write_grml_parameters(): "+query.error()+" while trying to get RDA files from dssdb."+dssdb_filetable,caller,user);
-    while (query.fetch_row(row)) {
-	rda_files.emplace(row[0]);
+    q.set(dssfil, "dssdb." + dssfil, "dsid = 'ds" + metautils::args.dsnum +
+        "' and tindex = " + tindex + " and " + wc);
+    if (q.submit(mysrv) < 0)
+      log_error2("'" + q.error() + "' while trying to get RDA files from dssdb."
+          + dssfil, F, caller, user);
+    for (const auto& r : q) {
+      rdafs.emplace(r[0]);
     }
   }
-  std::unordered_set<std::string> inv_codes;
+  unordered_set<string> invs;
   if (file_type == "inv") {
-    query.set("webID_code,dupe_vdates","IGrML.ds"+dsnum2+"_inventory_summary");
-    if (query.submit(server) < 0) {
-	metautils::log_error("write_grml_parameters(): "+query.error()+" while trying to get inventory file codes",caller,user);
+    q.set("webID_code, dupe_vdates", "IGrML.ds" + d2 + "_inventory_summary");
+    if (q.submit(mysrv) < 0) {
+      log_error2("'" + q.error() + "' while trying to get inventory file codes",
+          F, caller, user);
     }
-    init_date_selection="";
-    while (query.fetch_row(row)) {
-	inv_codes.emplace(row[0]);
-	if (init_date_selection.empty() && row[1] == "Y") {
-	  init_date_selection="I";
-	}
-    }
-  }
-  MySQL::Query s_query("code,"+id_type+"ID,format_code",db_prefix+"GrML.ds"+dsnum2+metadata_filetable);
-  if (s_query.submit(server) < 0) {
-    metautils::log_error("write_grml_parameters(): "+s_query.error()+" while trying to get metadata files from "+db_prefix+"GrML.ds"+dsnum2+metadata_filetable,caller,user);
-  }
-  std::unordered_map<std::string,std::string> metadata_files;
-  while (s_query.fetch_row(row)) {
-    if ((rda_files.size() == 0 || rda_files.find(row[1]) != rda_files.end()) && (inv_codes.size() == 0 || inv_codes.find(row[0]) != inv_codes.end())) {
-	metadata_files.emplace(row[0],row[2]);
+    init_date_selection = "";
+    for (const auto& r : q) {
+      invs.emplace(r[0]);
+      if (init_date_selection.empty() && r[1] == "Y") {
+        init_date_selection = "I";
+      }
     }
   }
-  s_query.set("parameter,start_date,end_date,"+id_type+"ID_code",db_prefix+"GrML.ds"+dsnum2+"_agrids");
-  if (s_query.submit(server) < 0) {
-    metautils::log_error("write_grml_parameters(): "+s_query.error()+" while trying to get agrids data",caller,user);
+  MySQL::Query s_query("code, " + idtyp + "ID, format_code", db + ".ds" + d2 +
+      mfil);
+  if (s_query.submit(mysrv) < 0) {
+    log_error2("'" + s_query.error() + "' while trying to get metadata files "
+        "from " + db + ".ds" + d2 + mfil, F, caller, user);
   }
-  std::unordered_set<std::string> unique_parameters;
-  my::map<ParameterEntry> parameter_description_table;
-  xmlutils::ParameterMapper parameter_mapper(metautils::directives.parameter_map_path);
-  std::vector<ParameterEntry> parray;
-  auto len=0;
-  while (s_query.fetch_row(row)) {
-    auto mf_elem=metadata_files.find(row[3]); 
-    if (mf_elem != metadata_files.end()) {
-	auto u_param=mf_elem->second+"!"+row[0];
-	if (unique_parameters.find(u_param) == unique_parameters.end()) {
-	  auto data_format=data_formats[mf_elem->second];
-	  ParameterEntry pe;
-	  pe.key=parameter_mapper.description(data_format,row[0]);
-	  if (!parameter_description_table.found(pe.key,pe)) {
-	    pe.count=len;
-	    parray.emplace_back();
-	    parray.back().key=mf_elem->second+"!"+row[0];
-	    if (strutils::contains(parray.back().key,"@")) {
-		parray.back().key=parray.back().key.substr(0,parray.back().key.find("@"));
-	    }
-	    parray.back().description=pe.key;
-	    strutils::replace_all(parray.back().description,"<br />"," ");
-	    parray.back().short_name=parameter_mapper.short_name(data_format,row[0]);
-	    parameter_description_table.insert(pe);
-	    ++len;
-	  }
-	  else {
-	    auto pcode=mf_elem->second+"!"+row[0];
-	    if (std::regex_search(pcode,std::regex("@"))) {
-		pcode=pcode.substr(0,pcode.find("@"));
-	    }
-	    if (!strutils::contains(parray[pe.count].key,pcode)) {
-		parray[pe.count].key+=","+pcode;
-	    }
-	  }
-	  unique_parameters.emplace(u_param);
-	}
-	if (row[1] < min) {
-	  min=row[1];
-	}
-	if (row[2] > max) {
-	  max=row[2];
-	}
+  unordered_map<string, string> mfmap; // map the data format to a data file
+  for (const auto& r : s_query) {
+    if ((rdafs.size() == 0 || rdafs.find(r[1]) != rdafs.end()) && (invs.size()
+        == 0 || invs.find(r[0]) != invs.end())) {
+      mfmap.emplace(r[0], r[2]);
     }
   }
-  server.disconnect();
-  parray.resize(len);
-  binary_sort(parray,
-  [](ParameterEntry& left,ParameterEntry& right) -> bool
-  {
-    if (strutils::to_lower(left.description) <= strutils::to_lower(right.description)) {
-	return true;
+  s_query.set("parameter, start_date, end_date, " + idtyp + "ID_code", db +
+      ".ds" + d2 + "_agrids");
+  if (s_query.submit(mysrv) < 0) {
+    log_error2("'" + s_query.error() + "' while trying to get agrids data", F,
+        caller, user);
+  }
+  xmlutils::ParameterMapper pmap(metautils::directives.parameter_map_path);
+  unordered_set<string> u;
+  vector<pair<string, ParameterEntry>> vp;
+  unordered_map<string, size_t> idxmap; // map of vp indexes for updates
+  auto cnt = 0;
+  for (const auto& r : s_query) {
+    auto itm = mfmap.find(r[3]); 
+    if (itm != mfmap.end()) {
+      auto uu = itm->second + "!" + r[0];
+      if (u.find(uu) == u.end()) {
+        auto f = dfmap[itm->second];
+        auto k = pmap.description(f, r[0]);
+        auto iti = idxmap.find(k);
+        if (iti == idxmap.end()) {
+          vp.emplace_back(make_pair(k, ParameterEntry()));
+          vp.back().second.id = itm->second + "!" + r[0];
+          auto x = vp.back().first.find("@");
+          if (x != string::npos) {
+            vp.back().first = vp.back().first.substr(0, x);
+          }
+          vp.back().second.short_name = pmap.short_name(f, r[0]);
+          idxmap.emplace(k, cnt);
+          ++cnt;
+        } else {
+          auto pcode = itm->second + "!" + r[0];
+          if (regex_search(pcode, regex("@"))) {
+            pcode = pcode.substr(0, pcode.find("@"));
+          }
+          if (!regex_search(vp[iti->second].second.id, regex(pcode))) {
+            vp[iti->second].second.id += "," + pcode;
+          }
+        }
+        u.emplace(uu);
+      }
+      if (r[1] < min) {
+        min = r[1];
+      }
+      if (r[2] > max) {
+        max = r[2];
+      }
     }
-    else {
-	return false;
+  }
+  mysrv.disconnect();
+  vp.resize(cnt);
+  sort(vp.begin(), vp.end(),
+  [](const pair<string, ParameterEntry>& left, const pair<string,
+      ParameterEntry>& right) -> bool {
+    if (strutils::to_lower(left.first) <= strutils::to_lower(right.first)) {
+      return true;
     }
+    return false;
   });
-  ofs << len << std::endl;
-  for (const auto& p : parray) {
-    ofs << p.key << "<!>" << p.description << "<!>" << p.short_name << std::endl;
+  ofs << cnt << endl;
+  for (auto& p : vp) {
+    replace_all(p.first, "<br />", " ");
+    ofs << p.second.id << "<!>" << p.first << "<!>" << p.second.short_name <<
+        endl;
   }
 }
 
-void write_groups(std::string& file_type,std::string db,std::ofstream& ofs,std::string& caller,std::string& user)
-{
-  std::string dsnum2=strutils::substitute(metautils::args.dsnum,".","");
-  my::map<XEntry> groups_table,files_table(99999),matched_groups_table;
-  XEntry xe,xe2;
-
-  MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
-  if (!server) {
-    metautils::log_error("write_groups(): "+server.error()+" while trying to connect",caller,user);
+void write_groups(string& file_type, string db, ofstream& ofs, string& caller,
+    string& user) {
+  static const string F = this_function_label(__func__);
+  MySQL::Server mysrv(metautils::directives.database_server, metautils::
+      directives.metadb_username, metautils::directives.metadb_password, "");
+  if (!mysrv) {
+    log_error2("'" + mysrv.error() + "' while trying to connect", F, caller,
+        user);
   }
-  MySQL::LocalQuery query("select gindex,title,grpid from dssdb.dsgroup where dsid = 'ds"+metautils::args.dsnum+"'");
-  if (query.submit(server) < 0)
-    metautils::log_error("write_groups(): "+query.error()+" while trying to get list of groups",caller,user);
-  if (query.num_rows() > 1) {
-    std::string metadata_db_prefix,ID_type,metadata_filetable,dssdb_filetable,dssdb_typedescr,dssdb_filetype;
-    if (file_type == "MSS") {
-	metadata_db_prefix="";
-	ID_type="mss";
-	metadata_filetable="_primaries2";
-	dssdb_filetable="mssfile";
-	dssdb_typedescr="property";
-	dssdb_filetype="P";
+  MySQL::LocalQuery q("select gindex, title, grpid from dssdb.dsgroup where "
+      "dsid = 'ds" + metautils::args.dsnum + "'");
+  if (q.submit(mysrv) < 0) {
+    log_error2("'" + q.error() + "' while trying to get list of groups", F,
+        caller, user);
+  }
+  unordered_map<string, pair<string, string>> gmap;
+  unordered_set<string> fset;
+  if (q.num_rows() > 1) {
+    string idtyp, mfil, dssfil, wc;
+    if (file_type == "Web" || file_type == "inv") {
+      db = "W" + db;
+      idtyp = "web";
+      mfil = "_webfiles2";
+      dssfil = "wfile";
+      wc = "type = 'D' and status = 'P'";
     }
-    else if (file_type == "Web" || file_type == "inv") {
-	metadata_db_prefix="W";
-	ID_type="web";
-	metadata_filetable="_webfiles2";
-	dssdb_filetable="wfile";
-	dssdb_typedescr="type";
-	dssdb_filetype="D";
+    for (const auto& row : q) {
+      if (row[2].empty()) {
+        gmap.emplace(row[0], make_pair(row[1], row[0]));
+      } else {
+        gmap.emplace(row[0], make_pair(row[1], row[2]));
+      }
+    }
+    q.set("select " + idtyp + "ID from " + db + ".ds" + substitute(metautils::
+        args.dsnum, ".", "") + mfil);
+    if (q.submit(mysrv) < 0) {
+      log_error2("'" + q.error() + "' while trying to get webfiles", F, caller,
+          user);
+    }
+    for (const auto& r : q) {
+      fset.emplace(r[0]);
+    }
+    q.set("select " + dssfil + ", gindex from dssdb." + dssfil + " where dsid "
+        "= 'ds" + metautils::args.dsnum + "' and " + wc);
+    if (q.submit(mysrv) < 0) {
+      log_error2("'" +  q.error() +  "' while trying to get wfile, gindex list",
+          F, caller, user);
+    }
+    unordered_set<string> gset;
+    vector<string> v;
+    v.resize(q.num_rows());
+    auto n = 0;
+    for (const auto& row : q) {
+      if (fset.find(row[0]) != fset.end()) {
+        if (gset.find(row[1]) == gset.end()) {
+          if (gmap.find(row[1]) != gmap.end()) {
+            v[n] = row[1];
+            ++n;
+            gset.emplace(row[1]);
+          }
+        }
+      }
+    }
+    v.resize(n);
+    sort(v.begin(), v.end(),
+    [](const string& left, const string& right) -> bool {
+      if (left.length() < right.length()) {
+        return true;
+      } else if (left.length() > right.length()) {
+        return false;
+      } else {
+        if (left <= right) {
+          return true;
+        }
+        return false;
+      }
+    });
+    for (size_t n = 0; n < v.size(); ++n) {
+      ofs << v[n] << "<!>" << gmap[v[n]].first << "<!>" << gmap[v[n]].second <<
+          endl;
+    }
+  }
+  mysrv.disconnect();
+}
+
+void create_file_list_cache(string file_type, string caller, string user, string
+    tindex) {
+  static const string F = this_function_label(__func__);
+  auto d2 = substitute(metautils::args.dsnum, ".", "");
+  MySQL::Server mysrv(metautils::directives.database_server, metautils::
+      directives.metadb_username, metautils::directives.metadb_password, "");
+  unordered_map<string, string> gmap;
+  fill_gindex_map(mysrv, gmap, caller, user);
+  unordered_map<string, tuple<string, string, string>> rdamap;
+  fill_rdadb_files_table(file_type, mysrv, rdamap, caller, user);
+  unordered_map<string, FileEntry> grmlmap, obmlmap, fixmlmap;
+  MySQL::LocalQuery oq, sq;
+  auto b = false;
+  if (file_type == "Web" || file_type == "inv") {
+    if (table_exists(mysrv, "WGrML.ds" + d2 + "_webfiles2")) {
+      if (file_type == "inv" && !table_exists(mysrv, "IGrML.ds" + d2 +
+          "_inventory_summary")) {
+        return;
+      }
+      if (file_type == "Web" && tindex.empty()) {
+        grml_file_data(file_type, gmap, rdamap, grmlmap, caller,
+            user);
+      }
+      b = true;
+    }
+    if (table_exists(mysrv, "WObML.ds" + d2 + "_webfiles2")) {
+      if (file_type == "Web" && tindex.empty()) {
+        obml_file_data(file_type, gmap, rdamap, obmlmap, caller,
+            user);
+      }
+      if (file_type == "Web") {
+        oq.set("select min(start_date), max(end_date) from WObML.ds" + d2 +
+            "_webfiles2 where start_date > 0");
+      } else if (file_type == "inv") {
+        if (table_exists(mysrv, "IObML.ds" + d2 + "_dataTypes")) {
+          oq.set("select min(start_date), max(end_date) from WObML.ds" + d2
+              + "_webfiles2 as w left join (select distinct webID_code from "
+              "IObML.ds" + d2 + "_dataTypes) as d on d.webID_code = w.code "
+              "where !isnull(d.webID_code) and start_date > 0");
+        } else if (table_exists(mysrv, "IObML.ds" + d2 +
+            "_inventory_summary")) {
+          oq.set("select min(start_date), max(end_date) from WObML.ds" + d2
+              + "_webfiles2 as w left join IObML.ds" + d2 +
+              "_inventory_summary as i on i.webID_code = w.code where !isnull("
+              "i.webID_code) and start_date > 0");
+        } else {
+          return;
+        }
+      }
+    }
+    if (table_exists(mysrv, "WFixML.ds" + d2 + "_webfiles2")) {
+      if (tindex.empty()) {
+        fixml_file_data(file_type, gmap, rdamap, fixmlmap, caller, user);
+      }
+    }
+  }
+  if (b) {
+    string f = "customize.";
+    if (file_type == "Web") {
+      f += "W";
+    } else if (file_type == "inv") {
+      f += "I";
+    } else {
+      f = "";
+    }
+    if (!f.empty()) {
+      f += "GrML";
+      if (!tindex.empty()) {
+        f += "." + tindex;
+      }
+      TempDir tdir;
+      if (!tdir.create(metautils::directives.temp_path)) {
+        log_error2("unable to create temporary directory (1)", F, caller, user);
+      }
+
+      // create the directory tree in the temp directory
+      stringstream oss, ess;
+      if (mysystem2("/bin/mkdir -p " + tdir.name() + "/metadata", oss, ess) !=
+          0) {
+        log_error2("unable to create a temporary directory tree (1) - '" + ess.
+            str() + "'", F, caller, user);
+      }
+      ofstream ofs((tdir.name() + "/metadata/" + f).c_str());
+      if (!ofs.is_open()) {
+        log_error2("unable to open temporary file for " + f, F, caller, user);
+      }
+      if (unixutils::exists_on_server(metautils::directives.web_server, "/data/"
+          "web/datasets/ds" + metautils::args.dsnum + "/metadata/inv",
+          metautils::directives.rdadata_home)) {
+        ofs << "curl_subset=Y" << endl;
+      }
+      string min = "99999999999999";
+      string max = "0";
+      string s;
+      write_grml_parameters(file_type, tindex, ofs, caller, user, min, max, s);
+      ofs << min << " " << max;
+      if (!s.empty()) {
+        ofs << " " << s;
+      }
+      ofs << endl;
+      if (tindex.empty()) {
+        write_groups(file_type, "GrML", ofs, caller, user);
+      }
+      ofs.close();
+      if (max == "0") {
+        string e;
+        if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds" + metautils::
+            args.dsnum + "/metadata/" + f, tdir.name(), metautils::directives.
+            rdadata_home, e) < 0) {
+          metautils::log_warning(F + "() couldn't unsync '" + f + "' - "
+              "rdadata_unsync error(s): '" + e + "'", caller, user);
+        }
+      } else {
+        string e;
+        if (unixutils::rdadata_sync(tdir.name(), "metadata/", "/data/web/"
+            "datasets/ds" + metautils::args.dsnum, metautils::directives.
+            rdadata_home, e) < 0) {
+          metautils::log_warning(F + "() couldn't sync '" + f + "' - "
+              "rdadata_sync error(s): '" + e + "'", caller, user);
+        }
+      }
+    }
+  }
+  xmlutils::DataTypeMapper dmap(metautils::directives.parameter_map_path);
+  if (oq) {
+    if (oq.submit(mysrv) < 0) {
+      log_error2("'" + oq.error() + "' from query: " + oq.show(), F, caller,
+          user);
     }
     MySQL::Row row;
-    while (query.fetch_row(row)) {
-	xe.key=row[0];
-	xe.strings.reset(new std::vector<std::string>);
-	xe.strings.get()->emplace_back(row[1]);
-	if (row[2].empty()) {
-	  xe.strings.get()->emplace_back(row[0]);
-	}
-	else {
-	  xe.strings.get()->emplace_back(row[2]);
-	}
-	groups_table.insert(xe);
-    }
-    query.set("select "+ID_type+"ID from "+metadata_db_prefix+db+".ds"+dsnum2+metadata_filetable);
-    if (query.submit(server) < 0) {
-	metautils::log_error("write_groups(): "+query.error()+" while trying to get webfiles",caller,user);
-    }
-    while (query.fetch_row(row)) {
-	xe.key=row[0];
-	files_table.insert(xe);
-    }
-    query.set("select "+dssdb_filetable+",gindex from dssdb."+dssdb_filetable+" where dsid = 'ds"+metautils::args.dsnum+"' and "+dssdb_typedescr+" = '"+dssdb_filetype+"'");
-    if (query.submit(server) < 0) {
-	metautils::log_error("write_groups(): "+query.error()+" while trying to get wfile,gindex list",caller,user);
-    }
-    std::vector<XEntry> array;
-    array.resize(query.num_rows());
-    auto n=0;
-    while (query.fetch_row(row)) {
-	if (files_table.found(row[0],xe)) {
-	  if (!matched_groups_table.found(row[1],xe)) {
-	    if (groups_table.found(row[1],xe2)) {
-		array[n].key=row[1];
-		array[n].strings=xe2.strings;
-		++n;
-		xe.key=row[1];
-		matched_groups_table.insert(xe);
-	    }
-	  }
-	}
-    }
-    array.resize(n);
-    binary_sort(array,
-    [](XEntry& left,XEntry& right) -> bool
-    {
-	if (left.key.length() < right.key.length()) {
-	  return true;
-	}
-	else if (left.key.length() > right.key.length()) {
-	  return false;
-	}
-	else {
-	  if (left.key <= right.key) {
-	    return true;
-	  }
-	  else {
-	    return false;
-	  }
-	}
-    });
-    for (size_t n=0; n < array.size(); ++n) {
-	ofs << array[n].key << "<!>" << (*array[n].strings.get())[0] << "<!>" << (*array[n].strings.get())[1] << std::endl;
-    }
-  }
-  server.disconnect();
-}
-
-void create_file_list_cache(std::string file_type,std::string caller,std::string user,std::string tindex)
-{
-  static const std::string THIS_FUNC=__func__;
-  std::string dsnum2=strutils::substitute(metautils::args.dsnum,".","");
-  MySQL::LocalQuery satellite_query;
-  MySQL::LocalQuery ocustom,fquery;
-  MySQL::Row row;
-  std::string min,max,ext;
-  std::vector<FileEntry> array;
-  std::ofstream ofs;
-  XMLElement e;
-  std::string filename,output,error;
-  CodeEntry ee;
-  my::map<FileEntry> grml_file_data_table(99999),obml_file_data_table(99999),fixml_file_data_table(99999);
-  FileEntry fe;
-  XEntry xe;
-  bool can_customize_GrML=false;
-
-  MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
-  my::map<XEntry> gindex_table;
-  fill_gindex_table(server,gindex_table,caller,user);
-  my::map<XEntry> rda_files_table(99999);
-  fill_rdadb_files_table(file_type,server,rda_files_table,caller,user);
-  if (file_type == "MSS") {
-    if (table_exists(server,"GrML.ds"+dsnum2+"_primaries2")) {
-	grml_file_data(file_type,gindex_table,rda_files_table,grml_file_data_table,caller,user);
-	can_customize_GrML=true;
-    }
-    if (table_exists(server,"ObML.ds"+dsnum2+"_primaries2")) {
-	obml_file_data(file_type,gindex_table,rda_files_table,obml_file_data_table,caller,user);
-	if (tindex.empty()) {
-	  ocustom.set("select min(start_date),max(end_date) from ObML.ds"+dsnum2+"_primaries2 where start_date > 0");
-	}
-	else {
-	  ocustom.set("select min(start_date),max(end_date) from ObML.ds"+dsnum2+"_primaries2 as p left join dssdb.mssfile as m on m.mssfile = p.mssID where m.tindex = "+tindex+" and m.dsid = 'ds"+metautils::args.dsnum+"' and start_date > 0");
-	}
-    }
-    if (table_exists(server,"SatML.ds"+dsnum2+"_primaries2")) {
-	satellite_query.set("select p.mssID,f.format,p.num_products,p.start_date,p.end_date,m.file_format,m.data_size,g.grpid,g.gindex,p.product from SatML.ds"+dsnum2+"_primaries2 as p left join SatML.formats as f on f.code = p.format_code left join dssdb.mssfile as m on m.mssfile = p.mssID left join dssdb.dsgroup as g on m.gindex = g.gindex where g.dsid = 'ds"+metautils::args.dsnum+"' or m.gindex = 0");
-	if (satellite_query.submit(server) < 0)
-	  metautils::log_error(THIS_FUNC+"(): "+satellite_query.error()+" from query: "+satellite_query.show(),caller,user);
-    }
-    if (table_exists(server,"FixML.ds"+dsnum2+"_primaries2")) {
-	fixml_file_data(file_type,gindex_table,rda_files_table,fixml_file_data_table,caller,user);
-    }
-  }
-  else if (file_type == "Web" || file_type == "inv") {
-    if (table_exists(server,"WGrML.ds"+dsnum2+"_webfiles2")) {
-	if (file_type == "inv" && !table_exists(server,"IGrML.ds"+dsnum2+"_inventory_summary")) {
-	  return;
-	}
-	if (file_type == "Web" && tindex.empty()) {
-	  grml_file_data(file_type,gindex_table,rda_files_table,grml_file_data_table,caller,user);
-	}
-	can_customize_GrML=true;
-    }
-    if (table_exists(server,"WObML.ds"+dsnum2+"_webfiles2")) {
-	if (file_type == "Web" && tindex.empty()) {
-	  obml_file_data(file_type,gindex_table,rda_files_table,obml_file_data_table,caller,user);
-	}
-	if (file_type == "Web") {
-	  ocustom.set("select min(start_date),max(end_date) from WObML.ds"+dsnum2+"_webfiles2 where start_date > 0");
-	}
-	else if (file_type == "inv") {
-	  if (table_exists(server,"IObML.ds"+dsnum2+"_dataTypes")) {
-	    ocustom.set("select min(start_date),max(end_date) from WObML.ds"+dsnum2+"_webfiles2 as w left join (select distinct webID_code from IObML.ds"+dsnum2+"_dataTypes) as d on d.webID_code = w.code where !isnull(d.webID_code) and start_date > 0");
-	  }
-	  else if (table_exists(server,"IObML.ds"+dsnum2+"_inventory_summary")) {
-	    ocustom.set("select min(start_date),max(end_date) from WObML.ds"+dsnum2+"_webfiles2 as w left join IObML.ds"+dsnum2+"_inventory_summary as i on i.webID_code = w.code where !isnull(i.webID_code) and start_date > 0");
-	  }
-	  else {
-	    return;
-	  }
-	}
-    }
-    if (table_exists(server,"WFixML.ds"+dsnum2+"_webfiles2")) {
-	if (tindex.empty()) {
-	  fixml_file_data(file_type,gindex_table,rda_files_table,fixml_file_data_table,caller,user);
-	}
-    }
-  }
-  if (can_customize_GrML) {
-    ext="";
-    if (file_type == "MSS") {
-	ext="GrML";
-    }
-    else if (file_type == "Web") {
-	ext="WGrML";
-    }
-    else if (file_type == "inv") {
-	ext="IGrML";
-    }
-    if (!ext.empty()) {
-	filename="customize."+ext;
-	if (!tindex.empty()) {
-	  filename+="."+tindex;
-	}
-	TempDir tdir;
-	if (!tdir.create(metautils::directives.temp_path)) {
-	  metautils::log_error(THIS_FUNC+"(): unable to create temporary directory (1)",caller,user);
-	}
-// create the directory tree in the temp directory
-	std::stringstream oss,ess;
-	if (unixutils::mysystem2("/bin/mkdir -p "+tdir.name()+"/metadata",oss,ess) != 0) {
-	  metautils::log_error(THIS_FUNC+"(): unable to create a temporary directory tree (1) - '"+ess.str()+"'",caller,user);
-	}
-	ofs.open((tdir.name()+"/metadata/"+filename).c_str());
-	if (!ofs.is_open()) {
-	  metautils::log_error(THIS_FUNC+"(): unable to open temporary file for "+filename,caller,user);
-	}
-	if (unixutils::exists_on_server(metautils::directives.web_server,"/data/web/datasets/ds"+metautils::args.dsnum+"/metadata/inv",metautils::directives.rdadata_home)) {
-	  ofs << "curl_subset=Y" << std::endl;
-	}
-	min="99999999999999";
-	max="0";
-	std::string init_date_selection;
-	write_grml_parameters(file_type,tindex,ofs,caller,user,min,max,init_date_selection);
-	ofs << min << " " << max;
-	if (!init_date_selection.empty()) {
-	  ofs << " " << init_date_selection;
-	}
-	ofs << std::endl;
-	if (tindex.empty()) {
-	  write_groups(file_type,"GrML",ofs,caller,user);
-	}
-	ofs.close();
-	if (max == "0") {
-	  if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+filename, tdir.name(), metautils::directives.rdadata_home,error) < 0) {
-	    metautils::log_warning(THIS_FUNC+"() couldn't unsync '"+filename+"' - rdadata_unsync error(s): '"+error+"'",caller,user);
-	  }
-	}
-	else {
-	  if (unixutils::rdadata_sync(tdir.name(),"metadata/","/data/web/datasets/ds"+metautils::args.dsnum,metautils::directives.rdadata_home,error) < 0) {
-	    metautils::log_warning(THIS_FUNC+"() couldn't sync '"+filename+"' - rdadata_sync error(s): '"+error+"'",caller,user);
-	  }
-	}
-    }
-  }
-  xmlutils::DataTypeMapper data_type_mapper(metautils::directives.parameter_map_path);
-  if (ocustom) {
-    if (ocustom.submit(server) < 0) {
-	metautils::log_error(THIS_FUNC+"(): "+ocustom.error()+" from query: "+ocustom.show(),caller,user);
-    }
-    ext="";
-    ocustom.fetch_row(row);
+    oq.fetch_row(row);
+    string f;
     if (!row[0].empty() && !row[1].empty()) {
-	if (file_type == "MSS") {
-	  ext="ObML";
-	}
-	else if (file_type == "Web") {
-	  ext="WObML";
-	}
-	else if (file_type == "inv") {
-	  ext="IObML";
-	}
+      f = "customize.";
+      if (file_type == "Web") {
+        f += "W";
+      } else if (file_type == "inv") {
+        f += "I";
+      } else {
+        f = "";
+      }
     }
-    if (!ext.empty()) {
-	filename="customize."+ext;
-	if (!tindex.empty()) {
-	  filename+="."+tindex;
-	}
-	TempDir tdir;
-	if (!tdir.create(metautils::directives.temp_path)) {
-	  metautils::log_error(THIS_FUNC+"(): unable to create temporary directory (2)",caller,user);
-	}
-// create the directory tree in the temp directory
-	std::stringstream oss,ess;
-	if (unixutils::mysystem2("/bin/mkdir -p "+tdir.name()+"/metadata",oss,ess) != 0) {
-	  metautils::log_error(THIS_FUNC+"(): unable to create a temporary directory tree (2) - '"+ess.str()+"'",caller,user);
-	}
-	ofs.open((tdir.name()+"/metadata/"+filename).c_str());
-	if (!ofs.is_open()) {
-	  metautils::log_error(THIS_FUNC+"(): unable to open temporary file for "+filename,caller,user);
-	}
-// date range
-	ofs << row[0] << " " << row[1] << std::endl;
-// platform types
-	if (file_type == "MSS") {
-	  if (MySQL::table_exists(server,"ObML.ds"+dsnum2+"_dataTypes2")) {
-	    ocustom.set("select distinct l.platformType_code,p.platformType from ObML.ds"+dsnum2+"_dataTypes2 as d left join ObML.ds"+dsnum2+"_dataTypesList as l on l.code = d.dataType_code left join ObML.platformTypes as p on p.code = l.platformType_code");
-	  }
-	  else {
-	    ocustom.set("select distinct d.platformType_code,p.platformType from ObML.ds"+dsnum2+"_dataTypes as d left join ObML.platformTypes as p on p.code = d.platformType_code");
-	  }
-	}
-	else if (file_type == "Web") {
-	  ocustom.set("select distinct l.platformType_code,p.platformType from WObML.ds"+dsnum2+"_dataTypes2 as d left join WObML.ds"+dsnum2+"_dataTypesList as l on l.code = d.dataType_code left join WObML.platformTypes as p on p.code = l.platformType_code");
-	}
-	else if (file_type == "inv") {
-	  ocustom.set("select distinct l.platformType_code,p.platformType from WObML.ds"+dsnum2+"_dataTypes2 as d left join WObML.ds"+dsnum2+"_dataTypesList as l on l.code = d.dataType_code left join WObML.platformTypes as p on p.code = l.platformType_code left join (select distinct webID_code from IObML.ds"+dsnum2+"_dataTypes) as dt on dt.webID_code = d.webID_code where !isnull(dt.webID_code)");
-	}
-	if (ocustom.submit(server) < 0) {
-	  metautils::log_error(THIS_FUNC+"(): "+ocustom.error()+" from query: "+ocustom.show(),caller,user);
-	}
-	ofs << ocustom.num_rows() << std::endl;
-	while (ocustom.fetch_row(row)) {
-	  ofs << row[0] << "<!>" << row[1] << std::endl;
-	}
-// data types and formats
-	if (file_type == "MSS") {
-	  fquery.set("select distinct f.format from ObML.ds"+dsnum2+"_primaries2 as p left join ObML.formats as f on f.code = p.format_code");
-	  if (MySQL::table_exists(server,"ObML.ds"+dsnum2+"_dataTypes2")) {
-	    ocustom.set("select distinct l.dataType from ObML.ds"+dsnum2+"_dataTypes2 as d left join ObML.ds"+dsnum2+"_dataTypesList as l on l.code = d.dataType_code");
-	  }
-	  else {
-	    ocustom.set("select distinct dataType from ObML.ds"+dsnum2+"_dataTypes");
-	  }
-	}
-	else if (file_type == "Web" || file_type == "inv") {
-	  fquery.set("select distinct f.format from WObML.ds"+dsnum2+"_webfiles2 as w left join WObML.formats as f on f.code = w.format_code");
-	  ocustom.set("select distinct l.dataType from WObML.ds"+dsnum2+"_dataTypes2 as d left join WObML.ds"+dsnum2+"_dataTypesList as l on l.code = d.dataType_code");
-	}
-	if (fquery.submit(server) < 0) {
-	  metautils::log_error(THIS_FUNC+"(): "+fquery.error()+" from query: "+fquery.show(),caller,user);
-	}
-	if (ocustom.submit(server) < 0) {
-	  metautils::log_error(THIS_FUNC+"(): "+ocustom.error()+" from query: "+ocustom.show(),caller,user);
-	}
-	std::vector<std::string> data_formats;
-	while (fquery.fetch_row(row)) {
-	  data_formats.emplace_back(row[0]);
-	}
-	my::map<XEntry> unique_data_types_table;
-	while (ocustom.fetch_row(row)) {
-	  auto dtype_parts=strutils::split(row[0],":");
-	  std::string format_specialization,data_type_code;
-	  if (dtype_parts.size() == 2) {
-	    format_specialization=dtype_parts.front();
-	    data_type_code=dtype_parts.back();
-	  }
-	  else {
-	    format_specialization="ds"+metautils::args.dsnum;
-	    data_type_code=dtype_parts.front();
-	  }
-	  for (const auto& data_format : data_formats) {
-	    xe.key=data_type_mapper.description(data_format,format_specialization,data_type_code);
-	    if (!xe.key.empty()) {
-		if (!unique_data_types_table.found(xe.key,xe)) {
-		  xe.strings.reset(new std::vector<std::string>(1));
-		  unique_data_types_table.insert(xe);
-		}
-		if (xe.strings->size() > 0 && !xe.strings->at(0).empty()) {
-		  xe.strings->at(0)+=",";
-		}
-		xe.strings->at(0)+=row[0];
-	    }
-	  }
-	}
-	if (unique_data_types_table.size() > 0) {
-	  ofs << unique_data_types_table.size() << std::endl;
-	  unique_data_types_table.keysort(
-	  [](const std::string& left,const std::string& right) -> bool
-	  {
-	    if (left <= right) {
-		return true;
-	    }
-	    else {
-		return false;
-	    }
-	  });
-	  for (const auto& key : unique_data_types_table.keys()) {
-	    unique_data_types_table.found(key,xe);
-	    ofs << xe.strings->at(0) << "<!>" << xe.key << std::endl;
-	  }
-	}
-// groups
-	if (tindex.empty()) {
-	  if (file_type == "MSS") {
-	    ocustom.set("select distinct g.gindex,g.title,g.grpid from (select m.gindex from ObML.ds"+dsnum2+"_primaries2 as p left join dssdb.mssfile as m on (m.dsid = 'ds"+metautils::args.dsnum+"' and m.mssfile = p.mssID)) as m left join dssdb.dsgroup as g on (g.dsid = 'ds"+metautils::args.dsnum+"' and g.gindex = m.gindex) where !isnull(g.gindex) order by g.gindex");
-	  }
-	  else {
-	    if (field_exists(server,"WObML.ds"+dsnum2+"_webfiles2","dsid")) {
-		ocustom.set("select distinct g.gindex,g.title,g.grpid from WObML.ds"+dsnum2+"_webfiles2 as p left join dssdb.wfile as w on (w.wfile = p.webID and w.type = p.type and w.dsid = p.dsid) left join dssdb.dsgroup as g on (g.dsid = 'ds"+metautils::args.dsnum+"' and g.gindex = w.gindex) where !isnull(w.wfile) order by g.gindex");
-	    }
-	    else {
-		ocustom.set("select distinct g.gindex,g.title,g.grpid from WObML.ds"+dsnum2+"_webfiles2 as p left join dssdb.wfile as w on w.wfile = p.webID left join dssdb.dsgroup as g on (g.dsid = 'ds"+metautils::args.dsnum+"' and g.gindex = w.gindex) where !isnull(w.wfile) order by g.gindex");
-	    }
-	  }
-	  if (ocustom.submit(server) < 0) {
-	    metautils::log_error(THIS_FUNC+"(): "+ocustom.error()+" from query: "+ocustom.show(),caller,user);
-	  }
-	  if (ocustom.num_rows() > 1) {
-	    while (ocustom.fetch_row(row)) {
-		auto grpid=row[2];
-		if (grpid.empty()) {
-		  grpid=row[0];
-		}
-		ofs << row[0] << "<!>" << row[1] << "<!>" << grpid << std::endl;
-	    }
-	  }
-	}
-	ofs.close();
-	if (unixutils::rdadata_sync(tdir.name(),"metadata/","/data/web/datasets/ds"+metautils::args.dsnum,metautils::directives.rdadata_home,error) < 0) {
-	  metautils::log_warning(THIS_FUNC+"() couldn't sync '"+filename+"' - rdadata_sync error(s): '"+error+"'",caller,user);
-	}
+    if (!f.empty()) {
+      f += "ObML";
+      if (!tindex.empty()) {
+        f += "." + tindex;
+      }
+      TempDir tdir;
+      if (!tdir.create(metautils::directives.temp_path)) {
+        metautils::log_error(F + "(): unable to create temporary directory (2)",
+            caller, user);
+      }
+
+      // create the directory tree in the temp directory
+      stringstream oss, ess;
+      if (mysystem2("/bin/mkdir -p " + tdir.name() + "/metadata", oss, ess) !=
+          0) {
+        log_error2("unable to create a temporary directory tree (2) - '" + ess.
+            str() + "'", F, caller, user);
+      }
+      ofstream ofs((tdir.name() + "/metadata/" + f).c_str());
+      if (!ofs.is_open()) {
+        log_error2("unable to open temporary file for " + f, F, caller, user);
+      }
+
+      // date range
+      ofs << row[0] << " " << row[1] << endl;
+
+      // platform types
+      if (file_type == "Web") {
+        oq.set("select distinct l.platformType_code, p.platformType from WObML."
+            "ds" + d2 + "_dataTypes2 as d left join WObML.ds" + d2 +
+            "_dataTypesList as l on l.code = d.dataType_code left join WObML."
+            "platformTypes as p on p.code = l.platformType_code");
+      } else if (file_type == "inv") {
+        oq.set("select distinct l.platformType_code, p.platformType from WObML."
+            "ds" + d2 + "_dataTypes2 as d left join WObML.ds" + d2 +
+            "_dataTypesList as l on l.code = d.dataType_code left join WObML."
+            "platformTypes as p on p.code = l.platformType_code left join "
+            "(select distinct webID_code from IObML.ds" + d2 + "_dataTypes) as "
+            "dt on dt.webID_code = d.webID_code where !isnull(dt.webID_code)");
+      }
+      if (oq.submit(mysrv) < 0) {
+        log_error2("'" + oq.error() + "' from query: " + oq.show(), F, caller,
+            user);
+      }
+      ofs << oq.num_rows() << endl;
+      for (const auto& r : oq) {
+        ofs << r[0] << "<!>" << r[1] << endl;
+      }
+
+      // data types and formats
+      MySQL::LocalQuery q;
+      if (file_type == "Web" || file_type == "inv") {
+        q.set("select distinct f.format from WObML.ds" + d2 + "_webfiles2 as w "
+            "left join WObML.formats as f on f.code = w.format_code");
+        oq.set("select distinct l.dataType from WObML.ds" + d2 + "_dataTypes2 "
+            "as d left join WObML.ds" + d2 + "_dataTypesList as l on l.code = "
+            "d.dataType_code");
+      }
+      if (q.submit(mysrv) < 0) {
+        log_error2("'" + q.error() + "' from query: " + q.show(), F, caller,
+            user);
+      }
+      if (oq.submit(mysrv) < 0) {
+        log_error2("'" + oq.error() + "' from query: " + oq.show(), F, caller,
+            user);
+      }
+      vector<string> vf;
+      for (const auto& r : q) {
+        vf.emplace_back(r[0]);
+      }
+      unordered_map<string, string> dtypmap;
+      for (const auto& r : oq) {
+        auto sp = split(r[0], ":");
+        string s, c;
+        if (sp.size() == 2) {
+          s = sp.front();
+          c = sp.back();
+        } else {
+          s = "ds" + metautils::args.dsnum;
+          c = sp.front();
+        }
+        for (const auto& f : vf) {
+          auto k = dmap.description(f, s, c);
+          if (!k.empty()) {
+            if (dtypmap.find(k) == dtypmap.end()) {
+              dtypmap.emplace(k, "");
+            }
+            if (!dtypmap[k].empty()) {
+              dtypmap[k] += ",";
+            }
+            dtypmap[k] += r[0];
+          }
+        }
+      }
+      if (dtypmap.size() > 0) {
+        ofs << dtypmap.size() << endl;
+        vector<string> v;
+        for (const auto& e : dtypmap) {
+          v.emplace_back(e.first);
+        }
+        sort(v.begin(), v.end(),
+        [](const string& left, const string& right) -> bool {
+          if (left <= right) {
+            return true;
+          }
+          return false;
+        });
+        for (const auto& k : v) {
+          ofs << dtypmap[k] << "<!>" << k << endl;
+        }
+      }
+
+      // groups
+      if (tindex.empty()) {
+        if (field_exists(mysrv, "WObML.ds" + d2 + "_webfiles2", "dsid")) {
+          oq.set("select distinct g.gindex, g.title, g.grpid from WObML.ds" + d2
+              + "_webfiles2 as p left join dssdb.wfile as w on (w.wfile = p."
+              "webID and w.type = p.type and w.dsid = p.dsid) left join dssdb."
+              "dsgroup as g on (g.dsid = 'ds" + metautils::args.dsnum + "' and "
+              "g.gindex = w.gindex) where !isnull(w.wfile) order by g.gindex");
+        } else {
+          oq.set("select distinct g.gindex, g.title, g.grpid from WObML.ds" + d2
+              + "_webfiles2 as p left join dssdb.wfile as w on w.wfile = p."
+              "webID left join dssdb.dsgroup as g on (g.dsid = 'ds" +
+              metautils::args.dsnum + "' and g.gindex = w.gindex) where "
+              "!isnull(w.wfile) order by g.gindex");
+        }
+        if (oq.submit(mysrv) < 0) {
+          log_error2("'" + oq.error() + "' from query: " + oq.show(), F, caller,
+              user);
+        }
+        if (oq.num_rows() > 1) {
+          for (const auto& r : oq) {
+            ofs << r[0] << "<!>" << r[1] << "<!>";
+            if (r[2].empty()) {
+              ofs << r[0];
+            } else {
+              ofs << r[2];
+            }
+            ofs << endl;
+          }
+        }
+      }
+      ofs.close();
+      string e;
+      if (unixutils::rdadata_sync(tdir.name(), "metadata/", "/data/web/"
+          "datasets/ds" + metautils::args.dsnum, metautils::directives.
+          rdadata_home, e) < 0) {
+        metautils::log_warning(F + "() couldn't sync '" + f + "' - "
+            "rdadata_sync error(s): '" + e + "'", caller, user);
+      }
     }
   }
   if (file_type == "inv") {
-// for inventories, the work is done here and we can return
-    server.disconnect();
+
+    // for inventories, the work is done here and we can return
+    mysrv.disconnect();
     return;
   }
-  my::map<CodeEntry> files_with_CMD_table(99999);
-  auto num=grml_file_data_table.size()+obml_file_data_table.size()+satellite_query.num_rows()+fixml_file_data_table.size();
+  unordered_set<string> cmdset;
+  auto num = grmlmap.size() + obmlmap.size() + sq.num_rows() + fixmlmap.size();
   if (num > 0) {
-    array.resize(num);
-    auto n=0;
-    for (const auto& key : grml_file_data_table.keys()) {
-	grml_file_data_table.found(key,fe);
-	array[n]=fe;
-	array[n].metafile_id=fe.key;
-/*
-	if (file_type == "MSS") {
-	  strutils::replace_all(array[n].metafile_id,"/FS/DSS/","");
-	  strutils::replace_all(array[n].metafile_id,"/DSS/","");
-	}
-*/
-	ee.key=fe.key;
-	files_with_CMD_table.insert(ee);
-//	strutils::replace_all(array[n].metafile_id,"/","%25");
-	strutils::replace_all(array[n].metafile_id,"+","%2B");
-	array[n].metafile_id+=".GrML";
-	strutils::replace_all(array[n].data_format,"proprietary_","");
-	++n;
+    vector<pair<string, FileEntry>> v;
+    v.resize(num);
+    auto n = 0;
+    for (const auto& e : grmlmap) {
+      v[n].first = e.first;
+      v[n].second = e.second;
+      v[n].second.metafile_id = e.first;
+      cmdset.emplace(e.first);
+      replace_all(v[n].second.metafile_id, "+", "%2B");
+      v[n].second.metafile_id += ".GrML";
+      replace_all(v[n].second.data_format, "proprietary_", "");
+      ++n;
     }
-    for (const auto& key : obml_file_data_table.keys()) {
-	obml_file_data_table.found(key,fe);
-	array[n]=fe;
-	array[n].metafile_id=fe.key;
-/*
-	if (file_type == "MSS") {
-	  strutils::replace_all(array[n].metafile_id,"/FS/DSS/","");
-	  strutils::replace_all(array[n].metafile_id,"/DSS/","");
-	}
-*/
-	ee.key=fe.key;
-	files_with_CMD_table.insert(ee);
-//	strutils::replace_all(array[n].metafile_id,"/","%25");
-	strutils::replace_all(array[n].metafile_id,"+","%2B");
-	array[n].metafile_id+=".ObML";
-	strutils::replace_all(array[n].data_format,"proprietary_","");
-	++n;
+    for (const auto& e : obmlmap) {
+      v[n].first = e.first;
+      v[n].second = e.second;
+      v[n].second.metafile_id = e.first;
+      cmdset.emplace(e.first);
+      replace_all(v[n].second.metafile_id, "+", "%2B");
+      v[n].second.metafile_id += ".ObML";
+      replace_all(v[n].second.data_format, "proprietary_", "");
+      ++n;
     }
-    while (satellite_query.fetch_row(row)) {
-	array[n].key=row[0];
-	array[n].metafile_id=row[0];
-/*
-	if (file_type == "MSS") {
-	  strutils::replace_all(array[n].metafile_id,"/FS/DSS/","");
-	  strutils::replace_all(array[n].metafile_id,"/DSS/","");
-	}
-*/
-	ee.key=row[0];
-	files_with_CMD_table.insert(ee);
-//	strutils::replace_all(array[n].metafile_id,"/","%25");
-	strutils::replace_all(array[n].metafile_id,"+","%2B");
-	array[n].metafile_id+=".SatML";
-	array[n].data_format=row[1];
-	strutils::replace_all(array[n].data_format,"proprietary_","");
-	array[n].units=row[2];
-	if (row[9] == "I") {
-	  array[n].units+=" Image";
-	}
-	else if (row[9] == "S") {
-	  array[n].units+=" Scan Line";
-	}
-	if (row[2] != "1") {
-	  array[n].units+="s";
-	}
-	array[n].start=dateutils::string_ll_to_date_string(row[3]);
-	array[n].end=dateutils::string_ll_to_date_string(row[4]);
-	array[n].file_format=row[5];
-	array[n].data_size=row[6];
-	if (!row[7].empty()) {
-	  array[n].group_id=row[7];
-	}
-	else {
-	  array[n].group_id=row[8];
-	}
-	if (!array[n].group_id.empty()) {
-	  array[n].group_id+="[!]"+row[8];
-	}
-	++n;
+    for (const auto& r : sq) {
+      v[n].first = r[0];
+      v[n].second.metafile_id = r[0];
+      cmdset.emplace(r[0]);
+      replace_all(v[n].second.metafile_id, "+", "%2B");
+      v[n].second.metafile_id += ".SatML";
+      v[n].second.data_format = r[1];
+      replace_all(v[n].second.data_format, "proprietary_", "");
+      v[n].second.units = r[2];
+      if (r[9] == "I") {
+        v[n].second.units += " Image";
+      } else if (r[9] == "S") {
+        v[n].second.units += " Scan Line";
+      }
+      if (r[2] != "1") {
+        v[n].second.units += "s";
+      }
+      v[n].second.start = dateutils::string_ll_to_date_string(r[3]);
+      v[n].second.end = dateutils::string_ll_to_date_string(r[4]);
+      v[n].second.file_format = r[5];
+      v[n].second.data_size = r[6];
+      if (!r[7].empty()) {
+        v[n].second.group_id = r[7];
+      } else {
+        v[n].second.group_id = r[8];
+      }
+      if (!v[n].second.group_id.empty()) {
+        v[n].second.group_id += "[!]" + r[8];
+      }
+      ++n;
     }
-    for (const auto& key : fixml_file_data_table.keys()) {
-	fixml_file_data_table.found(key,fe);
-	array[n]=fe;
-	array[n].metafile_id=fe.key;
-/*
-	if (file_type == "MSS") {
-	  strutils::replace_all(array[n].metafile_id,"/FS/DSS/","");
-	  strutils::replace_all(array[n].metafile_id,"/DSS/","");
-	}
-*/
-	ee.key=fe.key;
-	files_with_CMD_table.insert(ee);
-//	strutils::replace_all(array[n].metafile_id,"/","%25");
-	strutils::replace_all(array[n].metafile_id,"+","%2B");
-	array[n].metafile_id+=".FixML";
-	strutils::replace_all(array[n].data_format,"proprietary_","");
-	++n;
+    for (const auto& e : fixmlmap) {
+      v[n].first = e.first;
+      v[n].second = e.second;
+      v[n].second.metafile_id = e.first;
+      cmdset.emplace(e.first);
+      replace_all(v[n].second.metafile_id, "+", "%2B");
+      v[n].second.metafile_id += ".FixML";
+      replace_all(v[n].second.data_format, "proprietary_", "");
+      ++n;
     }
-    binary_sort(array,
-    [](const FileEntry& left,const FileEntry& right) -> bool
-    {
-	if (left.start < right.start) {
-	  return true;
-	}
-	else if (left.start > right.start) {
-	  return false;
-	}
-	else {
-	  if (left.end == right.end) {
-	    if (left.key <= right.key) {
-		return true;
-	    }
-	    else {
-		return false;
-	    }
-	  }
-	  else if (left.end < right.end) {
-	    return true;
-	  }
-	  else {
-	    return false;
-	  }
-	}
+    sort(v.begin(), v.end(),
+    [](const pair<string, FileEntry>& left, const pair<string, FileEntry>&
+        right) -> bool {
+      if (left.second.start < right.second.start) {
+        return true;
+      } else if (left.second.start > right.second.start) {
+        return false;
+      } else {
+        if (left.second.end == right.second.end) {
+          if (left.first <= right.first) {
+            return true;
+          }
+          return false;
+        } else if (left.second.end < right.second.end) {
+          return true;
+        }
+        return false;
+      }
     });
-    if (file_type == "MSS") {
-	filename="getMssList.cache";
-    }
-    else if (file_type == "Web") {
-	filename="getWebList.cache";
+    string f;
+    if (file_type == "Web") {
+      f = "getWebList.cache";
     }
     TempDir tdir;
     if (!tdir.create(metautils::directives.temp_path)) {
-	metautils::log_error("create file_list_cache(): unable to create temporary directory (3)",caller,user);
+      log_error2("unable to create temporary directory (3)", F, caller, user);
     }
-// create the directory tree in the temp directory
-    std::stringstream oss,ess;
-    if (unixutils::mysystem2("/bin/mkdir -p "+tdir.name()+"/metadata",oss,ess) != 0) {
-	metautils::log_error(THIS_FUNC+"(): unable to create a temporary directory tree (3) - '"+ess.str()+"'",caller,user);
+
+    // create the directory tree in the temp directory
+    stringstream oss, ess;
+    if (mysystem2("/bin/mkdir -p " + tdir.name() + "/metadata", oss, ess) !=
+        0) {
+      log_error2("unable to create a temporary directory tree (3) - '" + ess.
+          str() + "'", F, caller, user);
     }
-    ofs.open((tdir.name()+"/metadata/"+filename).c_str());
+    ofstream ofs((tdir.name() + "/metadata/" + f).c_str());
     if (!ofs.is_open()) {
-	metautils::log_error(THIS_FUNC+"(): unable to open temporary file for "+filename,caller,user);
+      log_error2("unable to open temporary file for " + f, F, caller, user);
     }
-    ofs << num << std::endl;
-    size_t num_missing_data_size=0;
-    for (size_t n=0; n < num; n++) {
-	std::string data_size;
-	if (!array[n].data_size.empty()) {
-	  data_size=strutils::ftos(std::stof(array[n].data_size)/1000000.,8,2);
-	}
-	else {
-metautils::log_warning(THIS_FUNC+"() returned warning: empty data size for '"+array[n].key+"'",caller,user);
-//	  ++num_missing_data_size;
-	  data_size="";
-	}
-	strutils::trim(data_size);
-	ofs << array[n].key << "<!>" << array[n].data_format << "<!>" << array[n].units << "<!>" << array[n].start << "<!>" << array[n].end << "<!>" << array[n].file_format << "<!>" << data_size << "<!>" << array[n].group_id << "<!>" << array[n].metafile_id;
-	ofs << std::endl;
-    }
-    if (num_missing_data_size > 0) {
-	metautils::log_warning(THIS_FUNC+"() returned warning: empty data sizes for "+strutils::itos(num_missing_data_size)+" files",caller,user);
+    ofs << num << endl;
+    for (size_t n = 0; n < num; ++n) {
+      string s;
+      if (!v[n].second.data_size.empty()) {
+        s = strutils::ftos(std::stof(v[n].second.data_size) / 1000000., 8, 2);
+      } else {
+          metautils::log_warning(F + "() returned warning: empty data size "
+              "for '" + v[n].first + "'", caller, user);
+        s = "";
+      }
+      strutils::trim(s);
+      ofs << v[n].first << "<!>" << v[n].second.data_format << "<!>" << v[n].
+          second.units << "<!>" << v[n].second.start << "<!>" << v[n].second.end
+          << "<!>" << v[n].second.file_format << "<!>" << s << "<!>" << v[n].
+          second.group_id << "<!>" << v[n].second.metafile_id;
+      ofs << endl;
     }
     ofs.close();
-    if (unixutils::rdadata_sync(tdir.name(),"metadata/","/data/web/datasets/ds"+metautils::args.dsnum,metautils::directives.rdadata_home,error) < 0) {
-	metautils::log_warning(THIS_FUNC+"() couldn't sync '"+filename+"' - rdadata_sync error(s): '"+error+"'",caller,user);
+    string e;
+    if (unixutils::rdadata_sync(tdir.name(), "metadata/", "/data/web/datasets/"
+        "ds" + metautils::args.dsnum, metautils::directives.rdadata_home, e) <
+        0) {
+      metautils::log_warning(F + "() couldn't sync '" + f + "' - rdadata_sync "
+          "error(s): '" + e + "'", caller, user);
     }
-  }
-  else if (tindex.empty()) {
-    filename="";
-    if (file_type == "MSS") {
-	filename="getMssList.cache";
-    }
-    else if (file_type == "Web") {
-	filename="getWebList.cache";
+  } else if (tindex.empty()) {
+    string f = "";
+    if (file_type == "Web") {
+      f = "getWebList.cache";
     }
     TempDir tdir;
     if (!tdir.create(metautils::directives.temp_path)) {
-	metautils::log_error("create file_list_cache(): unable to create temporary directory (4)",caller,user);
+      log_error2("unable to create temporary directory (4)", F, caller, user);
     }
-    if (!filename.empty() && unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+filename, tdir.name(), metautils::directives.rdadata_home,error) < 0) {
-	metautils::log_warning(THIS_FUNC+"() couldn't unsync '"+filename+"' - rdadata_unsync error(s): '"+error+"'",caller,user);
+    string e;
+    if (!f.empty() && unixutils::rdadata_unsync("/__HOST__/web/datasets/ds" +
+        metautils::args.dsnum + "/metadata/" + f, tdir.name(), metautils::
+        directives.rdadata_home, e) < 0) {
+      metautils::log_warning(F + "() couldn't unsync '" + f + "' - "
+          "rdadata_unsync error(s): '" + e + "'", caller, user);
     }
   }
-  server.disconnect();
-  if (tindex.empty() && files_with_CMD_table.size() > 0) {
-    create_non_cmd_file_list_cache(file_type,files_with_CMD_table,caller,user);
+  mysrv.disconnect();
+  if (tindex.empty() && cmdset.size() > 0) {
+    create_non_cmd_file_list_cache(file_type, cmdset, caller, user);
   }
-  server.connect(metautils::directives.database_server,metautils::directives.rdadb_username,metautils::directives.rdadb_password,"dssdb");
-  server.update("dataset","meta_link = 'Y',version = version+1","dsid = 'ds"+metautils::args.dsnum+"'");
-  server.disconnect();
+  mysrv.connect(metautils::directives.database_server, metautils::directives.
+      rdadb_username, metautils::directives.rdadb_password, "dssdb");
+  mysrv.update("dataset", "meta_link = 'Y', version = version + 1", "dsid = 'ds"
+      + metautils::args.dsnum + "'");
+  mysrv.disconnect();
 }
 
-std::string summarize_locations(std::string database)
-{
-  std::string dsnum2=strutils::substitute(metautils::args.dsnum,".","");
-  MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
-// get all location names that are NOT included
-  MySQL::LocalQuery query("distinct gcmd_keyword",database+".ds"+dsnum2+"_location_names","include = 'N'");
-  if (query.submit(server) < 0) {
-    return query.error();
+void summarize_locations(string database, string& error) {
+  error = "";
+  string d2 = substitute(metautils::args.dsnum, ".", "");
+  MySQL::Server mysrv(metautils::directives.database_server, metautils::
+      directives.metadb_username, metautils::directives.metadb_password, "");
+
+  // get all location names that are NOT included
+  MySQL::LocalQuery q("distinct gcmd_keyword", database + ".ds" + d2 +
+      "_location_names", "include = 'N'");
+  if (q.submit(mysrv) < 0) {
+    error = move(q.error());
+    return;
   }
-  std::unordered_set<std::string> include_set,noinclude_set;
-  MySQL::Row row;
-  while (query.fetch_row(row)) {
-    auto location_name=row[0];
-    strutils::replace_all(location_name,"'","\\'");
-    MySQL::LocalQuery q("name","search.political_boundaries","name like '"+location_name+" >%'");
-    if (q.submit(server) < 0) {
-	return q.error();
+  unordered_set<string> nset;
+  for (const auto& row : q) {
+    auto s = row[0];
+    replace_all(s, "'", "\\'");
+    MySQL::LocalQuery qn("name", "search.political_boundaries", "name like '" +
+        s + " >%'");
+    if (qn.submit(mysrv) < 0) {
+      error = move(qn.error());
+      return;
     }
-    if (q.num_rows() > 0) {
-// location name is a parent - only add the children
-	MySQL::Row r;
-	while (q.fetch_row(r)) {
-	  if (noinclude_set.find(r[0]) == noinclude_set.end()) {
-	    noinclude_set.emplace(r[0]);
-	  }
-	}
-    }
-    else {
-// location name is not a parent
-	if (noinclude_set.find(row[0]) == noinclude_set.end()) {
-	  noinclude_set.emplace(row[0]);
-	}
-    }
-  }
-// get the location names that ARE included
-  query.set("distinct gcmd_keyword",database+".ds"+dsnum2+"_location_names","include = 'Y'");
-  if (query.submit(server) < 0) {
-    return query.error();
-  }
-  std::list<std::string> location_list;
-  while (query.fetch_row(row)) {
-    auto location_name=row[0];
-    strutils::replace_all(location_name,"'","\\'");
-    MySQL::LocalQuery q("name","search.political_boundaries","name like '"+location_name+" >%'");
-    if (q.submit(server) < 0) {
-	return q.error();
-    }
-    if (q.num_rows() > 0) {
-// location name is a parent - only add the children if they are not in
-//   noinclude_set
-	MySQL::Row r;
-	while (q.fetch_row(r)) {
-	  if (noinclude_set.find(r[0]) == noinclude_set.end() && include_set.find(r[0]) == include_set.end()) {
-	    include_set.emplace(r[0]);
-	    location_list.emplace_back(r[0]);
-	  }
-	}
-    }
-    else {
-// location name is not a parent - add the location
-	if (include_set.find(row[0]) == include_set.end()) {
-	  include_set.emplace(row[0]);
-	  location_list.emplace_back(row[0]);
-	}
+    if (qn.num_rows() > 0) {
+
+      // location name is a parent - only add the children
+      for (const auto& r : qn) {
+        if (nset.find(r[0]) == nset.end()) {
+          nset.emplace(r[0]);
+        }
+      }
+    } else {
+
+      // location name is not a parent
+      if (nset.find(row[0]) == nset.end()) {
+        nset.emplace(row[0]);
+      }
     }
   }
-  std::string error;
-  server.command("lock tables search.locations write",error);
-  server._delete("search.locations","dsid = '"+metautils::args.dsnum+"'");
-  for (auto item : location_list) {
-    strutils::replace_all(item,"'","\\'");
-    if (server.insert("search.locations","'"+item+"','GCMD','Y','"+metautils::args.dsnum+"'") < 0) {
-	return server.error();
+
+   // get the location names that ARE included
+  q.set("distinct gcmd_keyword", database + ".ds" + d2 + "_location_names",
+      "include = 'Y'");
+  if (q.submit(mysrv) < 0) {
+    error = move(q.error());
+    return;
+  }
+  unordered_set<string> yset;
+  vector<string> v;
+  for (const auto& row : q) {
+    auto s = row[0];
+    replace_all(s, "'", "\\'");
+    MySQL::LocalQuery qn("name", "search.political_boundaries", "name like '" +
+        s + " >%'");
+    if (qn.submit(mysrv) < 0) {
+      error = move(qn.error());
+      return;
+    }
+    if (qn.num_rows() > 0) {
+
+      // location name is a parent - only add the children if they are not in
+      //  nset
+      for (const auto& r : qn) {
+        if (nset.find(r[0]) == nset.end() && yset.find(r[0]) == yset.end()) {
+          yset.emplace(r[0]);
+          v.emplace_back(r[0]);
+        }
+      }
+    } else {
+
+      // location name is not a parent - add the location
+      if (yset.find(row[0]) == yset.end()) {
+        yset.emplace(row[0]);
+        v.emplace_back(row[0]);
+      }
     }
   }
-  if (server.command("unlock tables",error) < 0) {
-    return server.error();
+  string err;
+  mysrv.command("lock tables search.locations write", err);
+  mysrv._delete("search.locations", "dsid = '" + metautils::args.dsnum + "'");
+  for (auto e : v) {
+    replace_all(e, "'", "\\'");
+    if (mysrv.insert("search.locations", "'" + e + "', 'GCMD', 'Y', '" +
+        metautils::args.dsnum + "'") < 0) {
+      error = move(mysrv.error());
+      return;
+    }
   }
-  server.disconnect();
-  return "";
+  if (mysrv.command("unlock tables", err) < 0) {
+    error = move(mysrv.error());
+    return;
+  }
+  mysrv.disconnect();
 }
 
 } // end namespace gatherxml::summarizeMetadata
