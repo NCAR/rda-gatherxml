@@ -8,7 +8,6 @@
 #include <gatherxml.hpp>
 #include <datetime.hpp>
 #include <MySQL.hpp>
-#include <bsort.hpp>
 #include <strutils.hpp>
 #include <utils.hpp>
 #include <bitmap.hpp>
