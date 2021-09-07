@@ -79,7 +79,7 @@ void summarize_fix_data(std::string caller,std::string user)
   if (server.command("unlock tables",error) < 0) {
     metautils::log_error(THIS_FUNC+"(): "+server.error(),caller,user);
   }
-  error=summarize_locations("WFixML");
+  summarize_locations("WFixML", error);
   if (!error.empty()) {
     metautils::log_error(THIS_FUNC+"(): summarize_locations() returned '"+error+"'",caller,user);
   }
