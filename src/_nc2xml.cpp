@@ -4,6 +4,7 @@
 #include <signal.h>
 #include <sstream>
 #include <regex>
+#include <numeric>
 #include <thread>
 #include <unordered_set>
 #include <unordered_map>
@@ -25,6 +26,7 @@ using floatutils::myequalf;
 using metautils::log_error2;
 using metautils::log_warning;
 using miscutils::this_function_label;
+using std::accumulate;
 using std::cerr;
 using std::cout;
 using std::endl;
@@ -2845,10 +2847,196 @@ bool found_alternate_lat_lon_coordinates(vector<NetCDF::Variable>& vars,
       size();
 }
 
+void check_for_centered_lambert_conformal(const unique_ptr<double[]>& lats,
+    const unique_ptr<double[]>& lons, Grid::GridDimensions& dims, Grid::
+    GridDefinition& def) {
+  if (gatherxml::verbose_operation) {
+    cout << "         ... checking for centered Lambert-Conformal projection "
+        "..." << endl;
+  }
+  auto dx2 = dims.x / 2;
+  auto dy2 = dims.y / 2;
+  switch (dims.x % 2) {
+    case 0: {
+      auto xm = dx2 - 1;
+      auto ym = dy2 - 1;
+      auto yp = dy2 + 1;
+      if (myequalf((lons[ym * dims.x + xm] + lons[ym * dims.x + dx2]), (lons[yp
+          * dims.x + xm] + lons[yp * dims.x + dx2]), 0.00001) && myequalf(lats[
+          dy2 * dims.x + xm], lats[dy2 * dims.x + dx2], 0.00001)) {
+        def.type = Grid::Type::lambertConformal;
+        def.llatitude = def.stdparallel1 = def.stdparallel2 = lround(lats[dy2 *
+            dims.x + dx2]);
+        if (def.llatitude >= 0.) {
+          def.projection_flag = 0;
+        } else {
+          def.projection_flag = 1;
+        }
+        def.olongitude = lround((lons[dy2 * dims.x + xm] + lons[dy2 * dims.x +
+            dx2]) / 2.);
+        def.dx = def.dy = lround(111.1 * cos(lats[dy2 * dims.x + dx2 - 1] *
+            3.141592654 / 180.) * (lons[dy2] - lons[dy2 * dims.x + dx2 - 1]));
+        if (gatherxml::verbose_operation) {
+          cout << "            ... confirmed a centered Lambert-Conformal "
+              "projection." << endl;
+        }
+      }
+      break;
+    }
+    case 1: {
+      if (myequalf(lons[(dy2 - 1) * dims.x + dx2], lons[(dy2 + 1) * dims.x +
+          dx2], 0.00001) && myequalf(lats[dy2 * dims.x + dx2 - 1], lats[dy2 *
+          dims.x + dx2 + 1], 0.00001)) {
+        def.type = Grid::Type::lambertConformal;
+        def.llatitude = def.stdparallel1 = def.stdparallel2 = lround(lats[dy2 *
+            dims.x + dx2]);
+        if (def.llatitude >= 0.) {
+          def.projection_flag = 0;
+        } else {
+          def.projection_flag = 1;
+        }
+        def.olongitude = lround(lons[dy2 * dims.x + dx2]);
+        def.dx = def.dy = lround(111.1 * cos(lats[dy2 * dims.x + dx2] *
+            3.141592654 / 180.) * (lons[dy2 * dims.x + dy2 + 1] - lons[dy2 *
+                dims.x + dx2]));
+        if (gatherxml::verbose_operation) {
+          cout << "            ... confirmed a centered Lambert-Conformal "
+              "projection." << endl;
+        }
+      }
+      break;
+    }
+  }
+  if (gatherxml::verbose_operation) {
+    cout << "         ... done." << endl;
+  }
+}
+
+void check_for_non_centered_lambert_conformal(const unique_ptr<double[]>& lats,
+    const unique_ptr<double[]>& lons, Grid::GridDimensions& dims, Grid::
+    GridDefinition& def) {
+  if (gatherxml::verbose_operation) {
+    cout << "         ... checking for non-centered Lambert-Conformal "
+        "projection ..." << endl;
+  }
+  def.type = Grid::Type::not_set;
+
+  // find the x-offsets in each row where the change in latitude goes from
+  //  positive to negative
+  vector<double> v;
+  v.reserve(dims.y);
+  double s = 0.;
+  for (auto n = 0; n < dims.y; ++n) {
+    auto yoff = n * dims.x;
+    for (auto m = 0; m < dims.x - 1; ++m) {
+      auto xoff = yoff + m;
+      if (lats[xoff + 1] <= lats[xoff]) {
+        v.emplace_back(xoff - yoff);
+        s += lons[xoff];
+        break;
+      }
+    }
+  }
+
+  // find the variance in the x-offsets
+  auto r = lround(accumulate(v.begin(), v.end(), 0.) / v.size());
+  double d = 0.;
+  for (const auto& e : v) {
+    auto x = e - r;
+    d += x * x;
+  }
+  auto var = d / (v.size() - 1);
+
+  // if the variance is low, confident that we found the orientation longitude
+  if (var < 1.) {
+    def.type = Grid::Type::lambertConformal;
+    def.olongitude = lround(s / v.size());
+
+    // find the x-direction distance for each row at the orientation longitude
+    const double PI = 3.141592654;
+    const double DEGRAD = PI / 180.;
+    const double KMDEG = 111.1;
+    v.clear();
+    for (auto n = r; n < dims.x * dims.y; n += dims.x) {
+      auto dy = (lons[n + 1] - lons[n]) * KMDEG * cos(lats[n] * DEGRAD);
+      auto dx = (lats[n + 1] - lats[n]) * KMDEG;
+      v.emplace_back(sqrt(dx * dx + dy * dy));
+    }
+    def.dx = lround(accumulate(v.begin(), v.end(), 0.) / v.size());
+    def.stdparallel1 = def.stdparallel2 = -99.;
+    size_t i = 0;
+    for (size_t n = 0; n < v.size(); ++n) {
+      if (myequalf(v[n], def.dx, 0.001)) {
+        auto p = lround(lats[r + n  * dims.x]);
+        if (def.stdparallel1 < -90.) {
+          def.stdparallel1 = p;
+          i = r + n * dims.x;
+        } else if (def.stdparallel2 < -90.) {
+          if (p != def.stdparallel1) {
+            def.stdparallel2 = p;
+          }
+        } else if (p != def.stdparallel2) {
+          if (gatherxml::verbose_operation) {
+            cout << "            ... check for a non-centered projection "
+                "failed. Too many tangent latitudes." << endl;
+          }
+          def.type = Grid::Type::not_set;
+          return;
+        }
+      }
+    }
+    if (def.stdparallel1 < -90.) {
+      if (gatherxml::verbose_operation) {
+        cout << "            ... check for a non-centered projection failed. "
+            "No tangent latitude could be identified." << endl;
+      }
+      def.type = Grid::Type::not_set;
+      return;
+    } else if (def.stdparallel2 < -90.) {
+      def.stdparallel2 = def.stdparallel1;
+    }
+    def.llatitude = def.stdparallel1;
+    if (def.llatitude >= 0.) {
+      def.projection_flag = 0;
+    } else {
+      def.projection_flag = 1;
+    }
+    auto dx = (lons[i] - lons[i - dims.x]) * KMDEG * cos(lats[i - dims.x] *
+        DEGRAD);
+    auto dy = (lats[i] - lats[i - dims.x]) * KMDEG;
+    def.dy = lround(sqrt(dx * dx + dy * dy));
+    if (gatherxml::verbose_operation) {
+      cout << "            ... confirmed a non-centered Lambert-conformal "
+          "projection." << endl;
+    }
+  }
+  if (gatherxml::verbose_operation) {
+    cout << "         ... done." << endl;
+  }
+}
+
+void check_for_lambert_conformal(const unique_ptr<double[]>& lats, const
+    unique_ptr<double[]>& lons, Grid::GridDimensions& dims, Grid::
+    GridDefinition& def) {
+  if (gatherxml::verbose_operation) {
+    cout << "      ... checking for Lambert-Conformal projection ..." << endl;
+  }
+  check_for_centered_lambert_conformal(lats, lons, dims, def);
+  if (def.type == Grid::Type::not_set) {
+    check_for_non_centered_lambert_conformal(lats, lons, dims, def);
+  }
+  if (gatherxml::verbose_operation) {
+    cout << "      ... done." << endl;
+  }
+}
+
 bool filled_grid_projection(const unique_ptr<double[]>& lats, const unique_ptr<
     double[]>& lons, Grid::GridDimensions& d, Grid::GridDefinition& f, size_t
     nlats, size_t nlons) {
   static const string F = this_function_label(__func__);
+  if (gatherxml::verbose_operation) {
+    cout << "   ... trying to fill grid projection ..." << endl;
+  }
 
   // check as one-dimensional coordinates
   double ndy = 99999., xdy = 0.;
@@ -3026,6 +3214,14 @@ bool filled_grid_projection(const unique_ptr<double[]>& lats, const unique_ptr<
           lons[nm + d.x]) / 2. * RAD) * sin(fabs(lons[nm] - lons[nm + d.x]) / 2.
           * RAD) * cos(lats[nm] * RAD) * cos(lats[nm + d.x] * RAD))) * 12745.6);
     }
+  }
+  if (f.type == Grid::Type::not_set) {
+
+    // check for a lambert-conformal grid
+    check_for_lambert_conformal(lats, lons, d, f);
+  }
+  if (gatherxml::verbose_operation) {
+    cout << "   ... done." << endl;
   }
   return !(f.type == Grid::Type::not_set);
 }
@@ -5358,6 +5554,11 @@ int main(int argc, char **argv) {
   metautils::args.args_string = unixutils::unix_args_string(argc, argv, d);
   metautils::read_config("nc2xml", USER);
   gatherxml::parse_args(d);
+  if (metautils::args.dsnum == "999.9") {
+    log_error2("Terminating - Testing has changed. Use:\n  gatherxml -d test "
+        "-f " + metautils::args.data_format + " <full path to file '" +
+        metautils::args.filename + "'>", "main()", "nc2xml", USER);
+  }
   atexit(clean_up);
   metautils::cmd_register("nc2xml", USER);
   if (!metautils::args.overwrite_only && !metautils::args.inventory_only) {
