@@ -120,7 +120,7 @@ extern void summarize_grid_resolutions(std::string caller, std::string user,
     std::string mss_ID_code = "");
 extern void summarize_grids(std::string database, std::string caller, std::
     string user, std::string file_ID_code = "");
-extern void summarize_locations(std::string database,  std::string& error);
+extern void summarize_locations(std::string database, std::string& error);
 extern bool summarize_obs_data(std::string caller, std::string user);
 
 } // end namespace gatherxml::summarizeMetadata
