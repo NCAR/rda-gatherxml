@@ -101,13 +101,7 @@ void inventory_all() {
   size_t n = 0;
   for (const auto& row : q) {
     string f = row[1];
-    replace_all(f, "WMO_", "");
     f = to_lower(f);
-    if (f == "grib1") {
-      f = "grib";
-    } else if (f == "netcdf4") {
-      f = "hdf5nc4";
-    }
     ++n;
     if (f == metautils::args.data_format || (f == "netcdf" && metautils::args.
         data_format == "cfnetcdf")) {
@@ -239,9 +233,6 @@ int main(int argc, char **argv) {
     } else {
       metautils::args.data_format = to_lower(metautils::args.data_format);
     }
-    if (metautils::args.data_format == "grib1") {
-      metautils::args.data_format = "grib";
-    }
     if (metautils::args.dsnum.empty()) {
       cerr << "Error: no dataset number specified" << endl;
       exit(1);
@@ -259,7 +250,7 @@ exit(1);
       if (metautils::args.path == "invall") {
         inventory_all();
         exit(0);
-      } else {
+      } else if (metautils::args.dsnum != "test") {
         string url = metautils::args.path[0] == '/' ? "https://rda.ucar.edu" +
             webhome() + metautils::args.path : "https://rda.ucar.edu" +
             webhome() + "/" + metautils::args.path;
@@ -281,7 +272,8 @@ exit(1);
           + " " + strutils::substitute(metautils::args.args_string, "%", " "),
           oss, ess);
       if (stat != 0) {
-        if (stat == 2) {
+        if (stat == 2 || metautils::args.dsnum == "test" || metautils::args.
+            dsnum >= "999.0") {
           cerr << ess.str() << endl;
           exit(1);
         } else {
@@ -306,7 +298,8 @@ exit(1);
               it2->second + " "+ substitute(metautils::args.args_string, "%",
               " "), oss, ess);
           if (stat != 0) {
-            if (stat == 2 || metautils::args.dsnum >= "999.0") {
+            if (stat == 2 || metautils::args.dsnum == "test" || metautils::args.
+                dsnum >= "999.0") {
               cerr << ess.str() << endl;
               exit(1);
             } else {
