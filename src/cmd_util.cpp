@@ -274,6 +274,7 @@ int main(int argc, char **argv) {
       log_error2("unable to find singularity", "main()", util, u);
     }
     unordered_map<string, string> umap{
+        { "bufr2xml", "gatherxml-exec-ubuntu" },
         { "dsgen", "gatherxml-exec-ubuntu" },
         { "grid2xml", "gatherxml-exec-ubuntu" },
         { "nc2xml", "gatherxml-exec-ubuntu" },
