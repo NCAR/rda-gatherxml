@@ -86,7 +86,8 @@ struct ScanData {
 
 struct GridData {
   struct CoordinateData {
-    CoordinateData() : dim(MISSING_FLAG), id(), type() { }
+    CoordinateData() : dim(MISSING_FLAG), id(), type(NetCDF::DataType::_NULL)
+        { }
 
     size_t dim;
     string id;
@@ -716,10 +717,11 @@ void add_gridded_lat_lon_keys(vector<string>& gentry_keys, Grid::
     GridDimensions dim, Grid::GridDefinition def, string timeid, size_t
     timedimid, int levdimid, size_t latdimid, size_t londimid, const metautils::
     NcTime::TimeRangeEntry& tre, vector<NetCDF::Variable>& vars) {
+  string k;
   switch (def.type) {
     case Grid::Type::latitudeLongitude:
     case Grid::Type::gaussianLatitudeLongitude: {
-      auto k = itos(static_cast<int>(def.type));
+      k = itos(static_cast<int>(def.type));
       if (def.is_cell) {
         k += "C";
       }
@@ -732,13 +734,11 @@ void add_gridded_lat_lon_keys(vector<string>& gentry_keys, Grid::
       k = itos(static_cast<int>(def.type)) + "<!>1<!>" + itos(dim.y) + "<!>" +
           ftos(def.slatitude, 3) + "<!>0<!>" + ftos(def.elatitude, 3) +
           "<!>360<!>" + ftos(def.laincrement, 3) + "<!>" + ftos(def.laincrement,
-          3) + "<!>";
-      add_gridded_time_range(k, gentry_keys, timeid, timedimid, levdimid,
-          latdimid, londimid, tre, vars);
+          3);
       break;
     }
     case Grid::Type::polarStereographic: {
-      auto k = itos(static_cast<int>(def.type));
+      k = itos(static_cast<int>(def.type));
       if (def.is_cell) {
         k += "C";
       }
@@ -751,26 +751,44 @@ void add_gridded_lat_lon_keys(vector<string>& gentry_keys, Grid::
       } else {
         k += "S";
       }
-      k += "<!>";
-      add_gridded_time_range(k, gentry_keys, timeid, timedimid, levdimid,
-          latdimid, londimid, tre, vars);
       break;
     }
     case Grid::Type::mercator: {
-      auto k = itos(static_cast<int>(def.type));
+      k = itos(static_cast<int>(def.type));
       if (def.is_cell) {
         k += "C";
       }
       k += "<!>" + itos(dim.x) + "<!>" + itos(dim.y) + "<!>" + ftos(def.
           slatitude, 3) + "<!>" + ftos(def.slongitude, 3) + "<!>" + ftos(def.
           elatitude, 3) + "<!>" + ftos(def.elongitude, 3) + "<!>" + ftos(def.
-          loincrement, 3) + "<!>" + ftos(def.laincrement, 3) + "<!>";
-      add_gridded_time_range(k, gentry_keys, timeid, timedimid, levdimid,
-          latdimid, londimid, tre, vars);
+          loincrement, 3) + "<!>" + ftos(def.laincrement, 3);
       break;
     }
-    default: { }
+    case Grid::Type::lambertConformal: {
+      k = itos(static_cast<int>(def.type));
+      if (def.is_cell) {
+        k += "C";
+      }
+      k += "<!>" + itos(dim.x) + "<!>" + itos(dim.y) + "<!>" + ftos(def.
+          slatitude, 3) + "<!>" + ftos(def.slongitude, 3) + "<!>" + ftos(def.
+          llatitude, 3) + "<!>" + ftos(def.olongitude, 3) + "<!>" + ftos(def.dx,
+          3) +" <!>" + ftos(def.dy, 3) + "<!>";
+      if (def.projection_flag == 0) {
+        k += "N";
+      } else {
+        k += "S";
+      }
+      k += "<!>" + ftos(def.stdparallel1, 3) + "<!>" + ftos(def.stdparallel2,
+          3);
+      break;
+    }
+    default: {
+      return;
+    }
   }
+  k += "<!>";
+  add_gridded_time_range(k, gentry_keys, timeid, timedimid, levdimid, latdimid,
+      londimid, tre, vars);
 }
 
 void add_gridded_zonal_mean_keys(vector<string>& gentry_keys, Grid::
@@ -2875,7 +2893,8 @@ void check_for_centered_lambert_conformal(const unique_ptr<double[]>& lats,
         def.olongitude = lround((lons[dy2 * dims.x + xm] + lons[dy2 * dims.x +
             dx2]) / 2.);
         def.dx = def.dy = lround(111.1 * cos(lats[dy2 * dims.x + dx2 - 1] *
-            3.141592654 / 180.) * (lons[dy2] - lons[dy2 * dims.x + dx2 - 1]));
+            3.141592654 / 180.) * (lons[dy2 * dims.x + dx2] - lons[dy2 * dims.x
+            + dx2 - 1]));
         if (gatherxml::verbose_operation) {
           cout << "            ... confirmed a centered Lambert-Conformal "
               "projection." << endl;
@@ -2897,7 +2916,7 @@ void check_for_centered_lambert_conformal(const unique_ptr<double[]>& lats,
         }
         def.olongitude = lround(lons[dy2 * dims.x + dx2]);
         def.dx = def.dy = lround(111.1 * cos(lats[dy2 * dims.x + dx2] *
-            3.141592654 / 180.) * (lons[dy2 * dims.x + dy2 + 1] - lons[dy2 *
+            3.141592654 / 180.) * (lons[dy2 * dims.x + dx2 + 1] - lons[dy2 *
                 dims.x + dx2]));
         if (gatherxml::verbose_operation) {
           cout << "            ... confirmed a centered Lambert-Conformal "
@@ -3246,6 +3265,7 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
     }
   }
   auto vars = istream.variables();
+  auto dims = istream.dimensions();
   GridData grid_data;
   my::map<metautils::NcTime::TimeRangeEntry> tr_table;
   find_coordinate_variables(istream, vars, grid_data, tr_table);
@@ -3277,7 +3297,6 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
       if (gatherxml::verbose_operation) {
         cout << "... found alternate latitude/longitude" << endl;
       }
-      auto dims = istream.dimensions();
       for (size_t n = 0; n < grid_data.lats.size(); ++n) {
         if (grid_data.lats[n].dim != grid_data.lons[n].dim) {
           log_error2("alternate latitude and longitude coordinate variables (" +
@@ -3305,10 +3324,8 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
         Grid::GridDimensions d;
         d.x = dims[gdm.back().x].length;
         d.y = dims[gdm.back().y].length;
-        Grid::GridDefinition f;
-        if (filled_grid_projection(lats, lons, d, f, nlats, nlons)) {
+        if (filled_grid_projection(lats, lons, d, gdf.back(), nlats, nlons)) {
           gdm.back() = d;
-          gdf.back() = f;
         } else {
           log_error2("unable to determine grid projection", F, "nc2xml", USER);
         }
@@ -3317,17 +3334,17 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
   }
   if (grid_data.levdata.ID.size() == 0) {
 
-    // look for a level coordinate that is not a coordinate variable
+    // look for level coordinates that are not a coordinate variable
     if (gatherxml::verbose_operation) {
-      cout << "looking for an alternate level coordinate ..." << endl;
+      cout << "looking for alternate level coordinates ..." << endl;
     }
     unordered_set<size_t> u;
     for (const auto& y : grid_data.lats) {
       if (y.dim > 100) {
         size_t m = y.dim / 10000 - 1;
         size_t l = (y.dim % 10000) / 100 - 1;
-        if (grid_data.levels.size() > 0 && grid_data.levels.back().dim !=
-            MISSING_FLAG) {
+        if (grid_data.levels.size() == 0 || (grid_data.levels.size() > 0 &&
+            grid_data.levels.back().dim != MISSING_FLAG)) {
           grid_data.levels.emplace_back();
           grid_data.levels.back().dim = MISSING_FLAG;
           grid_data.levdata.ID.emplace_back();
@@ -3340,16 +3357,22 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
               time.dim && v.dimids[2] == m && v.dimids[3] == l) {
 
             // check netCDF variables for what they are using as a level
-            //    dimension
+            //  dimension
             if (grid_data.levels.back().dim == MISSING_FLAG) {
               if (u.find(v.dimids[1]) == u.end()) {
                 grid_data.levels.back().dim = v.dimids[1];
                 u.emplace(grid_data.levels.back().dim);
               }
             } else if (grid_data.levels.back().dim != v.dimids[1]) {
-              log_error2("found multiple level dimensions for the gridded "
-                  "parameters - failed on parameter '" + v.name + "'", F,
-                  "nc2xml", USER);
+              if (u.find(v.dimids[1]) == u.end()) {
+                grid_data.levels.emplace_back();
+                grid_data.levels.back().dim = v.dimids[1];
+                u.emplace(grid_data.levels.back().dim);
+                grid_data.levdata.ID.emplace_back();
+                grid_data.levdata.description.emplace_back();
+                grid_data.levdata.units.emplace_back();
+                grid_data.levdata.write.emplace_back(false);
+              }
             }
           }
         }
@@ -3365,11 +3388,21 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
       grid_data.levdata.units.pop_back();
       grid_data.levdata.write.pop_back();
     }
+    while (grid_data.levdata.ID.size() > 0 && grid_data.levdata.ID.back().
+        empty()) {
+      grid_data.levdata.ID.pop_back();
+      grid_data.levdata.description.pop_back();
+      grid_data.levdata.units.pop_back();
+      grid_data.levdata.write.pop_back();
+    }
+    if (grid_data.levels.size() > 0 && grid_data.levdata.ID.size() == 0) {
+      log_error2("unable to determine the level coordinates", F, "nc2xml", USER);
+    }
+    if (gatherxml::verbose_operation) {
+      cout << "... found " << grid_data.levels.size() << " alternate level "
+          "coordinates" << endl;
+    }
     if (grid_data.levels.size() > 0) {
-      if (gatherxml::verbose_operation) {
-        cout << "... found " << grid_data.levels.size() << " level coordinates"
-            << endl;
-      }
       for (size_t n = 0; n < grid_data.levels.size(); ++n) {
         for (const auto& v : vars) {
           if (!v.is_coord && v.dimids.size() == 1 && v.dimids[0] == grid_data.
@@ -3397,10 +3430,6 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
         }
       }
     }
-  }
-  if (grid_data.levels.size() > 0 && grid_data.levdata.ID.size() == 0) {
-    log_error2("unable to determine the level coordinate variable", F,
-        "nc2xml", USER);
   }
   grid_data.levels.emplace_back();
   grid_data.levels.back().dim = MISSING_FLAG;
