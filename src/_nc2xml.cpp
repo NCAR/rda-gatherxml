@@ -98,7 +98,7 @@ struct GridData {
 
   CoordinateData time, time_bounds;
   vector<CoordinateData> lats, lats_b, lons, lons_b, levels;
-  metautils::NcLevel::LevelInfo levdata;
+  vector<metautils::NcLevel::LevelInfo> levdata;
 };
 
 struct NetCDFVariableAttributeData {
@@ -666,7 +666,7 @@ void update_gridded_parameters_in_netcdf_level_entry(const vector<NetCDF::
           }
         }
       }
-      grid_data.levdata.write[z] = true;
+      grid_data.levdata[z].write = true;
     }
   }
 }
@@ -2806,14 +2806,14 @@ else {
                 grid_data.levels.back().dim = v.dimids[0];
                 grid_data.levels.back().id = v.name;
                 grid_data.levels.back().type = v.data_type;
-                grid_data.levdata.ID.emplace_back(v.name + "@@" + units);
-                grid_data.levdata.description.emplace_back();
-                grid_data.levdata.units.emplace_back(units);
-                grid_data.levdata.write.emplace_back(false);
+                grid_data.levdata.emplace_back();
+                grid_data.levdata.back().ID = v.name + "@@" + units;
+                grid_data.levdata.back().units = units;
+                grid_data.levdata.back().write = false;
                 for (const auto& a3 : v.attrs) {
                   if (a3.data_type == NetCDF::DataType::CHAR && a3.name ==
                       "long_name") {
-                    grid_data.levdata.description.back() = *(reinterpret_cast<
+                    grid_data.levdata.back().description = *(reinterpret_cast<
                         string *>(a3.values));
                   }
                 }
@@ -2827,7 +2827,7 @@ else {
   }
 }
 
-bool found_alternate_lat_lon_coordinates(vector<NetCDF::Variable>& vars,
+bool found_auxiliary_lat_lon_coordinates(vector<NetCDF::Variable>& vars,
     GridData& grid_data) {
   for (const auto& v : vars) {
     if (!v.is_coord && v.dimids.size() == 2) {
@@ -3287,19 +3287,19 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
           "coordinate variable", F, "nc2xml", USER);
     } else {
       if (gatherxml::verbose_operation) {
-        cout << "looking for alternate latitude/longitude ..." << endl;
+        cout << "looking for auxiliary latitude/longitude ..." << endl;
       }
-      if (!found_alternate_lat_lon_coordinates(vars, grid_data)) {
+      if (!found_auxiliary_lat_lon_coordinates(vars, grid_data)) {
         cerr << "Terminating - could not find any latitude/longitude "
             "coordinates" << endl;
         exit(1);
       }
       if (gatherxml::verbose_operation) {
-        cout << "... found alternate latitude/longitude" << endl;
+        cout << "... found auxiliary latitude/longitude" << endl;
       }
       for (size_t n = 0; n < grid_data.lats.size(); ++n) {
         if (grid_data.lats[n].dim != grid_data.lons[n].dim) {
-          log_error2("alternate latitude and longitude coordinate variables (" +
+          log_error2("auxiliary latitude and longitude coordinate variables (" +
               itos(n) + ") do not have the same dimensions", F, "nc2xml", USER);
         }
         gdm.emplace_back();
@@ -3332,11 +3332,11 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
       }
     }
   }
-  if (grid_data.levdata.ID.size() == 0) {
+  if (grid_data.levdata.size() == 0) {
 
     // look for level coordinates that are not a coordinate variable
     if (gatherxml::verbose_operation) {
-      cout << "looking for alternate level coordinates ..." << endl;
+      cout << "looking for auxiliary level coordinates ..." << endl;
     }
     unordered_set<size_t> u;
     for (const auto& y : grid_data.lats) {
@@ -3347,10 +3347,8 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
             grid_data.levels.back().dim != MISSING_FLAG)) {
           grid_data.levels.emplace_back();
           grid_data.levels.back().dim = MISSING_FLAG;
-          grid_data.levdata.ID.emplace_back();
-          grid_data.levdata.description.emplace_back();
-          grid_data.levdata.units.emplace_back();
-          grid_data.levdata.write.emplace_back(false);
+          grid_data.levdata.emplace_back();
+          grid_data.levdata.back().write = false;
         }
         for (const auto& v : vars) {
           if (!v.is_coord && v.dimids.size() == 4 && v.dimids[0] == grid_data.
@@ -3368,10 +3366,8 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
                 grid_data.levels.emplace_back();
                 grid_data.levels.back().dim = v.dimids[1];
                 u.emplace(grid_data.levels.back().dim);
-                grid_data.levdata.ID.emplace_back();
-                grid_data.levdata.description.emplace_back();
-                grid_data.levdata.units.emplace_back();
-                grid_data.levdata.write.emplace_back(false);
+                grid_data.levdata.emplace_back();
+                grid_data.levdata.back().write = false;
               }
             }
           }
@@ -3383,23 +3379,17 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
     while (grid_data.levels.size() > 0 && grid_data.levels.back().dim ==
         MISSING_FLAG) {
       grid_data.levels.pop_back();
-      grid_data.levdata.ID.pop_back();
-      grid_data.levdata.description.pop_back();
-      grid_data.levdata.units.pop_back();
-      grid_data.levdata.write.pop_back();
+      grid_data.levdata.pop_back();
     }
-    while (grid_data.levdata.ID.size() > 0 && grid_data.levdata.ID.back().
+    while (grid_data.levdata.size() > 0 && grid_data.levdata.back().ID.
         empty()) {
-      grid_data.levdata.ID.pop_back();
-      grid_data.levdata.description.pop_back();
-      grid_data.levdata.units.pop_back();
-      grid_data.levdata.write.pop_back();
+      grid_data.levdata.pop_back();
     }
-    if (grid_data.levels.size() > 0 && grid_data.levdata.ID.size() == 0) {
+    if (grid_data.levels.size() > 0 && grid_data.levdata.size() == 0) {
       log_error2("unable to determine the level coordinates", F, "nc2xml", USER);
     }
     if (gatherxml::verbose_operation) {
-      cout << "... found " << grid_data.levels.size() << " alternate level "
+      cout << "... found " << grid_data.levels.size() << " auxiliary level "
           "coordinates" << endl;
     }
     if (grid_data.levels.size() > 0) {
@@ -3419,13 +3409,13 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
                 u = *(reinterpret_cast<string *>(a.values));
               }
             }
-            grid_data.levdata.ID[n] = v.name + "@@" + u;
+            grid_data.levdata[n].ID = v.name + "@@" + u;
             if (d.empty()) {
-              grid_data.levdata.description[n] = v.name;
+              grid_data.levdata[n].description = v.name;
             } else {
-              grid_data.levdata.description[n] = d;
+              grid_data.levdata[n].description = d;
             }
-            grid_data.levdata.units[n] = u;
+            grid_data.levdata[n].units = u;
           }
         }
       }
@@ -3435,10 +3425,10 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
   grid_data.levels.back().dim = MISSING_FLAG;
   grid_data.levels.back().id = "sfc";
   grid_data.levels.back().type = NetCDF::DataType::_NULL;
-  grid_data.levdata.ID.emplace_back("sfc");
-  grid_data.levdata.description.emplace_back("Surface");
-  grid_data.levdata.units.emplace_back();
-  grid_data.levdata.write.emplace_back(false);
+  grid_data.levdata.emplace_back();
+  grid_data.levdata.back().ID = "sfc";
+  grid_data.levdata.back().description = "Surface";
+  grid_data.levdata.back().write = false;
   unordered_set<string> parameter_table;
   if (grid_data.lats.size() == 0 || grid_data.lons.size() == 0) {
     log_error2("unable to determined horizontal coordinates", F, "nc2xml",
@@ -3604,7 +3594,7 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
     }
   }
   for (size_t z = 0; z < grid_data.levels.size(); ++z) {
-    auto levid = grid_data.levdata.ID[z].substr(0, grid_data.levdata.ID[z].find(
+    auto levid = grid_data.levdata[z].ID.substr(0, grid_data.levdata[z].ID.find(
         "@@"));
     if (gatherxml::verbose_operation) {
       cout << "Scanning netCDF variables for level '" << levid << "' ..." <<
@@ -3645,7 +3635,7 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
                 parameter_table, scan_data);
             for (size_t n = 0; n < nl; ++n) {
               lentry_p->key = "ds" + metautils::args.dsnum + "," + grid_data.
-                  levdata.ID[z] + ":";
+                  levdata[z].ID + ":";
               switch (grid_data.levels[z].type) {
                 case NetCDF::DataType::INT: {
                   lentry_p->key += itos(lvd[n]);
@@ -3670,7 +3660,7 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
                       grid_data.time.dim, grid_data.levels[z].dim, grid_data.
                       lats[y].dim, grid_data.lons[y].dim, istream);
                 }
-                grid_data.levdata.write[z] = true;
+                grid_data.levdata[z].write = true;
               }
             }
             if (gentry_p->level_table.size() > 0) {
@@ -3681,7 +3671,7 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
             // existing grid - needs update
             for (size_t n = 0; n < nl; ++n) {
               lentry_p->key = "ds" + metautils::args.dsnum + "," + grid_data.
-                  levdata.ID[z] + ":";
+                  levdata[z].ID + ":";
               switch (grid_data.levels[z].type) {
                 case NetCDF::DataType::INT: {
                   lentry_p->key += itos(lvd[n]);
@@ -3712,7 +3702,7 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
                         grid_data.time.dim, grid_data.levels[z].dim, grid_data.
                         lats[y].dim, grid_data.lons[y].dim, istream);
                   }
-                  grid_data.levdata.write[z] = true;
+                  grid_data.levdata[z].write = true;
                 }
               } else {
 
