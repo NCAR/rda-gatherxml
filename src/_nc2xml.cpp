@@ -461,7 +461,7 @@ string gridded_time_method(const NetCDF::Variable& var, string timeid) {
 
 void add_grid_to_inventory(string gentry_key) {
   int idx = gentry_key.rfind("<!>");
-  auto key = substitute(gentry_key.substr(0, idx), "<!>", ", ");
+  auto key = substitute(gentry_key.substr(0, idx), "<!>", ",");
   if (G_map.find(key) == G_map.end()) {
     G_map.emplace(key, make_pair(G_map.size(), ""));
   }
@@ -476,7 +476,7 @@ void add_level_to_inventory(string lentry_key, string gentry_key, size_t
   }
   auto idx = gentry_key.rfind("<!>");
   string s = "|" + itos(U_map[gentry_key.substr(idx + 3)].first) + "|" + itos(
-      G_map[substitute(gentry_key.substr(0, idx), "<!>", ", ")].first) + "|" +
+      G_map[substitute(gentry_key.substr(0, idx), "<!>", ",")].first) + "|" +
       itos(L_map[lentry_key].first);
   auto d = istream.dimensions();
   auto v = istream.variables();
