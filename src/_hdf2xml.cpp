@@ -67,7 +67,7 @@ struct CoordinateVariables {
   std::shared_ptr<metautils::NcTime::TimeData> nc_time;
   std::shared_ptr<metautils::NcTime::TimeData> forecast_period;
   vector<string> lat_ids, lon_ids;
-  metautils::NcLevel::LevelInfo level_info;
+  vector<metautils::NcLevel::LevelInfo> level_info;
 };
 
 struct GridData {
@@ -1681,8 +1681,7 @@ void add_gridded_parameters_to_netcdf_level_entry(InputHDF5Stream& istream,
 
 void update_level_entry(InputHDF5Stream& istream,
     const metautils::NcTime::TimeBounds& time_bounds, const GridData& grid_data,
-    ScanData& scan_data, ParameterData& parameter_data,
-    unsigned char& level_write) {
+    ScanData& scan_data, ParameterData& parameter_data, bool& level_write) {
   static const string THIS_FUNC = this_function_label(__func__);
   auto vars = istream.datasets_with_attribute("DIMENSION_LIST");
   for (const auto& var : vars) {
@@ -1766,7 +1765,7 @@ void update_level_entry(InputHDF5Stream& istream,
           grid_entry_ptr->level_table.replace(*level_entry_ptr);
         }
       }
-      level_write = 1;
+      level_write = true;
       if (inv_P_map.find(parameter_entry_ptr->key) == inv_P_map.end()) {
         inv_P_map.emplace(parameter_entry_ptr->key, inv_P_map.size());
       }
@@ -2709,15 +2708,16 @@ void find_coordinate_variables(InputHDF5Stream& istream,
           }
         } else {
           if (unique_level_id_set.find(var_name) == unique_level_id_set.end()) {
-            coord_vars.level_info.ID.emplace_back(var_name);
+            coord_vars.level_info.emplace_back();
+            coord_vars.level_info.back().ID = var_name;
             attr_it = dset_ptr->attributes.find("long_name");
             if (attr_it != dset_ptr->attributes.end() && attr_it->
                 second._class_ == 3) {
-              coord_vars.level_info.description.emplace_back(
-                  reinterpret_cast<char *>(attr_it->second.array));
+              coord_vars.level_info.back().description = reinterpret_cast<
+                  char *>(attr_it->second.array);
             }
-            coord_vars.level_info.units.emplace_back(units_value);
-            coord_vars.level_info.write.emplace_back(0);
+            coord_vars.level_info.back().units = units_value;
+            coord_vars.level_info.back().write = false;
             unique_level_id_set.emplace(var_name);
           }
         }
@@ -2727,15 +2727,15 @@ void find_coordinate_variables(InputHDF5Stream& istream,
       if (attr_it != dset_ptr->attributes.end() && attr_it->second._class_ ==
           3 && unique_level_id_set.find(var_name) ==
           unique_level_id_set.end()) {
-        coord_vars.level_info.ID.emplace_back(var_name);
+        coord_vars.level_info.back().ID = var_name;
         attr_it = dset_ptr->attributes.find("long_name");
         if (attr_it != dset_ptr->attributes.end() && attr_it->second._class_ ==
             3) {
-          coord_vars.level_info.description.emplace_back(
-              reinterpret_cast<char *>(attr_it->second.array));
+          coord_vars.level_info.back().description = reinterpret_cast<char *>(
+              attr_it->second.array);
         }
-        coord_vars.level_info.units.emplace_back("");
-        coord_vars.level_info.write.emplace_back(0);
+        coord_vars.level_info.back().units = "";
+        coord_vars.level_info.back().write = false;
         unique_level_id_set.emplace(var_name);
       }
     }
@@ -3214,7 +3214,7 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream, ScanData& scan_data) {
         "variables" << endl;
     exit(1);
   }
-  if (coord_vars.level_info.ID.empty()) {
+  if (coord_vars.level_info.empty()) {
     if (gatherxml::verbose_operation) {
       cout << "...looking for vertical level coordinates..." << endl;
     }
@@ -3229,13 +3229,14 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream, ScanData& scan_data) {
       if (attr_it != dset_ptr->attributes.end() && attr_it->
           second.dim_sizes.size() == 1 && attr_it->second.dim_sizes[0] == 1 &&
           attr_it->second._class_ == 9) {
-        coord_vars.level_info.ID.emplace_back(var_name);
+        coord_vars.level_info.emplace_back();
+        coord_vars.level_info.back().ID = var_name;
         if (gatherxml::verbose_operation) {
           cout << "   ...found '" << var_name << "'" << endl;
         }
-        coord_vars.level_info.description.emplace_back("Pressure Level");
-        coord_vars.level_info.units.emplace_back("Pa");
-        coord_vars.level_info.write.emplace_back(0);
+        coord_vars.level_info.back().description = "Pressure Level";
+        coord_vars.level_info.back().units = "Pa";
+        coord_vars.level_info.back().write = false;
         grid_data.coordinate_variables_set.emplace(var_name);
       }
     }
@@ -3247,34 +3248,36 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream, ScanData& scan_data) {
       if (attr_it != dset_ptr->attributes.end() && attr_it->
           second.dim_sizes.size() == 1 && attr_it->second.dim_sizes[0] == 1 &&
           attr_it->second._class_ == 9) {
-        coord_vars.level_info.ID.emplace_back(var_name);
+        coord_vars.level_info.emplace_back();
+        coord_vars.level_info.back().ID = var_name;
         if (gatherxml::verbose_operation) {
           cout << "   ...found '" << var_name << "'" << endl;
         }
         attr_it = dset_ptr->attributes.find("description");
         if (attr_it != dset_ptr->attributes.end() && attr_it->second._class_ ==
             3) {
-          coord_vars.level_info.description.emplace_back(
-              reinterpret_cast<char *>(attr_it->second.array));
+          coord_vars.level_info.back().description = reinterpret_cast<char *>(
+              attr_it->second.array);
         } else {
-          coord_vars.level_info.description.emplace_back("");
+          coord_vars.level_info.back().description = "";
         }
         attr_it = dset_ptr->attributes.find("units");
         if (attr_it != dset_ptr->attributes.end() && attr_it->second._class_ ==
             3) {
-          coord_vars.level_info.units.emplace_back(
-              reinterpret_cast<char *>(attr_it->second.array));
+          coord_vars.level_info.back().units = reinterpret_cast<char *>(
+              attr_it->second.array);
         } else {
-          coord_vars.level_info.units.emplace_back("");
+          coord_vars.level_info.back().units = "";
         }
-        coord_vars.level_info.write.emplace_back(0);
+        coord_vars.level_info.back().write = false;
       }
     }
   }
-  coord_vars.level_info.ID.emplace_back("sfc");
-  coord_vars.level_info.description.emplace_back("Surface");
-  coord_vars.level_info.units.emplace_back("");
-  coord_vars.level_info.write.emplace_back(0);
+  coord_vars.level_info.emplace_back();
+  coord_vars.level_info.back().ID = "sfc";
+  coord_vars.level_info.back().description = "Surface";
+  coord_vars.level_info.back().units = "";
+  coord_vars.level_info.back().write = false;
   if (grid_data.valid_time.id.empty()) {
     cerr << "Terminating - no time coordinate found" << endl;
     exit(1);
@@ -3609,25 +3612,31 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream, ScanData& scan_data) {
             THIS_FUNC, "hdf2xml", USER);
       }
     } else {
-      stringstream ss;
-      grid_data.latitude.ds->attributes["DIMENSION_LIST"].print(ss, istream.
-          reference_table_pointer());
-      auto sp = split(ss.str().substr(1, ss.str().length() - 2));
-      switch (sp.size()) {
-        case 1: {
-          dim.y = grid_data.latitude.data_array.num_values;
-          dim.x = grid_data.longitude.data_array.num_values;
-          break;
-        }
-        case 2: {
-          dim.y = grid_data.latitude.data_array.dimensions[0];
-          dim.x = grid_data.latitude.data_array.dimensions[1];
-          break;
-        }
-        default: {
-          cerr << "Terminating - latitude and longitude coordinates must be "
-              "one- or two-dimensional" << endl;
-          exit(1);
+      auto it = grid_data.latitude.ds->attributes.find("DIMENSION_LIST");
+      if (it == grid_data.latitude.ds->attributes.end()) {
+        dim.y = grid_data.latitude.data_array.num_values;
+        dim.x = grid_data.longitude.data_array.num_values;
+      }
+      else {
+        stringstream ss;
+        it->second.print(ss, istream.reference_table_pointer());
+        auto sp = split(ss.str().substr(1, ss.str().length() - 2));
+        switch (sp.size()) {
+          case 1: {
+            dim.y = grid_data.latitude.data_array.num_values;
+            dim.x = grid_data.longitude.data_array.num_values;
+            break;
+          }
+          case 2: {
+            dim.y = grid_data.latitude.data_array.dimensions[0];
+            dim.x = grid_data.latitude.data_array.dimensions[1];
+            break;
+          }
+          default: {
+            cerr << "Terminating - latitude and longitude coordinates must be "
+                "one- or two-dimensional" << endl;
+            exit(1);
+          }
         }
       }
       def.type = Grid::Type::latitudeLongitude;
@@ -3654,10 +3663,10 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream, ScanData& scan_data) {
       cout << "...grid was identified as type " << static_cast<int>(def.type) <<
           "..." << endl;
     }
-    for (size_t m = 0; m < coord_vars.level_info.ID.size(); ++m) {
-      grid_data.level.id = coord_vars.level_info.ID[m];
+    for (size_t m = 0; m < coord_vars.level_info.size(); ++m) {
+      grid_data.level.id = coord_vars.level_info[m].ID;
       size_t num_levels;
-      if (m == (coord_vars.level_info.ID.size() - 1) && grid_data.level.id ==
+      if (m == (coord_vars.level_info.size() - 1) && grid_data.level.id ==
           "sfc") {
         num_levels = 1;
       } else {
@@ -3747,7 +3756,7 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream, ScanData& scan_data) {
                   }
                 }
                 grid_entry_ptr->level_table.insert(*level_entry_ptr);
-                coord_vars.level_info.write[m] = 1;
+                coord_vars.level_info[m].write = 1;
                 if (inv_stream.is_open()) {
                   update_inventory(inv_U_map[product_key], inv_G_map[grid_key],
                       grid_data);
@@ -3780,13 +3789,13 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream, ScanData& scan_data) {
                     parameter_data);
                 if (!level_entry_ptr->parameter_code_table.empty()) {
                   grid_entry_ptr->level_table.insert(*level_entry_ptr);
-                  coord_vars.level_info.write[m] = 1;
+                  coord_vars.level_info[m].write = 1;
                 }
               } else {
                  update_level_entry(istream, time_bounds, grid_data, scan_data,
-                    parameter_data, coord_vars.level_info.write[m]);
+                    parameter_data, coord_vars.level_info[m].write);
               }
-              if (coord_vars.level_info.write[m] == 1 && inv_stream.is_open()) {
+              if (coord_vars.level_info[m].write == 1 && inv_stream.is_open()) {
                 update_inventory(inv_U_map[product_key], inv_G_map[grid_key],
                     grid_data);
               }
