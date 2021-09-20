@@ -745,7 +745,7 @@ void add_gridded_lat_lon_keys(vector<string>& gentry_keys, Grid::
       k += "<!>" + itos(dim.x) + "<!>" + itos(dim.y) + "<!>" + ftos(def.
           slatitude, 3) + "<!>" + ftos(def.slongitude, 3) + "<!>" + ftos(def.
           llatitude, 3) + "<!>" + ftos(def.olongitude, 3) + "<!>" + ftos(def.dx,
-          3) +" <!>" + ftos(def.dy, 3) + "<!>";
+          3) +"<!>" + ftos(def.dy, 3) + "<!>";
       if (def.projection_flag == 0) {
         k += "N";
       } else {
@@ -772,7 +772,7 @@ void add_gridded_lat_lon_keys(vector<string>& gentry_keys, Grid::
       k += "<!>" + itos(dim.x) + "<!>" + itos(dim.y) + "<!>" + ftos(def.
           slatitude, 3) + "<!>" + ftos(def.slongitude, 3) + "<!>" + ftos(def.
           llatitude, 3) + "<!>" + ftos(def.olongitude, 3) + "<!>" + ftos(def.dx,
-          3) +" <!>" + ftos(def.dy, 3) + "<!>";
+          3) +"<!>" + ftos(def.dy, 3) + "<!>";
       if (def.projection_flag == 0) {
         k += "N";
       } else {
