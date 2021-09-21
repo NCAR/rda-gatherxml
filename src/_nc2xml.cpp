@@ -480,6 +480,12 @@ void add_level_to_inventory(string lentry_key, string gentry_key, size_t
       itos(L_map[lentry_key].first);
   auto d = istream.dimensions();
   auto v = istream.variables();
+  if (latdimid > 100) {
+    latdimid = latdimid / 10000 - 1;
+  }
+  if (londimid > 100) {
+    londimid = (londimid % 10000) / 100 -1;
+  }
   for (size_t n = 0; n < v.size(); ++n) {
     auto key = "ds" + metautils::args.dsnum + ":" + v[n].name;
     if (v[n].dimids.size() > 0 && !v[n].is_coord && v[n].dimids[0] == timedimid
