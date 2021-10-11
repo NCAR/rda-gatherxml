@@ -4075,7 +4075,7 @@ int main(int argc, char **argv) {
           metautils::args.filename + "." + scan_data.cmd_type, oss, ess) < 0) {
         cerr << ess.str() << endl;
       }
-    } else if (metautils::args.dsnum == "999.9" && !xml_directory.empty()) {
+    } else if (metautils::args.dsnum == "test" && !xml_directory.empty()) {
       cout << "Output is in:" << endl;
       cout << "  " << xml_directory << "/" << metautils::args.filename <<
           ".";
