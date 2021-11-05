@@ -110,6 +110,7 @@ void cmd_dates(string database, size_t date_left_padding, vector<CMDDateRange>&
         for (const auto& r : q) {
           v.emplace_back(cmd_date_range(r[0], r[1], r[2], precision));
         }
+/*
         sort(v.begin(), v.end(),
         [](const CMDDateRange& left, const CMDDateRange& right) -> bool {
           if (left.start <= right.start) {
@@ -117,6 +118,7 @@ void cmd_dates(string database, size_t date_left_padding, vector<CMDDateRange>&
           }
           return false;
         });
+*/
         CMDDateRange d;
         d.gindex = "0";
         DateTime sdt(stoll(v[0].start));
@@ -333,7 +335,7 @@ pair<string, string> gridded_frequency_data(string time_range) {
       data.second = "<!>1<!>" + num_years + "-year";
     }
   }
-  return move(data);
+  return data;
 }
 
 unordered_set<string> summarize_frequencies_from_wgrml_by_dataset(MySQL::Server&
@@ -393,7 +395,7 @@ unordered_set<string> summarize_frequencies_from_wgrml_by_dataset(MySQL::Server&
   }
   server._delete("search.time_resolutions", "dsid = '" + metautils::args.dsnum +
       "' and origin = 'WGrML'");
-  return move(sfreq);
+  return sfreq;
 }
 
 unordered_set<string> summarize_frequencies_from_wgrml_by_data_file(MySQL::
@@ -407,7 +409,7 @@ unordered_set<string> summarize_frequencies_from_wgrml_by_data_file(MySQL::
       "sum(min_nsteps), sum(max_nsteps) from WGrML.ds" + ds + "_grids where "
       "webID_code = " + file_id_code + " group by timeRange_code, parameter");
   if (qt.submit(server) < 0) {
-    return move(sfreq);
+    return sfreq;
   }
 
   // create a map of time range codes and their descriptions
@@ -581,7 +583,7 @@ unordered_set<string> summarize_frequencies_from_wgrml_by_data_file(MySQL::
           file_id_code + ", '" + smin + "', 0, ''", F, caller, user);
     }
   }
-  return move(sfreq);
+  return sfreq;
 }
 
 unordered_set<string> summarize_frequencies_from_wgrml(MySQL::Server& server,
@@ -606,7 +608,7 @@ unordered_set<string> summarize_frequencies_from_wobml(MySQL::Server& server,
       "ObML.ds" + substitute(metautils::args.dsnum, ".", "") + "_frequencies "
       "group by unit");
   if (q.submit(server) < 0) {
-    return move(fset);
+    return fset;
   }
   if (file_id_code.empty()) {
     server._delete("search.time_resolutions", "dsid = '" + metautils::args.dsnum
@@ -643,7 +645,7 @@ unordered_set<string> summarize_frequencies_from_wobml(MySQL::Server& server,
       fset.emplace(k);
     }
   }
-  return move(fset);
+  return fset;
 }
 
 void summarize_frequencies(string caller, string user, string file_id_code) {
