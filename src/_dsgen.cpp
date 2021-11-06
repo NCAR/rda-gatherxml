@@ -369,7 +369,7 @@ string text_field_from_element(const XMLElement& e) {
       s.insert(i2, " style=\"margin: 0px; padding: 0px\"");
     }
   }
-  return move(s);
+  return s;
 }
 
 void insert_text_field(ofstream& ofs, const XMLElement& e, string
