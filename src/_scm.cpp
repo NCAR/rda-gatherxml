@@ -334,7 +334,8 @@ delete_temporary_directory();
 myerror = "Terminating - scm no longer works on HPSS files";
 exit(1);
   } else if (regex_search(markup_parameters->filename, regex(
-      "^http(s){0,1}://rda\\.ucar\\.edu"))) {
+      "^http(s){0,1}://rda\\.ucar\\.edu")) || regex_search(markup_parameters->
+      filename, regex("^file://web:"))) {
     initialize_web_file(markup_parameters);
   } else {
     log_error2("invalid uri '" + markup_parameters->filename + "' in xml file",
@@ -602,6 +603,9 @@ void clear_obml_tables(MarkupParameters *markup_parameters) {
 }
 
 void clear_satml_tables(MarkupParameters *markup_parameters) {
+  markup_parameters->server._delete(markup_parameters->database + ".ds" +
+      local_args.dsnum2 + "_products", markup_parameters->file_type + "ID_code "
+      "= " + markup_parameters->file_map[markup_parameters->filename]);
 }
 
 void clear_fixml_tables(MarkupParameters *markup_parameters) {
@@ -1629,7 +1633,7 @@ void process_satml_markup(void *markup_parameters) {
     }
     if (sp->server.insert(sp->database + ".ds" + local_args.dsnum2 +
         "_products", sp->file_map[sp->filename] + ", '" + ptyp + "', " + itos(
-        n)) < 0) {
+        n), "update num_products = value(num_products)") < 0) {
       if (!strutils::contains(sp->server.error(), "Duplicate entry")) {
         log_error2("error: '" + sp->server.error() + "' while inserting into " +
             sp->database + ".ds" + local_args.dsnum2 + "_products", F, "scm",
@@ -2296,16 +2300,6 @@ int main(int argc, char **argv) {
             "for this dataset", F, "scm", USER);
       }
     }
-    if (table_exists(mysrv, "WGrML.ds" + local_args.dsnum2 + "_agrids_cache")) {
-      gatherxml::summarizeMetadata::summarize_grids("WGrML", "scm", USER);
-      targs.emplace_back(vector<string>());
-      targs.back().emplace_back("WGrML");
-      pthread_t t;
-      pthread_create(&t, nullptr, thread_aggregate_grids, &targs.back());
-      tv.emplace_back(t);
-      pthread_create(&t, nullptr, thread_summarize_grid_resolutions, nullptr);
-      tv.emplace_back(t);
-    }
     pthread_t t;
     pthread_create(&t, nullptr, thread_summarize_frequencies, nullptr);
     tv.emplace_back(t);
@@ -2327,6 +2321,9 @@ int main(int argc, char **argv) {
           targs.back().emplace_back("WGrML");
           pthread_t t;
           pthread_create(&t, nullptr, thread_aggregate_grids, &targs.back());
+          tv.emplace_back(t);
+          pthread_create(&t, nullptr, thread_summarize_grid_resolutions,
+              nullptr);
           tv.emplace_back(t);
         }
         if (table_exists(mysrv, "WObML.ds" + local_args.dsnum2 +
