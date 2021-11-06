@@ -477,18 +477,18 @@ int main(int argc, char **argv) {
   }
   if (metautils::args.update_db) {
     if (!metautils::args.update_graphics) {
-      cflg += " -G";
+      cflg = "-G " + cflg;
     }
     if (!metautils::args.regenerate) {
-      cflg += " -R";
+      cflg = "-R " + cflg;
     }
     if (!metautils::args.update_summary) {
-      cflg += " -S";
+      cflg = "-S " + cflg;
     }
     stringstream oss, ess;
     if (mysystem2(metautils::directives.local_root + "/bin/scm -d " +
         metautils::args.dsnum + " " + cflg + " " + metautils::args.filename +
-        ".ObML", oss, ess) < 0) {
+        ".ObML", oss, ess) != 0) {
       log_error2(ess.str(), "main(): running scm", "bufr2xml", USER);
     }
   }
