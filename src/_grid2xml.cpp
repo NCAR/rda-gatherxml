@@ -210,7 +210,7 @@ void scan_file() {
       tfile_name = (tfile->name()).substr(0, idx + 1) + tfile_name;
       stringstream oss, ess;
       if (mysystem2("/bin/ln -s " + tfile->name() + " " + tfile_name, oss, ess)
-          < 0) {
+          != 0) {
         log_error2("unable to sym-link to temporary file - " + ess.str(), F,
             "grid2xml", USER);
       }
@@ -932,8 +932,10 @@ int main(int argc, char **argv) {
       stringstream oss, ess;
       if (mysystem2(metautils::directives.local_root + "/bin/scm -d " +
           metautils::args.dsnum + " " + flags + " " + metautils::args.filename +
-          ".GrML", oss, ess) < 0) {
-        log_error2(ess.str(), "main() running scm", "grid2xml", USER);
+          ".GrML", oss, ess) != 0) {
+        string e = ess.str();
+        trim(e);
+        log_error2(e, "main(): running scm", "grid2xml", USER);
       }
     } else if (metautils::args.dsnum == "test") {
       cout << "Output is in:" << endl;

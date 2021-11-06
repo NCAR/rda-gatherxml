@@ -222,11 +222,11 @@ bool remove_from(std::string database,std::string table_ext,std::string file_fie
       md_file+=file_ext;
       if (!local_args.keep_xml) {
         std::unique_ptr<TempDir> tdir;
+        tdir.reset(new TempDir);
+        if (!tdir->create(metautils::directives.temp_path)) {
+          metautils::log_error("remove_from() could not create a temporary directory","dcm",USER);
+        }
         if (is_version_controlled) {
-          tdir.reset(new TempDir);
-          if (!tdir->create(metautils::directives.temp_path)) {
-            metautils::log_error("remove_from() could not create a temporary directory","dcm",USER);
-          }
           std::stringstream oss,ess;
           if (unixutils::mysystem2("/bin/mkdir -p "+tdir->name()+"/metadata/"+md_directory+"/v",oss,ess) < 0) {
             metautils::log_error("remove_from() could not create the temporary directory tree","dcm",USER);
@@ -262,7 +262,7 @@ bool remove_from(std::string database,std::string table_ext,std::string file_fie
                   metautils::log_error("remove_from() could not get remote file https://rda.ucar.edu/datasets/ds"+metautils::args.dsnum+"/metadata/"+md_directory+"/"+e.attribute_value("ref"),"dcm",USER);
                 }
               }
-              if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+md_directory+"/"+e.attribute_value("ref"),metautils::directives.rdadata_home,error) < 0) {
+              if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+md_directory+"/"+e.attribute_value("ref"),tdir->name(),metautils::directives.rdadata_home,error) < 0) {
                 metautils::log_warning("unable to unsync "+e.attribute_value("ref"),"dcm",USER);
               }
             }
@@ -274,7 +274,7 @@ bool remove_from(std::string database,std::string table_ext,std::string file_fie
                   metautils::log_error("remove_from() could not get remote file https://rda.ucar.edu/datasets/ds"+metautils::args.dsnum+"/metadata/"+md_directory+"/"+e.attribute_value("ref"),"dcm",USER);
                 }
               }
-              if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+md_directory+"/"+e.attribute_value("ref"),metautils::directives.rdadata_home,error) < 0) {
+              if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+md_directory+"/"+e.attribute_value("ref"),tdir->name(),metautils::directives.rdadata_home,error) < 0) {
                 metautils::log_warning("unable to unsync "+e.attribute_value("ref"),"dcm",USER);
               }
             }
@@ -283,21 +283,20 @@ bool remove_from(std::string database,std::string table_ext,std::string file_fie
         }
         if (md_directory == "wfmd") {
           if (unixutils::exists_on_server(metautils::directives.web_server,"/data/web/datasets/ds"+metautils::args.dsnum+"/metadata/inv/"+md_file+"_inv.gz",metautils::directives.rdadata_home)) {
-            if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/inv/"+md_file+"_inv.gz",metautils::directives.rdadata_home,error) < 0) {
+            if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/inv/"+md_file+"_inv.gz",tdir->name(),metautils::directives.rdadata_home,error) < 0) {
               metautils::log_warning("unable to unsync "+md_file+"_inv","dcm",USER);
             }
           }
           else if (unixutils::exists_on_server(metautils::directives.web_server,"/data/web/datasets/ds"+metautils::args.dsnum+"/metadata/inv/"+md_file+"_inv",metautils::directives.rdadata_home)) {
-            if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/inv/"+md_file+"_inv",metautils::directives.rdadata_home,error) < 0) {
+            if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/inv/"+md_file+"_inv",tdir->name(),metautils::directives.rdadata_home,error) < 0) {
               metautils::log_warning("unable to unsync "+md_file+"_inv","dcm",USER);
             }
           }
           if (unixutils::exists_on_server(metautils::directives.web_server,"/data/web/datasets/ds"+metautils::args.dsnum+"/metadata/wms/"+md_file+".gz",metautils::directives.rdadata_home)) {
-            if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/wms/"+md_file+".gz",metautils::directives.rdadata_home,error) < 0) {
+            if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/wms/"+md_file+".gz",tdir->name(),metautils::directives.rdadata_home,error) < 0) {
               metautils::log_warning("unable to unsync wms file "+md_file,"dcm",USER);
             }
           }
-
         }
         if (flag == 1) {
           md_file+=".gz";
@@ -311,7 +310,7 @@ bool remove_from(std::string database,std::string table_ext,std::string file_fie
             }
           }
         }
-        if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+md_directory+"/"+md_file,metautils::directives.rdadata_home,error) < 0) {
+        if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+md_directory+"/"+md_file,tdir->name(),metautils::directives.rdadata_home,error) < 0) {
           metautils::log_warning("unable to unsync "+md_file,"dcm",USER);
         }
       }

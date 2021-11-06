@@ -194,12 +194,12 @@ void rewrite_uri_in_cmd_file(std::string db)
 	if (sp[0] != sp[1]) {
 // remove the old file
 	  if (old_is_gzipped) {
- 	    if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+cmdir+"/"+sp[0]+".GrML.gz",metautils::directives.rdadata_home,error) < 0) {
+ 	    if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+cmdir+"/"+sp[0]+".GrML.gz",tdir.name(),metautils::directives.rdadata_home,error) < 0) {
 		metautils::log_warning("rewrite_uri_in_cmd_file() could not remove "+sp[0]+".GrML - unixutils::rdadata_unsync error(s): '"+error+"'","rcm",USER);
 	    }
 	  }
 	  else {
- 	    if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+cmdir+"/"+sp[0]+".GrML",metautils::directives.rdadata_home,error) < 0) {
+ 	    if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+cmdir+"/"+sp[0]+".GrML",tdir.name(),metautils::directives.rdadata_home,error) < 0) {
 		metautils::log_warning("rewrite_uri_in_cmd_file() could not remove "+sp[0]+".GrML - unixutils::rdadata_unsync error(s): '"+error+"'","rcm",USER);
 	    }
 	  }
@@ -213,7 +213,7 @@ void rewrite_uri_in_cmd_file(std::string db)
 	    ext="";
 	  }
 	  if (!inv_filename.empty() && stat(inv_filename.c_str(),&buf) == 0 && unixutils::mysystem2("/bin/mv "+inv_filename+" "+tdir.name()+"/metadata/inv/"+sp[1]+".GrML_inv"+ext,oss,ess) == 0) {
-	    if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/inv/"+sp[0]+".GrML_inv"+ext,metautils::directives.rdadata_home,error) < 0) {
+	    if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/inv/"+sp[0]+".GrML_inv"+ext,tdir.name(),metautils::directives.rdadata_home,error) < 0) {
 		metautils::log_warning("rewrite_uri_in_cmd_file() could not remove "+sp[0]+".GrML_inv"+ext+" - unixutils::rdadata_unsync error(s): '"+error+"'","rcm",USER);
 	    }
 	  }
@@ -272,7 +272,7 @@ void rewrite_uri_in_cmd_file(std::string db)
 		ifs2.clear();
 		ofs2.close();
 // remove the old ref file
-		if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+cmdir+"/"+ref_file,metautils::directives.rdadata_home,error) < 0) {
+		if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+cmdir+"/"+ref_file,tdir.name(),metautils::directives.rdadata_home,error) < 0) {
 		  metautils::log_warning("rewrite_uri_in_cmd_file() could not remove old reference file '"+ref_file+"'","rcm",USER);
 		}
 		strutils::replace_all(sline,oname,nname);
@@ -291,12 +291,12 @@ void rewrite_uri_in_cmd_file(std::string db)
     if (oname != nname) {
 // remove the old file
  	if (old_is_gzipped) {
- 	  if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+cmdir+"/"+oname+".ObML.gz",metautils::directives.rdadata_home,error) < 0) {
+ 	  if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+cmdir+"/"+oname+".ObML.gz",tdir.name(),metautils::directives.rdadata_home,error) < 0) {
 	    metautils::log_warning("rewrite_uri_in_cmd_file() could not remove "+oname+".ObML - unixutils::rdadata_unsync error(s): '"+error+"'","rcm",USER);
 	  }
 	}
 	else {
- 	  if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+cmdir+"/"+oname+".ObML",metautils::directives.rdadata_home,error) < 0) {
+ 	  if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+cmdir+"/"+oname+".ObML",tdir.name(),metautils::directives.rdadata_home,error) < 0) {
 	    metautils::log_warning("rewrite_uri_in_cmd_file() could not remove "+oname+".ObML - unixutils::rdadata_unsync error(s): '"+error+"'","rcm",USER);
 	  }
 	}
@@ -342,7 +342,7 @@ void rewrite_uri_in_cmd_file(std::string db)
     system(("gzip -f "+tdir.name()+"/metadata/"+cmdir+"/"+nname+".FixML").c_str());
     if (oname != nname) {
 // remove the old file
- 	if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+cmdir+"/"+oname+".FixML",metautils::directives.rdadata_home,error) < 0) {
+ 	if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+cmdir+"/"+oname+".FixML",tdir.name(),metautils::directives.rdadata_home,error) < 0) {
 	  metautils::log_warning("rewrite_uri_in_cmd_file() could not remove "+oname+".FixML - unixutils::rdadata_unsync error(s): '"+error+"'","rcm",USER);
 	}
     }

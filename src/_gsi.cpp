@@ -51,54 +51,20 @@ const string IMG_EXT = ".png";
 
 void write_plot_head(unique_ptr<TempFile>& plot_file, unique_ptr<TempFile>&
     image_file) {
-  plot_file->writeln("load \"$NCARG_ROOT/lib/ncarg/nclscripts/csm/gsn_code."
-      "ncl\"");
-  plot_file->writeln("load \"$NCARG_ROOT/lib/ncarg/nclscripts/csm/gsn_csm."
-      "ncl\"");
-  plot_file->writeln("begin");
-  plot_file->writeln("  wks = gsn_open_wks(\"png\", \"" + image_file->
-      base_name() + "\")");
-  plot_file->writeln("  cmap = (/ (/1., 1., 1./), (/0., 0., 0./), (/0.3294, "
-      "0.4588, 0.3529/), (/0.1529, 0.6667, 0.8960/), (/0.55, 0.55, 0.55/), "
-      "(/.55, .55, .55/), (/1.0, 1.0, 0.8608/) /)");
-  plot_file->writeln("  gsn_define_colormap(wks, cmap)");
-  plot_file->writeln("  minlat   =  -90.");
-  plot_file->writeln("  maxlat   =  90.");
-  plot_file->writeln("  mpres = True");
-  plot_file->writeln("  minlon   = -180.");
-  plot_file->writeln("  mpres@mpCenterLonF = 0.");
-  plot_file->writeln("  maxlon   =  180.");
-  plot_file->writeln("  mpres@gsnFrame = False");
-  plot_file->writeln("  mpres@gsnMaximize = True");
-  plot_file->writeln("  mpres@mpProjection = \"CylindricalEquidistant\"");
-  plot_file->writeln("  mpres@mpLimitMode = \"LatLon\"");
-  plot_file->writeln("  mpres@mpOutlineOn = True");
-  plot_file->writeln("  mpres@mpOutlineBoundarySets = \"National\"");
-  plot_file->writeln("  mpres@mpNationalLineColor = 4");
-  plot_file->writeln("  mpres@mpGeophysicalLineColor = 2");
-  plot_file->writeln("  mpres@mpGeophysicalLineThicknessF = 0.");
-  plot_file->writeln("  mpres@mpMinLatF   = minlat");
-  plot_file->writeln("  mpres@mpMaxLatF   = maxlat");
-  plot_file->writeln("  mpres@mpMinLonF   = minlon");
-  plot_file->writeln("  mpres@mpMaxLonF   = maxlon");
-  plot_file->writeln("  mpres@mpFillColors = (/0, 3, 2, 3/)");
-  plot_file->writeln("  mpres@mpPerimOn = False");
-  plot_file->writeln("  mpres@mpLabelsOn = False");
-  plot_file->writeln("  mpres@mpGridAndLimbOn = True");
-  plot_file->writeln("  mpres@mpGridMaskMode = \"MaskNotOcean\"");
-  plot_file->writeln("  mpres@mpGridLineColor = 2");
-  plot_file->writeln("  mpres@mpGridSpacingF = 30.");
-  plot_file->writeln("  mpres@tmBorderLineColor = 0");
-  plot_file->writeln("  mpres@tmXBOn = False");
-  plot_file->writeln("  mpres@tmXTOn = False");
-  plot_file->writeln("  mpres@tmYLOn = False");
-  plot_file->writeln("  mpres@tmYROn = False");
-  plot_file->writeln("  map = gsn_csm_map(wks, mpres)");
-  plot_file->writeln("  mres = True");
-  plot_file->writeln("  mres@gsMarkerIndex = 6");
-  plot_file->writeln("  mres@gsMarkerSizeF = 0.002634");
-  plot_file->writeln("  mres@gsMarkerThicknessF = 13.");
-  plot_file->writeln("  mres@gsMarkerColor = 6");
+  plot_file->writeln("import cartopy.crs as ccrs");
+  plot_file->writeln("import cartopy.feature as cfeature");
+  plot_file->writeln("import matplotlib.pyplot as plt");
+  plot_file->writeln("import matplotlib.ticker as mticker");
+  plot_file->writeln("ax = plt.axes(projection=ccrs.PlateCarree())");
+  plot_file->writeln("ax.set_extent([-180, 180, -90, 90], ccrs.PlateCarree())");
+  plot_file->writeln("ax.add_feature(cfeature.LAND, color='#54755a')");
+  plot_file->writeln("ax.add_feature(cfeature.OCEAN, color='#27aae4')");
+  plot_file->writeln("gl = ax.gridlines(crs=ccrs.PlateCarree(), color="
+      "'#54755a')");
+  plot_file->writeln("gl.ylocator = mticker.FixedLocator([-90, -60, -30, 0, "
+      "30, 60, 90])");
+  plot_file->writeln("gl.xlocator = mticker.FixedLocator([-180, -150, -120, "
+      "-90, -60, -30, 0, 30, 60, 90, 120, 150, 180])");
 }
 
 void *thread_plot(void *tnc) {
@@ -109,6 +75,8 @@ void *thread_plot(void *tnc) {
   if (t->query.submit(srv) < 0) {
     log_error2(t->query.error(), F, "gsi", USER);
   }
+
+  // set up a 3-degree by 3-degree bitmap
   char wrotemap[60][121];
   for (size_t n = 0; n < 60; ++n) {
     for (size_t m = 0; m < 121; ++m) {
@@ -120,35 +88,39 @@ void *thread_plot(void *tnc) {
   auto img_p = unique_ptr<TempFile>(new TempFile(metautils::directives.
       temp_path, IMG_EXT));
   write_plot_head(plt_p, img_p);
-  plt_p->writeln("  p = new((/500000, 2/), \"float\", -999)");
-  auto cnt = 0;
+  stringstream xss, yss;
+  xss.setf(std::ios::fixed);
+  xss.precision(1);
+  yss.setf(std::ios::fixed);
+  yss.precision(1);
   for (const auto& row : t->query) {
     auto y = stoi(row[0]);
     y = (y - 1) / 3;
     if (wrotemap[y][120] < 120) {
       for (size_t x = 0; x < row[1].length(); ++x) {
         if (row[1][x] != '0' && wrotemap[y][x] == 0) {
-          plt_p->writeln("  p(" + itos(cnt) + ", 0) = " + ftos(-178.5 + x * 3,
-              1));
-          plt_p->writeln("  p(" + itos(cnt) + ", 1) = " + ftos(-88.5 + y * 3,
-              1));
+          if (!xss.str().empty()) {
+            xss << ", ";
+            yss << ", ";
+          }
+          xss << -178.5 + x * 3;
+          yss << -88.5 + y * 3;
           if (wrotemap[y][x] == 0) {
             ++wrotemap[y][120];
           }
           wrotemap[y][x] = 1;
           g_bitmap[y][x] = 1;
           g_bitmap[y][120] = 1;
-          ++cnt;
         }
       }
     }
   }
   srv.disconnect();
-  plt_p->writeln("  do i = 0, " + itos(cnt - 1));
-  plt_p->writeln("    gsn_polymarker(wks, map, p(i, 0), p(i, 1), mres)");
-  plt_p->writeln("  end do");
-  plt_p->writeln("  frame(wks)");
-  plt_p->writeln("end");
+  plt_p->writeln("lons = [" + xss.str() + "]");
+  plt_p->writeln("lats = [" + yss.str() + "]");
+  plt_p->writeln("plt.plot(lons, lats, marker='.', color='#ffffdc', linewidth="
+      "0)");
+  plt_p->writeln("plt.savefig('" + img_p->name() + "')");
   plt_p->close();
   auto tdir = unique_ptr<TempDir>(new TempDir);
   if (!tdir->create(metautils::directives.temp_path)) {
@@ -159,18 +131,11 @@ void *thread_plot(void *tnc) {
       args.dsnum + "/metadata", oss, ess) < 0) {
     log_error2("can't create directory tree", F, "gsi", USER);
   }
-  if (regex_search(unixutils::host_name(), regex("^(cheyenne|casper)"))) {
-    mysystem2("/bin/tcsh -c \"module delete intel; module load gnu ncl; ncl " +
-        plt_p->name() + "; convert -trim  + repage -resize 360x180 " + img_p->
-        name() + " " + tdir->name() + "/datasets/ds" + metautils::args.dsnum +
-        "/metadata/spatial_coverage." + t->imagetag + ".gif\"", oss, ess);
-  } else {
-    mysystem2("/bin/tcsh -c \"setenv NCARG_NCARG /usr/share/ncarg; "
-        "/usr/bin/ncl " + plt_p->name() + "; convert -trim  + repage -resize "
-        "360x180 " + img_p->name() + " " + tdir->name() + "/datasets/ds" +
-        metautils::args.dsnum + "/metadata/spatial_coverage." + t->imagetag +
-        ".gif\"", oss, ess);
-  }
+  mysystem2("/bin/tcsh -c \"conda run -p /glade/u/home/rdadata/conda-envs/"
+      "rdaviz python " + plt_p->name() + "; convert -trim +repage -resize "
+      "360x180 " + img_p->name() + " " + tdir->name() + "/datasets/ds" +
+      metautils::args.dsnum + "/metadata/spatial_coverage." + t->imagetag +
+      ".gif\"", oss, ess);
   string e;
   if (unixutils::rdadata_sync(tdir->name(), "datasets/ds" + metautils::args.
       dsnum + "/metadata/", "/data/web", metautils::directives.rdadata_home, e)
@@ -242,46 +207,44 @@ void generate_graphics(MySQL::LocalQuery& query, string type, string table,
   auto img_p = unique_ptr<TempFile>(new TempFile(metautils::directives.
       temp_path, IMG_EXT));
   write_plot_head(plt_p, img_p);
-  plt_p->writeln("  p = new((/500000, 2/), \"float\", -999)");
-  auto cnt = 0;
+  stringstream xss, yss;
+  xss.setf(std::ios::fixed);
+  xss.precision(1);
+  yss.setf(std::ios::fixed);
+  yss.precision(1);
   for (size_t n = 0; n < 60; ++n) {
     if (g_bitmap[n][120] == 1) {
       for (size_t m = 0; m < 120; ++m) {
         if (g_bitmap[n][m] == 1) {
-          plt_p->writeln("  p(" + itos(cnt) + ", 0) = " + ftos(-178.5 + m * 3,
-              1));
-          plt_p->writeln("  p(" + itos(cnt) + ", 1) = " + ftos(-88.5 + n * 3,
-              1));
-          ++cnt;
+          if (!xss.str().empty()) {
+            xss << ", ";
+            yss << ", ";
+          }
+          xss << -178.5 + m * 3;
+          yss << -88.5 + n * 3;
         }
       }
     }
   }
-  plt_p->writeln("  do i = 0, " + itos(cnt - 1));
-  plt_p->writeln("    gsn_polymarker(wks, map, p(i, 0), p(i, 1), mres)");
-  plt_p->writeln("  end do");
-  plt_p->writeln("  frame(wks)");
-  plt_p->writeln("end");
+  plt_p->writeln("lons = [" + xss.str() + "]");
+  plt_p->writeln("lats = [" + yss.str() + "]");
+  plt_p->writeln("plt.plot(lons, lats, marker='.', color='#ffffdc', linewidth="
+      "0)");
+  plt_p->writeln("plt.savefig('" + img_p->name() + "')");
   plt_p->close();
   auto tdir = unique_ptr<TempDir>(new TempDir);
   if (!tdir->create(metautils::directives.temp_path)) {
     log_error2("can't create temporary directory", F, "gsi", USER);
   }
   stringstream oss, ess;
-  if (mysystem2("/bin/mkdir -p " + tdir->name() + "/datasets/ds" + metautils::args.dsnum + "/metadata", oss, ess) < 0) {
+  if (mysystem2("/bin/mkdir -p " + tdir->name() + "/datasets/ds" + metautils::
+      args.dsnum + "/metadata", oss, ess) < 0) {
     log_error2("can't create directory tree", F, "gsi", USER);
   }
-  if (regex_search(unixutils::host_name(), regex("^(cheyenne|casper)"))) {
-    mysystem2("/bin/tcsh -c \"module delete intel; module load gnu ncl; ncl " +
-        plt_p->name() + "; convert -trim  + repage -resize 360x180 " + img_p->
-        name() + " " + tdir->name() + "/datasets/ds" + metautils::args.dsnum +
-        "/metadata/spatial_coverage.gif\"", oss, ess);
-  } else {
-    mysystem2("/bin/tcsh -c \"setenv NCARG_NCARG /usr/share/ncarg; "
-        "/usr/bin/ncl " + plt_p->name() + "; convert -trim  + repage -resize "
-        "360x180 " + img_p->name() + " " + tdir->name() + "/datasets/ds" +
-        metautils::args.dsnum + "/metadata/spatial_coverage.gif\"", oss, ess);
-  }
+  mysystem2("/bin/tcsh -c \"conda run -p /glade/u/home/rdadata/conda-envs/"
+      "rdaviz python " + plt_p->name() + "; convert -trim +repage -resize "
+      "360x180 " + img_p->name() + " " + tdir->name() + "/datasets/ds" +
+      metautils::args.dsnum + "/metadata/spatial_coverage.gif\"", oss, ess);
   string e;
   if (unixutils::rdadata_sync(tdir->name(),"datasets/ds" + metautils::args.
       dsnum + "/metadata/", "/data/web", metautils::directives.rdadata_home, e)
@@ -326,11 +289,11 @@ int main(int argc, char **argv) {
       query.set("select distinct l.observationType_code, l.platformType_code, "
           "o.obsType, pf.platformType, p.format_code, f.format from WObML.ds" +
           dsnum2 + "_webfiles2 as p left join WObML.ds" + dsnum2 +
-          "_dataTypes2 as d on d.webID_code = p.code left join WObML.ds" + dsnum2
-          + "_dataTypesList as l on l.code = d.dataType_code left join "
+          "_dataTypes2 as d on d.webID_code = p.code left join WObML.ds" +
+          dsnum2 + "_dataTypesList as l on l.code = d.dataType_code left join "
           "WObML.obsTypes as o on l.observationType_code = o.code left join "
-          "WObML.platformTypes as pf on l.platformType_code = pf.code left join "
-          "WObML.formats as f on f.code = p.format_code");
+          "WObML.platformTypes as pf on l.platformType_code = pf.code left "
+          "join WObML.formats as f on f.code = p.format_code");
       table = "search.obs_data";
     } else {
       query.set("select distinct l.observationType_code, l.platformType_code, "
@@ -339,9 +302,9 @@ int main(int argc, char **argv) {
           "= p.webID left join WObML.ds" + dsnum2 + "_dataTypes2 as d on d."
           "webID_code = p.code left join WObML.ds" + dsnum2 + "_dataTypesList "
           "as l on l.code = d.dataType_code left join WObML.obsTypes as o on l."
-          "observationType_code = o.code left join WObML.platformTypes as pf on "
-          "l.platformType_code = pf.code left join WObML.formats as f on f.code "
-          "= p.format_code where x.gindex = " + gindex);
+          "observationType_code = o.code left join WObML.platformTypes as pf "
+          "on l.platformType_code = pf.code left join WObML.formats as f on f."
+          "code = p.format_code where x.gindex = " + gindex);
       table = "WObML.ds" + dsnum2 + "_locations";
     }
     generate_graphics(query, "obs", table, gindex);
@@ -350,9 +313,10 @@ int main(int argc, char **argv) {
     if (gindex.empty()) {
       query.set("select distinct d.classification_code, c.classification, p."
           "format_code, f.format from WFixML.ds" + dsnum2 + "_webfiles2 as p "
-          "left join WFixML.ds" + dsnum2 + "_locations as d on d.webID_code = p."
-          "code left join WFixML.classifications as c on d.classification_code "
-          "= c.code left join WFixML.formats as f on f.format = p.format_code");
+          "left join WFixML.ds" + dsnum2 + "_locations as d on d.webID_code = "
+          "p.code left join WFixML.classifications as c on d."
+          "classification_code = c.code left join WFixML.formats as f on f."
+          "format = p.format_code");
       table = "search.fix_data";
     } else {
       query.set("select distinct d.classification_code, c.classification, p."

@@ -24,7 +24,6 @@ using std::cerr;
 using std::cout;
 using std::endl;
 using std::list;
-using std::move;
 using std::regex;
 using std::regex_search;
 using std::shared_ptr;
@@ -167,7 +166,7 @@ string grid_definition_parameters(const XMLElement& e) {
         ":" + e.attribute_value("yRes") + ":" + e.attribute_value(
         "stdParallel1") + ":" + e.attribute_value("stdParallel2");
   }
-  return move(s);
+  return s;
 }
 
 void build_wms_capabilities() {
@@ -177,7 +176,9 @@ void build_wms_capabilities() {
   auto f = unixutils::remote_web_file(res + ".gz", temp_dir.name());
   struct stat buf;
   if (stat(f.c_str(), &buf) == 0) {
-    system(("gunzip " + f).c_str());
+    if (system(("gunzip " + f).c_str()) != 0) {
+      log_error2("uncompress of '" + f + "' failed", F, "iinv", USER);
+    }
     chop(f, 3);
   }
   XMLDocument xdoc;
@@ -876,8 +877,9 @@ void insert_grml_inventory() {
   }
 //  server.issueCommand("unlock tables", error);
   if (server.insert("IGrML.ds" + local_args.dsnum2 + "_inventory_summary",
-      "webID_code, byte_length, dup", wic + ", " + lltos(tbyts) + ", '" + dup +
-      "'", "update byte_length = " + lltos(tbyts) + ", dupe_vdates = '" + dup +       "'") < 0) {
+      "webID_code, byte_length, dupe_vdates", wic + ", " + lltos(tbyts) + ", '"
+      + dup + "'", "update byte_length = " + lltos(tbyts) + ", dupe_vdates = '"
+      + dup +       "'") < 0) {
     if (!regex_search(server.error(),regex("Duplicate entry"))) {
       log_error2("insert_grml_inventory() returned error: " + server.error() +
           " while inserting row '" + wic + ", " + lltos(tbyts) +
@@ -1735,7 +1737,9 @@ void insert_obml_inventory() {
       metautils::args.dsnum + "/metadata/inv/" + metautils::args.filename +
       ".gz", temp_dir.name());
   if (stat(fil.c_str(), &buf) == 0) {
-    system(("gunzip " + fil).c_str());
+    if (system(("gunzip " + fil).c_str()) != 0) {
+      log_error2("uncompress of '" + fil + "' failed", F, "iinv", USER);
+    }
     chop(fil, 3);
   } else {
     fil = unixutils::remote_web_file("https://rda.ucar.edu/datasets/ds" +
@@ -1795,19 +1799,21 @@ void insert_inventory() {
 
 int main(int argc, char **argv) {
   if (argc < 4) {
-    cerr << "usage: iinv -d [ds]nnn.n [options...] -f file" << endl;
-    cerr << "\nrequired:" << endl;
-    cerr << "-d nnn.n   specifies the dataset number" << endl;
-    cerr << "-f file    summarize information for inventory file <file>" <<
+    cout << "usage: iinv -d [ds]nnn.n [options...] -f file" << endl;
+    cout << "\nrequired:" << endl;
+    cout << "  -d [ds]nnn.n   specifies the dataset number, optionally "
+        "prepended with \"ds\"" << endl;
+    cout << "  -f file        summarize information for inventory file <file>"
+        << endl;
+    cout << "\noptions:" << endl;
+    cout << "  -c/-C        create (default)/don't create file list cache" <<
         endl;
-    cerr << "\noptions:" << endl;
-    cerr << "-c/-C       create (default)/don't create file list cache" << endl;
-    cerr << "-N          notify with a message when " << argv[0] <<
+    cout << "  -N           notify with a message when " << argv[0] <<
         " completes" << endl;
-    cerr << "-V          verbose mode" << endl;
-    cerr << "--wms-only  only generate the WMS capabilities document for the "
-        "file" << endl;
-    exit(1);
+    cout << "  -V           verbose mode" << endl;
+    cout << "  --wms-only   only generate the WMS capabilities document for "
+        "the file" << endl;
+    exit(0);
   }
   auto t1 = time(nullptr);
   signal(SIGSEGV, segv_handler);
