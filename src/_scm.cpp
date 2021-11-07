@@ -336,6 +336,7 @@ exit(1);
   } else if (regex_search(markup_parameters->filename, regex(
       "^http(s){0,1}://rda\\.ucar\\.edu")) || regex_search(markup_parameters->
       filename, regex("^file://web:"))) {
+    replace_all(markup_parameters->filename, "file://web:", "");
     initialize_web_file(markup_parameters);
   } else {
     log_error2("invalid uri '" + markup_parameters->filename + "' in xml file",
