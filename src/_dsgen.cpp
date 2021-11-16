@@ -1750,16 +1750,16 @@ void generate_description(string type, string tdir_name) {
 }
 
 void show_usage() {
-  cout << "usage: dsgen nnn.n" << endl;
-  cout << "\noptions:" << endl;
-  cout << "  --no-dset-waf  don't add the dataset to the queue for the DSET WAF"
+  cerr << "usage: dsgen nnn.n" << endl;
+  cerr << "\noptions:" << endl;
+  cerr << "  --no-dset-waf  don't add the dataset to the queue for the DSET WAF"
       << endl;
 }
 
 int main(int argc, char **argv) {
   if (argc != 2 && argc != 3) {
     show_usage();
-    exit(0);
+    exit(1);
   }
   const string F = this_function_label(__func__);
   auto next = 1;
