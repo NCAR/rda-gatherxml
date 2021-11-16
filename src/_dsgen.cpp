@@ -22,6 +22,7 @@
 
 using metautils::log_error2;
 using miscutils::this_function_label;
+using std::cerr;
 using std::cout;
 using std::endl;
 using std::get;
