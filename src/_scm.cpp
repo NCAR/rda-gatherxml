@@ -2099,60 +2099,60 @@ extern "C" void segv_handler(int) {
 }
 
 void show_usage() {
-  cout << "usage: (1) scm -d [ds]<nnn.n> { -rw | -ri } [ <tindex> | all ]" <<
+  cerr << "usage: (1) scm -d [ds]<nnn.n> { -rw | -ri } [ <tindex> | all ]" <<
       endl;
-  cout << "   or: (2) scm -d [ds]<nnn.n> -wa [ <type> ]" << endl;
-  cout << "   or: (3) scm -d [ds]<nnn.n> [-t <tdir> ] -wf FILE" << endl;
-  cout << "summarize content metadata - generally, specialists will use (1) or "
+  cerr << "   or: (2) scm -d [ds]<nnn.n> -wa [ <type> ]" << endl;
+  cerr << "   or: (3) scm -d [ds]<nnn.n> [-t <tdir> ] -wf FILE" << endl;
+  cerr << "summarize content metadata - generally, specialists will use (1) or "
       "(2) and" << endl;
-  cout << "  other gatherxml utilities will use (3)." << endl;
-  cout << "\nrequired:" << endl;
-  cout << "  -d <nnn.n>   (1), (2), (3): the dataset number, optionally "
+  cerr << "  other gatherxml utilities will use (3)." << endl;
+  cerr << "\nrequired:" << endl;
+  cerr << "  -d <nnn.n>   (1), (2), (3): the dataset number, optionally "
       "prepended with \"ds\"" << endl;
-  cout << "  -rw | -ri    (1): refresh the web or detailed inventory database. "
+  cerr << "  -rw | -ri    (1): refresh the web or detailed inventory database. "
       "If a dataset" << endl;
-  cout << "                 has groups, optionally include the top-level index "
+  cerr << "                 has groups, optionally include the top-level index "
       "to summarize" << endl;
-  cout << "                 that specific group, or optionally include the "
+  cerr << "                 that specific group, or optionally include the "
       "keyword \"all\" to" << endl;
-  cout << "                 summarize all groups." << endl;
-  cout << "  -wa          (2): summarize every Web metadata file for the "
+  cerr << "                 summarize all groups." << endl;
+  cerr << "  -wa          (2): summarize every Web metadata file for the "
       "dataset. This can" << endl;
-  cout << "                 be restricted to an optional markup type (e.g. "
+  cerr << "                 be restricted to an optional markup type (e.g. "
       "\"GrML\", \"ObML\"," << endl;
-  cout << "                 etc.)." << endl;
-  cout << "  -wf          (3): summarize the markup for a Web file" << endl;
-  cout << "  FILE         (3): the relative path for the markup file being "
+  cerr << "                 etc.)." << endl;
+  cerr << "  -wf          (3): summarize the markup for a Web file" << endl;
+  cerr << "  FILE         (3): the relative path for the markup file being "
       "summarized" << endl;
-  cout << "\noptions:" << endl;
-  cout << "  -g/-G      generate (default)/don't generate graphics" << endl;
-  cout << "  -k/-K      generate (default)/don't generate KML for observations"
+  cerr << "\noptions:" << endl;
+  cerr << "  -g/-G      generate (default)/don't generate graphics" << endl;
+  cerr << "  -k/-K      generate (default)/don't generate KML for observations"
       << endl;
-  cout << "  -N         notify with a message when scm completes" << endl;
+  cerr << "  -N         notify with a message when scm completes" << endl;
   if (USER == "dattore") {
-    cout << "  -F         refresh only - use this flag only when the data file "        "is unchanged" << endl;
-    cout << "               but additional fields/tables have been added to "
+    cerr << "  -F         refresh only - use this flag only when the data file "        "is unchanged" << endl;
+    cerr << "               but additional fields/tables have been added to "
         "the database that" << endl;
-    cout << "               need to be populated" << endl;
-    cout << "  -r/-R      regenerate (default)/don't regenerate dataset web "
+    cerr << "               need to be populated" << endl;
+    cerr << "  -r/-R      regenerate (default)/don't regenerate dataset web "
         "page" << endl;
-    cout << "  -s/-S      summarize (default)/don't summarize date and time "
+    cerr << "  -s/-S      summarize (default)/don't summarize date and time "
         "resolutions" << endl;
   }
-  cout << "  -t <tdir>  (3): the name of the temporary directory where FILE is "
+  cerr << "  -t <tdir>  (3): the name of the temporary directory where FILE is "
       "located." << endl;
-  cout << "               Otherwise, the default location is" << endl;
-  cout << "               /data/web/datasets/dsnnn.n/metadata/wfmd on the "
+  cerr << "               Otherwise, the default location is" << endl;
+  cerr << "               /data/web/datasets/dsnnn.n/metadata/wfmd on the "
       "production web" << endl;
-  cout << "               server." << endl;
-  cout << "  -V         verbose mode" << endl;
+  cerr << "               server." << endl;
+  cerr << "  -V         verbose mode" << endl;
 }
 
 int main(int argc, char **argv) {
   static const string F = this_function_label(__func__);
   if (argc < 3) {
     show_usage();
-    exit(0);
+    exit(1);
   }
 
   // set exit handlers
