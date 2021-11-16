@@ -5712,12 +5712,12 @@ void show_usage() {
   cerr << "                 - MSS paths must begin with \"/FS/DECS\"" << endl;
   cerr << "                 - URLs must begin with \"https://rda.ucar.edu\""
       << endl;
-  exit(1);
 }
 
 int main(int argc, char **argv) {
   if (argc < 4) {
     show_usage();
+    exit(1);
   }
   signal(SIGSEGV, segv_handler);
   signal(SIGINT, int_handler);
