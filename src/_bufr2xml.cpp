@@ -417,21 +417,21 @@ void scan_file(BUFRReport& bufr_report, gatherxml::markup::ObML::
 }
 
 void show_usage() {
-  cout << "usage: bufr2xml -f format -d [ds]nnn.n [options...] https://"
+  cerr << "usage: bufr2xml -f format -d [ds]nnn.n [options...] https://"
       "rda.ucar.edu/..." << endl;
-  cout << "\nrequired (choose one):" << endl;
-  cout << "-f ecmwfbufr     ECMWF BUFR" << endl;
-  cout << "-f adpbufr       NCEP ADP BUFR" << endl;
-  cout << "-f prepbufr      NCEP PREPBUFR" << endl;
-  cout << "-f radbufr       NCEP Radiance BUFR" << endl;
-  cout << "\nrequired:" << endl;
-  cout << "-d <nnn.n>       nnn.n is the dataset number to which the data file "
+  cerr << "\nrequired (choose one):" << endl;
+  cerr << "-f ecmwfbufr     ECMWF BUFR" << endl;
+  cerr << "-f adpbufr       NCEP ADP BUFR" << endl;
+  cerr << "-f prepbufr      NCEP PREPBUFR" << endl;
+  cerr << "-f radbufr       NCEP Radiance BUFR" << endl;
+  cerr << "\nrequired:" << endl;
+  cerr << "-d <nnn.n>       nnn.n is the dataset number to which the data file "
       "belongs" << endl;
-  cout << "\noptions:" << endl;
+  cerr << "\noptions:" << endl;
   if (USER == "dattore") {
-    cout << "-g/-G            do/don't generate graphics (default is -g)" <<
+    cerr << "-g/-G            do/don't generate graphics (default is -g)" <<
         endl;
-    cout << "-u/-U            do/don't update the database (default is -u)" <<
+    cerr << "-u/-U            do/don't update the database (default is -u)" <<
         endl;
   }
 }
@@ -439,7 +439,7 @@ void show_usage() {
 int main(int argc, char **argv) {
   if (argc < 6) {
     show_usage();
-    exit(0);
+    exit(1);
   }
   signal(SIGSEGV, segv_handler);
   signal(SIGINT, int_handler);
