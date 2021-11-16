@@ -274,19 +274,19 @@ int main(int argc, char **argv) {
       log_error2("unable to find singularity", "main()", util, u);
     }
     unordered_map<string, string> umap{
-        { "bufr2xml", "gatherxml-exec-ubuntu" },
-        { "dsgen", "gatherxml-exec-ubuntu" },
-        { "grid2xml", "gatherxml-exec-ubuntu" },
-        { "nc2xml", "gatherxml-exec-ubuntu" },
-        { "iinv", "gatherxml-exec-ubuntu" },
-        { "scm", "gatherxml-exec-ubuntu" },
+        { "bufr2xml", "gatherxml-exec" },
+        { "dsgen", "gatherxml-exec" },
+        { "grid2xml", "gatherxml-exec" },
+        { "nc2xml", "gatherxml-exec" },
+        { "iinv", "gatherxml-exec" },
+        { "scm", "gatherxml-exec" },
     };
     auto it = umap.find(util);
     if (it == umap.end()) {
       log_error2("no sif map entry for utility '" + util + "'", "main()", util,
           u);
     }
-    unordered_map<string, string> bmap{ { "gatherxml-exec-ubuntu",
+    unordered_map<string, string> bmap{ { "gatherxml-exec",
         "/glade/u/home/dattore/conf,/glade/scratch/rdadata,/glade/u/home/"
         "rdadata,/glade/collections/rda/data,/gpfs/fs1/collections/rda/work/"
         "logs/md" } };
