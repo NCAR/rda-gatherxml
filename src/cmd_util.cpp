@@ -273,28 +273,9 @@ int main(int argc, char **argv) {
     if (s.empty()) {
       log_error2("unable to find singularity", "main()", util, u);
     }
-    unordered_map<string, string> umap{
-        { "bufr2xml", "gatherxml-exec" },
-        { "dsgen", "gatherxml-exec" },
-        { "grid2xml", "gatherxml-exec" },
-        { "nc2xml", "gatherxml-exec" },
-        { "iinv", "gatherxml-exec" },
-        { "scm", "gatherxml-exec" },
-    };
-    auto it = umap.find(util);
-    if (it == umap.end()) {
-      log_error2("no sif map entry for utility '" + util + "'", "main()", util,
-          u);
-    }
-    unordered_map<string, string> bmap{ { "gatherxml-exec",
-        "/glade/u/home/dattore/conf,/glade/scratch/rdadata,/glade/u/home/"
-        "rdadata,/glade/collections/rda/data,/gpfs/fs1/collections/rda/work/"
-        "logs/md" } };
-    auto it2 = bmap.find(it->second);
-    if (it2 == bmap.end()) {
-      log_error2("no bind map entry for this utility", "main()", util, u);
-    }
-    auto b = it2->second;
+    string b = "/glade/u/home/dattore/conf,/glade/scratch/rdadata,/glade/u/"
+        "home/rdadata,/glade/collections/rda/data,/gpfs/fs1/collections/rda/"
+        "work/logs/md";
     auto sp = split(metautils::args.args_string, "!");
     if (sp.size() > 0 && sp.back()[0] == '/') {
 
@@ -302,8 +283,8 @@ int main(int argc, char **argv) {
       auto idx = sp.back().rfind("/");
       b += "," + sp.back().substr(0, idx);
     }
-    cmd = s + " -s exec -B " + b + " /glade/u/home/rdadata/bin/singularity/" +
-        it->second + ".sif /usr/local/bin/_" + util;
+    cmd = s + " -s exec -B " + b + " /glade/u/home/rdadata/bin/singularity/"
+        "gatherxml-exec.sif /usr/local/bin/_" + util;
   } else {
     cmd = metautils::directives.decs_bindir + "/_" + util;
   }
