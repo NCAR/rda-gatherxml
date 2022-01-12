@@ -263,6 +263,7 @@ int main(int argc, char **argv) {
     return 1;
   }
   setreuid(15968, 15968);
+  setenv("HOME", "/glade/u/home/rdadata", 1);
   string cmd;
   if (regex_search(util, regex("_s$"))) {
     chop(util, 2);
