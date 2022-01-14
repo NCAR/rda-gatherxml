@@ -29,6 +29,7 @@ using std::move;
 using std::pair;
 using std::regex;
 using std::regex_search;
+using std::shared_ptr;
 using std::sort;
 using std::stoi;
 using std::string;
@@ -48,8 +49,8 @@ namespace gatherxml {
 
 namespace detailedMetadata {
 
-struct ParameterData {
-  ParameterData() : code(), short_name(), description(), units(), comment()
+struct ParameterMetadata {
+  ParameterMetadata() : code(), short_name(), description(), units(), comment()
       { }
 
   string code, short_name, description, units, comment;
@@ -87,9 +88,9 @@ struct ParameterEntry {
   ParameterEntry() : key(),parameter_code_set(),level_table(),level_values() {}
 
   string key;
-  std::shared_ptr<unordered_set<string>> parameter_code_set;
-  std::shared_ptr<unordered_map<size_t, pair<string, string>>> level_table;
-  std::shared_ptr<vector<size_t>> level_values;
+  shared_ptr<unordered_set<string>> parameter_code_set;
+  shared_ptr<unordered_map<size_t, pair<string, string>>> level_table;
+  shared_ptr<vector<size_t>> level_values;
 };
 
 struct DBData {
@@ -103,11 +104,11 @@ struct TypeEntry {
 
   string key;
   string start,end;
-  std::shared_ptr<my::map<TypeEntry>> type_table;
-  std::shared_ptr<list<string>> type_table_keys,type_table_keys_2;
+  shared_ptr<my::map<TypeEntry>> type_table;
+  shared_ptr<list<string>> type_table_keys,type_table_keys_2;
 };
 
-bool compare_parameter_data(const ParameterData& left, const ParameterData&
+bool compare_parameter_data(const ParameterMetadata& left, const ParameterMetadata&
     right) {
   if (left.code == right.code) {
     return true;
@@ -243,7 +244,7 @@ void generate_parameter_cross_reference(string format, string title, string
     exit(1);
   }
   if (q.num_rows() > 0) {
-    unordered_map<string, unordered_map<string, ParameterData>> ptmap;
+    unordered_map<string, unordered_map<string, ParameterMetadata>> ptmap;
     xmlutils::ParameterMapper pmap(metautils::directives.parameter_map_path);
     for (const auto& r : q) {
       auto c = r[0];
@@ -251,9 +252,9 @@ void generate_parameter_cross_reference(string format, string title, string
       xmlutils::clean_parameter_code(c, m);
       auto key = pmap.title(format, m);
       if (ptmap.find(key) == ptmap.end()) {
-        ptmap.emplace(key, unordered_map<string, ParameterData>());
+        ptmap.emplace(key, unordered_map<string, ParameterMetadata>());
       }
-      ParameterData pd;
+      ParameterMetadata pd;
       if (ptmap[key].find(c) == ptmap[key].end()) {
         pd.code = c;
         pd.short_name = pmap.short_name(format, r[0]);
@@ -278,7 +279,7 @@ void generate_parameter_cross_reference(string format, string title, string
     ofs << "</style>" << endl;
     ofs2 << "<parameterTables>" << endl;
     for (const auto& e : ptmap) {
-      vector<ParameterData> pdv;
+      vector<ParameterMetadata> pdv;
       pdv.reserve(e.second.size());
       auto snc = false;
       auto cc = false;
