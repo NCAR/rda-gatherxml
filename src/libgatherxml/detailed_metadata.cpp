@@ -26,12 +26,14 @@ using std::list;
 using std::make_pair;
 using std::make_tuple;
 using std::move;
+using std::ofstream;
 using std::pair;
 using std::regex;
 using std::regex_search;
 using std::shared_ptr;
 using std::sort;
 using std::stoi;
+using std::stoll;
 using std::string;
 using std::stringstream;
 using std::tie;
@@ -84,13 +86,12 @@ struct ProductSummary {
   unordered_map<size_t, GridSummary> grid_table;
 };
 
-struct ParameterEntry {
-  ParameterEntry() : key(),parameter_code_set(),level_table(),level_values() {}
+struct ParameterData {
+  ParameterData() : parameter_codes(), level_tables(), level_values() { }
 
-  string key;
-  shared_ptr<unordered_set<string>> parameter_code_set;
-  shared_ptr<unordered_map<size_t, pair<string, string>>> level_table;
-  shared_ptr<vector<size_t>> level_values;
+  unordered_set<string> parameter_codes;
+  unordered_map<size_t, pair<string, string>> level_tables;
+  vector<size_t> level_values;
 };
 
 struct DBData {
@@ -108,8 +109,8 @@ struct TypeEntry {
   shared_ptr<list<string>> type_table_keys,type_table_keys_2;
 };
 
-bool compare_parameter_data(const ParameterMetadata& left, const ParameterMetadata&
-    right) {
+bool compare_parameter_data(const ParameterMetadata& left, const
+    ParameterMetadata& right) {
   if (left.code == right.code) {
     return true;
   } else {
@@ -264,11 +265,11 @@ void generate_parameter_cross_reference(string format, string title, string
         ptmap[key].emplace(c, pd);
       }
     }
-    std::ofstream ofs((t.name() + "/metadata/" + html_file).c_str());
+    ofstream ofs((t.name() + "/metadata/" + html_file).c_str());
     if (!ofs.is_open()) {
       log_error2("unable to open html file for output", F, caller, user);
     }
-    std::ofstream ofs2((t.name() + "/metadata/" + substitute(html_file, ".html",
+    ofstream ofs2((t.name() + "/metadata/" + substitute(html_file, ".html",
         ".xml")).c_str());
     if (!ofs2.is_open()) {
       log_error2("unable to open xml file for output", F, caller, user);
@@ -358,7 +359,9 @@ void generate_parameter_cross_reference(string format, string title, string
     string e;
     if (unixutils::rdadata_sync(t.name(), "metadata/", "/data/web/datasets/ds" +
         metautils::args.dsnum, metautils::directives.rdadata_home, e) < 0) {
-      metautils::log_warning("generate_parameter_cross_reference() couldn't sync cross-references - rdadata_sync error(s): '" + e  + "'", caller, user);
+      metautils::log_warning("generate_parameter_cross_reference() couldn't "
+          "sync cross-references - rdadata_sync error(s): '" + e  + "'", caller,
+          user);
     }
   } else {
 
@@ -391,8 +394,8 @@ void generate_level_cross_reference(string format, string title, string
   MySQL::Server mysrv(metautils::directives.database_server, metautils::
       directives.metadb_username, metautils::directives.metadb_password, "");
   MySQL::LocalQuery q("select distinct levelType_codes from WGrML.summary as s "
-      "left join WGrML.formats as f on f.code = s.format_code where s.dsid = '" +
-      metautils::args.dsnum + "' and f.format = '" + format + "'");
+      "left join WGrML.formats as f on f.code = s.format_code where s.dsid = '"
+      + metautils::args.dsnum + "' and f.format = '" + format + "'");
   if (q.submit(mysrv) < 0) {
     myerror = move(q.error());
     exit(1);
@@ -434,7 +437,7 @@ void generate_level_cross_reference(string format, string title, string
     if (mysystem2("/bin/mkdir -p " + t.name() + "/metadata", oss, ess) != 0) {
       log_error2("unable to create temporary directory tree", F, caller, user);
     }
-    std::ofstream ofs((t.name() + "/metadata/" + html_file).c_str());
+    ofstream ofs((t.name() + "/metadata/" + html_file).c_str());
     if (!ofs.is_open()) {
       log_error2("unable to open html file for output", F, caller, user);
     }
@@ -648,7 +651,7 @@ string time_range_query(MySQL::Server& mysrv, const DBData& dbdata, string
   }
 }
 
-void write_grid_html(std::ofstream& ofs, size_t num_products) {
+void write_grid_html(ofstream& ofs, size_t num_products) {
   ofs << "<style id=\"detail\">" << endl;
   ofs << "  @import url(/css/transform.css);" << endl;
   ofs << "</style>" << endl;
@@ -698,7 +701,8 @@ void write_grid_html(std::ofstream& ofs, size_t num_products) {
   ofs << "        x[n].className = 'view_button_off';" << endl;
   ofs << "    }" << endl;
   ofs << "    e.className = 'view_button_on';" << endl;
-  ofs << "    getAjaxContent('GET',null,'/datasets/ds" << metautils::args.dsnum << "/metadata/'+v,'detail_content');" << endl;
+  ofs << "    getAjaxContent('GET',null,'/datasets/ds" << metautils::args.dsnum
+      << "/metadata/'+v,'detail_content');" << endl;
   ofs << "  }" << endl;
   ofs << "}" << endl;
   ofs << "</script>" << endl;
@@ -785,7 +789,7 @@ void generate_gridded_product_detail(MySQL::Server& mysrv, const DBData& dbdata,
     gdmap.emplace(stoi(r[2]), gridutils::convert_grid_definition(r[0] + "<!>" +
         r[1]));
   }
-  std::ofstream ofs((tdir.name() + "/metadata/product-detail.html").c_str());
+  ofstream ofs((tdir.name() + "/metadata/product-detail.html").c_str());
   if (!ofs.is_open()) {
     log_error2("unable to open output for product detail", F, caller, user);
   }
@@ -955,7 +959,7 @@ void generate_gridded_product_detail(MySQL::Server& mysrv, const DBData& dbdata,
   ofs.close();
 }
 
-void generate_detailed_grid_summary(string file_type, string group_index, std::
+void generate_detailed_grid_summary(string file_type, string group_index,
     ofstream& ofs, const vector<pair<string, string>>& format_list, string
     caller, string user) {
   static const string F = this_function_label(__func__);
@@ -970,12 +974,11 @@ void generate_detailed_grid_summary(string file_type, string group_index, std::
     log_error2("unable to create temporary directory tree - '" + ess.str() +
         "'", F, caller, user);
   }
-  std::ofstream ofs_p((t.name() + "/metadata/parameter-detail.html").
-      c_str());
+  ofstream ofs_p((t.name() + "/metadata/parameter-detail.html").c_str());
   if (!ofs_p.is_open()) {
     log_error2("unable to open output for parameter detail", F, caller, user);
   }
-  std::ofstream ofs_l((t.name() + "/metadata/level-detail.html").c_str());
+  ofstream ofs_l((t.name() + "/metadata/level-detail.html").c_str());
   if (!ofs_l.is_open()) {
     log_error2("unable to open output for level detail", F, caller, user);
   }
@@ -990,7 +993,7 @@ void generate_detailed_grid_summary(string file_type, string group_index, std::
   xmlutils::ParameterMapper pmap(metautils::directives.parameter_map_path);
   xmlutils::LevelMapper lmap(metautils::directives.level_map_path);
   vector<string> pfv;
-  my::map<ParameterEntry> detailed_parameter_table(99999);
+  unordered_map<string, ParameterData> pdmap;
   unordered_map<size_t, LevelSummary> lsmap;
   unordered_map<size_t, tuple<string, string, string>> lcmap;
   fill_level_code_table(dbdata.db, lcmap);
@@ -1003,22 +1006,19 @@ void generate_detailed_grid_summary(string file_type, string group_index, std::
     if (q.submit(mysrv) < 0) {
       log_error2("'" + q.error() + "'", F, caller, user);
     }
-    unordered_map<string, string> pdmap;
+    unordered_map<string, string> m;
     for (const auto& r : q) {
-      if (pdmap.find(r[0]) == pdmap.end())  {
-        pdmap.emplace(r[0], metatranslations::detailed_parameter(pmap, fp.first,
+      if (m.find(r[0]) == m.end())  {
+        m.emplace(r[0], metatranslations::detailed_parameter(pmap, fp.first,
             r[0]));
       }
-      ParameterEntry pe;
-      pe.key = pdmap[r[0]];
-      if (!detailed_parameter_table.found(pe.key, pe)) {
-        pe.parameter_code_set.reset(new unordered_set<string>);
-        pe.parameter_code_set->emplace(r[0]);
-        pe.level_table.reset(new unordered_map<size_t, pair<string, string>>);
-        pe.level_values.reset(new vector<size_t>);
-        bitmap::uncompress_values(r[1],*pe.level_values);
-        for (auto& level_value : *pe.level_values) {
-          pe.level_table->emplace(level_value, make_pair(r[2], r[3]));
+      auto key = m[r[0]];
+      if (pdmap.find(key) == pdmap.end()) {
+        ParameterData pd;
+        pd.parameter_codes.emplace(r[0]);
+        bitmap::uncompress_values(r[1],pd.level_values);
+        for (auto& level_value : pd.level_values) {
+          pd.level_tables.emplace(level_value, make_pair(r[2], r[3]));
           if (lsmap.find(level_value) == lsmap.end()) {
             LevelSummary ls;
             ls.map = get<0>(lcmap[level_value]);
@@ -1026,23 +1026,25 @@ void generate_detailed_grid_summary(string file_type, string group_index, std::
             ls.value = get<2>(lcmap[level_value]);
             lsmap.emplace(level_value, ls);
           }
-          if (lsmap[level_value].variable_table.find(pe.key) == lsmap[
+          if (lsmap[level_value].variable_table.find(key) == lsmap[
               level_value].variable_table.end()) {
-            lsmap[level_value].variable_table.emplace(pe.key,
-               (*pe.level_table)[level_value]);
+            lsmap[level_value].variable_table.emplace(key, pd.level_tables[
+                level_value]);
           }
         }
-        detailed_parameter_table.insert(pe);
+        pdmap.emplace(key, pd);
       } else {
-        if (pe.parameter_code_set->find(r[0]) == pe.parameter_code_set->end()) {
-          pe.parameter_code_set->emplace(r[0]);
+        if (pdmap[key].parameter_codes.find(r[0]) == pdmap[key].parameter_codes.
+            end()) {
+          pdmap[key].parameter_codes.emplace(r[0]);
         }
         vector<size_t> vlst;
         bitmap::uncompress_values(r[1], vlst);
         for (auto& v : vlst) {
-          if (pe.level_table->find(v) == pe.level_table->end()) {
-            pe.level_table->emplace(v, make_pair(r[2], r[3]));
-            pe.level_values->emplace_back(v);
+          if (pdmap[key].level_tables.find(v) == pdmap[key].level_tables.
+              end()) {
+            pdmap[key].level_tables.emplace(v, make_pair(r[2], r[3]));
+            pdmap[key].level_values.emplace_back(v);
             if (lsmap.find(v) == lsmap.end()) {
               LevelSummary ls;
               ls.map = get<0>(lcmap[v]);
@@ -1050,25 +1052,25 @@ void generate_detailed_grid_summary(string file_type, string group_index, std::
               ls.value = get<2>(lcmap[v]);
               lsmap.emplace(v, ls);
             }
-            if (lsmap[v].variable_table.find(pe.key) == lsmap[v].variable_table.
+            if (lsmap[v].variable_table.find(key) == lsmap[v].variable_table.
                 end()) {
-              lsmap[v].variable_table.emplace(pe.key, (*pe.level_table)[v]);
+              lsmap[v].variable_table.emplace(key, pdmap[key].level_tables[v]);
             }
           } else {
-            if (r[2] < (*pe.level_table)[v].first) {
-              (*pe.level_table)[v].first = r[2];
+            if (r[2] < pdmap[key].level_tables[v].first) {
+              pdmap[key].level_tables[v].first = r[2];
             }
-            if (r[3] > (*pe.level_table)[v].second) {
-              (*pe.level_table)[v].second = r[3];
+            if (r[3] > pdmap[key].level_tables[v].second) {
+              pdmap[key].level_tables[v].second = r[3];
             }
-            if ((*pe.level_table)[v].first < lsmap[v].variable_table[pe.key].
+            if (pdmap[key].level_tables[v].first < lsmap[v].variable_table[key].
                 first) {
-              lsmap[v].variable_table[pe.key].first = (*pe.level_table)[v].
+              lsmap[v].variable_table[key].first = pdmap[key].level_tables[v].
                   first;
             }
-            if ((*pe.level_table)[v].second > lsmap[v].variable_table[pe.key].
-                second) {
-              lsmap[v].variable_table[pe.key].second = (*pe.level_table)[v].
+            if (pdmap[key].level_tables[v].second > lsmap[v].variable_table[
+                key].second) {
+              lsmap[v].variable_table[key].second = pdmap[key].level_tables[v].
                   second;
             }
           }
@@ -1159,17 +1161,20 @@ void generate_detailed_grid_summary(string file_type, string group_index, std::
         "valign=\"top\" class=\"bg2\"><th align=\"left\">Variables</th><th "
         "width=\"41%\" align=\"left\">Temporal Valid Range</th></tr></table>"
         "</th></tr>" << endl;
-    detailed_parameter_table.keysort(
-    [](const string& left,const string& right) -> bool {
+    vector<string> pd_keys;
+    for (const auto& e : pdmap) {
+      pd_keys.emplace_back(e.first);
+    }
+    sort(pd_keys.begin(), pd_keys.end(),
+    [](const string& left, const string& right) -> bool {
       return metacompares::default_compare(left, right);
     });
     auto cidx = 0;
     unordered_map<size_t, string> ldmap;
-    for (const auto& k : detailed_parameter_table.keys()) {
-      ParameterEntry pe;
-      detailed_parameter_table.found(k, pe);
-      replace_all(pe.key, "&lt;", "<");
-      replace_all(pe.key, "&gt;", ">");
+    for (const auto& k : pd_keys) {
+      auto kk = k;
+      replace_all(kk, "&lt;", "<");
+      replace_all(kk, "&gt;", ">");
       ofs_p << "<tr class=\"bg" << cidx << "\" valign=\"top\"><td>";
       if (q.num_rows() > 1) {
         ofs_p << "<a title=\"Products and Coverages\" href=\"javascript:void("
@@ -1179,42 +1184,40 @@ void generate_detailed_grid_summary(string file_type, string group_index, std::
         if (!group_index.empty()) {
           ofs_p << "&gindex=" << group_index;
         }
-        for (const auto& e : *pe.parameter_code_set) {
+        for (const auto& e : pdmap[k].parameter_codes) {
           ofs_p << "&pcode=" << e;
         }
-        ofs_p << "', 950, 600)\">" << pe.key << "</a>";
+        ofs_p << "', 950, 600)\">" << kk << "</a>";
       } else {
-        ofs_p << pe.key;
+        ofs_p << kk;
       }
       unordered_map<string, pair<string, string>> ulmap;
-      for (auto& v : *pe.level_values) {
+      for (auto& v : pdmap[k].level_values) {
         if (ldmap.find(v) == ldmap.end()) {
           ldmap.emplace(v, metatranslations::detailed_level(lmap, fp.first, get<
               0>(lcmap[v]), get<1>(lcmap[v]), get<2>(lcmap[v]), true));
         }
         auto key = ldmap[v];
         if (ulmap.find(key) == ulmap.end()) {
-          ulmap.emplace(key, (*pe.level_table)[v]);
+          ulmap.emplace(key, pdmap[k].level_tables[v]);
         } else {
-          if ((*pe.level_table)[v].first < ulmap[key].first) {
-            ulmap[key].first=(*pe.level_table)[v].first;
+          if (pdmap[k].level_tables[v].first < ulmap[key].first) {
+            ulmap[key].first=pdmap[k].level_tables[v].first;
           }
-          if ((*pe.level_table)[v].second > ulmap[key].second) {
-            ulmap[key].second=(*pe.level_table)[v].second;
+          if (pdmap[k].level_tables[v].second > ulmap[key].second) {
+            ulmap[key].second=pdmap[k].level_tables[v].second;
           }
         }
       }
-      pe.level_table->clear();
-      pe.level_table.reset();
-      pe.level_values->clear();
-      pe.level_values.reset();
+      pdmap[k].level_tables.clear();
+      pdmap[k].level_values.clear();
       if (ulmap.size() > 10) {
         ofs_p << "<br /><span style=\"font-size: 13px; color: #6a6a6a\">(" <<
             ulmap.size() << " levels; scroll to see all)</span>";
       }
       ofs_p << "</td>";
       if (fp.first == "WMO_GRIB1") {
-        auto it = pe.parameter_code_set->begin();
+        auto it = pdmap[k].parameter_codes.begin();
         auto idx = it->find(":");
         ofs_p << "<td align=\"center\">" << it->substr(idx + 1) << "</td>";
       }
@@ -1361,7 +1364,7 @@ void generate_detailed_grid_summary(string file_type, string group_index, std::
       cidx = 1 - cidx;
     }
     clmap.clear();
-    detailed_parameter_table.clear();
+    pdmap.clear();
     ofs_p << "</table>" << endl;
     ofs_l << "</table>" << endl;
   }
@@ -1382,7 +1385,7 @@ void generate_detailed_grid_summary(string file_type, string group_index, std::
 }
 
 void generate_detailed_observation_summary(string file_type, string group_index,
-    std::ofstream& ofs, const vector<pair<string, string>>& format_list, string
+    ofstream& ofs, const vector<pair<string, string>>& format_list, string
     caller, string user) {
   static const string F = this_function_label(__func__);
   MySQL::Query query;
@@ -1557,7 +1560,7 @@ void generate_detailed_observation_summary(string file_type, string group_index,
   mysrv.disconnect();
 }
 
-void generate_detailed_fix_summary(string file_type, string group_index, std::
+void generate_detailed_fix_summary(string file_type, string group_index,
     ofstream& ofs, const vector<pair<string, string>>& format_list, string
     caller, string user) {
   static const string F = this_function_label(__func__);
@@ -1676,8 +1679,8 @@ void generate_detailed_metadata_view(string caller, string user) {
 
   // svec contains the database, the data type description, and a function
   //  that generates an appropriate summary
-  vector<tuple<string, string, void(*)(string, string, std::ofstream&, const
-      vector<pair<string, string>>&, string, string)>> svec{
+  vector<tuple<string, string, void(*)(string, string, ofstream&, const vector<
+      pair<string, string>>&, string, string)>> svec{
     make_tuple("WGrML", "Grids", generate_detailed_grid_summary),
     make_tuple("WObML", "Platform Observations",
     generate_detailed_observation_summary),
@@ -1735,7 +1738,7 @@ void generate_detailed_metadata_view(string caller, string user) {
     if (mysystem2("/bin/mkdir -p "+t.name()+"/metadata",oss,ess) != 0) {
       metautils::log_error("generate_detailed_metadata_view(): unable to create metadata directory tree - '"+ess.str()+"'",caller,user);
     }
-    std::ofstream ofs((t.name()+"/metadata/detailed.html").c_str());
+    ofstream ofs((t.name()+"/metadata/detailed.html").c_str());
     if (!ofs.is_open()) {
       metautils::log_error("generate_detailed_metadata_view(): unable to open output for detailed.html",caller,user);
     }
@@ -1799,7 +1802,7 @@ void generate_detailed_metadata_view(string caller, string user) {
     MySQL::Row row;
     query.fetch_row(row);
     if (!row[0].empty()) {
-      volume=std::stoll(row[0]);
+      volume=stoll(row[0]);
     } else {
       volume=0.;
     }
@@ -1872,7 +1875,7 @@ void generate_detailed_metadata_view(string caller, string user) {
 
 void generate_group_detailed_metadata_view(string group_index,string file_type,string caller,string user)
 {
-  std::ofstream ofs;
+  ofstream ofs;
   string dsnum2=substitute(metautils::args.dsnum,".","");
   MySQL::LocalQuery query,grml_query,obml_query,fixml_query;
   string gtitle,gsummary,output,error;
@@ -1900,25 +1903,7 @@ else
 group_index="0";
 }
 /*
-  if (file_type == "MSS") {
-    query.set("title,mnote","dsgroup","dsid = 'ds"+dsnum+"' and gindex = "+group_index);
-    if (table_exists(server_m,"GrML.ds"+dsnum2+"_primaries2")) {
-      grml_query.set("select distinct f.format,f.code from GrML.formats as f left join GrML.ds"+dsnum2+"_primaries2 as p on f.code = p.format_code left join dssdb.mssfile as m on m.mssfile = p.mssID where !isnull(p.format_code) and m.gindex = "+group_index);
-      if (grml_query.submit(server_m) < 0)
-        metautils::log_error("generate_group_detailed_metadata_view(): "+grml_query.error(),caller,user,args);
-    }
-    if (table_exists(server_m,"ObML.ds"+dsnum2+"_primaries2")) {
-      obml_query.set("select distinct f.format,f.code from ObML.formats as f left join ObML.ds"+dsnum2+"_primaries2 as p on f.code = p.format_code left join dssdb.mssfile as m on m.mssfile = p.mssID where !isnull(p.format_code) and m.gindex = "+group_index);
-      if (obml_query.submit(server_m) < 0)
-        metautils::log_error("generate_group_detailed_metadata_view(): "+obml_query.error(),caller,user,args);
-    }
-    if (table_exists(server_m,"FixML.ds"+dsnum2+"_primaries2")) {
-      fixml_query.set("select distinct f.format,f.code from FixML.formats as f left join FixML.ds"+dsnum2+"_primaries2 as p on f.code = p.format_code left join dssdb.mssfile as m on m.mssfile = p.mssID where !isnull(p.format_code) and m.gindex = "+group_index);
-      if (fixml_query.submit(server_m) < 0)
-        metautils::log_error("generate_group_detailed_metadata_view(): "+fixml_query.error(),caller,user,args);
-    }
-  }
-  else if (file_type == "Web") {
+  if (file_type == "Web") {
     query.set("title,wnote","dsgroup","dsid = 'ds"+dsnum+"' and gindex = "+group_index);
     if (table_exists(server_m,"WGrML.ds"+dsnum2+"_webfiles2")) {
       if (field_exists(server_m,"WGrML.ds"+dsnum2+"_webfiles2","dsid")) {
