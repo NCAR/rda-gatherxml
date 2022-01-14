@@ -22,6 +22,7 @@ using metautils::log_error2;
 using miscutils::this_function_label;
 using std::endl;
 using std::get;
+using std::list;
 using std::make_pair;
 using std::make_tuple;
 using std::move;
@@ -52,13 +53,6 @@ struct ParameterData {
       { }
 
   string code, short_name, description, units, comment;
-};
-
-struct ParameterTableEntry {
-  ParameterTableEntry() : key(), parameter_data_table() {}
-
-  string key;
-  unordered_map<string, ParameterData> parameter_data_table;
 };
 
 struct LevelSummary {
@@ -110,7 +104,7 @@ struct TypeEntry {
   string key;
   string start,end;
   std::shared_ptr<my::map<TypeEntry>> type_table;
-  std::shared_ptr<std::list<string>> type_table_keys,type_table_keys_2;
+  std::shared_ptr<list<string>> type_table_keys,type_table_keys_2;
 };
 
 bool compare_parameter_data(const ParameterData& left, const ParameterData&
@@ -241,33 +235,32 @@ void generate_parameter_cross_reference(string format, string title, string
   }
   MySQL::Server mysrv(metautils::directives.database_server, metautils::
       directives.metadb_username, metautils::directives.metadb_password, "");
-  MySQL::LocalQuery q("select distinct parameter from GrML.summary as s left "
-      "join GrML.formats as f on f.code = s.format_code where s.dsid = '" +
+  MySQL::LocalQuery q("select distinct parameter from WGrML.summary as s left "
+      "join WGrML.formats as f on f.code = s.format_code where s.dsid = '" +
       metautils::args.dsnum + "' and f.format = '" + format + "'");
   if (q.submit(mysrv) < 0) {
     myerror = move(q.error());
     exit(1);
   }
   if (q.num_rows() > 0) {
-    my::map<ParameterTableEntry> ptmap;
+    unordered_map<string, unordered_map<string, ParameterData>> ptmap;
     xmlutils::ParameterMapper pmap(metautils::directives.parameter_map_path);
     for (const auto& r : q) {
       auto c = r[0];
       string m;
       xmlutils::clean_parameter_code(c, m);
-      ParameterTableEntry pte;
-      pte.key = pmap.title(format, m);
-      if (!ptmap.found(pte.key, pte)) {
-        ptmap.insert(pte);
+      auto key = pmap.title(format, m);
+      if (ptmap.find(key) == ptmap.end()) {
+        ptmap.emplace(key, unordered_map<string, ParameterData>());
       }
       ParameterData pd;
-      if (pte.parameter_data_table.find(c) == pte.parameter_data_table.end()) {
+      if (ptmap[key].find(c) == ptmap[key].end()) {
         pd.code = c;
         pd.short_name = pmap.short_name(format, r[0]);
         pd.description = pmap.description(format, r[0]);
         pd.units = pmap.units(format, r[0]);
         pd.comment = pmap.comment(format, r[0]);
-        pte.parameter_data_table.emplace(c, pd);
+        ptmap[key].emplace(c, pd);
       }
     }
     std::ofstream ofs((t.name() + "/metadata/" + html_file).c_str());
@@ -284,29 +277,28 @@ void generate_parameter_cross_reference(string format, string title, string
     ofs << "  @import url(/css/transform.css);" << endl;
     ofs << "</style>" << endl;
     ofs2 << "<parameterTables>" << endl;
-    for (const auto& k : ptmap.keys()) {
-      ParameterTableEntry pte;
-      ptmap.found(k, pte);
+    for (const auto& e : ptmap) {
       vector<ParameterData> pdv;
-      pdv.reserve(pte.parameter_data_table.size());
+      pdv.reserve(e.second.size());
       auto snc = false;
       auto cc = false;
-      for (const auto& e : pte.parameter_data_table) {
-        if (!snc && !e.second.short_name.empty()) {
+      for (const auto& e2 : e.second) {
+        if (!snc && !e2.second.short_name.empty()) {
           snc = true;
         }
-        if (!cc && !e.second.comment.empty()) {
+        if (!cc && !e2.second.comment.empty()) {
           cc = true;
         }
-        pdv.emplace_back(e.second);
+        pdv.emplace_back(e2.second);
       }
       sort(pdv.begin(), pdv.end(), compare_parameter_data);
-      ofs << "<p>The following " << pte.parameter_data_table.size() <<
-          " parameters from " << k << " are included in this dataset:<center>"
-          "<table class=\"insert\" cellspacing=\"1\" cellpadding=\"5\" border="
-          "\"0\"><tr class=\"bg2\" valign=\"bottom\"><th align=\"center\">";
+      ofs << "<p>The following " << e.second.size() <<
+          " parameters from " << e.first << " are included in this dataset:"
+          "<center><table class=\"insert\" cellspacing=\"1\" cellpadding=\"5\" "
+          "border=\"0\"><tr class=\"bg2\" valign=\"bottom\"><th align="
+          "\"center\">";
       ofs2 << "  <parameterTable>" << endl;
-      ofs2 << "    <description>" << k << "</description>" << endl;
+      ofs2 << "    <description>" << e.first << "</description>" << endl;
       if (format == "WMO_GRIB2") {
         ofs << "Discipline</th><th align=\"center\">Category</th><th align="
             "\"center\">Code";
@@ -323,7 +315,7 @@ void generate_parameter_cross_reference(string format, string title, string
         ofs << "<th align=\"left\">Comments</th>";
       }
       ofs << "</tr>" << endl;
-      for (size_t n = 0; n < pte.parameter_data_table.size(); n++) {
+      for (size_t n = 0; n < e.second.size(); n++) {
         ofs << "<tr class=\"bg" << (n % 2) << "\"><td align=\"center\">";
         ofs2 << "    <parameter>" << endl;
         if (format == "WMO_GRIB2") {
@@ -394,11 +386,11 @@ void generate_level_cross_reference(string format, string title, string
      html_file, string caller, string user) {
   static const string F = this_function_label(__func__);
   unordered_map<size_t, tuple<string, string, string>> lcmap;
-  fill_level_code_table("GrML", lcmap);
+  fill_level_code_table("WGrML", lcmap);
   MySQL::Server mysrv(metautils::directives.database_server, metautils::
       directives.metadb_username, metautils::directives.metadb_password, "");
-  MySQL::LocalQuery q("select distinct levelType_codes from GrML.summary as s "
-      "left join GrML.formats as f on f.code = s.format_code where s.dsid = '" +
+  MySQL::LocalQuery q("select distinct levelType_codes from WGrML.summary as s "
+      "left join WGrML.formats as f on f.code = s.format_code where s.dsid = '" +
       metautils::args.dsnum + "' and f.format = '" + format + "'");
   if (q.submit(mysrv) < 0) {
     myerror = move(q.error());
@@ -1439,14 +1431,14 @@ void generate_detailed_observation_summary(string file_type, string group_index,
 //   corresponding observation types
         te.key=res[0];
         te.type_table.reset(new my::map<TypeEntry>);
-        te.type_table_keys.reset(new std::list<string>);
+        te.type_table_keys.reset(new list<string>);
 // te2 is the entry for an individual observation type; te2.type_table_keys is
 //   the list of corresponding dataTypes (don't need te2.type_table for
 //   uniqueness because query guarantees each dataType will be unique
         te2.key=res[1];
         te2.start=res[3];
         te2.end=res[4];
-        te2.type_table_keys.reset(new std::list<string>);
+        te2.type_table_keys.reset(new list<string>);
         te2.type_table_keys->emplace_back(res[2]);
         te2.type_table_keys_2=nullptr;
         te.type_table->insert(te2);
@@ -1468,7 +1460,7 @@ void generate_detailed_observation_summary(string file_type, string group_index,
           te2.key=res[1];
           te2.start=res[3];
           te2.end=res[4];
-          te2.type_table_keys.reset(new std::list<string>);
+          te2.type_table_keys.reset(new list<string>);
           te2.type_table_keys->emplace_back(res[2]);
           te2.type_table_keys_2=nullptr;
           te.type_table->insert(te2);
@@ -1500,7 +1492,7 @@ void generate_detailed_observation_summary(string file_type, string group_index,
       if (platform_table.found(res[0],te)) {
         te.type_table->found(res[1],te2);
         if (te2.type_table_keys_2 == NULL) {
-          te2.type_table_keys_2.reset(new std::list<string>);
+          te2.type_table_keys_2.reset(new list<string>);
         }
         if (res[2] == res[3]) {
           te2.type_table_keys_2->emplace_back("<nobr>"+res[2]+" per "+res[4]+"</nobr>");
@@ -1600,7 +1592,7 @@ void generate_detailed_fix_summary(string file_type, string group_index, std::
         te.key=res[0];
         te.start=res[1];
         te.end=res[2];
-        te.type_table_keys.reset(new std::list<string>);
+        te.type_table_keys.reset(new list<string>);
         platform_table.insert(te);
       }
       else {
@@ -1883,7 +1875,7 @@ void generate_group_detailed_metadata_view(string group_index,string file_type,s
   string dsnum2=substitute(metautils::args.dsnum,".","");
   MySQL::LocalQuery query,grml_query,obml_query,fixml_query;
   string gtitle,gsummary,output,error;
-//  std::list<string> formatList;
+//  list<string> formatList;
 //  bool foundDetail=false;
 
   MySQL::Server server_m(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
