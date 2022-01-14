@@ -113,47 +113,46 @@ bool compare_parameter_data(const ParameterMetadata& left, const
     ParameterMetadata& right) {
   if (left.code == right.code) {
     return true;
+  }
+  if (left.code.find(".") == string::npos && right.code.find(".") == string::
+      npos) {
+    if (strutils::is_numeric(left.code) && strutils::is_numeric(right.code)) {
+      auto l = stoi(left.code);
+      auto r = stoi(right.code);
+      if (l < r) {
+        return true;
+      }
+      return false;
+    } else {
+      if (left.code < right.code) {
+        return true;
+      }
+      return false;
+    }
   } else {
-    if (left.code.find(".") == string::npos && right.code.find(".") == string::
-        npos) {
-      if (strutils::is_numeric(left.code) && strutils::is_numeric(right.code)) {
-        auto l = stoi(left.code);
-        auto r = stoi(right.code);
-        if (l < r) {
-          return true;
-        }
-        return false;
+    auto sp1 = split(left.code, ".");
+    auto sp2 = split(right.code, ".");
+    bool b = true;
+    if (sp1.size() != sp2.size()) {
+      if (left.code < right.code) {
+        b = true;
       } else {
-        if (left.code < right.code) {
-          return true;
-        }
-        return false;
+        b = false;
       }
     } else {
-      auto sp = split(left.code, ".");
-      auto sp2 = split(right.code, ".");
-      bool b = true;
-      if (sp.size() != sp2.size()) {
-        if (left.code < right.code) {
+      for (size_t n = 0; n < sp1.size(); n++) {
+        auto l = stoi(sp1[n]);
+        auto r = stoi(sp2[n]);
+        if (l < r) {
           b = true;
-        } else {
+          n = sp1.size();
+        } else if (l > r) {
           b = false;
-        }
-      } else {
-        for (size_t n = 0; n < sp.size(); n++) {
-          auto l = stoi(sp[n]);
-          auto r = stoi(sp2[n]);
-          if (l < r) {
-            b = true;
-            n = sp.size();
-          } else if (l > r) {
-            b = false;
-            n = sp.size();
-          }
+          n = sp1.size();
         }
       }
-      return b;
     }
+    return b;
   }
 }
 
@@ -199,12 +198,11 @@ bool compare_layers(const string& left, const string& right) {
     return true;
   } else if (l > r) {
     return false;
-  } else {
-    if (l2 <= r2) {
-      return true;
-    }
-    return false;
   }
+  if (l2 <= r2) {
+    return true;
+  }
+  return false;
 }
 
 void fill_level_code_table(string db, unordered_map<size_t, tuple<string,
@@ -571,16 +569,15 @@ string parameter_query(MySQL::Server& mysrv, const DBData& dbdata, string
             "= " + format_code + " and !isnull(x." + dbdata.dtable + ") and x."
             "gindex = " + group_index + " group by a.parameter, a."
             "levelType_codes";
-      } else {
-        return "select a.parameter, a.levelType_codes, min(a.start_date), max("
-            "a.end_date) from " + dbdata.db + ".ds" + d2 + dbdata.table + " as "
-            "p left join dssdb." + dbdata.dtable + " as x on x." + dbdata.dtable
-            + " = p." + dbdata.ID_type + "ID left join " + dbdata.db + ".ds" +
-            d2 + "_agrids as a on a." + dbdata.ID_type + "ID_code = p.code "
-            "where p.format_code = " + format_code + " and !isnull(x." + dbdata.
-            dtable + ") and x.gindex = " + group_index + " group by a."
-            "parameter, a.levelType_codes";
       }
+      return "select a.parameter, a.levelType_codes, min(a.start_date), max(a."
+          "end_date) from " + dbdata.db + ".ds" + d2 + dbdata.table + " as p "
+          "left join dssdb." + dbdata.dtable + " as x on x." + dbdata.dtable +
+          " = p." + dbdata.ID_type + "ID left join " + dbdata.db + ".ds" + d2 +
+          "_agrids as a on a." + dbdata.ID_type + "ID_code = p.code where p."
+          "format_code = " + format_code + " and !isnull(x." + dbdata.dtable +
+          ") and x.gindex = " + group_index + " group by a.parameter, a."
+          "levelType_codes";
     } else {
       if (field_exists(mysrv, dbdata.db + ".ds" + d2 + dbdata.table, "dsid")) {
         return "select a.parameter, a.levelType_codes, min(a.start_date), max("
@@ -591,15 +588,14 @@ string parameter_query(MySQL::Server& mysrv, const DBData& dbdata, string
             "a on a." + dbdata.ID_type + "ID_code = p.code where !isnull(x." +
             dbdata.dtable + ") and x.gindex = " + group_index + " group by a."
             "parameter, a.levelType_codes";
-      } else {
-        return "select a.parameter, a.levelType_codes, min(a.start_date), max("
-            "a.end_date) from " + dbdata.db + ".ds" + d2 + dbdata.table + " as "
-            "p left join dssdb." + dbdata.dtable + " as x on x." + dbdata.dtable
-            + " = p." + dbdata.ID_type + "ID left join " + dbdata.db + ".ds" +
-            d2 + "_agrids as a on a." + dbdata.ID_type + "ID_code = p.code "
-            "where !isnull(x." + dbdata.dtable + ") and x.gindex = " +
-            group_index + " group by a.parameter, a.levelType_codes";
       }
+      return "select a.parameter, a.levelType_codes, min(a.start_date), max(a."
+          "end_date) from " + dbdata.db + ".ds" + d2 + dbdata.table + " as p "
+          "left join dssdb." + dbdata.dtable + " as x on x." + dbdata.dtable +
+          " = p." + dbdata.ID_type + "ID left join " + dbdata.db + ".ds" + d2 +
+          "_agrids as a on a." + dbdata.ID_type + "ID_code = p.code where "
+          "!isnull(x." + dbdata.dtable + ") and x.gindex = " + group_index +
+          " group by a.parameter, a.levelType_codes";
     }
   } else {
     if (format_query_result_size > 1) {
@@ -608,11 +604,10 @@ string parameter_query(MySQL::Server& mysrv, const DBData& dbdata, string
           + dbdata.db + ".ds" + d2 + dbdata.table + " as p on p.code = a." +
           dbdata.ID_type + "ID_code where p.format_code = " + format_code +
           " group by a.parameter, a.levelType_codes";
-    } else {
-      return "select parameter, levelType_codes, min(start_date), max("
-          "end_date) from " + dbdata.db + ".ds" + d2 + "_agrids group by "
-          "parameter, levelType_codes";
     }
+    return "select parameter, levelType_codes, min(start_date), max(end_date) "
+        "from " + dbdata.db + ".ds" + d2 + "_agrids group by parameter, "
+        "levelType_codes";
   }
 }
 
@@ -625,30 +620,28 @@ string time_range_query(MySQL::Server& mysrv, const DBData& dbdata, string
         "on t.code = s.timeRange_code left join " + dbdata.db +
         ".gridDefinitions as d on d.code = s.gridDefinition_code where s.dsid "
         "= '" + metautils::args.dsnum + "' and format_code = " + format_code;
-  } else {
-    if (field_exists(mysrv, dbdata.db + ".ds" + d2 + dbdata.table, "dsid")) {
-      return "select distinct t.timeRange, d.definition, d.defParams from " +
-          dbdata.db + ".ds" + d2 + dbdata.table + " as p left join dssdb." +
-          dbdata.dtable + " as x on (x." + dbdata.dtable + " = p." + dbdata.
-          ID_type + "ID and x.type = p.type and x.dsid = p.dsid) left join " +
-          dbdata.db + ".ds" + d2 + "_grids as g on g." + dbdata.ID_type +
-          "ID_code = p.code left join " + dbdata.db + ".timeRanges as t on t."
-          "code = g.timeRange_code left join " + dbdata.db + ".gridDefinitions "
-          "as d on d.code = g.gridDefinition_code where p.format_code = " +
-          format_code + " and !isnull(x." + dbdata.dtable + ") and x.gindex = "
-          + group_index;
-    } else {
-      return "select distinct t.timeRange, d.definition, d.defParams from ("
-          "select p.code from " + dbdata.db + ".ds" + d2 + dbdata.table + " as "
-          "p left join dssdb." + dbdata.dtable + " as x on x." + dbdata.dtable +
-          " = p." + dbdata.ID_type + "ID where p.format_code = " + format_code +
-          " and !isnull(x." + dbdata.dtable + ") and x.gindex = " + group_index
-          + ") as p left join " + dbdata.db + ".ds" + d2 + "_grids as g on g." +
-          dbdata.ID_type + "ID_code = p.code left join " + dbdata.db +
-          ".timeRanges as t on t.code = g.timeRange_code left join " + dbdata.
-          db + ".gridDefinitions as d on d.code = g.gridDefinition_code";
-    }
   }
+  if (field_exists(mysrv, dbdata.db + ".ds" + d2 + dbdata.table, "dsid")) {
+    return "select distinct t.timeRange, d.definition, d.defParams from " +
+        dbdata.db + ".ds" + d2 + dbdata.table + " as p left join dssdb." +
+        dbdata.dtable + " as x on (x." + dbdata.dtable + " = p." + dbdata.
+        ID_type + "ID and x.type = p.type and x.dsid = p.dsid) left join " +
+        dbdata.db + ".ds" + d2 + "_grids as g on g." + dbdata.ID_type +
+        "ID_code = p.code left join " + dbdata.db + ".timeRanges as t on t."
+        "code = g.timeRange_code left join " + dbdata.db + ".gridDefinitions "
+        "as d on d.code = g.gridDefinition_code where p.format_code = " +
+        format_code + " and !isnull(x." + dbdata.dtable + ") and x.gindex = "
+        + group_index;
+  }
+  return "select distinct t.timeRange, d.definition, d.defParams from (select "
+      "p.code from " + dbdata.db + ".ds" + d2 + dbdata.table + " as p left "
+      "join dssdb." + dbdata.dtable + " as x on x." + dbdata.dtable + " = p." +
+      dbdata.ID_type + "ID where p.format_code = " + format_code + " and "
+      "!isnull(x." + dbdata.dtable + ") and x.gindex = " + group_index + ") as "
+      "p left join " + dbdata.db + ".ds" + d2 + "_grids as g on g." + dbdata.
+      ID_type + "ID_code = p.code left join " + dbdata.db + ".timeRanges as t "
+      "on t.code = g.timeRange_code left join " + dbdata.db +
+      ".gridDefinitions as d on d.code = g.gridDefinition_code";
 }
 
 void write_grid_html(ofstream& ofs, size_t num_products) {
