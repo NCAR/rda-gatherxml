@@ -1,5 +1,6 @@
 #include <iostream>
 #include <stdlib.h>
+#include <sys/stat.h>
 #include <string>
 #include <deque>
 #include <regex>
@@ -50,6 +51,14 @@ const string USER = getenv("USER");
 const string PLT_EXT = ".py";
 const string IMG_EXT = ".png";
 
+const bool IS_SINGULARITY = []() {
+    struct stat buf;
+    if (stat("/.singularity.d", &buf) == 0 && buf.st_mode == S_IFDIR) {
+      return true;
+    }
+    return false;
+}();
+
 void write_plot_head(unique_ptr<TempFile>& plot_file, unique_ptr<TempFile>&
     image_file) {
   plot_file->writeln("import cartopy.crs as ccrs");
@@ -66,6 +75,33 @@ void write_plot_head(unique_ptr<TempFile>& plot_file, unique_ptr<TempFile>&
       "30, 60, 90])");
   plot_file->writeln("gl.xlocator = mticker.FixedLocator([-180, -150, -120, "
       "-90, -60, -30, 0, 30, 60, 90, 120, 150, 180])");
+}
+
+void create_graphics(string plot_script, string image_name, string tempdir_name,
+    string image_tag = "") {
+  string command;
+  if (IS_SINGULARITY) {
+    command = "/bin/bash -c \"export MPLCONFIGDIR=/glade/scratch/rdadata; "
+        "source /usr/local/rdaviz/bin/activate; python ";
+  } else {
+    command = "/bin/tcsh -c \"setenv MPLCONFIGDIR /glade/scratch/rdadata; ";
+    if (regex_search(unixutils::host_name(), regex("^(cheyenne|casper)"))) {
+      command += "module load conda; ";
+    }
+    command += "conda run -p /glade/u/home/rdadata/conda-envs/rdaviz python ";
+  }
+  command += plot_script + "; convert -trim +repage -resize 360x180 " +
+      image_name + " " + tempdir_name + "/datasets/ds" + metautils::args.dsnum +
+      "/metadata/spatial_coverage";
+  if (!image_tag.empty()) {
+    command += "." + image_tag;
+  }
+  command += ".gif\"";
+  stringstream oss, ess;
+  if (mysystem2(command, oss, ess) != 0) {
+    log_error2("failed to create graphics: '" + ess.str() + "'",
+        "create_graphics()", "gsi", USER);
+  }
 }
 
 void *thread_plot(void *tnc) {
@@ -132,14 +168,7 @@ void *thread_plot(void *tnc) {
       args.dsnum + "/metadata", oss, ess) != 0) {
     log_error2("can't create directory tree", F, "gsi", USER);
   }
-  if (mysystem2("/bin/bash -c \"export MPLCONFIGDIR=/glade/scratch/rdadata; "
-      "source /usr/local/rdaviz/bin/activate; python " + plt_p->name() + "; "
-      "convert -trim +repage -resize 360x180 " + img_p->name() + " " + tdir->
-      name() + "/datasets/ds" + metautils::args.dsnum + "/metadata/"
-      "spatial_coverage." + t->imagetag + ".gif\"", oss, ess) != 0) {
-    log_error2("failed to create graphics: '" + ess.str() + "'", F, "gsi",
-        USER);
-  }
+  create_graphics(plt_p->name(), img_p->name(), tdir->name(), t->imagetag);
   string e;
   if (unixutils::rdadata_sync(tdir->name(), "datasets/ds" + metautils::args.
       dsnum + "/metadata/", "/data/web", metautils::directives.rdadata_home, e)
@@ -246,14 +275,7 @@ void generate_graphics(MySQL::LocalQuery& query, string type, string table,
       args.dsnum + "/metadata", oss, ess) != 0) {
     log_error2("can't create directory tree", F, "gsi", USER);
   }
-  if (mysystem2("/bin/bash -c \"export MPLCONFIGDIR=/glade/scratch/rdadata; "
-      "source /usr/local/rdaviz/bin/activate; python " + plt_p->name() + "; "
-      "convert -trim +repage -resize 360x180 " + img_p->name() + " " + tdir->
-      name() + "/datasets/ds" + metautils::args.dsnum + "/metadata/"
-      "spatial_coverage.gif\"", oss, ess) != 0) {
-    log_error2("failed to create graphics: '" + ess.str() + "'", F, "gsi",
-        USER);
-  }
+  create_graphics(plt_p->name(), img_p->name(), tdir->name());
   string e;
   if (unixutils::rdadata_sync(tdir->name(),"datasets/ds" + metautils::args.
       dsnum + "/metadata/", "/data/web", metautils::directives.rdadata_home, e)
