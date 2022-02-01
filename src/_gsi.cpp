@@ -119,8 +119,8 @@ void *thread_plot(void *tnc) {
   srv.disconnect();
   plt_p->writeln("lons = [" + xss.str() + "]");
   plt_p->writeln("lats = [" + yss.str() + "]");
-  plt_p->writeln("plt.plot(lons, lats, marker='.', color='#ffffdc', linewidth="
-      "0)");
+  plt_p->writeln("plt.plot(lons, lats, marker='s', color='#ffffdc', linewidth="
+      "0, markersize=1)");
   plt_p->writeln("plt.savefig('" + img_p->name() + "')");
   plt_p->close();
   auto tdir = unique_ptr<TempDir>(new TempDir);
@@ -132,10 +132,10 @@ void *thread_plot(void *tnc) {
       args.dsnum + "/metadata", oss, ess) != 0) {
     log_error2("can't create directory tree", F, "gsi", USER);
   }
-  if (mysystem2("/bin/tcsh -c \"setenv MPLCONFIGDIR /glade/scratch/rdadata; "
-      "conda run -p /glade/u/home/rdadata/conda-envs/rdaviz python " + plt_p->
-      name() + "; convert -trim +repage -resize 360x180 " + img_p->name() + " "
-      + tdir->name() + "/datasets/ds" + metautils::args.dsnum + "/metadata/"
+  if (mysystem2("/bin/bash -c \"export MPLCONFIGDIR=/glade/scratch/rdadata; "
+      "source /usr/local/rdaviz/bin/activate; python " + plt_p->name() + "; "
+      "convert -trim +repage -resize 360x180 " + img_p->name() + " " + tdir->
+      name() + "/datasets/ds" + metautils::args.dsnum + "/metadata/"
       "spatial_coverage." + t->imagetag + ".gif\"", oss, ess) != 0) {
     log_error2("failed to create graphics: '" + ess.str() + "'", F, "gsi",
         USER);
@@ -233,8 +233,8 @@ void generate_graphics(MySQL::LocalQuery& query, string type, string table,
   }
   plt_p->writeln("lons = [" + xss.str() + "]");
   plt_p->writeln("lats = [" + yss.str() + "]");
-  plt_p->writeln("plt.plot(lons, lats, marker='.', color='#ffffdc', linewidth="
-      "0)");
+  plt_p->writeln("plt.plot(lons, lats, marker='s', color='#ffffdc', linewidth="
+      "0, markersize=1)");
   plt_p->writeln("plt.savefig('" + img_p->name() + "')");
   plt_p->close();
   auto tdir = unique_ptr<TempDir>(new TempDir);
@@ -246,10 +246,10 @@ void generate_graphics(MySQL::LocalQuery& query, string type, string table,
       args.dsnum + "/metadata", oss, ess) != 0) {
     log_error2("can't create directory tree", F, "gsi", USER);
   }
-  if (mysystem2("/bin/tcsh -c \"setenv MPLCONFIGDIR /glade/scratch/rdadata; "
-      "conda run -p /glade/u/home/rdadata/conda-envs/rdaviz python " + plt_p->
-      name() + "; convert -trim +repage -resize 360x180 " + img_p->name() + " "
-      + tdir->name() + "/datasets/ds" + metautils::args.dsnum + "/metadata/"
+  if (mysystem2("/bin/bash -c \"export MPLCONFIGDIR=/glade/scratch/rdadata; "
+      "source /usr/local/rdaviz/bin/activate; python " + plt_p->name() + "; "
+      "convert -trim +repage -resize 360x180 " + img_p->name() + " " + tdir->
+      name() + "/datasets/ds" + metautils::args.dsnum + "/metadata/"
       "spatial_coverage.gif\"", oss, ess) != 0) {
     log_error2("failed to create graphics: '" + ess.str() + "'", F, "gsi",
         USER);
@@ -265,8 +265,6 @@ void generate_graphics(MySQL::LocalQuery& query, string type, string table,
 int main(int argc, char **argv) {
   if (argc < 2) {
     cerr << "usage: gsi [options...] nnn.n" << endl;
-    cerr << "         OR " << endl;
-    cerr << "       gsi --cron" << endl;
     cerr << "\noptions:" << endl;
     cerr << "-g <gindex>   create graphics only for group index <gindex>" <<
         endl;
@@ -283,90 +281,61 @@ int main(int argc, char **argv) {
   if (!server) {
     log_error2("unable to connect to MySQL server on startup", F, "gsi", USER);
   }
-  if (metautils::args.dsnum != "--cron") {
-    auto dsid = substitute(metautils::args.dsnum, ".", "");
-    string g;
-    for (size_t n = 0; n < sp.size(); ++n) {
-      if (sp[n] == "-g") {
-        g = sp[++n];
-      } else if (sp[n] == "--cron") {
-        log_error2("Terminating - can't use '--cron' with a specified dataset",
-            F, "gsi", USER);
-      }
+  string g;
+  for (size_t n = 0; n < sp.size(); ++n) {
+    if (sp[n] == "-g") {
+      g = sp[++n];
     }
-    if (table_exists(server, "WObML.ds" + dsid + "_dataTypes2") ||
-        table_exists(server, "WFixML.ds" + dsid + "_locations")) {
-      auto s = strand(5);
-      if (server.insert("metautil.gsi", "dsid, gindex, uflg", "'" + metautils::
-          args.dsnum + "', '" + g + "', '" + s + "'", "update uflg = values("
-          "uflg)") != 0) {
-        log_error2("insert error while inserting '" + metautils::args.dsnum +
-            ", " + g + ", " + s + "'", F, "gsi", USER);
-      }
+  }
+  auto dsid = substitute(metautils::args.dsnum, ".", "");
+  if (table_exists(server, "WObML.ds" + dsid + "_dataTypes2")) {
+    MySQL::LocalQuery q2;
+    string t;
+    if (g.empty()) {
+      q2.set("select distinct l.observationType_code, l.platformType_code, "
+          "o.obsType, pf.platformType, p.format_code, f.format from WObML.ds" +
+          dsid + "_webfiles2 as p left join WObML.ds" + dsid + "_dataTypes2 as "
+          "d on d.webID_code = p.code left join WObML.ds" + dsid +
+          "_dataTypesList as l on l.code = d.dataType_code left join WObML."
+          "obsTypes as o on l.observationType_code = o.code left join WObML."
+          "platformTypes as pf on l.platformType_code = pf.code left join "
+          "WObML.formats as f on f.code = p.format_code");
+      t = "search.obs_data";
+    } else {
+      q2.set("select distinct l.observationType_code, l.platformType_code, "
+          "o.obsType, pf.platformType, p.format_code, f.format from WObML.ds" +
+          dsid + "_webfiles2 as p left join dssdb.wfile as x on x.wfile = p."
+          "webID left join WObML.ds" + dsid + "_dataTypes2 as d on "
+          "d.webID_code = p.code left join WObML.ds" + dsid + "_dataTypesList "
+          "as l on l.code = d.dataType_code left join WObML.obsTypes as o on "
+          "l.observationType_code = o.code left join WObML.platformTypes as pf "
+          "on l.platformType_code = pf.code left join WObML.formats as f on "
+          "f.code = p.format_code where x.gindex = " + g);
+      t = "WObML.ds" + dsid + "_locations";
     }
-  } else {
-    MySQL::LocalQuery q("select dsid, gindex, uflg from metautil.gsi");
-    if (q.submit(server) < 0) {
-      log_error2(q.error(), F, "gsi", USER);
+    generate_graphics(q2, "obs", t, g);
+  }
+  if (table_exists(server, "WFixML.ds" + dsid + "_locations")) {
+    MySQL::LocalQuery q2;
+    string t;
+    if (g.empty()) {
+      q2.set("select distinct d.classification_code, c.classification, p."
+          "format_code, f.format from WFixML.ds" + dsid + "_webfiles2 as p "
+          "left join WFixML.ds" + dsid + "_locations as d on d.webID_code = "
+          "p.code left join WFixML.classifications as c on d."
+          "classification_code = c.code left join WFixML.formats as f on f."
+          "format = p.format_code");
+      t = "search.fix_data";
+    } else {
+      q2.set("select distinct d.classification_code, c.classification, p."
+          "format_code, f.format from WFixML.ds" + dsid + "_webfiles2 as p "
+          "left join dssdb.wfile as x on x.wfile = p.webID left join WFixML.ds"
+          + dsid + "_locations as d on d.webID_code = p.code left join WFixML."
+          "classifications as c on d.classification_code = c.code left join "
+          "WFixML.formats as f on f.format = p.format_code where x.gindex = " +
+          g);
+      t = "WFixML.ds" + dsid + "_locations";
     }
-    for (const auto& r : q) {
-      metautils::args.dsnum = r[0];
-      auto dsid = substitute(metautils::args.dsnum, ".", "");
-      if (table_exists(server, "WObML.ds" + dsid + "_dataTypes2")) {
-        MySQL::LocalQuery q2;
-        string t;
-        if (r[1].empty()) {
-          q2.set("select distinct l.observationType_code, l.platformType_code, "
-              "o.obsType, pf.platformType, p.format_code, f.format from "
-              "WObML.ds" + dsid + "_webfiles2 as p left join WObML.ds" + dsid
-              + "_dataTypes2 as d on d.webID_code = p.code left join WObML.ds" +
-              dsid + "_dataTypesList as l on l.code = d.dataType_code left "
-              "join WObML.obsTypes as o on l.observationType_code = o.code "
-              "left join WObML.platformTypes as pf on l.platformType_code = pf."
-              "code left join WObML.formats as f on f.code = p.format_code");
-          t = "search.obs_data";
-        } else {
-          q2.set("select distinct l.observationType_code, l.platformType_code, "
-              "o.obsType, pf.platformType, p.format_code, f.format from WObML."
-              "ds" + dsid + "_webfiles2 as p left join dssdb.wfile as x on x."
-              "wfile = p.webID left join WObML.ds" + dsid + "_dataTypes2 as d "
-              "on d.webID_code = p.code left join WObML.ds" + dsid +
-              "_dataTypesList as l on l.code = d.dataType_code left join WObML."
-              "obsTypes as o on l.observationType_code = o.code left join "
-              "WObML.platformTypes as pf on l.platformType_code = pf.code left "
-              "join WObML.formats as f on f.code = p.format_code where x."
-              "gindex = " + r[1]);
-          t = "WObML.ds" + dsid + "_locations";
-        }
-        generate_graphics(q2, "obs", t, r[1]);
-      }
-      if (table_exists(server, "WFixML.ds" + dsid + "_locations")) {
-        MySQL::LocalQuery q2;
-        string t;
-        if (r[1].empty()) {
-          q2.set("select distinct d.classification_code, c.classification, p."
-              "format_code, f.format from WFixML.ds" + dsid + "_webfiles2 as p "
-              "left join WFixML.ds" + dsid + "_locations as d on d.webID_code "
-              "= p.code left join WFixML.classifications as c on d."
-              "classification_code = c.code left join WFixML.formats as f on f."
-              "format = p.format_code");
-          t = "search.fix_data";
-        } else {
-          q2.set("select distinct d.classification_code, c.classification, p."
-              "format_code, f.format from WFixML.ds" + dsid + "_webfiles2 as p "
-              "left join dssdb.wfile as x on x.wfile = p.webID left join "
-              "WFixML.ds" + dsid + "_locations as d on d.webID_code = p.code "
-              "left join WFixML.classifications as c on d.classification_code "
-              "= c.code left join WFixML.formats as f on f.format = p."
-              "format_code where x.gindex = " + r[1]);
-          t = "WFixML.ds" + dsid + "_locations";
-        }
-        generate_graphics(q2, "fix", t, r[1]);
-      }
-      if (server._delete("metautil.gsi", "dsid = '" + r[0] + "' and uflg = '" +
-          r[2] + "'") != 0) {
-        log_error2(server.error(), F, "gsi", USER);
-      }
-    }
+    generate_graphics(q2, "fix", t, g);
   }
 }
