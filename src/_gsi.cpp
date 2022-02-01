@@ -53,8 +53,8 @@ const string IMG_EXT = ".png";
 
 const bool IS_SINGULARITY = []() {
     struct stat buf;
-    if (stat("/.singularity.d", &buf) == 0 && (buf.st_mode & 0040000) ==
-        0040000) {
+    if (stat("/.singularity.d", &buf) == 0 && (buf.st_mode & S_IFDIR) ==
+        S_IFDIR) {
       return true;
     }
     return false;
