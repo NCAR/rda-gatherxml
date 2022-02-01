@@ -1,15 +1,9 @@
 BootStrap: library
-From: ubuntu:16.04
+From: ubuntu:20.04
 
 %post
-    apt-get update && apt-get install -y \
-      build-essential \
-      gcc-6-base \
-      libjasper-dev \
-      libmysqlclient-dev \
-      libcurl4-openssl-dev \
-      rsync \
-      openssh-client
+    apt-get update -y
+    apt-get install -y build-essential
 
 %environment
     export LC_ALL=C
