@@ -1,0 +1,51 @@
+BootStrap: localimage
+From: /glade/u/home/rdadata/lib/singularity/gatherxml-2-pkgs.sif
+Stage: full
+
+%post
+    add-apt-repository -y multiverse
+    apt-get update -y && apt-get upgrade -y
+    apt-get install -y libproj-dev proj-data proj-bin
+    apt-get install -y libgeos-dev
+    add-apt-repository -y ppa:deadsnakes/ppa
+    apt-get update -y && apt-get upgrade -y
+    apt-get install -y python3.9 python3.9-dev python3.9-venv
+
+    cd /usr/local
+    /usr/bin/python3.9 -m venv rdaviz
+    /usr/local/rdaviz/bin/pip3 install wheel
+    /usr/local/rdaviz/bin/pip3 install cartopy==0.19.0.post1
+    /usr/local/rdaviz/bin/pip3 install matplotlib
+    /usr/local/rdaviz/bin/pip3 install scipy
+
+    apt-get install -y imagemagick
+
+
+BootStrap: library
+From: ubuntu:20.04
+Stage: final
+
+%files from full
+
+    /usr/lib/x86_64-linux-gnu /usr/lib
+    /usr/bin /usr
+
+    # g++
+    /usr/include /usr
+    /usr/lib/gcc
+
+    # python
+    /usr/lib/python3.9
+    /usr/local/rdaviz
+
+    # other
+    /etc/ssl
+    /etc/alternatives /etc
+
+%environment
+    export LC_ALL=C
+
+%runscript
+
+%labels
+    Author dattore@ucar.edu
