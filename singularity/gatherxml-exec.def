@@ -1,19 +1,68 @@
 BootStrap: localimage
-From: /glade/u/home/rdadata/lib/singularity/gatherxml-utils-ubuntu.sif
+From: /glade/u/home/rdadata/lib/singularity/gatherxml-5-utils.sif
 Stage: compile
 
 BootStrap: library
-From: ubuntu:16.04
+From: ubuntu:20.04
 Stage: binary
 
 %files from compile
-    /usr/lib64/mylibs
     /usr/lib/x86_64-linux-gnu /usr/lib
-    /lib/x86_64-linux-gnu /lib
+
+    # gatherxml
+    /usr/lib64/mylibs
     /usr/local/bin /usr/local
+
+    # python
+    /usr/lib/python3.9
+    /usr/bin/python3.9
+    /usr/local/rdaviz
+
+    # other
     /etc/ssl
+    /usr/bin/convert-im6.q16 /usr/bin/convert
     /usr/bin/rsync
     /usr/bin/ssh
+
+%post
+
+    # remove unused files to slim down the final image
+    rm /usr/bin/perl
+    rm -rf /usr/lib/apt
+    rm /usr/lib/python3.9/config-3.9-x86_64-linux-gnu/lib*.a
+    rm /usr/lib/x86_64-linux-gnu/lib*.a
+    rm -rf /usr/lib/x86_64-linux-gnu/gconv
+    rm -rf /usr/lib/x86_64-linux-gnu/ldscripts
+    rm -rf /usr/lib/x86_64-linux-gnu/perl
+    rm -rf /usr/lib/x86_64-linux-gnu/perl-base
+    rm -rf /usr/lib/x86_64-linux-gnu/security
+    rm /usr/lib/x86_64-linux-gnu/lib*san*
+    rm /usr/lib/x86_64-linux-gnu/libapt*
+    rm /usr/lib/x86_64-linux-gnu/libarchive*
+    rm /usr/lib/x86_64-linux-gnu/libbfd*
+    rm /usr/lib/x86_64-linux-gnu/libdb*
+    rm /usr/lib/x86_64-linux-gnu/libgio*
+    rm /usr/lib/x86_64-linux-gnu/libgs.so.9.50
+    rm /usr/lib/x86_64-linux-gnu/libgstreamer*
+    rm /usr/lib/x86_64-linux-gnu/libopcodes*
+    rm /usr/lib/x86_64-linux-gnu/libperl*
+    rm /usr/lib/x86_64-linux-gnu/libsepol*
+    rm /usr/lib/x86_64-linux-gnu/libsoup*
+    rm /usr/lib/x86_64-linux-gnu/libsystemd*
+    rm /usr/lib/x86_64-linux-gnu/liby*
+    rm /usr/lib/x86_64-linux-gnu/libzstd*
+    rm -rf /usr/local/rdaviz/lib/python3.9/site-packages/fontTools
+    rm -rf /usr/local/rdaviz/lib/python3.9/site-packages/pip*
+    rm -rf /usr/local/rdaviz/lib/python3.9/site-packages/scipy/integrate
+    rm -rf /usr/local/rdaviz/lib/python3.9/site-packages/scipy/optimize
+    rm -rf /usr/local/rdaviz/lib/python3.9/site-packages/scipy/stats
+    rm -rf /usr/local/rdaviz/lib/python3.9/site-packages/wheel*
+    rm -rf /usr/sbin
+    rm -rf /usr/share
+    rm -rf /var/cache
+    rm -rf /var/lib/apt
+    rm -rf /var/lib/dpkg
+    rm -rf /var/log
 
 %environment
     export LC_ALL=C
