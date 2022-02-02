@@ -1,24 +1,46 @@
 BootStrap: localimage
-From: /glade/u/home/rdadata/lib/singularity/gatherxml-libs-ubuntu.sif
-Stage: compile
+From: /glade/u/home/rdadata/lib/singularity/gatherxml-4-libs.sif
 
 %setup
     cp /glade/u/home/dattore/gatherxml/Makefile ${SINGULARITY_ROOTFS}/gatherxml/
+    cp -p /glade/u/home/dattore/gatherxml/src/_ascii2xml.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
+    cp -p /glade/u/home/dattore/gatherxml/src/_bufr2xml.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
+    cp -p /glade/u/home/dattore/gatherxml/src/_dcm.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
     cp -p /glade/u/home/dattore/gatherxml/src/_dsgen.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
+    cp -p /glade/u/home/dattore/gatherxml/src/_fix2xml.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
     cp -p /glade/u/home/dattore/gatherxml/src/_grid2xml.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
+    cp -p /glade/u/home/dattore/gatherxml/src/_gsi.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
+    cp -p /glade/u/home/dattore/gatherxml/src/_hdf2xml.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
     cp -p /glade/u/home/dattore/gatherxml/src/_iinv.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
     cp -p /glade/u/home/dattore/gatherxml/src/_nc2xml.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
+    cp -p /glade/u/home/dattore/gatherxml/src/_obs2xml.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
+    cp -p /glade/u/home/dattore/gatherxml/src/_prop2xml.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
+    cp -p /glade/u/home/dattore/gatherxml/src/_rcm.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
     cp -p /glade/u/home/dattore/gatherxml/src/_scm.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
+    cp -p /glade/u/home/dattore/gatherxml/src/_sdp.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
+    cp -p /glade/u/home/dattore/gatherxml/src/_sml.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
 
 %post
     cd /gatherxml
-    make HOST=singularity VERSION=ubuntu _dsgen
-    make HOST=singularity VERSION=ubuntu _grid2xml
-    make HOST=singularity VERSION=ubuntu _iinv
-    make HOST=singularity VERSION=ubuntu _nc2xml
-    make HOST=singularity VERSION=ubuntu _scm
+    make HOST=singularity VERSION=1 _ascii2xml
+    make HOST=singularity VERSION=1 _bufr2xml
+    make HOST=singularity VERSION=1 _dcm
+    make HOST=singularity VERSION=1 _dsgen
+    make HOST=singularity VERSION=1 _fix2xml
+    make HOST=singularity VERSION=1 _grid2xml
+    make HOST=singularity VERSION=1 _gsi
+    make HOST=singularity VERSION=1 _hdf2xml
+    make HOST=singularity VERSION=1 _iinv
+    make HOST=singularity VERSION=1 _nc2xml
+    make HOST=singularity VERSION=1 _obs2xml
+    make HOST=singularity VERSION=1 _prop2xml
+    make HOST=singularity VERSION=1 _rcm
+    make HOST=singularity VERSION=1 _scm
+    make HOST=singularity VERSION=1 _sdp
+    make HOST=singularity VERSION=1 _sml
     cd /usr/local/bin
     ln -s _dsgen dsgen
+    ln -s _gsi gsi
     ln -s _iinv iinv
     ln -s _scm scm
 

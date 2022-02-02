@@ -1,5 +1,5 @@
 BootStrap: localimage
-From: /glade/u/home/rdadata/lib/singularity/gatherxml-utils-ubuntu.sif
+From: /glade/u/home/rdadata/lib/singularity/gatherxml-5-utils.sif
 Stage: compile
 
 %setup
@@ -10,7 +10,7 @@ Stage: compile
 %post
     cd /gatherxml
     export UTILITY=`cat utility`
-    make HOST=singularity VERSION=ubuntu $UTILITY
+    make HOST=singularity VERSION=1 $UTILITY
 
 %environment
     export LC_ALL=C
