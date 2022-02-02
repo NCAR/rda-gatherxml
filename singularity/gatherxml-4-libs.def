@@ -1,5 +1,5 @@
 BootStrap: localimage
-From: /glade/u/home/rdadata/lib/singularity/gatherxml-base-ubuntu.sif
+From: /glade/u/home/rdadata/lib/singularity/gatherxml-3-python.sif
 
 %setup
     mkdir -p ${SINGULARITY_ROOTFS}/usr/include/jasper
@@ -12,6 +12,8 @@ From: /glade/u/home/rdadata/lib/singularity/gatherxml-base-ubuntu.sif
     cp -p /glade/u/home/dattore/cpp/lib/source/libbufr/*.cpp ${SINGULARITY_ROOTFS}/src/libbufr/
     mkdir -p ${SINGULARITY_ROOTFS}/src/libcitation/singularity
     cp -p /glade/u/home/dattore/cpp/lib/source/libcitation/*.cpp ${SINGULARITY_ROOTFS}/src/libcitation/
+    mkdir -p ${SINGULARITY_ROOTFS}/src/libcyclone/singularity
+    cp -p /glade/u/home/dattore/cpp/lib/source/libcyclone/*.cpp ${SINGULARITY_ROOTFS}/src/libcyclone/
     mkdir -p ${SINGULARITY_ROOTFS}/src/libdatetime/singularity
     cp -p /glade/u/home/dattore/cpp/lib/source/libdatetime/*.cpp ${SINGULARITY_ROOTFS}/src/libdatetime/
     mkdir -p ${SINGULARITY_ROOTFS}/src/liberror/singularity
@@ -36,8 +38,8 @@ From: /glade/u/home/rdadata/lib/singularity/gatherxml-base-ubuntu.sif
     cp -p /glade/u/home/dattore/cpp/lib/source/libmysql/*.cpp ${SINGULARITY_ROOTFS}/src/libmysql/
     mkdir -p ${SINGULARITY_ROOTFS}/src/libmyssl/singularity
     cp -p /glade/u/home/dattore/cpp/lib/source/libmyssl/*.cpp ${SINGULARITY_ROOTFS}/src/libmyssl/
-    mkdir -p ${SINGULARITY_ROOTFS}/src/libio/singularity
-    cp -p /glade/u/home/dattore/cpp/lib/source/libio/*.cpp ${SINGULARITY_ROOTFS}/src/libio/
+    mkdir -p ${SINGULARITY_ROOTFS}/src/libobs/singularity
+    cp -p /glade/u/home/dattore/cpp/lib/source/libobs/*.cpp ${SINGULARITY_ROOTFS}/src/libobs/
     mkdir -p ${SINGULARITY_ROOTFS}/src/libs3/singularity
     cp -p /glade/u/home/dattore/cpp/lib/source/libs3/*.cpp ${SINGULARITY_ROOTFS}/src/libs3/
     mkdir -p ${SINGULARITY_ROOTFS}/src/libsearch/singularity
@@ -63,6 +65,7 @@ From: /glade/u/home/rdadata/lib/singularity/gatherxml-base-ubuntu.sif
     make HOST=singularity libbitmap.so
     make HOST=singularity libbufr.so
     make HOST=singularity libcitation.so
+    make HOST=singularity libcyclone.so
     make HOST=singularity libdatetime.so
     make HOST=singularity liberror.so
     make HOST=singularity libgrids.so
@@ -75,6 +78,7 @@ From: /glade/u/home/rdadata/lib/singularity/gatherxml-base-ubuntu.sif
     make HOST=singularity libmetautils.so
     make HOST=singularity libmysql.so
     make HOST=singularity libmyssl.so
+    make HOST=singularity libobs.so
     make HOST=singularity libsearch.so
     make HOST=singularity libutils.so
     make HOST=singularity libutilsthread.so
@@ -87,7 +91,7 @@ From: /glade/u/home/rdadata/lib/singularity/gatherxml-base-ubuntu.sif
       g++ -std=c++14 -Wall -Wold-style-cast -O3 -Weffc++ -Wl,-rpath,/usr/lib64/mylibs cosfile.cpp -I/usr/include/myincludes -L/usr/lib64/mylibs -lio -lutils -ldatetime -ls3 -lmyssl -lxml -lcurl -o /usr/local/bin/cosfile
     fi
     if [ ! -f "/usr/local/bin/cosconvert" ] || [ "cosconvert.cpp" -nt "/usr/local/bin/cosconvert" ]; then
-      g++ -std=c++14 -Wall -Wold-style-cast -O3 -Weffc++ -Wl,-rpath,/usr/lib64/mylibs cosconvert.cpp -I/usr/include/myincludes -L/usr/lib64/mylibs -lio -lutils -ldatetime -ls3 -lmyssl -lxml -lgrids -lgridutils -ljasper -lcurl -o /usr/local/bin/cosconvert
+      g++ -std=c++14 -Wall -Wold-style-cast -O3 -Weffc++ -Wl,-rpath,/usr/lib64/mylibs -Wl,-rpath,/usr/lib/x86_64-linux-gnu/lib cosconvert.cpp -I/usr/include/myincludes -L/usr/lib64/mylibs -L/usr/lib/x86_64-linux-gnu/lib -lio -lutils -ldatetime -ls3 -lmyssl -lxml -lgrids -lgridutils -ljasper -lcurl -o /usr/local/bin/cosconvert
     fi
 
 %environment
