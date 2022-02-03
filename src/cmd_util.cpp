@@ -222,7 +222,8 @@ string gatherxml_utility(string user) {
   if (util.empty()) {
     log_error2("unable to determine gatherxml utility", F, "gatherxml", user);
   }
-  if (sp_a.back()[0] != '/') {
+  if (sp_a.back()[0] != '/' && !regex_search(sp_a.back(), regex("^https://rda."
+      "ucar.edu/"))) {
     auto idx = metautils::args.args_string.rfind("!");
     if (idx == string::npos) {
       log_error2("bad arguments string: '" + metautils::args.args_string, F,
