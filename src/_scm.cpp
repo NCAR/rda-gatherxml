@@ -380,8 +380,9 @@ void create_grml_tables(MarkupParameters *markup_parameters) {
   auto tb_base = markup_parameters->database + ".ds" + local_args.dsnum2;
   string r;
   if (markup_parameters->server.command("create table " + tb_base + "_" +
-      markup_parameters->file_type + "files2 like " + markup_parameters->database
-      + "template_" + markup_parameters->file_type + "files2", r) < 0) {
+      markup_parameters->file_type + "files2 like " + markup_parameters->
+      database + ".template_" + markup_parameters->file_type + "files2", r) <
+      0) {
     log_error2("error: '" + markup_parameters->server.error() + "' while "
         "creating table " + tb_base + "_" + markup_parameters->file_type +
         "files2", F, "scm", USER);
@@ -416,14 +417,16 @@ void create_obml_tables(MarkupParameters *markup_parameters) {
   auto tb_base = markup_parameters->database + ".ds" + local_args.dsnum2;
   string r;
   if (markup_parameters->server.command("create table " + tb_base + "_" +
-      markup_parameters->file_type + "files2 like " + markup_parameters->database
-      + "template_" + markup_parameters->file_type + "files2", r) < 0) {
+      markup_parameters->file_type + "files2 like " + markup_parameters->
+      database + ".template_" + markup_parameters->file_type + "files2", r) <
+      0) {
     log_error2("error: '" + markup_parameters->server.error() + "' while "
         "creating table " + tb_base + "_" + markup_parameters->file_type +
         "files2", F, "scm", USER);
   }
-  if (markup_parameters->server.command("create table " + tb_base + "_locations "
-      "like " + markup_parameters->database + ".template_locations", r) < 0) {
+  if (markup_parameters->server.command("create table " + tb_base +
+      "_locations like " + markup_parameters->database + ".template_locations",
+      r) < 0) {
     log_error2("error: '" + markup_parameters->server.error() + "' while "
         "creating table " + tb_base + "_locations", F, "scm", USER);
   }
@@ -441,8 +444,8 @@ void create_obml_tables(MarkupParameters *markup_parameters) {
   }
 */
   if (markup_parameters->server.command("create table " + tb_base +
-      "_dataTypes2 like " + markup_parameters->database + ".template_dataTypes2",
-      r) < 0) {
+      "_dataTypes2 like " + markup_parameters->database +
+      ".template_dataTypes2", r) < 0) {
     log_error2("error: '" + markup_parameters->server.error() + "' while "
         "creating table " + tb_base + "_dataTypes2", F, "scm", USER);
   }
@@ -458,8 +461,8 @@ void create_obml_tables(MarkupParameters *markup_parameters) {
     log_error2("error: '" + markup_parameters->server.error() + "' while "
         "creating table " + tb_base + "_frequencies", F, "scm", USER);
   }
-  if (markup_parameters->server.command("create table " + tb_base + "_IDs2 like "
-      + markup_parameters->database + ".template_IDs2", r) < 0) {
+  if (markup_parameters->server.command("create table " + tb_base + "_IDs2 "
+      "like " + markup_parameters->database + ".template_IDs2", r) < 0) {
     log_error2("error: '" + markup_parameters->server.error() + "' while "
         "creating table " + tb_base + "_IDs2", F, "scm", USER);
   }
@@ -468,8 +471,9 @@ void create_obml_tables(MarkupParameters *markup_parameters) {
     log_error2("error: '" + markup_parameters->server.error() + "' while "
         "creating table " + tb_base + "_IDList2", F, "scm", USER);
   }
-  if (markup_parameters->server.command("create table " + tb_base + "_geobounds "
-      "like " + markup_parameters->database + ".template_geobounds", r) < 0) {
+  if (markup_parameters->server.command("create table " + tb_base +
+      "_geobounds like " + markup_parameters->database + ".template_geobounds",
+      r) < 0) {
     log_error2("error: '" + markup_parameters->server.error() + "' while "
         "creating table " + tb_base + "_geobounds", F, "scm", USER);
   }
@@ -487,8 +491,9 @@ void create_fixml_tables(MarkupParameters *markup_parameters) {
   auto tb_base = markup_parameters->database + ".ds" + local_args.dsnum2;
   string r;
   if (markup_parameters->server.command("create table " + tb_base + "_" +
-      markup_parameters->file_type + "files2 like " + markup_parameters->database
-      + "template_" + markup_parameters->file_type + "files2", r) < 0) {
+      markup_parameters->file_type + "files2 like " + markup_parameters->
+      database + "template_" + markup_parameters->file_type + "files2", r) <
+      0) {
     log_error2("error: '" + markup_parameters->server.error() + "' while "
         "creating table " + tb_base + "_" + markup_parameters->file_type +
         "files2", F, "scm", USER);
@@ -498,8 +503,9 @@ void create_fixml_tables(MarkupParameters *markup_parameters) {
     log_error2("error: '" + markup_parameters->server.error() + "' while "
         "creating table " + tb_base + "_IDList", F, "scm", USER);
   }
-  if (markup_parameters->server.command("create table " + tb_base + "_locations "
-      "like " + markup_parameters->database + ".template_locations", r) < 0) {
+  if (markup_parameters->server.command("create table " + tb_base +
+      "_locations like " + markup_parameters->database + ".template_locations",
+      r) < 0) {
     log_error2("error: '" + markup_parameters->server.error() + "' while "
         "creating table " + tb_base + "_locations", F, "scm", USER);
   }
@@ -611,8 +617,8 @@ void clear_satml_tables(MarkupParameters *markup_parameters) {
 
 void clear_fixml_tables(MarkupParameters *markup_parameters) {
   markup_parameters->server._delete(markup_parameters->database + ".ds" +
-      local_args.dsnum2 + "_locations", markup_parameters->file_type + "ID_code "
-      "= " + markup_parameters->file_map[markup_parameters->filename]);
+      local_args.dsnum2 + "_locations", markup_parameters->file_type +
+      "ID_code = " + markup_parameters->file_map[markup_parameters->filename]);
   markup_parameters->server._delete(markup_parameters->database + ".ds" +
       local_args.dsnum2 + "_frequencies", markup_parameters->file_type +
       "ID_code = " + markup_parameters->file_map[markup_parameters->filename]);
