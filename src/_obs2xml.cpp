@@ -848,10 +848,9 @@ bool processed_observation(std::unique_ptr<Observation>& obs,gatherxml::markup::
     return processed_uadb_observation(obs,obs_data,obs_type);
   } else if (metautils::args.data_format == "wmssc") {
     return processed_wmssc_observation(obs,obs_data,obs_type);
-  } else {
-    std::cerr << "Error: unable to scan format " << metautils::args.data_format << std::endl;
-    exit(1);
   }
+  std::cerr << "Error: unable to scan format " << metautils::args.data_format << std::endl;
+  exit(1);
 }
 
 bool open_file(void *istream,string filename)
@@ -874,9 +873,8 @@ bool open_file(void *istream,string filename)
     return (reinterpret_cast<InputUADBRaobStream *>(istream))->open(filename);
   } else if (metautils::args.data_format == "wmssc") {
     return (reinterpret_cast<InputWMSSCObservationStream *>(istream))->open(filename);
-  } else {
-    metautils::log_error("open_file(): "+metautils::args.data_format+"-formatted file not recognized","obs2xml",USER);
   }
+  metautils::log_error("open_file(): "+metautils::args.data_format+"-formatted file not recognized","obs2xml",USER);
   return false;
 }
 
