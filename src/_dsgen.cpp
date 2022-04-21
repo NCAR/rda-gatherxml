@@ -37,16 +37,19 @@ using std::stof;
 using std::stoi;
 using std::string;
 using std::stringstream;
+using std::to_string;
 using std::tuple;
 using std::unordered_map;
 using std::unordered_set;
 using std::vector;
+using strutils::append;
 using strutils::capitalize;
 using strutils::chop;
 using strutils::ftos;
 using strutils::itos;
 using strutils::replace_all;
 using strutils::split;
+using strutils::sql_ready;
 using strutils::substitute;
 using strutils::to_capital;
 using strutils::trim;
@@ -62,6 +65,34 @@ XMLDocument xdoc;
 MySQL::Server server;
 string dataset_type;
 bool no_dset_waf = false;
+
+unordered_map<string, string> wagtail_db{
+    { "citations", "dataset_citation_datasetcitationpage" },
+    { "num_citations", "dataset_citation_datasetcitationpage" },
+    { "abstract", "dataset_description_datasetdescriptionpage" },
+    { "contributors", "dataset_description_datasetdescriptionpage" },
+    { "data_formats", "dataset_description_datasetdescriptionpage" },
+    { "dsdoi", "dataset_description_datasetdescriptionpage" },
+    { "dstitle", "dataset_description_datasetdescriptionpage" },
+    { "related_dslist", "dataset_description_datasetdescriptionpage" },
+    { "related_rsrc_list", "dataset_description_datasetdescriptionpage" },
+    { "update_freq", "dataset_description_datasetdescriptionpage" },
+    { "variables", "dataset_description_datasetdescriptionpage" },
+    { "volume", "dataset_description_datasetdescriptionpage" },
+};
+
+void update_wagtail(string column, string insert_value, string caller) {
+  if (wagtail_db.find(column) == wagtail_db.end()) {
+    log_error2("unknown wagtail column '" + column + "'", caller, "dsgen",
+        USER);
+  }
+  if (server.update("wagtail." + wagtail_db[column], column + " = '" +
+      sql_ready(insert_value) + "'", "dsid = '" + metautils::args.dsnum + "'") <
+      0) {
+    log_error2("failed to update wagtail." + wagtail_db[column] + " " + column +
+        ": error '" + server.error() + "'", caller, "dsgen", USER);
+  }
+}
 
 void generate_index(string type, string tdir_name) {
   static const string F = this_function_label(__func__);
@@ -116,6 +147,7 @@ void generate_index(string type, string tdir_name) {
     auto e = xdoc.element("dsOverview/title");
     auto ti = e.content();
     tdoc.add_replacement("__TITLE__", ti);
+    update_wagtail("dstitle", ti, F);
     if (!metadataExport::export_to_json_ld(ss, metautils::args.dsnum, xdoc,
         0)) {
       log_error2("unable to export JSON-LD metadata", F, "dsgen", USER);
@@ -133,30 +165,15 @@ void generate_index(string type, string tdir_name) {
       tdoc.add_replacement("__LOGO_IMAGE__", "default_200_200.png");
       tdoc.add_replacement("__LOGO_WIDTH__", "70");
     }
-    MySQL::Query query("doi", "dssdb.dsvrsn", "dsid = 'ds" + metautils::args.
-        dsnum + "' and status = 'A'");
+    MySQL::LocalQuery query("doi", "dssdb.dsvrsn", "dsid = 'ds" + metautils::
+        args.dsnum + "' and status = 'A'");
     MySQL::Row row;
     string ds;
     if (query.submit(server) == 0 && query.fetch_row(row) && !row[0].empty()) {
       ds = "&nbsp;|&nbsp;<span class=\"blue\">DOI: " + row[0] + "</span>";
+      update_wagtail("dsdoi", row[0], F);
     }
     tdoc.add_replacement("__DOI_SPAN__", ds);
-    e = xdoc.element("dsOverview/contact");
-    auto sp = split(e.content());
-    query.set("select logname, phoneno from dssdb.dssgrp where fstname = '" +
-        sp[0] + "' and lstname = '" + sp[1] + "'");
-    if (query.submit(server) < 0) {
-      log_error2("mysql error while trying to get specialist information: " +
-          query.error(), F, "dsgen", USER);
-    }
-    if (!query.fetch_row(row)) {
-      log_error2("no result returned for specialist '" + e.content() + "'", F,
-          "dsgen", USER);
-    }
-    tdoc.add_replacement("__CONTACT_LOGIN__", row[0]);
-    tdoc.add_replacement("__CONTACT_NAME__", e.content());
-    tdoc.add_replacement("__CONTACT_PHONE__", substitute(substitute(row[1], "(",
-        ""), ")", ""));
     if (dataset_type == "D") {
       tdoc.add_if("__IS_DEAD_DATASET__");
     }
@@ -556,9 +573,10 @@ void add_data_formats(TokenDocument& tdoc, vector<string>& formats, bool
   if (!fdoc) {
     log_error2("unable to open FormatReferences.xml", F, "dsgen", USER);
   }
-  string df;
+  string df, json;
   size_t n = 0;
   for (const auto& i : formats) {
+    string j;
     auto sp = split(i, "<!>");
     auto d = sp[0];
     string u;
@@ -582,22 +600,27 @@ void add_data_formats(TokenDocument& tdoc, vector<string>& formats, bool
     }
     replace_all(d, "_", " ");
     df += d;
+    append(j, "\"description\": \"" + d + "\"", ", ");
     if (!u.empty()) {
       df += "</a>";
       if (!regex_search(u, regex("^http://rda.ucar.edu"))) {
         df += "</i>";
       }
+      append(j, "\"url\": \"" + u + "\"", ", ");
     }
     ++n;
     if (n < formats.size()) {
       df += ", ";
     }
+    append(json, "{" + j + "}", ", ");
   }
   fdoc.close();
   tdoc.add_replacement("__DATA_FORMATS__", df);
+  update_wagtail("data_formats", "[" + json + "]", F);
 }
 
 void add_citations(TokenDocument& tdoc) {
+  static const string F = this_function_label(__func__);
   MySQL::LocalQuery qc("select distinct d.DOI_work from citation"
       ".data_citations as d left join dssdb.dsvrsn as v on v.doi = d.DOI_data "
       "where v.dsid = 'ds" + metautils::args.dsnum + "'");
@@ -763,16 +786,23 @@ void add_citations(TokenDocument& tdoc) {
       return (get<1>(left) < get<1>(right));
     });
     unordered_set<string> yrs;
+    string json;
     for (const auto& c : clist) {
       auto pub_year=get<0>(c);
       if (yrs.find(pub_year) == yrs.end()) {
         tdoc.add_repeat("__DATA_CITER__", "CITATION[!]" + get<1>(c) +
             "<!>YEAR[!]" + pub_year);
+        append(json, "{\"year\": " + pub_year + ", \"publications\": [\"" +
+            substitute(get<1>(c), "\"", "\\\\\"") + "\"", "]}, ");
         yrs.emplace(pub_year);
       } else {
         tdoc.add_repeat("__DATA_CITER__", "CITATION[!]" + get<1>(c));
+        append(json, "\"" + substitute(get<1>(c), "\"", "\\\\\"") + "\"", ", ");
       }
     }
+    update_wagtail("num_citations", to_string(clist.size()), F);
+//log_error2("[" + json + "]}]", F, "dsgen", USER);
+    update_wagtail("citations", "[" + json + "]}]", F);
   } else {
     tdoc.add_replacement("__NUM_DATA_CITATIONS__", "<strong>0</strong> times");
   }
@@ -806,6 +836,8 @@ void generate_description(string type, string tdir_name) {
   // dataset abstract
   tdoc.add_replacement("__ABSTRACT__", text_field_from_element(xdoc.element(
       "dsOverview/summary")));
+  update_wagtail("abstract", text_field_from_element(xdoc.element(
+      "dsOverview/summary")), F);
   if (dataset_type == "D") {
     tdoc.add_if("__IS_DEAD_DATASET__");
     ofs << tdoc;
@@ -1018,6 +1050,8 @@ void generate_description(string type, string tdir_name) {
     tdoc.add_if("__HAS_UPDATE_FREQUENCY__");
     tdoc.add_replacement("__UPDATE_FREQUENCY__", capitalize(e.attribute_value(
         "frequency")));
+    update_wagtail("update_freq", capitalize(e.attribute_value("frequency")),
+        F);
   }
 
   // access restrictions
@@ -1066,11 +1100,14 @@ void generate_description(string type, string tdir_name) {
         "dsgen", USER);
   }
   list<string> l;
+  string json;
   for (const auto& row : qvar) {
     l.emplace_back(capitalize(row[0]));
+    append(json, "\"" + capitalize(row[0]) + "\"", ", ");
   }
   tdoc.add_replacement("__VARIABLES__", create_table_from_strings(l, 4,
       "#e1eaff", "#c8daff"));
+  update_wagtail("variables", "[" + json + "]", F);
   auto elist = xdoc.element_list("dsOverview/contentMetadata/detailedVariables/"
       "detailedVariable");
   if (elist.size() > 0) {
@@ -1577,6 +1614,7 @@ void generate_description(string type, string tdir_name) {
         "dsgen", USER);
   }
   stringstream ss;
+  json.clear();
   auto n = 0;
   for (const auto& row : qc) {
     if (n > 0) {
@@ -1596,9 +1634,13 @@ void generate_description(string type, string tdir_name) {
         "hideInfo('src" << n << "')\">" << snam << "</span><div class=\"info\" "
         "id=\"src" << n << "\" class=\"source\"><small>" << lnam << "</small>"
         "</div>";
+    append(json, "{\"id\": \"" + snam + "\", \"name\": \"" + lnam + "\"}", ", ");
     ++n;
   }
   tdoc.add_replacement("__DATA__CONTRIBUTORS__", ss.str());
+  if (!json.empty()) {
+    update_wagtail("contributors", "[" + json + "]", F);
+  }
 
   // related web sites
   elist = xdoc.element_list("dsOverview/relatedResource");
@@ -1609,15 +1651,16 @@ void generate_description(string type, string tdir_name) {
       tdoc.add_replacement("__WEB_SITES_VALIGN__", "bottom");
     }
     stringstream ss;
+    json.clear();
     for (const auto& e : elist) {
       auto d = e.content();
       trim(d);
       if (d.back() == '.' && d[d.length() - 2] != '.') {
         chop(d);
       }
-      ss << "<a href=\"" << e.attribute_value("url") << "\">";
-      auto is_local = false;
       auto url = e.attribute_value("url");
+      ss << "<a href=\"" << url << "\">";
+      auto is_local = false;
       if (regex_search(url, regex("^http://rda.ucar.edu")) || regex_search(url,
           regex("^https://rda.ucar.edu")) || regex_search(url, regex(
           "^http://dss.ucar.edu")) || regex_search(url, regex(
@@ -1632,9 +1675,12 @@ void generate_description(string type, string tdir_name) {
         ss << "</span>";
       }
       ss << "</a><br />";
+      append(json, "{\"description\": \"" + d + "\", \"url\": \"" + url + "\"}",
+          ", ");
     }
     tdoc.add_if("__HAS_RELATED_WEB_SITES__");
     tdoc.add_replacement("__RELATED_WEB_SITES__", ss.str());
+    update_wagtail("related_rsrc_list", "[" + json + "]", F);
   }
 
   // publications
@@ -1665,6 +1711,8 @@ void generate_description(string type, string tdir_name) {
       ++n;
     }
     ss << ftos(llround(v * 100.) / 100., 6, 2, ' ') << " " << vlist[n];
+    json = "\"full\": \"" + ftos(llround(v * 100.) / 100., 2) + " " + vlist[n] +
+        "\"";
   }
   if (qg.num_rows() > 1) {
     ss << " <span class=\"fs13px\">(Entire dataset)</span><br /><span id=\"D" <<
@@ -1678,25 +1726,29 @@ void generate_description(string type, string tdir_name) {
         "/images/bluetriangle90.gif\" width=\"15\" height=\"12\" border=\"0\">"
         "</a><span class=\"fs13px\">Volume details by dataset product:";
     dnum += 2;
+    string j;
     for (const auto& row2: qg) {
+      auto g = row2[1].empty() ? row2[2] : row2[1];
       auto v=stof(row2[0]) / 1000000.;
       n = 0;
       while (v > 1000. && n < VOLUME_LEN) {
         v /= 1000.;
         ++n;
       }
-      ss << "<div style=\"margin-left: 10px\">";
-      if (!row2[1].empty()) {
-        ss << row2[1];
-      } else {
-        ss << row2[2];
-      }
-      ss << ": " << ftos(llround(v * 100.) / 100., 6, 2, ' ') << " " << vlist[n]
-          << "</div>";
+      ss << "<div style=\"margin-left: 10px\">" << g << ": " << ftos(llround(v *
+          100.) / 100., 6, 2, ' ') << " " << vlist[n] << "</div>";
+      append(j, "{\"volume\": \"" + ftos(llround(v * 100.) / 100., 2) + " " +
+          vlist[n] + "\", \"group\": \"" + g + "\"}", ", ");
     }
     ss << "</span></span>";
+    if (!json.empty()) {
+      json += ", \"groups\": [" + j + "]";
+    }
   }
   tdoc.add_replacement("__VOLUME__", ss.str());
+  if (!json.empty()) {
+    update_wagtail("volume", "{" + json + "}", F);
+  }
 
   // data formats
   add_data_formats(tdoc, formats, found_content_metadata);
@@ -1716,7 +1768,7 @@ void generate_description(string type, string tdir_name) {
       }
       return false;
     });
-    string s;
+    string s, json;
     for (const auto& ele : elist) {
       MySQL::LocalQuery qd("dsid, title", "search.datasets", "dsid = '" +
           ele.attribute_value("ID") + "' and (type = 'P' or type = 'H')");
@@ -1730,9 +1782,12 @@ void generate_description(string type, string tdir_name) {
             "#description\">" + row[0] + "</a></td><td>-</td><td>" + row[1] +
             "</td></tr>";
       }
+      append(json, "{\"dsid\": \"" + row[0] + "\", \"title\": \"" + row[1] +
+          "\"}", ", ");
     }
     tdoc.add_if("__HAS_RELATED_DATASETS__");
     tdoc.add_replacement("__RELATED_DATASETS__", s);
+    update_wagtail("related_dslist", "[" + json + "]", F);
   }
 
   // more details
