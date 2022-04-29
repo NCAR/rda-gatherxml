@@ -3998,38 +3998,33 @@ void scan_file(ScanData& scan_data) {
   }
 }
 
+void show_usage_and_exit() {
+  cerr << "usage: hdf2xml -f format -d [ds]nnn.n [options...] <path>" << endl;
+  cerr << "\nrequired (choose one):" << endl;
+  cerr << "HDF4 formats:" << endl;
+  cerr << "-f quikscathdf4   NASA QuikSCAT HDF4" << endl;
+  cerr << "HDF5 formats:" << endl;
+  cerr << "-f ispdhdf5       NOAA International Surface Pressure Databank HDF5"
+      << endl;
+  cerr << "-f hdf5nc4        NetCDF4 with HDF5 storage" << endl;
+  cerr << "-f usarrthdf5     EarthScope USArray Transportable Array Pressure "
+      "Observations" << endl;
+  cerr << "\nrequired:" << endl;
+  cerr << "-d <nnn.n>       nnn.n is the dataset number to which the data file "
+      "belongs" << endl;
+  cerr << "\noptions" << endl;
+  cerr << "-V               verbose operation" << endl;
+  cerr << "\nrequired:" << endl;
+  cerr << "<path>           full HPSS path or URL of the file to read" << endl;
+  cerr << "                 - HPSS paths must begin with \"/FS/DECS\"" << endl;
+  cerr << "                 - URLs must begin with \"http://rda.ucar.edu\"" <<
+      endl;
+  exit(1);
+}
+
 int main(int argc, char **argv) {
   if (argc < 6) {
-    cerr << "usage: hdf2xml -f format -d [ds]nnn.n [options...] <path>" <<
-        endl;
-    cerr << "\nrequired (choose one):" << endl;
-    cerr << "HDF4 formats:" << endl;
-    cerr << "-f quikscathdf4   NASA QuikSCAT HDF4" << endl;
-    cerr << "HDF5 formats:" << endl;
-    cerr << "-f ispdhdf5       NOAA International Surface Pressure "
-        "Databank HDF5" << endl;
-    cerr << "-f hdf5nc4        NetCDF4 with HDF5 storage" << endl;
-    cerr << "-f usarrthdf5     EarthScope USArray Transportable Array "
-        "Pressure Observations" << endl;
-    cerr << "\nrequired:" << endl;
-    cerr << "-d <nnn.n>       nnn.n is the dataset number to which the "
-        "data file belongs" << endl;
-    cerr << "\noptions" << endl;
-    cerr << "-l <name>        name of the HPSS file on local disk (this "
-        "avoids an HPSS read)" << endl;
-    cerr << "-m <name>        name of member; <path> MUST be the name of "
-        "a parent file that" << endl;
-    cerr << "                   has support for direct member access" <<
-        endl;
-    cerr << "-V               verbose operation" << endl;
-    cerr << "\nrequired:" << endl;
-    cerr << "<path>           full HPSS path or URL of the file to read" <<
-        endl;
-    cerr << "                 - HPSS paths must begin with \"/FS/DECS\"" <<
-        endl;
-    cerr << "                 - URLs must begin with "
-        "\"http://{rda|dss}.ucar.edu\"" << endl;
-    exit(1);
+    show_usage_and_exit();
   }
   const string THIS_FUNC = this_function_label(__func__);
   signal(SIGSEGV, segv_handler);
