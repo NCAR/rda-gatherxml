@@ -714,9 +714,10 @@ string write(my::map<GridEntry>& grid_table, string caller, string user) {
 
     // print out <level> elements
     vector<string> used;
-    for (const auto& k : ge.level_table.keys()) {
+    for (const auto& e : ge.level_table) {
+      string k;
       LevelEntry le;
-      ge.level_table.found(k, le);
+      tie(k, le) = e;
       auto sp = split(k, ":");
       if (metautils::args.data_format == "grib" || metautils::args.data_format
           == "grib0" || metautils::args.data_format == "grib2" || metautils::
@@ -841,14 +842,15 @@ string write(my::map<GridEntry>& grid_table, string caller, string user) {
       }
     }
     for (const auto& e : used) {
-      ge.level_table.remove(e);
+      ge.level_table.erase(e);
     }
 
     // print out <layer> elements
     used.clear();
-    for (const auto& k : ge.level_table.keys()) {
+    for (const auto& e : ge.level_table) {
+      string k;
       LevelEntry le;
-      ge.level_table.found(k, le);
+      tie(k, le) = e;
       auto sp = split(k, ":");
       if (metautils::args.data_format == "grib" || metautils::args.data_format
           == "grib0" || metautils::args.data_format == "grib2" || metautils::
@@ -925,7 +927,7 @@ string write(my::map<GridEntry>& grid_table, string caller, string user) {
       }
     }
     for (const auto& e : used) {
-      ge.level_table.remove(e);
+      ge.level_table.erase(e);
     }
     if (ge.level_table.size() > 0) {
       log_error2("level/layer table should be empty but table length is " +
