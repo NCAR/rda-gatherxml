@@ -23,6 +23,7 @@ using std::string;
 using std::stringstream;
 using std::tie;
 using std::unique_ptr;
+using std::unordered_map;
 using std::vector;
 using strutils::ftos;
 using strutils::itos;
@@ -618,7 +619,8 @@ void write_grid(string grid_entry_key, std::ofstream& ofs, string caller, string
   }
 }
 
-string write(my::map<GridEntry>& grid_table, string caller, string user) {
+string write(unordered_map<string, GridEntry>& grid_table, string caller, string
+    user) {
   static const string F = "GrML::" + this_function_label(__func__);
   TempDir t; // t.name() is the return value
   if (!t.create(metautils::directives.temp_path)) {
@@ -677,8 +679,8 @@ string write(my::map<GridEntry>& grid_table, string caller, string user) {
       "%Y-%m-%d %T %Z") << "\" />" << endl;
   vector<string> v;
   v.reserve(grid_table.size());
-  for (const auto& k : grid_table.keys()) {
-    v.emplace_back(k);
+  for (const auto& e : grid_table) {
+    v.emplace_back(e.first);
   }
   sort(v.begin(), v.end(),
   [](const string& left, const string& right) -> bool {
@@ -687,12 +689,11 @@ string write(my::map<GridEntry>& grid_table, string caller, string user) {
     }
     return false;
   });
-  for (size_t m = 0; m < grid_table.size(); ++m) {
-    GridEntry ge;
-    grid_table.found(v[m], ge);
+  for (const auto& key : v) {
+    auto ge = grid_table[key];
 
     // print out <grid> element
-    write_grid(ge.key, ofs, caller, user);
+    write_grid(key, ofs, caller, user);
 
     // print out <process> elements
     for (const auto& e : ge.process_table) {
