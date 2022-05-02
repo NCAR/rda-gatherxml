@@ -2925,6 +2925,28 @@ metautils::NcTime::TimeBounds time_bounds(InputHDF5Stream& is, const metautils::
   return tbnds;
 }
 
+void set_month_end_date(GridData& gd, string calendar) {
+  auto& i = gd.time_range_entry.data->instantaneous;
+  if (i.first_valid_datetime.day() == 1 && i.first_valid_datetime.time() == 0) {
+    i.last_valid_datetime.add_seconds(dateutils::days_in_month(i.
+        last_valid_datetime.year(), i.last_valid_datetime.month(), calendar) *
+        86400 - 1, calendar);
+  }
+  auto& b = gd.time_range_entry.data->bounded;
+  if (!gd.time_bounds.id.empty()) {
+    if (b.first_valid_datetime.day() == 1) {
+      b.last_valid_datetime.add_days(dateutils::days_in_month(b.
+          last_valid_datetime.year(), b.last_valid_datetime.month(), calendar) -
+          1, calendar);
+    }
+  } else if (!gd.climo_bounds.id.empty()) {
+    if (b.first_valid_datetime.day() == b.last_valid_datetime.day() && b.
+        first_valid_datetime.time() == 0 && b.last_valid_datetime.time() == 0) {
+      b.last_valid_datetime.subtract_seconds(1);
+    }
+  }
+}
+
 bool found_alternate_lat_lon_coordinates(InputHDF5Stream& istream, GridData&
      grid_data, vector<string>& lat_ids, vector<string>& lon_ids) {
   vector<string> compass{"north", "east"};
@@ -3414,39 +3436,7 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream, ScanData& scan_data) {
       num_values;
   auto tm_bnds = time_bounds(istream, *coord_vars.nc_time, grid_data);
   if (coord_vars.nc_time->units == "months") {
-    if (grid_data.time_range_entry.data->
-        instantaneous.first_valid_datetime.day() == 1 &&
-        grid_data.time_range_entry.data->
-        instantaneous.first_valid_datetime.time() == 0) {
-      grid_data.time_range_entry.data->
-          instantaneous.last_valid_datetime.add_seconds(
-          dateutils::days_in_month(grid_data.time_range_entry.data->
-          instantaneous.last_valid_datetime.year(),
-          grid_data.time_range_entry.data->
-          instantaneous.last_valid_datetime.month(), coord_vars.nc_time->
-          calendar) * 86400 - 1, coord_vars.nc_time->calendar);
-    }
-    if (!grid_data.time_bounds.id.empty()) {
-      if (grid_data.time_range_entry.data->bounded.first_valid_datetime.day() ==
-          1) {
-        grid_data.time_range_entry.data->bounded.last_valid_datetime.add_days(
-            dateutils::days_in_month(grid_data.time_range_entry.data->
-            bounded.last_valid_datetime.year(),
-            grid_data.time_range_entry.data->
-            bounded.last_valid_datetime.month(), coord_vars.nc_time->calendar) -
-            1, coord_vars.nc_time->calendar);
-      }
-    } else if (!grid_data.climo_bounds.id.empty()) {
-      if (grid_data.time_range_entry.data->bounded.first_valid_datetime.day() ==
-          grid_data.time_range_entry.data->bounded.last_valid_datetime.day() &&
-          grid_data.time_range_entry.data->
-          bounded.first_valid_datetime.time() == 0 &&
-          grid_data.time_range_entry.data->bounded.last_valid_datetime.time() ==
-          0) {
-        grid_data.time_range_entry.data->
-            bounded.last_valid_datetime.subtract_seconds(1);
-      }
-    }
+    set_month_end_date(grid_data, coord_vars.nc_time->calendar);
   }
   if (static_cast<int>(grid_data.time_range_entry.key) == -1 &&
       grid_data.forecast_period.data_array.num_values > 0) {
