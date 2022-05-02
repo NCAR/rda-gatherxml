@@ -21,6 +21,7 @@ using std::stoi;
 using std::stof;
 using std::string;
 using std::stringstream;
+using std::tie;
 using std::unique_ptr;
 using std::vector;
 using strutils::ftos;
@@ -731,16 +732,16 @@ string write(my::map<GridEntry>& grid_table, string caller, string user) {
             ofs << sp[0];
           }
           ofs << "\" value=\"" << sp[1] << "\">" << endl;
-          for (const auto& k2 : le.parameter_code_table.keys()) {
+          for (const auto& e : le.parameter_code_table) {
+            string code;
             ParameterEntry pe;
-            if (le.parameter_code_table.found(k2, pe)) {
-              auto idx = k2.find(":");
-              ofs << "      <parameter map=\"" << k2.substr(0, idx) << "\" "
-                  "value=\"" << k2.substr(idx + 1) << "\" start=\"" << pe.
-                  start_date_time.to_string("%Y-%m-%d %R %Z") << "\" end=\"" <<
-                  pe.end_date_time.to_string("%Y-%m-%d %R %Z") << "\" nsteps=\""
-                  << pe.num_time_steps << "\" />" << endl;
-            }
+            tie(code, pe) = e;
+            auto idx = code.find(":");
+            ofs << "      <parameter map=\"" << code.substr(0, idx) << "\" "
+                "value=\"" << code.substr(idx + 1) << "\" start=\"" << pe.
+                start_date_time.to_string("%Y-%m-%d %R %Z") << "\" end=\"" <<
+                pe.end_date_time.to_string("%Y-%m-%d %R %Z") << "\" nsteps=\""
+                << pe.num_time_steps << "\" />" << endl;
           }
           ofs << "    </level>" << endl;
           used.emplace_back(k);
@@ -756,14 +757,14 @@ string write(my::map<GridEntry>& grid_table, string caller, string user) {
           } else {
             ofs << "    <level value=\"" << sp[1] << "\">" << endl;
           }
-          for (const auto& k2 : le.parameter_code_table.keys()) {
+          for (const auto& e : le.parameter_code_table) {
+            string code;
             ParameterEntry pe;
-            if (le.parameter_code_table.found(k2, pe)) {
-              ofs << "      <parameter value=\"" << k2 << "\" start=\"" << pe.
-                  start_date_time.to_string("%Y-%m-%d %R %Z") << "\" end=\"" <<
-                  pe.end_date_time.to_string("%Y-%m-%d %R %Z") << "\" nsteps=\""
-                  << pe.num_time_steps << "\" />" << endl;
-            }
+            tie(code, pe) = e;
+            ofs << "      <parameter value=\"" << code << "\" start=\"" << pe.
+                start_date_time.to_string("%Y-%m-%d %R %Z") << "\" end=\"" <<
+                pe.end_date_time.to_string("%Y-%m-%d %R %Z") << "\" nsteps=\""
+                << pe.num_time_steps << "\" />" << endl;
           }
           ofs << "    </level>" << endl;
           used.emplace_back(k);
@@ -771,15 +772,15 @@ string write(my::map<GridEntry>& grid_table, string caller, string user) {
       } else if (metautils::args.data_format == "jraieeemm") {
         ofs << "    <level map=\"ds" << metautils::args.dsnum << "\" type=\"" <<
             sp[0] << "\" value=\"" << sp[1] << "\">" << endl;
-        for (const auto& k2 : le.parameter_code_table.keys()) {
+        for (const auto& e : le.parameter_code_table) {
+          string code;
           ParameterEntry pe;
-          if (le.parameter_code_table.found(k2, pe)) {
-            ofs << "      <parameter map=\"ds" << metautils::args.dsnum << "\" "
-                "value=\"" << k2 << "\" start=\"" << pe.start_date_time.
-                to_string("%Y-%m-%d %R %Z") << "\" end=\"" << pe.end_date_time.
-                to_string("%Y-%m-%d %R %Z") << "\" nsteps=\"" << pe.
-                num_time_steps << "\" />" << endl;
-          }
+          tie(code, pe) = e;
+          ofs << "      <parameter map=\"ds" << metautils::args.dsnum << "\" "
+              "value=\"" << code << "\" start=\"" << pe.start_date_time.
+              to_string("%Y-%m-%d %R %Z") << "\" end=\"" << pe.end_date_time.
+              to_string("%Y-%m-%d %R %Z") << "\" nsteps=\"" << pe.
+              num_time_steps << "\" />" << endl;
         }
         ofs << "    </level>" << endl;
         used.emplace_back(k);
@@ -789,14 +790,14 @@ string write(my::map<GridEntry>& grid_table, string caller, string user) {
             && n <= 135)) {
           ofs << "    <level type=\"" << n << "\" value=\"" << sp[1] << "\">" <<
               endl;
-          for (const auto& k2 : le.parameter_code_table.keys()) {
+          for (const auto& e : le.parameter_code_table) {
+            string code;
             ParameterEntry pe;
-            if (le.parameter_code_table.found(k2, pe)) {
-              ofs << "      <parameter value=\"" << k2 << "\" start=\"" << pe.
-                  start_date_time.to_string("%Y-%m-%d %R %Z") << "\" end=\"" <<
-                  pe.end_date_time.to_string("%Y-%m-%d %R %Z") << "\" nsteps=\""
-                  << pe.num_time_steps << "\" />" << endl;
-            }
+            tie(code, pe) = e;
+            ofs << "      <parameter value=\"" << code << "\" start=\"" << pe.
+                start_date_time.to_string("%Y-%m-%d %R %Z") << "\" end=\"" <<
+                pe.end_date_time.to_string("%Y-%m-%d %R %Z") << "\" nsteps=\""
+                << pe.num_time_steps << "\" />" << endl;
           }
           ofs << "    </level>" << endl;
           used.emplace_back(k);
@@ -809,27 +810,29 @@ string write(my::map<GridEntry>& grid_table, string caller, string user) {
           a = "0";
         }
         ofs << a << "\">" << endl;
-        for (const auto& k2 : le.parameter_code_table.keys()) {
+        for (const auto& e : le.parameter_code_table) {
+          string code;
           ParameterEntry pe;
-          if (le.parameter_code_table.found(k2, pe))
-            ofs << "      <parameter map=\"ds" << metautils::args.dsnum << "\" "
-                "value=\"" << k2 << "\" start=\"" << pe.start_date_time.
-                to_string("%Y-%m-%d %R %Z") << "\" end=\"" << pe.end_date_time.
-                to_string("%Y-%m-%d %R %Z") << "\" nsteps=\"" << pe.
-                num_time_steps << "\" />" << endl;
+          tie(code, pe) = e;
+          ofs << "      <parameter map=\"ds" << metautils::args.dsnum << "\" "
+              "value=\"" << code << "\" start=\"" << pe.start_date_time.
+              to_string("%Y-%m-%d %R %Z") << "\" end=\"" << pe.end_date_time.
+              to_string("%Y-%m-%d %R %Z") << "\" nsteps=\"" << pe.
+              num_time_steps << "\" />" << endl;
         }
         ofs << "    </level>" << endl;
         used.emplace_back(k);
       } else if (metautils::args.data_format == "cmorph025" || metautils::args.
           data_format == "cmorph8km" || metautils::args.data_format == "gpcp") {
         ofs << "    <level type=\"" << k << "\" value=\"0\">" << endl;;
-        for (const auto& k2 : le.parameter_code_table.keys()) {
+        for (const auto& e : le.parameter_code_table) {
+          string code;
           ParameterEntry pe;
-          if (le.parameter_code_table.found(k2, pe))
-            ofs << "      <parameter value=\"" << k2 << "\" start=\"" << pe.
-                start_date_time.to_string("%Y-%m-%d %R %Z") << "\" end=\"" <<
-                pe.end_date_time.to_string("%Y-%m-%d %R %Z") << "\" nsteps=\""
-                << pe.num_time_steps << "\" />" << endl;
+          tie(code, pe) = e;
+          ofs << "      <parameter value=\"" << code << "\" start=\"" << pe.
+              start_date_time.to_string("%Y-%m-%d %R %Z") << "\" end=\"" << pe.
+              end_date_time.to_string("%Y-%m-%d %R %Z") << "\" nsteps=\"" << pe.
+              num_time_steps << "\" />" << endl;
         }
         ofs << "    </level>" << endl;
         used.emplace_back(k);
@@ -862,16 +865,16 @@ string write(my::map<GridEntry>& grid_table, string caller, string user) {
           }
           ofs << "\" bottom=\"" << sp[2] << "\" top=\"" << sp[1] << "\">" <<
               endl;
-          for (const auto& k2 : le.parameter_code_table.keys()) {
+          for (const auto& e : le.parameter_code_table) {
+            string code;
             ParameterEntry pe;
-            if (le.parameter_code_table.found(k2, pe)) {
-              auto idx = k2.find(":");
-              ofs << "      <parameter map=\"" << k2.substr(0, idx) << "\" "
-                  "value=\"" << k2.substr(idx + 1) << "\" start=\"" << pe.
-                  start_date_time.to_string("%Y-%m-%d %R %Z") << "\" end=\"" <<
-                  pe.end_date_time.to_string("%Y-%m-%d %R %Z") << "\" nsteps=\""
-                  << pe.num_time_steps << "\" />" << endl;
-            }
+            tie(code, pe) = e;
+            auto idx = code.find(":");
+            ofs << "      <parameter map=\"" << code.substr(0, idx) << "\" "
+                "value=\"" << code.substr(idx + 1) << "\" start=\"" << pe.
+                start_date_time.to_string("%Y-%m-%d %R %Z") << "\" end=\"" <<
+                pe.end_date_time.to_string("%Y-%m-%d %R %Z") << "\" nsteps=\""
+                << pe.num_time_steps << "\" />" << endl;
           }
           ofs << "    </layer>" << endl;
           used.emplace_back(k);
@@ -888,14 +891,14 @@ string write(my::map<GridEntry>& grid_table, string caller, string user) {
             ofs << "    <layer bottom=\"" << sp[2] << "\" top=\"" << sp[1] <<
                 "\">" << endl;
           }
-          for (const auto& k2 : le.parameter_code_table.keys()) {
+          for (const auto& e : le.parameter_code_table) {
+            string code;
             ParameterEntry pe;
-            if (le.parameter_code_table.found(k2, pe)) {
-              ofs << "      <parameter value=\"" << k2 << "\" start=\"" << pe.
-                  start_date_time.to_string("%Y-%m-%d %R %Z") << "\" end=\"" <<
-                  pe.end_date_time.to_string("%Y-%m-%d %R %Z") << "\" nsteps=\""
-                  << pe.num_time_steps << "\" />" << endl;
-            }
+            tie(code, pe) = e;
+            ofs << "      <parameter value=\"" << code << "\" start=\"" << pe.
+                start_date_time.to_string("%Y-%m-%d %R %Z") << "\" end=\"" <<
+                pe.end_date_time.to_string("%Y-%m-%d %R %Z") << "\" nsteps=\""
+                << pe.num_time_steps << "\" />" << endl;
           }
           ofs << "    </layer>" << endl;
           used.emplace_back(k);
@@ -905,14 +908,14 @@ string write(my::map<GridEntry>& grid_table, string caller, string user) {
         if ((n == 8 && sp.size() == 3) || (n >= 144 && n <= 148)) {
           ofs << "    <layer type=\"" << n << "\" bottom=\"" << sp[2] <<
                "\" top=\"" << sp[1] << "\">" << endl;
-          for (const auto& k2 : le.parameter_code_table.keys()) {
+          for (const auto& e : le.parameter_code_table) {
+            string code;
             ParameterEntry pe;
-            if (le.parameter_code_table.found(k2, pe)) {
-              ofs << "      <parameter value=\"" << k2 << "\" start=\"" << pe.
-                  start_date_time.to_string("%Y-%m-%d %R %Z") << "\" end=\"" <<
-                  pe.end_date_time.to_string("%Y-%m-%d %R %Z") << "\" nsteps=\""
-                  << pe.num_time_steps << "\" />" << endl;
-            }
+            tie(code, pe) = e;
+            ofs << "      <parameter value=\"" << code << "\" start=\"" << pe.
+                start_date_time.to_string("%Y-%m-%d %R %Z") << "\" end=\"" <<
+                pe.end_date_time.to_string("%Y-%m-%d %R %Z") << "\" nsteps=\""
+                << pe.num_time_steps << "\" />" << endl;
           }
           ofs << "    </layer>" << endl;
           used.emplace_back(k);
