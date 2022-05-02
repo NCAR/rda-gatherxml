@@ -27,6 +27,7 @@ using std::string;
 using std::stringstream;
 using std::unique_ptr;
 using std::unordered_map;
+using std::unordered_set;
 using std::vector;
 using strutils::ftos;
 using strutils::itos;
@@ -1644,18 +1645,18 @@ void add_gridded_parameters_to_netcdf_level_entry(InputHDF5Stream& istream,
         if (time_method.empty() || (floatutils::myequalf(time_bounds.t1, 0,
             0.0001) && floatutils::myequalf(time_bounds.t1, time_bounds.t2,
             0.0001))) {
-          time_range.first_valid_datetime = grid_data.time_range_entry.data->
+          time_range.first_valid_datetime = grid_data.time_range_entry.
               instantaneous.first_valid_datetime;
-          time_range.last_valid_datetime = grid_data.time_range_entry.data->
+          time_range.last_valid_datetime = grid_data.time_range_entry.
               instantaneous.last_valid_datetime;
         } else {
           if (time_bounds.changed) {
             log_error2("time bounds changed", F, g_util_ident);
           }
-          time_range.first_valid_datetime = grid_data.time_range_entry.data->
-              bounded.first_valid_datetime;
-          time_range.last_valid_datetime = grid_data.time_range_entry.data->
-              bounded.last_valid_datetime;
+          time_range.first_valid_datetime = grid_data.time_range_entry.bounded.
+              first_valid_datetime;
+          time_range.last_valid_datetime = grid_data.time_range_entry.bounded.
+              last_valid_datetime;
         }
         time_method = strutils::capitalize(time_method);
         string tr_description, error;
@@ -1673,7 +1674,7 @@ void add_gridded_parameters_to_netcdf_level_entry(InputHDF5Stream& istream,
             parameter_entry_ptr->key="ds" + metautils::args.dsnum + ":" +
                 var.first;
             add_gridded_netcdf_parameter(var, scan_data, time_range,
-                parameter_data, grid_data.time_range_entry.data->num_steps);
+                parameter_data, grid_data.time_range_entry.num_steps);
             if (g_inv.maps.P.find(parameter_entry_ptr->key) == g_inv.maps.P.
                 end()) {
               g_inv.maps.P.emplace(parameter_entry_ptr->key, g_inv.maps.P.
@@ -1706,22 +1707,22 @@ void update_level_entry(InputHDF5Stream& istream,
         if (time_method.empty() || (floatutils::myequalf(time_bounds.t1, 0,
             0.0001) && floatutils::myequalf(time_bounds.t1, time_bounds.t2,
             0.0001))) {
-          time_range.first_valid_datetime = grid_data.time_range_entry.data->
+          time_range.first_valid_datetime = grid_data.time_range_entry.
               instantaneous.first_valid_datetime;
-          time_range.last_valid_datetime = grid_data.time_range_entry.data->
+          time_range.last_valid_datetime = grid_data.time_range_entry.
               instantaneous.last_valid_datetime;
           add_gridded_netcdf_parameter(var, scan_data, time_range,
-              parameter_data, grid_data.time_range_entry.data->num_steps);
+              parameter_data, grid_data.time_range_entry.num_steps);
         } else {
           if (time_bounds.changed) {
             log_error2("time bounds changed", F, g_util_ident);
           }
-          time_range.first_valid_datetime = grid_data.time_range_entry.data->
-              bounded.first_valid_datetime;
-          time_range.last_valid_datetime = grid_data.time_range_entry.data->
-              bounded.last_valid_datetime;
+          time_range.first_valid_datetime = grid_data.time_range_entry.bounded.
+              first_valid_datetime;
+          time_range.last_valid_datetime = grid_data.time_range_entry.bounded.
+              last_valid_datetime;
           add_gridded_netcdf_parameter(var, scan_data, time_range,
-              parameter_data, grid_data.time_range_entry.data->num_steps);
+              parameter_data, grid_data.time_range_entry.num_steps);
         }
         grid_entry_ptr->level_table.replace(*level_entry_ptr);
       } else {
@@ -1739,35 +1740,30 @@ void update_level_entry(InputHDF5Stream& istream,
           if (time_method.empty() || (floatutils::myequalf(time_bounds.t1, 0,
               0.0001) && floatutils::myequalf(time_bounds.t1, time_bounds.t2,
               0.0001))) {
-            if (grid_data.time_range_entry.data->
-                instantaneous.first_valid_datetime < parameter_entry_ptr->
-                start_date_time) {
+            if (grid_data.time_range_entry.instantaneous.first_valid_datetime <
+                parameter_entry_ptr->start_date_time) {
               parameter_entry_ptr->start_date_time =
-                  grid_data.time_range_entry.data->
-                  instantaneous.first_valid_datetime;
+                  grid_data.time_range_entry.instantaneous.first_valid_datetime;
             }
-            if (grid_data.time_range_entry.data->
-                instantaneous.last_valid_datetime > parameter_entry_ptr->
-                end_date_time) {
-              parameter_entry_ptr->end_date_time =
-                  grid_data.time_range_entry.data->
-                  instantaneous.last_valid_datetime;
-            }
-          } else {
-            if (grid_data.time_range_entry.data->
-                bounded.first_valid_datetime < parameter_entry_ptr->
-                start_date_time) {
-              parameter_entry_ptr->start_date_time =
-                  grid_data.time_range_entry.data->bounded.first_valid_datetime;
-            }
-            if (grid_data.time_range_entry.data->bounded.last_valid_datetime >
+            if (grid_data.time_range_entry.instantaneous.last_valid_datetime >
                 parameter_entry_ptr->end_date_time) {
               parameter_entry_ptr->end_date_time =
-                  grid_data.time_range_entry.data->bounded.last_valid_datetime;
+                  grid_data.time_range_entry.instantaneous.last_valid_datetime;
+            }
+          } else {
+            if (grid_data.time_range_entry.bounded.first_valid_datetime <
+                parameter_entry_ptr->start_date_time) {
+              parameter_entry_ptr->start_date_time =
+                  grid_data.time_range_entry.bounded.first_valid_datetime;
+            }
+            if (grid_data.time_range_entry.bounded.last_valid_datetime >
+                parameter_entry_ptr->end_date_time) {
+              parameter_entry_ptr->end_date_time =
+                  grid_data.time_range_entry.bounded.last_valid_datetime;
             }
           }
           parameter_entry_ptr->num_time_steps +=
-              grid_data.time_range_entry.data->num_steps;
+              grid_data.time_range_entry.num_steps;
           level_entry_ptr->parameter_code_table.replace(*parameter_entry_ptr);
           grid_entry_ptr->level_table.replace(*level_entry_ptr);
         }
@@ -1795,12 +1791,12 @@ void fill_time_bounds(const HDF5::DataArray& data_array, InputHDF5Stream::
   }
   time_bounds.t2 = data_array_value(data_array, data_array.num_values - 1, ds);
   string error;
-  tre.data->bounded.first_valid_datetime = metautils::NcTime::actual_date_time(
+  tre.bounded.first_valid_datetime = metautils::NcTime::actual_date_time(
       time_bounds.t1, time_data, error);
   if (!error.empty()) {
     log_error2(error, F, g_util_ident);
   }
-  tre.data->bounded.last_valid_datetime = metautils::NcTime::actual_date_time(
+  tre.bounded.last_valid_datetime = metautils::NcTime::actual_date_time(
       time_bounds.t2, time_data, error);
   if (!error.empty()) {
     log_error2(error, F, g_util_ident);
@@ -2894,29 +2890,29 @@ metautils::NcTime::TimeBounds time_bounds(InputHDF5Stream& is, const metautils::
     if (bounds.num_values > 0) {
       fill_time_bounds(bounds, gd.climo_bounds.ds.get(), gd.time_range_entry,
           nc_time, tbnds);
-      gd.time_range_entry.key = (gd.time_range_entry.data->bounded.
-          last_valid_datetime).years_since(gd.time_range_entry.data->bounded.
+      gd.time_range_entry.key = (gd.time_range_entry.bounded.
+          last_valid_datetime).years_since(gd.time_range_entry.bounded.
           first_valid_datetime);
-      gd.time_range_entry.data->instantaneous.last_valid_datetime = gd.
-          time_range_entry.data->bounded.last_valid_datetime.years_subtracted(
-          gd.time_range_entry.key);
-      if (gd.time_range_entry.data->instantaneous.last_valid_datetime == gd.
-          time_range_entry.data->bounded.first_valid_datetime) {
-        gd.time_range_entry.data->unit = 3;
-      } else if ((gd.time_range_entry.data->instantaneous.last_valid_datetime).
-          months_since(gd.time_range_entry.data->bounded.first_valid_datetime)
+      gd.time_range_entry.instantaneous.last_valid_datetime = gd.
+          time_range_entry.bounded.last_valid_datetime.years_subtracted(gd.
+          time_range_entry.key);
+      if (gd.time_range_entry.instantaneous.last_valid_datetime == gd.
+          time_range_entry.bounded.first_valid_datetime) {
+        gd.time_range_entry.unit = 3;
+      } else if ((gd.time_range_entry.instantaneous.last_valid_datetime).
+          months_since(gd.time_range_entry.bounded.first_valid_datetime)
           == 3) {
-        gd.time_range_entry.data->unit = 2;
-      } else if ((gd.time_range_entry.data->instantaneous.last_valid_datetime).
-          months_since(gd.time_range_entry.data->bounded.first_valid_datetime)
+        gd.time_range_entry.unit = 2;
+      } else if ((gd.time_range_entry.instantaneous.last_valid_datetime).
+          months_since(gd.time_range_entry.bounded.first_valid_datetime)
           == 1) {
-        gd.time_range_entry.data->unit = 1;
+        gd.time_range_entry.unit = 1;
       } else {
         log_error2("unable to determine climatology unit", F, g_util_ident);
       }
 
       // COARDS convention for climatology over all-available years
-      if ((gd.time_range_entry.data->instantaneous.first_valid_datetime).year()
+      if ((gd.time_range_entry.instantaneous.first_valid_datetime).year()
           == 0) {
         gd.time_range_entry.key = 0x7fffffff;
       }
@@ -2926,13 +2922,13 @@ metautils::NcTime::TimeBounds time_bounds(InputHDF5Stream& is, const metautils::
 }
 
 void set_month_end_date(GridData& gd, string calendar) {
-  auto& i = gd.time_range_entry.data->instantaneous;
+  auto& i = gd.time_range_entry.instantaneous;
   if (i.first_valid_datetime.day() == 1 && i.first_valid_datetime.time() == 0) {
     i.last_valid_datetime.add_seconds(dateutils::days_in_month(i.
         last_valid_datetime.year(), i.last_valid_datetime.month(), calendar) *
         86400 - 1, calendar);
   }
-  auto& b = gd.time_range_entry.data->bounded;
+  auto& b = gd.time_range_entry.bounded;
   if (!gd.time_bounds.id.empty()) {
     if (b.first_valid_datetime.day() == 1) {
       b.last_valid_datetime.add_days(dateutils::days_in_month(b.
@@ -3404,10 +3400,7 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream, ScanData& scan_data) {
         << vector_to_string(coord_vars.lat_ids) << "'), and longitude ('" <<
         vector_to_string(coord_vars.lon_ids) << "') coordinates..." << endl;
   }
-  my::map<metautils::NcTime::TimeRangeEntry> time_range_table;
   grid_data.time_range_entry.key = -1;
-  grid_data.time_range_entry.data.reset(
-      new metautils::NcTime::TimeRangeEntry::Data);
   grid_data.valid_time.ds = istream.dataset("/" + grid_data.valid_time.id);
   if (grid_data.valid_time.ds == nullptr) {
     log_error2("unable to access the /" + grid_data.valid_time.id + " dataset "
@@ -3425,41 +3418,40 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream, ScanData& scan_data) {
   nctime.t2 = data_array_value(grid_data.valid_time.data_array, grid_data.
       valid_time.data_array.num_values - 1, grid_data.valid_time.ds.get());
   string e;
-  grid_data.time_range_entry.data->instantaneous.first_valid_datetime =
-      metautils::NcTime::actual_date_time(nctime.t1, *coord_vars.nc_time, e);
+  grid_data.time_range_entry.instantaneous.first_valid_datetime = metautils::
+      NcTime::actual_date_time(nctime.t1, *coord_vars.nc_time, e);
   if (!e.empty()) log_error2(e, F, g_util_ident);
-  grid_data.time_range_entry.data->instantaneous.last_valid_datetime =
-      metautils::NcTime::actual_date_time(nctime.t2, *coord_vars.nc_time, e);
+  grid_data.time_range_entry.instantaneous.last_valid_datetime = metautils::
+      NcTime::actual_date_time(nctime.t2, *coord_vars.nc_time, e);
   if (!e.empty()) log_error2(e, F, g_util_ident);
   get_forecast_data(istream, grid_data);
-  grid_data.time_range_entry.data->num_steps = grid_data.valid_time.data_array.
+  grid_data.time_range_entry.num_steps = grid_data.valid_time.data_array.
       num_values;
   auto tm_bnds = time_bounds(istream, *coord_vars.nc_time, grid_data);
   if (coord_vars.nc_time->units == "months") {
     set_month_end_date(grid_data, coord_vars.nc_time->calendar);
   }
+  vector<metautils::NcTime::TimeRangeEntry> time_ranges;
   if (static_cast<int>(grid_data.time_range_entry.key) == -1 &&
       grid_data.forecast_period.data_array.num_values > 0) {
     for (size_t n = 0; n < grid_data.forecast_period.data_array.num_values;
         ++n) {
-      metautils::NcTime::TimeRangeEntry f_tre;
-      f_tre.key = data_array_value(grid_data.forecast_period.data_array, n,
+      auto tre = grid_data.time_range_entry;
+      tre.key = data_array_value(grid_data.forecast_period.data_array, n,
           grid_data.forecast_period.ds.get());
-      f_tre.data.reset(new metautils::NcTime::TimeRangeEntry::Data);
-      *f_tre.data = *grid_data.time_range_entry.data;
-      f_tre.data->instantaneous.first_valid_datetime.add(
-          coord_vars.forecast_period->units, f_tre.key);
-      f_tre.data->instantaneous.last_valid_datetime.add(
-          coord_vars.forecast_period->units, f_tre.key);
-      if (f_tre.key == 0) {
-        f_tre.key = -1;
+      tre.instantaneous.first_valid_datetime.add(coord_vars.forecast_period->
+          units, tre.key);
+      tre.instantaneous.last_valid_datetime.add(coord_vars.forecast_period->
+          units, tre.key);
+      if (tre.key == 0) {
+        tre.key = -1;
       } else {
-        f_tre.key = -(f_tre.key * 100);
+        tre.key = -(tre.key * 100);
       }
-      time_range_table.insert(f_tre);
+      time_ranges.emplace_back(tre);
     }
   } else {
-    time_range_table.insert(grid_data.time_range_entry);
+    time_ranges.emplace_back(grid_data.time_range_entry);
   }
   for (size_t n = 0; n < coord_vars.lat_ids.size(); ++n) {
     grid_data.latitude.id = coord_vars.lat_ids[n];
@@ -3673,8 +3665,8 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream, ScanData& scan_data) {
         }
       }
       std::unordered_set<string> grid_entry_set;
-      for (const auto& key : time_range_table.keys()) {
-        time_range_table.found(key, grid_data.time_range_entry);
+      for (const auto& e : time_ranges) {
+        grid_data.time_range_entry = e;
         grid_data.time_data = grid_data.forecast_period.id.empty() ?
             coord_vars.nc_time : coord_vars.forecast_period;
         add_gridded_lat_lon_keys(grid_entry_set, dim, def, grid_data, istream);
