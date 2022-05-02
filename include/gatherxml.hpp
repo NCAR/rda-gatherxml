@@ -205,15 +205,14 @@ struct LevelEntry {
 };
 
 struct GridEntry {
-  GridEntry() : key(), level_table(), process_table(), ensemble_table() { }
+  GridEntry() : level_table(), process_table(), ensemble_table() { }
 
-  std::string key;
   std::unordered_map<std::string, LevelEntry> level_table;
   std::unordered_set<std::string> process_table, ensemble_table;
 };
 
-extern std::string write(my::map<GridEntry>& grid_table, std::string caller,
-    std::string user);
+extern std::string write(std::unordered_map<std::string, GridEntry>& grid_table,
+    std::string caller, std::string user);
 
 } // end namespace gatherxml::markup::GrML
 
