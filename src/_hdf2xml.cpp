@@ -2734,6 +2734,9 @@ void find_coordinate_variables(InputHDF5Stream& istream, CoordinateVariables&
 void check_for_forecasts(InputHDF5Stream& istream, GridData& grid_data,
       std::shared_ptr<metautils::NcTime::TimeData>& time_data) {
   static const string F = this_function_label(__func__);
+  if (gatherxml::verbose_operation) {
+    cout << "...checking for forecasts..." << endl;
+  }
   auto vars = istream.datasets_with_attribute(
       "standard_name=forecast_reference_time");
   if (vars.size() > 1) {
@@ -2822,6 +2825,14 @@ void find_vertical_level_coordinates(InputHDF5Stream& istream,
       coord_vars.level_info.back().write = false;
     }
   }
+}
+
+void add_surface_level(CoordinateVariables& coord_vars) {
+  coord_vars.level_info.emplace_back();
+  coord_vars.level_info.back().ID = "sfc";
+  coord_vars.level_info.back().description = "Surface";
+  coord_vars.level_info.back().units = "";
+  coord_vars.level_info.back().write = false;
 }
 
 void get_forecast_data(InputHDF5Stream& is, GridData& gd) {
@@ -2945,7 +2956,7 @@ void set_month_end_date(GridData& gd, string calendar) {
 }
 
 bool found_alternate_lat_lon_coordinates(InputHDF5Stream& istream, GridData&
-     grid_data, vector<string>& lat_ids, vector<string>& lon_ids) {
+    grid_data, vector<string>& lat_ids, vector<string>& lon_ids) {
   vector<string> compass{"north", "east"};
   unordered_map<string, string> dim_map[compass.size()];
   for (size_t n = 0; n < compass.size(); ++n) {
@@ -2979,6 +2990,20 @@ bool found_alternate_lat_lon_coordinates(InputHDF5Stream& istream, GridData&
     }
   }
   return !(lat_ids.empty() || lon_ids.empty());
+}
+
+void find_alternate_lat_lon_coordinates(InputHDF5Stream& istream, GridData&
+    grid_data, vector<string>& lat_ids, vector<string>& lon_ids) {
+  if (gatherxml::verbose_operation) {
+    cout << "...looking for alternate latitude and longitude coordinates..."
+        << endl;
+  }
+  if (!found_alternate_lat_lon_coordinates(istream, grid_data, lat_ids,
+      lon_ids)) {
+    cerr << "Terminating - could not find any latitude/longitude coordinates"
+        << endl;
+    exit(1);
+  }
 }
 
 bool grid_is_polar_stereographic(const GridData& grid_data,
@@ -3319,6 +3344,38 @@ bool grid_is_lambert_conformal(const GridData& grid_data,
   return false;
 }
 
+void update_existing_grid(InputHDF5Stream& is, GridData& gd,
+    CoordinateVariables& cv, size_t num_levels, size_t lidx, ScanData& sd,
+    metautils::NcTime::TimeBounds& tb, ParameterData& pd, string pkey, string
+    gkey) {
+  for (size_t l = 0; l < num_levels; ++l) {
+    level_entry_key = "ds" + metautils::args.dsnum + "," + gd.level.id + ":";
+    auto v = gd.level.ds == nullptr ? 0. : data_array_value(gd.level.data_array,
+        l, gd.level.ds.get());
+    if (floatutils::myequalf(v, static_cast<int>(v), 0.001)) {
+      level_entry_key += itos(v);
+    } else {
+      level_entry_key += ftos(v, 3);
+    }
+    if (grid_entry_ptr->level_table.find(level_entry_key) == grid_entry_ptr->
+        level_table.end()) {
+      level_entry_ptr->parameter_code_table.clear();
+      add_gridded_parameters_to_netcdf_level_entry(is, grid_entry_key, gd, sd,
+          tb, pd);
+      if (!level_entry_ptr->parameter_code_table.empty()) {
+        grid_entry_ptr->level_table.emplace(level_entry_key, *level_entry_ptr);
+        cv.level_info[lidx].write = 1;
+      }
+    } else {
+       update_level_entry(is, tb, gd, sd, pd, cv.level_info[lidx].write);
+    }
+    if (cv.level_info[lidx].write == 1 && g_inv.stream.is_open()) {
+      update_inventory(g_inv.maps.U[pkey], g_inv.maps.G[gkey], gd);
+    }
+  }
+  (*grid_table_ptr)[grid_entry_key] = *grid_entry_ptr;
+}
+
 void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream, ScanData& scan_data) {
   static const string F = this_function_label(__func__);
   if (gatherxml::verbose_operation) {
@@ -3358,24 +3415,13 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream, ScanData& scan_data) {
 
   // if the reference and valid times are different, look for forecasts
   if (grid_data.reference_time.id != grid_data.valid_time.id) {
-    if (gatherxml::verbose_operation) {
-      cout << "...checking for forecasts..." << endl;
-    }
     check_for_forecasts(istream, grid_data, coord_vars.nc_time);
   }
 
   // if no lat/lon coordinate variables found, look for alternates
   if (coord_vars.lat_ids.empty() && coord_vars.lon_ids.empty()) {
-    if (gatherxml::verbose_operation) {
-      cout << "...looking for alternate latitude and longitude coordinates..."
-          << endl;
-    }
-    if (!found_alternate_lat_lon_coordinates(istream, grid_data, coord_vars.
-        lat_ids, coord_vars.lon_ids)) {
-      cerr << "Terminating - could not find any latitude/longitude coordinates"
-          << endl;
-      exit(1);
-    }
+    find_alternate_lat_lon_coordinates(istream, grid_data, coord_vars.lat_ids,
+      coord_vars.lon_ids);
   }
   if (coord_vars.lat_ids.size() != coord_vars.lon_ids.size()) {
     cerr << "Terminating - unequal number of latitude and longitude coordinate "
@@ -3385,13 +3431,7 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream, ScanData& scan_data) {
   if (coord_vars.level_info.empty()) {
     find_vertical_level_coordinates(istream, coord_vars, grid_data);
   }
-
-  // add a surface level
-  coord_vars.level_info.emplace_back();
-  coord_vars.level_info.back().ID = "sfc";
-  coord_vars.level_info.back().description = "Surface";
-  coord_vars.level_info.back().units = "";
-  coord_vars.level_info.back().write = false;
+  add_surface_level(coord_vars);
   if (grid_data.valid_time.id.empty()) {
     cerr << "Terminating - no time coordinate found" << endl;
     exit(1);
@@ -3469,7 +3509,7 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream, ScanData& scan_data) {
     grid_data.longitude.ds = istream.dataset("/" + coord_vars.lon_ids[n]);
     if (grid_data.longitude.ds == nullptr) {
       log_error2("unable to access the /" + coord_vars.lon_ids[n] + " dataset "
-          "for the latitudes", F, g_util_ident);
+          "for the longitudes", F, g_util_ident);
     }
     grid_data.longitude.data_array.fill(istream, *grid_data.longitude.ds);
     def.slongitude = data_array_value(grid_data.longitude.data_array, 0,
@@ -3742,42 +3782,8 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream, ScanData& scan_data) {
               grid_table_ptr->emplace(grid_entry_key, *grid_entry_ptr);
             }
            } else {
-
-            // existing grid - needs update
-            for (size_t l = 0; l < num_levels; ++l) {
-              level_entry_key = "ds" + metautils::args.dsnum + "," +
-                  grid_data.level.id + ":";
-              auto level_value = (grid_data.level.ds == nullptr) ? 0. :
-                  data_array_value(grid_data.level.data_array, l,
-                  grid_data.level.ds.get());
-              if (floatutils::myequalf(level_value, static_cast<int>(
-                  level_value), 0.001)) {
-                level_entry_key += itos(level_value);
-              } else {
-                level_entry_key += ftos(level_value, 3);
-              }
-              if (grid_entry_ptr->level_table.find(level_entry_key) ==
-                  grid_entry_ptr->level_table.end()) {
-                level_entry_ptr->parameter_code_table.clear();
-                add_gridded_parameters_to_netcdf_level_entry(istream,
-                    grid_entry_key, grid_data, scan_data, tm_bnds,
-                    parameter_data);
-                if (!level_entry_ptr->parameter_code_table.empty()) {
-                  grid_entry_ptr->level_table.emplace(level_entry_key,
-                      *level_entry_ptr);
-                  coord_vars.level_info[m].write = 1;
-                }
-              } else {
-                 update_level_entry(istream, tm_bnds, grid_data, scan_data,
-                    parameter_data, coord_vars.level_info[m].write);
-              }
-              if (coord_vars.level_info[m].write == 1 && g_inv.stream.
-                  is_open()) {
-                update_inventory(g_inv.maps.U[product_key], g_inv.maps.G[
-                    grid_key], grid_data);
-              }
-            }
-            (*grid_table_ptr)[grid_entry_key] = *grid_entry_ptr;
+            update_existing_grid(istream, grid_data, coord_vars, num_levels, m,
+                scan_data, tm_bnds, parameter_data, product_key, grid_key);
           }
         }
       }
