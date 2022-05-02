@@ -141,6 +141,7 @@ struct ParameterData {
 unique_ptr<my::map<gatherxml::markup::GrML::GridEntry>> grid_table_ptr;
 unique_ptr<gatherxml::markup::GrML::GridEntry> grid_entry_ptr;
 unique_ptr<gatherxml::markup::GrML::LevelEntry> level_entry_ptr;
+string parameter_entry_key;
 unique_ptr<gatherxml::markup::GrML::ParameterEntry> parameter_entry_ptr;
 std::unordered_set<string> unique_data_type_observation_set;
 gatherxml::markup::ObML::DataTypeEntry de;
@@ -1485,7 +1486,8 @@ void add_gridded_netcdf_parameter(const InputHDF5Stream::DatasetEntry& var,
   parameter_entry_ptr->start_date_time = time_range.first_valid_datetime;
   parameter_entry_ptr->end_date_time = time_range.last_valid_datetime;
   parameter_entry_ptr->num_time_steps = num_steps;
-  level_entry_ptr->parameter_code_table.insert(*parameter_entry_ptr);
+  level_entry_ptr->parameter_code_table.emplace(parameter_entry_key,
+      *parameter_entry_ptr);
 }
 
 bool parameter_matches_dimensions(InputHDF5Stream& istream, const
@@ -1671,14 +1673,12 @@ void add_gridded_parameters_to_netcdf_level_entry(InputHDF5Stream& istream,
         if (std::regex_search(grid_entry_key, std::regex(tr_description +
             "$"))) {
 //          if (attr.value.dim_sizes[0] == 4 || attr.value.dim_sizes[0] == 3 || (attr.value.dim_sizes[0] == 2 && grid_data.valid_time.data_array.num_values == 1)) {
-            parameter_entry_ptr->key="ds" + metautils::args.dsnum + ":" +
+            parameter_entry_key = "ds" + metautils::args.dsnum + ":" +
                 var.first;
             add_gridded_netcdf_parameter(var, scan_data, time_range,
                 parameter_data, grid_data.time_range_entry.num_steps);
-            if (g_inv.maps.P.find(parameter_entry_ptr->key) == g_inv.maps.P.
-                end()) {
-              g_inv.maps.P.emplace(parameter_entry_ptr->key, g_inv.maps.P.
-                  size());
+            if (g_inv.maps.P.find(parameter_entry_key) == g_inv.maps.P.end()) {
+              g_inv.maps.P.emplace(parameter_entry_key, g_inv.maps.P.size());
             }
 //          }
         }
@@ -1698,12 +1698,12 @@ void update_level_entry(InputHDF5Stream& istream,
     if (attr_it->second._class_ == 9 && attr_it->second.dim_sizes.size() == 1 &&
         attr_it->second.dim_sizes[0] > 2 && attr_it->second.vlen.class_ == 7 &&
         parameter_matches_dimensions(istream, attr_it->second, grid_data)) {
-      parameter_entry_ptr->key="ds" + metautils::args.dsnum + ":" + var.first;
+      parameter_entry_key = "ds" + metautils::args.dsnum + ":" + var.first;
       auto time_method = gridded_time_method(dset_ptr, grid_data);
       time_method = strutils::capitalize(time_method);
       metautils::NcTime::TimeRange time_range;
-      if (!level_entry_ptr->parameter_code_table.found(parameter_entry_ptr->key,
-          *parameter_entry_ptr)) {
+      if (level_entry_ptr->parameter_code_table.find(parameter_entry_key) ==
+          level_entry_ptr->parameter_code_table.end()) {
         if (time_method.empty() || (floatutils::myequalf(time_bounds.t1, 0,
             0.0001) && floatutils::myequalf(time_bounds.t1, time_bounds.t2,
             0.0001))) {
@@ -1737,40 +1737,39 @@ void update_level_entry(InputHDF5Stream& istream,
         tr_description = strutils::capitalize(tr_description);
         if (std::regex_search(grid_entry_ptr->key, std::regex(tr_description +
             "$"))) {
+          auto pe = level_entry_ptr->parameter_code_table[parameter_entry_key];
           if (time_method.empty() || (floatutils::myequalf(time_bounds.t1, 0,
               0.0001) && floatutils::myequalf(time_bounds.t1, time_bounds.t2,
               0.0001))) {
             if (grid_data.time_range_entry.instantaneous.first_valid_datetime <
-                parameter_entry_ptr->start_date_time) {
-              parameter_entry_ptr->start_date_time =
-                  grid_data.time_range_entry.instantaneous.first_valid_datetime;
+                pe.start_date_time) {
+              pe.start_date_time = grid_data.time_range_entry.instantaneous.
+                  first_valid_datetime;
             }
             if (grid_data.time_range_entry.instantaneous.last_valid_datetime >
-                parameter_entry_ptr->end_date_time) {
-              parameter_entry_ptr->end_date_time =
-                  grid_data.time_range_entry.instantaneous.last_valid_datetime;
+                pe.end_date_time) {
+              pe.end_date_time = grid_data.time_range_entry.instantaneous.
+                  last_valid_datetime;
             }
           } else {
             if (grid_data.time_range_entry.bounded.first_valid_datetime <
-                parameter_entry_ptr->start_date_time) {
-              parameter_entry_ptr->start_date_time =
-                  grid_data.time_range_entry.bounded.first_valid_datetime;
+                pe.start_date_time) {
+              pe.start_date_time = grid_data.time_range_entry.bounded.
+                  first_valid_datetime;
             }
             if (grid_data.time_range_entry.bounded.last_valid_datetime >
-                parameter_entry_ptr->end_date_time) {
-              parameter_entry_ptr->end_date_time =
-                  grid_data.time_range_entry.bounded.last_valid_datetime;
+                pe.end_date_time) {
+              pe.end_date_time = grid_data.time_range_entry.bounded.
+                  last_valid_datetime;
             }
           }
-          parameter_entry_ptr->num_time_steps +=
-              grid_data.time_range_entry.num_steps;
-          level_entry_ptr->parameter_code_table.replace(*parameter_entry_ptr);
+          pe.num_time_steps += grid_data.time_range_entry.num_steps;
           grid_entry_ptr->level_table.replace(*level_entry_ptr);
         }
       }
       level_write = true;
-      if (g_inv.maps.P.find(parameter_entry_ptr->key) == g_inv.maps.P.end()) {
-        g_inv.maps.P.emplace(parameter_entry_ptr->key, g_inv.maps.P.size());
+      if (g_inv.maps.P.find(parameter_entry_key) == g_inv.maps.P.end()) {
+        g_inv.maps.P.emplace(parameter_entry_key, g_inv.maps.P.size());
       }
     }
   }
@@ -1834,14 +1833,14 @@ void update_inventory(int unum, int gnum, const GridData& grid_data) {
     g_inv.maps.L.emplace(level_entry_ptr->key, g_inv.maps.L.size());
   }
   for (size_t n = 0; n < grid_data.valid_time.data_array.num_values; ++n) {
-    for (const auto& key : level_entry_ptr->parameter_code_table.keys()) {
+    for (const auto& e : level_entry_ptr->parameter_code_table) {
       stringstream inv_line;
       string error;
       inv_line << "0|0|" << metautils::NcTime::actual_date_time(
           data_array_value(grid_data.valid_time.data_array, n, grid_data.
           valid_time.ds.get()), *grid_data.time_data, error).to_string(
           "%Y%m%d%H%MM") << "|" << unum << "|" << gnum << "|" << g_inv.maps.L[
-          level_entry_ptr->key] << "|" << g_inv.maps.P[key] << "|0";
+          level_entry_ptr->key] << "|" << g_inv.maps.P[e.first] << "|0";
       g_inv.lines.emplace_back(inv_line.str());
     }
   }
