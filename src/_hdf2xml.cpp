@@ -138,7 +138,9 @@ struct ParameterData {
   ParameterMap map;
 };
 
-unique_ptr<my::map<gatherxml::markup::GrML::GridEntry>> grid_table_ptr;
+unique_ptr<unordered_map<string, gatherxml::markup::GrML::GridEntry>>
+    grid_table_ptr;
+string grid_entry_key;
 unique_ptr<gatherxml::markup::GrML::GridEntry> grid_entry_ptr;
 string level_entry_key;
 unique_ptr<gatherxml::markup::GrML::LevelEntry> level_entry_ptr;
@@ -184,7 +186,8 @@ extern "C" void int_handler(int) {
 
 void grid_initialize() {
   if (grid_table_ptr == nullptr) {
-    grid_table_ptr.reset(new my::map<gatherxml::markup::GrML::GridEntry>);
+    grid_table_ptr.reset(new unordered_map<string, gatherxml::markup::GrML::
+        GridEntry>);
     grid_entry_ptr.reset(new gatherxml::markup::GrML::GridEntry);
     level_entry_ptr.reset(new gatherxml::markup::GrML::LevelEntry);
     parameter_entry_ptr.reset(new gatherxml::markup::GrML::ParameterEntry);
@@ -1736,7 +1739,7 @@ void update_level_entry(InputHDF5Stream& istream,
           log_error2(error, F, g_util_ident);
         }
         tr_description = strutils::capitalize(tr_description);
-        if (std::regex_search(grid_entry_ptr->key, std::regex(tr_description +
+        if (std::regex_search(grid_entry_key, std::regex(tr_description +
             "$"))) {
           auto pe = level_entry_ptr->parameter_code_table[parameter_entry_key];
           if (time_method.empty() || (floatutils::myequalf(time_bounds.t1, 0,
@@ -3673,8 +3676,8 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream, ScanData& scan_data) {
             cout << "...processing grid entry: " << grid_entry << " ..." <<
                 endl;
           }
-          grid_entry_ptr->key = grid_entry;
-          auto key_parts = split(grid_entry_ptr->key, "<!>");
+          grid_entry_key = grid_entry;
+          auto key_parts = split(grid_entry_key, "<!>");
           auto& product_key = key_parts.back();
           string grid_key;
           if (g_inv.stream.is_open()) {
@@ -3683,15 +3686,14 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream, ScanData& scan_data) {
               grid_key += "," + key_parts[nn];
             }
           }
-          if (!grid_table_ptr->found(grid_entry_ptr->key, *grid_entry_ptr)) {
+          if (grid_table_ptr->find(grid_entry_key) == grid_table_ptr->end()) {
 
             // new grid
             grid_entry_ptr->level_table.clear();
             level_entry_ptr->parameter_code_table.clear();
             parameter_entry_ptr->num_time_steps = 0;
             add_gridded_parameters_to_netcdf_level_entry(istream,
-                grid_entry_ptr->key, grid_data, scan_data, tm_bnds,
-                parameter_data);
+                grid_entry_key, grid_data, scan_data, tm_bnds, parameter_data);
             if (!level_entry_ptr->parameter_code_table.empty()) {
               for (size_t l = 0; l < num_levels; ++l) {
                 level_entry_key = "ds" + metautils::args.dsnum + "," +
@@ -3737,7 +3739,7 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream, ScanData& scan_data) {
               }
             }
             if (!grid_entry_ptr->level_table.empty()) {
-              grid_table_ptr->insert(*grid_entry_ptr);
+              grid_table_ptr->emplace(grid_entry_key, *grid_entry_ptr);
             }
            } else {
 
@@ -3758,7 +3760,7 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream, ScanData& scan_data) {
                   grid_entry_ptr->level_table.end()) {
                 level_entry_ptr->parameter_code_table.clear();
                 add_gridded_parameters_to_netcdf_level_entry(istream,
-                    grid_entry_ptr->key, grid_data, scan_data, tm_bnds,
+                    grid_entry_key, grid_data, scan_data, tm_bnds,
                     parameter_data);
                 if (!level_entry_ptr->parameter_code_table.empty()) {
                   grid_entry_ptr->level_table.emplace(level_entry_key,
@@ -3775,7 +3777,7 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream, ScanData& scan_data) {
                     grid_key], grid_data);
               }
             }
-            grid_table_ptr->replace(*grid_entry_ptr);
+            (*grid_table_ptr)[grid_entry_key] = *grid_entry_ptr;
           }
         }
       }
@@ -3786,7 +3788,7 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream, ScanData& scan_data) {
     }
   }
   scan_data.write_type = ScanData::GrML_type;
-  if (grid_table_ptr->size() == 0) {
+  if (grid_table_ptr->empty()) {
     if (!grid_data.valid_time.id.empty()) {
       cerr << "Terminating - no grids found and no content metadata will be "
           "generated" << endl;
