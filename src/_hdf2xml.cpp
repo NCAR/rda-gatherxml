@@ -3344,11 +3344,58 @@ bool grid_is_lambert_conformal(const GridData& grid_data,
   return false;
 }
 
+void add_new_grid(InputHDF5Stream& is, GridData& gd, CoordinateVariables& cv,
+    size_t nlev, size_t lidx, ScanData& sd, metautils::NcTime::TimeBounds& tb,
+    ParameterData& pd, string pkey, string gkey) {
+  grid_entry_ptr->level_table.clear();
+  level_entry_ptr->parameter_code_table.clear();
+  parameter_entry_ptr->num_time_steps = 0;
+  add_gridded_parameters_to_netcdf_level_entry(is, grid_entry_key, gd, sd, tb,
+      pd);
+  if (!level_entry_ptr->parameter_code_table.empty()) {
+    for (size_t l = 0; l < nlev; ++l) {
+      level_entry_key = "ds" + metautils::args.dsnum + "," + gd.level.id + ":";
+      if (gd.level_bounds.ds == nullptr) {
+        auto v = (gd.level.ds == nullptr) ? 0. : data_array_value(gd.level.
+            data_array, l, gd.level.ds.get());
+        if (floatutils::myequalf(v, static_cast<int>(v), 0.001)) {
+          level_entry_key += itos(v);
+        } else {
+          level_entry_key += ftos(v, 3);
+        }
+      } else {
+        auto v = data_array_value(
+            gd.time_bounds.data_array, l * 2, gd.level_bounds.ds.get());
+        if (floatutils::myequalf(v, static_cast<int>(v), 0.001)) {
+          level_entry_key += itos(v);
+        } else {
+          level_entry_key += ftos(v, 3);
+        }
+        v = data_array_value(gd.time_bounds.data_array, l * 2 + 1, gd.
+            level_bounds.ds.get());
+        level_entry_key += ":";
+        if (floatutils::myequalf(v, static_cast<int>(v), 0.001)) {
+          level_entry_key += itos(v);
+        } else {
+          level_entry_key += ftos(v, 3);
+        }
+      }
+      grid_entry_ptr->level_table.emplace(level_entry_key, *level_entry_ptr);
+      cv.level_info[lidx].write = 1;
+      if (g_inv.stream.is_open()) {
+        update_inventory(g_inv.maps.U[pkey], g_inv.maps.G[gkey], gd);
+      }
+    }
+  }
+  if (!grid_entry_ptr->level_table.empty()) {
+    grid_table_ptr->emplace(grid_entry_key, *grid_entry_ptr);
+  }
+}
+
 void update_existing_grid(InputHDF5Stream& is, GridData& gd,
-    CoordinateVariables& cv, size_t num_levels, size_t lidx, ScanData& sd,
-    metautils::NcTime::TimeBounds& tb, ParameterData& pd, string pkey, string
-    gkey) {
-  for (size_t l = 0; l < num_levels; ++l) {
+    CoordinateVariables& cv, size_t nlev, size_t lidx, ScanData& sd, metautils::
+    NcTime::TimeBounds& tb, ParameterData& pd, string pkey, string gkey) {
+  for (size_t l = 0; l < nlev; ++l) {
     level_entry_key = "ds" + metautils::args.dsnum + "," + gd.level.id + ":";
     auto v = gd.level.ds == nullptr ? 0. : data_array_value(gd.level.data_array,
         l, gd.level.ds.get());
@@ -3727,60 +3774,8 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream, ScanData& scan_data) {
             }
           }
           if (grid_table_ptr->find(grid_entry_key) == grid_table_ptr->end()) {
-
-            // new grid
-            grid_entry_ptr->level_table.clear();
-            level_entry_ptr->parameter_code_table.clear();
-            parameter_entry_ptr->num_time_steps = 0;
-            add_gridded_parameters_to_netcdf_level_entry(istream,
-                grid_entry_key, grid_data, scan_data, tm_bnds, parameter_data);
-            if (!level_entry_ptr->parameter_code_table.empty()) {
-              for (size_t l = 0; l < num_levels; ++l) {
-                level_entry_key = "ds" + metautils::args.dsnum + "," +
-                    grid_data.level.id + ":";
-                if (grid_data.level_bounds.ds == nullptr) {
-                  auto level_value = (grid_data.level.ds == nullptr) ? 0. :
-                      data_array_value(grid_data.level.data_array, l,
-                      grid_data.level.ds.get());
-                  if (floatutils::myequalf(level_value, static_cast<int>(
-                      level_value), 0.001)) {
-                    level_entry_key += itos(level_value);
-                  } else {
-                    level_entry_key += ftos(level_value, 3);
-                  }
-                } else {
-                  auto level_value = data_array_value(
-                      grid_data.time_bounds.data_array, l * 2,
-                      grid_data.level_bounds.ds.get());
-                  if (floatutils::myequalf(level_value, static_cast<int>(
-                      level_value), 0.001)) {
-                    level_entry_key += itos(level_value);
-                  } else {
-                    level_entry_key += ftos(level_value, 3);
-                  }
-                  level_value = data_array_value(
-                      grid_data.time_bounds.data_array, l * 2 + 1,
-                      grid_data.level_bounds.ds.get());
-                  level_entry_key += ":";
-                  if (floatutils::myequalf(level_value, static_cast<int>(
-                      level_value), 0.001)) {
-                    level_entry_key += itos(level_value);
-                  } else {
-                    level_entry_key += ftos(level_value, 3);
-                  }
-                }
-                grid_entry_ptr->level_table.emplace(level_entry_key,
-                    *level_entry_ptr);
-                coord_vars.level_info[m].write = 1;
-                if (g_inv.stream.is_open()) {
-                  update_inventory(g_inv.maps.U[product_key], g_inv.maps.G[
-                      grid_key], grid_data);
-                }
-              }
-            }
-            if (!grid_entry_ptr->level_table.empty()) {
-              grid_table_ptr->emplace(grid_entry_key, *grid_entry_ptr);
-            }
+            add_new_grid(istream, grid_data, coord_vars, num_levels, m,
+                scan_data, tm_bnds, parameter_data, product_key, grid_key);
            } else {
             update_existing_grid(istream, grid_data, coord_vars, num_levels, m,
                 scan_data, tm_bnds, parameter_data, product_key, grid_key);
