@@ -140,6 +140,7 @@ struct ParameterData {
 
 unique_ptr<my::map<gatherxml::markup::GrML::GridEntry>> grid_table_ptr;
 unique_ptr<gatherxml::markup::GrML::GridEntry> grid_entry_ptr;
+string level_entry_key;
 unique_ptr<gatherxml::markup::GrML::LevelEntry> level_entry_ptr;
 string parameter_entry_key;
 unique_ptr<gatherxml::markup::GrML::ParameterEntry> parameter_entry_ptr;
@@ -1724,7 +1725,7 @@ void update_level_entry(InputHDF5Stream& istream,
           add_gridded_netcdf_parameter(var, scan_data, time_range,
               parameter_data, grid_data.time_range_entry.num_steps);
         }
-        grid_entry_ptr->level_table.replace(*level_entry_ptr);
+        grid_entry_ptr->level_table[level_entry_key] = *level_entry_ptr;
       } else {
         string error;
         auto tr_description =
@@ -1764,7 +1765,7 @@ void update_level_entry(InputHDF5Stream& istream,
             }
           }
           pe.num_time_steps += grid_data.time_range_entry.num_steps;
-          grid_entry_ptr->level_table.replace(*level_entry_ptr);
+          grid_entry_ptr->level_table[level_entry_key] = *level_entry_ptr;
         }
       }
       level_write = true;
@@ -1829,8 +1830,8 @@ DateTime compute_nc_time(const HDF5::DataArray& times,
 }
 
 void update_inventory(int unum, int gnum, const GridData& grid_data) {
-  if (g_inv.maps.L.find(level_entry_ptr->key) == g_inv.maps.L.end()) {
-    g_inv.maps.L.emplace(level_entry_ptr->key, g_inv.maps.L.size());
+  if (g_inv.maps.L.find(level_entry_key) == g_inv.maps.L.end()) {
+    g_inv.maps.L.emplace(level_entry_key, g_inv.maps.L.size());
   }
   for (size_t n = 0; n < grid_data.valid_time.data_array.num_values; ++n) {
     for (const auto& e : level_entry_ptr->parameter_code_table) {
@@ -1840,7 +1841,7 @@ void update_inventory(int unum, int gnum, const GridData& grid_data) {
           data_array_value(grid_data.valid_time.data_array, n, grid_data.
           valid_time.ds.get()), *grid_data.time_data, error).to_string(
           "%Y%m%d%H%MM") << "|" << unum << "|" << gnum << "|" << g_inv.maps.L[
-          level_entry_ptr->key] << "|" << g_inv.maps.P[e.first] << "|0";
+          level_entry_key] << "|" << g_inv.maps.P[e.first] << "|0";
       g_inv.lines.emplace_back(inv_line.str());
     }
   }
@@ -3693,7 +3694,7 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream, ScanData& scan_data) {
                 parameter_data);
             if (!level_entry_ptr->parameter_code_table.empty()) {
               for (size_t l = 0; l < num_levels; ++l) {
-                level_entry_ptr->key = "ds" + metautils::args.dsnum + "," +
+                level_entry_key = "ds" + metautils::args.dsnum + "," +
                     grid_data.level.id + ":";
                 if (grid_data.level_bounds.ds == nullptr) {
                   auto level_value = (grid_data.level.ds == nullptr) ? 0. :
@@ -3701,9 +3702,9 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream, ScanData& scan_data) {
                       grid_data.level.ds.get());
                   if (floatutils::myequalf(level_value, static_cast<int>(
                       level_value), 0.001)) {
-                    level_entry_ptr->key += itos(level_value);
+                    level_entry_key += itos(level_value);
                   } else {
-                    level_entry_ptr->key += ftos(level_value, 3);
+                    level_entry_key += ftos(level_value, 3);
                   }
                 } else {
                   auto level_value = data_array_value(
@@ -3711,22 +3712,23 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream, ScanData& scan_data) {
                       grid_data.level_bounds.ds.get());
                   if (floatutils::myequalf(level_value, static_cast<int>(
                       level_value), 0.001)) {
-                    level_entry_ptr->key += itos(level_value);
+                    level_entry_key += itos(level_value);
                   } else {
-                    level_entry_ptr->key += ftos(level_value, 3);
+                    level_entry_key += ftos(level_value, 3);
                   }
                   level_value = data_array_value(
                       grid_data.time_bounds.data_array, l * 2 + 1,
                       grid_data.level_bounds.ds.get());
-                  level_entry_ptr->key += ":";
+                  level_entry_key += ":";
                   if (floatutils::myequalf(level_value, static_cast<int>(
                       level_value), 0.001)) {
-                    level_entry_ptr->key += itos(level_value);
+                    level_entry_key += itos(level_value);
                   } else {
-                    level_entry_ptr->key += ftos(level_value, 3);
+                    level_entry_key += ftos(level_value, 3);
                   }
                 }
-                grid_entry_ptr->level_table.insert(*level_entry_ptr);
+                grid_entry_ptr->level_table.emplace(level_entry_key,
+                    *level_entry_ptr);
                 coord_vars.level_info[m].write = 1;
                 if (g_inv.stream.is_open()) {
                   update_inventory(g_inv.maps.U[product_key], g_inv.maps.G[
@@ -3741,25 +3743,26 @@ void scan_gridded_hdf5nc4_file(InputHDF5Stream& istream, ScanData& scan_data) {
 
             // existing grid - needs update
             for (size_t l = 0; l < num_levels; ++l) {
-              level_entry_ptr->key="ds" + metautils::args.dsnum + "," +
+              level_entry_key = "ds" + metautils::args.dsnum + "," +
                   grid_data.level.id + ":";
               auto level_value = (grid_data.level.ds == nullptr) ? 0. :
                   data_array_value(grid_data.level.data_array, l,
                   grid_data.level.ds.get());
               if (floatutils::myequalf(level_value, static_cast<int>(
                   level_value), 0.001)) {
-                level_entry_ptr->key += itos(level_value);
+                level_entry_key += itos(level_value);
               } else {
-                level_entry_ptr->key += ftos(level_value, 3);
+                level_entry_key += ftos(level_value, 3);
               }
-              if (!grid_entry_ptr->level_table.found(level_entry_ptr->key,
-                  *level_entry_ptr)) {
+              if (grid_entry_ptr->level_table.find(level_entry_key) ==
+                  grid_entry_ptr->level_table.end()) {
                 level_entry_ptr->parameter_code_table.clear();
                 add_gridded_parameters_to_netcdf_level_entry(istream,
                     grid_entry_ptr->key, grid_data, scan_data, tm_bnds,
                     parameter_data);
                 if (!level_entry_ptr->parameter_code_table.empty()) {
-                  grid_entry_ptr->level_table.insert(*level_entry_ptr);
+                  grid_entry_ptr->level_table.emplace(level_entry_key,
+                      *level_entry_ptr);
                   coord_vars.level_info[m].write = 1;
                 }
               } else {
