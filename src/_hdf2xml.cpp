@@ -49,8 +49,8 @@ unique_ptr<TempFile> work_file;
 
 struct ScanData {
   ScanData() : num_not_missing(0), write_type(-1), cmd_type(), tdir(nullptr),
-      map_name(), platform_type(), varlist(), var_changes_table(),
-      found_map(false), convert_ids_to_upper_case(false) {}
+      map_name(), platform_type(), varlist(), var_changes_table(), found_map(
+      false), convert_ids_to_upper_case(false) { }
 
   enum {GrML_type = 1, ObML_type};
   size_t num_not_missing;
@@ -59,7 +59,7 @@ struct ScanData {
   unique_ptr<TempDir> tdir;
   string map_name, platform_type;
   std::list<string> varlist;
-  my::map<metautils::StringEntry> var_changes_table;
+  unordered_set<string> var_changes_table;
   bool found_map, convert_ids_to_upper_case;
 };
 
@@ -1238,9 +1238,9 @@ void scan_usarray_transportable_hdf5_file(InputHDF5Stream& istream,
   scan_data.found_map = !scan_data.map_name.empty();
   se.key = datatype + "<!>" + se.key + "<!>Hz";
   scan_data.varlist.emplace_back(se.key);
-  if (scan_data.found_map && !scan_data.var_changes_table.found(datatype, se)) {
-    se.key = datatype;
-    scan_data.var_changes_table.insert(se);
+  if (scan_data.found_map && scan_data.var_changes_table.find(datatype) ==
+      scan_data.var_changes_table.end()) {
+    scan_data.var_changes_table.emplace(datatype);
   }
   scan_data.write_type = ScanData::ObML_type;
 }
@@ -1476,9 +1476,9 @@ void add_gridded_netcdf_parameter(const InputHDF5Stream::DatasetEntry& var,
     } else {
       parameter_data.set.emplace(se.key);
       scan_data.varlist.emplace_back(se.key);
-      if (!scan_data.var_changes_table.found(var.first, se)) {
-        se.key = var.first;
-        scan_data.var_changes_table.insert(se);
+      if (scan_data.var_changes_table.find(var.first) == scan_data.
+          var_changes_table.end()) {
+        scan_data.var_changes_table.emplace(var.first);
       }
     }
   }
@@ -2069,10 +2069,9 @@ void scan_cf_point_hdf5nc4_file(InputHDF5Stream& istream, ScanData& scan_data,
       metautils::StringEntry se;
       se.key = var_name + "<!>" + descr + "<!>" + units;
       scan_data.varlist.emplace_back(se.key);
-      if (scan_data.found_map && !scan_data.var_changes_table.found(var_name,
-          se)) {
-        se.key = var_name;
-        scan_data.var_changes_table.insert(se);
+      if (scan_data.found_map && scan_data.var_changes_table.find(var_name) ==
+          scan_data.var_changes_table.end()) {
+        scan_data.var_changes_table.emplace(var_name);
       }
       HDF5::DataArray var_data;
       var_data.fill(istream, *ds);
@@ -2439,10 +2438,9 @@ id_types.emplace_back("unknown");
           se.key = var_name + "<!>" + nc_va_data.long_name + "<!>" +
               nc_va_data.units;
           scan_data.varlist.emplace_back(se.key);
-          if (scan_data.found_map && !scan_data.var_changes_table.found(
-              var_name, se)) {
-            se.key = var_name;
-            scan_data.var_changes_table.insert(se);
+          if (scan_data.found_map && scan_data.var_changes_table.find(var_name)
+              == scan_data.var_changes_table.end()) {
+            scan_data.var_changes_table.emplace(var_name);
           }
           auto var_off = 0;
           auto z_off = 0;
