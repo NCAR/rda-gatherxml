@@ -127,11 +127,11 @@ extern bool summarize_obs_data(std::string caller, std::string user);
 
 namespace fileInventory {
 
-extern void close(std::string filename, TempDir **tdir, std::ofstream& ofs,
-    std::string cmd_type, bool insert_into_db, bool create_cache, std::string
-    caller, std::string user);
-extern void open(std::string& filename, TempDir **tdir, std::ofstream& ofs,
-    std::string cmd_type, std::string caller, std::string user);
+extern void close(std::string filename, std::unique_ptr<TempDir>& tdir, std::
+    ofstream& ofs, std::string cmd_type, bool insert_into_db, bool create_cache,
+    std::string caller, std::string user);
+extern void open(std::string& filename, std::unique_ptr<TempDir>& tdir, std::
+    ofstream& ofs, std::string cmd_type, std::string caller, std::string user);
 
 } // end namespace gatherxml::fileInventory
 
