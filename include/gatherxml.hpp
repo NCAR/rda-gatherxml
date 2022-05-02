@@ -198,9 +198,8 @@ struct ParameterEntry {
 };
 
 struct LevelEntry {
-  LevelEntry() : key(), units(), parameter_code_table() { }
+  LevelEntry() : units(), parameter_code_table() { }
 
-  std::string key;
   std::string units;
   std::unordered_map<std::string, ParameterEntry> parameter_code_table;
 };
@@ -209,7 +208,7 @@ struct GridEntry {
   GridEntry() : key(), level_table(), process_table(), ensemble_table() { }
 
   std::string key;
-  my::map<LevelEntry> level_table;
+  std::unordered_map<std::string, LevelEntry> level_table;
   std::unordered_set<std::string> process_table, ensemble_table;
 };
 
