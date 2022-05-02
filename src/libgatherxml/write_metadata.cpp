@@ -21,6 +21,7 @@ using std::stoi;
 using std::stof;
 using std::string;
 using std::stringstream;
+using std::unique_ptr;
 using std::vector;
 using strutils::ftos;
 using strutils::itos;
@@ -36,8 +37,9 @@ namespace gatherxml {
 
 namespace fileInventory {
 
-void close(string filename, TempDir **tdir, std::ofstream& ofs, string cmd_type,
-    bool insert_into_db, bool create_cache, string caller, string user) {
+void close(string filename, unique_ptr<TempDir>& tdir, std::ofstream& ofs,
+    string cmd_type, bool insert_into_db, bool create_cache, string caller,
+    string user) {
   if (!ofs.is_open()) {
     return;
   }
@@ -58,22 +60,19 @@ void close(string filename, TempDir **tdir, std::ofstream& ofs, string cmd_type,
     if (!create_cache) {
       c += " -C";
     }
-    c += " -d " + metautils::args.dsnum + " -t " + (*tdir)->name() + " -f " +
+    c += " -d " + metautils::args.dsnum + " -t " + tdir->name() + " -f " +
         filename + "." + cmd_type + "_inv";
     mysystem2(c, oss, ess);
     if (!ess.str().empty()) {
       log_warning("close(): " + ess.str() + "' while running iinv", caller,
           user);
-      (*tdir)->set_keep();
+      tdir->set_keep();
     }
-  }
-  if (*tdir != nullptr) {
-    delete *tdir;
   }
 }
 
-void open(string& filename, TempDir **tdir, std::ofstream& ofs, string cmd_type,
-    string caller, string user) {
+void open(string& filename, unique_ptr<TempDir>& tdir, std::ofstream& ofs,
+    string cmd_type, string caller, string user) {
   static const string F = this_function_label(__func__);
   if (ofs.is_open()) {
     return;
@@ -84,13 +83,13 @@ void open(string& filename, TempDir **tdir, std::ofstream& ofs, string cmd_type,
   filename = metautils::relative_web_filename(metautils::args.path + "/" +
       metautils::args.filename);
   replace_all(filename, "/", "%");
-  if (*tdir == nullptr) {
-    *tdir = new TempDir();
-    if (!(*tdir)->create(metautils::directives.temp_path)) {
+  if (tdir == nullptr) {
+    tdir.reset(new TempDir());
+    if (!tdir->create(metautils::directives.temp_path)) {
       log_error2("unable to create temporary directory", F, caller, user);
     }
   }
-  ofs.open((*tdir)->name() + "/" + filename + "." + cmd_type + "_inv");
+  ofs.open(tdir->name() + "/" + filename + "." + cmd_type + "_inv");
   if (!ofs.is_open()) {
     log_error2("couldn't open the inventory output file", F, caller, user);
   }
