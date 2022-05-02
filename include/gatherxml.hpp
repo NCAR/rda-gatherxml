@@ -191,10 +191,8 @@ extern void write(my::map<FeatureEntry>& feature_table, my::map<StageEntry>&
 namespace GrML {
 
 struct ParameterEntry {
-  ParameterEntry() : key(), start_date_time(), end_date_time(), num_time_steps(
-      0) { }
+  ParameterEntry() : start_date_time(), end_date_time(), num_time_steps(0) { }
 
-  std::string key;
   DateTime start_date_time, end_date_time;
   size_t num_time_steps;
 };
@@ -204,7 +202,7 @@ struct LevelEntry {
 
   std::string key;
   std::string units;
-  my::map<ParameterEntry> parameter_code_table;
+  std::unordered_map<std::string, ParameterEntry> parameter_code_table;
 };
 
 struct GridEntry {
