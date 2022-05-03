@@ -671,9 +671,8 @@ string ispd_hdf5_id_entry(const std::tuple<string, string, float, float, short,
   return ientry_key;
 }
 
-//void scan_ispd_hdf5_file(InputHDF5Stream& istream, ScanData& scan_data,
-void scan_ispd_hdf5_file(ScanData& scan_data,
-    gatherxml::markup::ObML::ObservationData& obs_data) {
+void scan_ispd_hdf5_file(ScanData& scan_data, gatherxml::markup::ObML::
+    ObservationData& obs_data) {
   static const string F = this_function_label(__func__);
   auto is = reinterpret_cast<InputHDF5Stream *>(g_istream.get());
   auto ds = is->dataset("/ISPD_Format_Version");
@@ -1283,11 +1282,12 @@ string gridded_time_method(
 }
 
 void add_gridded_time_range(string key_start, std::unordered_set<string>&
-    grid_entry_set, const GridData& grid_data, InputHDF5Stream& istream) {
+    grid_entry_set, const GridData& grid_data) {
   static const string F = this_function_label(__func__);
+  auto is = reinterpret_cast<InputHDF5Stream *>(g_istream.get());
   string grid_entry_key, inv_key;
   bool found_no_method = false;
-  auto vars = istream.datasets_with_attribute("DIMENSION_LIST");
+  auto vars = is->datasets_with_attribute("DIMENSION_LIST");
   for (const auto& var : vars) {
     auto& dset_ptr = var.second;
     auto attr_it = dset_ptr->attributes.find("DIMENSION_LIST");
@@ -1335,9 +1335,8 @@ void add_gridded_time_range(string key_start, std::unordered_set<string>&
   }
 }
 
-void add_gridded_lat_lon_keys(std::unordered_set<string>& grid_entry_set,
-    Grid::GridDimensions dim, Grid::GridDefinition def,
-    const GridData& grid_data, InputHDF5Stream& istream) {
+void add_gridded_lat_lon_keys(std::unordered_set<string>& grid_entry_set, Grid::
+    GridDimensions dim, Grid::GridDefinition def, const GridData& grid_data) {
   string key_start;
   switch (def.type) {
     case Grid::Type::latitudeLongitude: {
@@ -1349,7 +1348,7 @@ void add_gridded_lat_lon_keys(std::unordered_set<string>& grid_entry_set,
           ftos(def.slatitude, 3) + "<!>" + ftos(def.slongitude, 3) + "<!>" +
           ftos(def.elatitude, 3) + "<!>" + ftos(def.elongitude, 3) + "<!>" +
           ftos(def.loincrement, 3) + "<!>" + ftos(def.laincrement, 3) + "<!>";
-      add_gridded_time_range(key_start, grid_entry_set, grid_data, istream);
+      add_gridded_time_range(key_start, grid_entry_set, grid_data);
       break;
     }
     case Grid::Type::polarStereographic: {
@@ -1364,7 +1363,7 @@ void add_gridded_lat_lon_keys(std::unordered_set<string>& grid_entry_set,
         key_start += "S";
       }
       key_start += "<!>";
-      add_gridded_time_range(key_start, grid_entry_set, grid_data, istream);
+      add_gridded_time_range(key_start, grid_entry_set, grid_data);
       break;
     }
     case Grid::Type::lambertConformal: {
@@ -1380,7 +1379,7 @@ void add_gridded_lat_lon_keys(std::unordered_set<string>& grid_entry_set,
       }
       key_start += "<!>" + ftos(def.stdparallel1, 3) + "<!>" + ftos(
           def.stdparallel2, 3) + "<!>";
-      add_gridded_time_range(key_start, grid_entry_set, grid_data, istream);
+      add_gridded_time_range(key_start, grid_entry_set, grid_data);
       break;
     }
     default: { }
@@ -1507,9 +1506,10 @@ void add_gridded_netcdf_parameter(const InputHDF5Stream::DatasetEntry& var,
       *parameter_entry_ptr);
 }
 
-bool parameter_matches_dimensions(InputHDF5Stream& istream, const
-    InputHDF5Stream::DataValue& dimension_list, const GridData& grid_data) {
+bool parameter_matches_dimensions(const InputHDF5Stream::DataValue&
+    dimension_list, const GridData& grid_data) {
   static const string F = this_function_label(__func__);
+  auto is = reinterpret_cast<InputHDF5Stream *>(g_istream.get());
   bool parameter_matches = false;
   auto off = 4;
   size_t first = 1;
@@ -1525,9 +1525,9 @@ bool parameter_matches_dimensions(InputHDF5Stream& istream, const
   unordered_map<size_t, string>::iterator rtp_it[3];
   for (size_t n = first, rcnt = 0; n < dimension_list.dim_sizes[0]; ++n,
       ++rcnt) {
-    rtp_it[rcnt] = istream.reference_table_pointer()->find(HDF5::value(
+    rtp_it[rcnt] = is->reference_table_pointer()->find(HDF5::value(
         &dimension_list.vlen.buffer[off], dimension_list.precision_));
-    if (rtp_it[rcnt] == istream.reference_table_pointer()->end()) {
+    if (rtp_it[rcnt] == is->reference_table_pointer()->end()) {
       log_error2("unable to dereference dimension reference", F, g_util_ident);
     }
     if (gatherxml::verbose_operation) {
@@ -1552,14 +1552,14 @@ bool parameter_matches_dimensions(InputHDF5Stream& istream, const
             second != grid_data.longitude.id) {
 
           // check for auxiliary coordinate variables for latitude and longitude
-          auto lat_ds = istream.dataset("/" + grid_data.latitude.id);
-          auto lon_ds = istream.dataset("/" + grid_data.longitude.id);
+          auto lat_ds = is->dataset("/" + grid_data.latitude.id);
+          auto lon_ds = is->dataset("/" + grid_data.longitude.id);
           if (lat_ds != nullptr && lon_ds != nullptr) {
             stringstream lat_dims;
-            lat_ds->attributes["DIMENSION_LIST"].print(lat_dims, istream.
+            lat_ds->attributes["DIMENSION_LIST"].print(lat_dims, is->
                 reference_table_pointer());
             stringstream lon_dims;
-            lon_ds->attributes["DIMENSION_LIST"].print(lon_dims, istream.
+            lon_ds->attributes["DIMENSION_LIST"].print(lon_dims, is->
                 reference_table_pointer());
             if ((lat_dims.str() == "[" + rtp_it[0]->second + "]" && lon_dims.
                 str() == "[" + rtp_it[1]->second + "]") || (lat_dims.str() ==
@@ -1584,7 +1584,7 @@ bool parameter_matches_dimensions(InputHDF5Stream& istream, const
         if (grid_data.level.ds != nullptr) {
           stringstream lev_dims;
           grid_data.level.ds->attributes["DIMENSION_LIST"].print(lev_dims,
-              istream.reference_table_pointer());
+              is->reference_table_pointer());
           if (lev_dims.str() == "[" + rtp_it[off]->second + "]") {
             can_continue = true;
           }
@@ -1602,15 +1602,15 @@ bool parameter_matches_dimensions(InputHDF5Stream& istream, const
         } else {
 
           // check for auxiliary coordinate variables for latitude and longitude
-          auto lat_ds = istream.dataset("/" + grid_data.latitude.id);
-          auto lon_ds = istream.dataset("/" + grid_data.longitude.id);
+          auto lat_ds = is->dataset("/" + grid_data.latitude.id);
+          auto lon_ds = is->dataset("/" + grid_data.longitude.id);
           if (lat_ds != nullptr && lon_ds != nullptr) {
             stringstream lat_dims;
-            lat_ds->attributes["DIMENSION_LIST"].print(lat_dims, istream.
+            lat_ds->attributes["DIMENSION_LIST"].print(lat_dims, is->
                 reference_table_pointer());
             stringstream lon_dims;
             lon_ds->attributes["DIMENSION_LIST"].print(lon_dims,
-                istream.reference_table_pointer());
+                is->reference_table_pointer());
             if ((lat_dims.str() == "[" + rtp_it[off + 1]->second + "]" &&
                 lon_dims.str() == "[" + rtp_it[off + 2]->second + "]") ||
                 (lat_dims.str() == lon_dims.str() && lon_dims.str() == "[" +
@@ -1632,14 +1632,14 @@ bool parameter_matches_dimensions(InputHDF5Stream& istream, const
   return parameter_matches;
 }
 
-void add_gridded_parameters_to_netcdf_level_entry(InputHDF5Stream& istream,
-    string& grid_entry_key, const GridData& grid_data, ScanData& scan_data,
-    const metautils::NcTime::TimeBounds& time_bounds,
-    ParameterData& parameter_data) {
+void add_gridded_parameters_to_netcdf_level_entry(string& grid_entry_key, const
+    GridData& grid_data, ScanData& scan_data, const metautils::NcTime::
+    TimeBounds& time_bounds, ParameterData& parameter_data) {
   static const string F = this_function_label(__func__);
+  auto is = reinterpret_cast<InputHDF5Stream *>(g_istream.get());
 
   // find all of the variables
-  auto vars = istream.datasets_with_attribute("DIMENSION_LIST");
+  auto vars = is->datasets_with_attribute("DIMENSION_LIST");
   for (const auto& var : vars) {
     if (grid_data.coordinate_variables_set.find(var.first) ==
         grid_data.coordinate_variables_set.end()) {
@@ -1647,15 +1647,14 @@ void add_gridded_parameters_to_netcdf_level_entry(InputHDF5Stream& istream,
       auto attr_it = dset_ptr->attributes.find("DIMENSION_LIST");
       if (gatherxml::verbose_operation) {
         cout << "    '" << var.first << "' has a DIMENSION_LIST: ";
-        attr_it->second.print(cout, istream.reference_table_pointer());
+        attr_it->second.print(cout, is->reference_table_pointer());
         cout << endl;
       }
-      if (attr_it->second._class_ == 9 && attr_it->second.dim_sizes.size() ==
-          1 && (attr_it->second.dim_sizes[0] > 2 || (attr_it->
-          second.dim_sizes[0] == 2 &&
-          grid_data.valid_time.data_array.num_values == 1)) && attr_it->
-          second.vlen.class_ == 7 && parameter_matches_dimensions(
-          istream, attr_it->second, grid_data)) {
+      if (attr_it->second._class_ == 9 && attr_it->second.dim_sizes.size() == 1
+          && (attr_it->second.dim_sizes[0] > 2 || (attr_it->second.dim_sizes[0]
+          == 2 && grid_data.valid_time.data_array.num_values == 1)) && attr_it->
+          second.vlen.class_ == 7 && parameter_matches_dimensions(attr_it->
+          second, grid_data)) {
         if (gatherxml::verbose_operation) {
           cout << "    ...is a netCDF variable" << endl;
         }
@@ -1704,17 +1703,18 @@ void add_gridded_parameters_to_netcdf_level_entry(InputHDF5Stream& istream,
   }
 }
 
-void update_level_entry(InputHDF5Stream& istream,
-    const metautils::NcTime::TimeBounds& time_bounds, const GridData& grid_data,
-    ScanData& scan_data, ParameterData& parameter_data, bool& level_write) {
+void update_level_entry(const metautils::NcTime::TimeBounds& time_bounds, const
+    GridData& grid_data, ScanData& scan_data, ParameterData& parameter_data,
+    bool& level_write) {
   static const string F = this_function_label(__func__);
-  auto vars = istream.datasets_with_attribute("DIMENSION_LIST");
+  auto is = reinterpret_cast<InputHDF5Stream *>(g_istream.get());
+  auto vars = is->datasets_with_attribute("DIMENSION_LIST");
   for (const auto& var : vars) {
     auto& dset_ptr = var.second;
     auto attr_it = dset_ptr->attributes.find("DIMENSION_LIST");
     if (attr_it->second._class_ == 9 && attr_it->second.dim_sizes.size() == 1 &&
         attr_it->second.dim_sizes[0] > 2 && attr_it->second.vlen.class_ == 7 &&
-        parameter_matches_dimensions(istream, attr_it->second, grid_data)) {
+        parameter_matches_dimensions(attr_it->second, grid_data)) {
       parameter_entry_key = "ds" + metautils::args.dsnum + ":" + var.first;
       auto time_method = gridded_time_method(dset_ptr, grid_data);
       time_method = strutils::capitalize(time_method);
@@ -1888,10 +1888,11 @@ void process_units_attribute(const InputHDF5Stream::DatasetEntry& ds_entry,
   }
 }
 
-void fill_dgd_index(InputHDF5Stream& istream, string attribute_name_to_match,
-    string attribute_value_to_match, string& dgd_index) {
+void fill_dgd_index(string attribute_name_to_match, string
+    attribute_value_to_match, string& dgd_index) {
   static const string F = this_function_label(__func__);
-  auto ds_entry_list = istream.datasets_with_attribute(attribute_name_to_match);
+  auto is = reinterpret_cast<InputHDF5Stream *>(g_istream.get());
+  auto ds_entry_list = is->datasets_with_attribute(attribute_name_to_match);
   if (ds_entry_list.size() > 1) {
     log_error2("more than one " + attribute_name_to_match + " variable found",
         F, g_util_ident);
@@ -1912,10 +1913,11 @@ void fill_dgd_index(InputHDF5Stream& istream, string attribute_name_to_match,
   }
 }
 
-void fill_dgd_index(InputHDF5Stream& istream, string attribute_name_to_match,
-    unordered_map<string, string>& dgd_index) {
+void fill_dgd_index(string attribute_name_to_match, unordered_map<string,
+    string>& dgd_index) {
   static const string F = this_function_label(__func__);
-  auto ds_entry_list = istream.datasets_with_attribute(attribute_name_to_match);
+  auto is = reinterpret_cast<InputHDF5Stream *>(g_istream.get());
+  auto ds_entry_list = is->datasets_with_attribute(attribute_name_to_match);
   for (const auto& ds_entry : ds_entry_list) {
     auto aval = ds_entry.second->attributes[attribute_name_to_match];
     string attr_val(reinterpret_cast<char *>(aval.get()), aval.size);
@@ -1928,11 +1930,12 @@ void fill_dgd_index(InputHDF5Stream& istream, string attribute_name_to_match,
   }
 }
 
-void process_vertical_coordinate_variable(InputHDF5Stream& istream,
-    DiscreteGeometriesData& dgd, string& obs_type) {
+void process_vertical_coordinate_variable(DiscreteGeometriesData& dgd, string&
+    obs_type) {
   static const string F = this_function_label(__func__);
+  auto is = reinterpret_cast<InputHDF5Stream *>(g_istream.get());
   obs_type = "";
-  auto ds = istream.dataset("/" + dgd.indexes.z_var);
+  auto ds = is->dataset("/" + dgd.indexes.z_var);
   auto attr_it = ds->attributes.find("units");
   if (attr_it != ds->attributes.end()) {
     dgd.z_units.assign(reinterpret_cast<char *>(attr_it->second.get()),
@@ -1973,9 +1976,8 @@ void process_vertical_coordinate_variable(InputHDF5Stream& istream,
   }
 }
 
-//void scan_cf_point_hdf5nc4_file(InputHDF5Stream& istream, ScanData& scan_data,
-void scan_cf_point_hdf5nc4_file(ScanData& scan_data,
-    gatherxml::markup::ObML::ObservationData& obs_data) {
+void scan_cf_point_hdf5nc4_file(ScanData& scan_data, gatherxml::markup::ObML::
+    ObservationData& obs_data) {
   static const string F = this_function_label(__func__);
   auto is = reinterpret_cast<InputHDF5Stream *>(g_istream.get());
   auto ds_entry_list = is->datasets_with_attribute("units");
@@ -2147,14 +2149,14 @@ void scan_cf_point_hdf5nc4_file(ScanData& scan_data,
   scan_data.write_type = ScanData::ObML_type;
 }
 
-void scan_cf_orthogonal_time_series_hdf5nc4_file(InputHDF5Stream& istream,
-    const DiscreteGeometriesData& dgd,
-    const metautils::NcTime::TimeData& time_data, ScanData& scan_data,
+void scan_cf_orthogonal_time_series_hdf5nc4_file(const DiscreteGeometriesData&
+    dgd, const metautils::NcTime::TimeData& time_data, ScanData& scan_data,
     gatherxml::markup::ObML::ObservationData& obs_data) {
   static const string F = this_function_label(__func__);
   if (gatherxml::verbose_operation) {
     cout << "...beginning function " << F << "..." << endl;
   }
+  auto is = reinterpret_cast<InputHDF5Stream *>(g_istream.get());
   if (dgd.indexes.lat_var.empty()) {
     log_error2("latitude could not be identified", F, g_util_ident);
   }
@@ -2164,7 +2166,7 @@ void scan_cf_orthogonal_time_series_hdf5nc4_file(InputHDF5Stream& istream,
   vector<string> platform_types, id_types, id_cache;
   size_t num_stns = 0;
   if (dgd.indexes.stn_id_var.empty()) {
-    auto root_ds = istream.dataset("/");
+    auto root_ds = is->dataset("/");
     size_t known_sources = 0xffffffff;
     if (root_ds == nullptr) {
       log_error2("unable to get root dataset", F, g_util_ident);
@@ -2213,30 +2215,30 @@ void scan_cf_orthogonal_time_series_hdf5nc4_file(InputHDF5Stream& istream,
       log_error2("timeseries_id role could not be identified", F, g_util_ident);
     }
   }
-  auto times_ds = istream.dataset("/" + dgd.indexes.time_var);
+  auto times_ds = is->dataset("/" + dgd.indexes.time_var);
   if (times_ds == nullptr) {
     log_error2("unable to get time dataset", F, g_util_ident);
   }
   NetCDFVariableAttributeData nc_ta_data;
   extract_from_hdf5_variable_attributes(times_ds->attributes, nc_ta_data);
   HDF5::DataArray time_vals;
-  time_vals.fill(istream, *times_ds);
-  auto lats_ds = istream.dataset("/" + dgd.indexes.lat_var);
+  time_vals.fill(*is, *times_ds);
+  auto lats_ds = is->dataset("/" + dgd.indexes.lat_var);
   if (lats_ds == nullptr) {
     log_error2("unable to get latitude dataset", F, g_util_ident);
   }
   HDF5::DataArray lat_vals;
-  lat_vals.fill(istream, *lats_ds);
+  lat_vals.fill(*is, *lats_ds);
   if (lat_vals.num_values != num_stns) {
     log_error2("number of stations does not match number of latitudes", F,
         g_util_ident);
   }
-  auto lons_ds = istream.dataset("/" + dgd.indexes.lon_var);
+  auto lons_ds = is->dataset("/" + dgd.indexes.lon_var);
   if (lons_ds == nullptr) {
     log_error2("unable to get longitude dataset", F, g_util_ident);
   }
   HDF5::DataArray lon_vals;
-  lon_vals.fill(istream, *lons_ds);
+  lon_vals.fill(*is, *lons_ds);
   if (lon_vals.num_values != num_stns) {
     log_error2("number of stations does not match number of longitudes", F,
         g_util_ident);
@@ -2252,7 +2254,7 @@ log_error2("determining platforms is not implemented", F, g_util_ident);
           g_util_ident);
     }
   }
-  auto ds_entry_list = istream.datasets_with_attribute("DIMENSION_LIST");
+  auto ds_entry_list = is->datasets_with_attribute("DIMENSION_LIST");
   auto netcdf_var_re = std::regex("^\\[" + dgd.indexes.time_var +
       "(,.{1,}){0,1}\\]$");
   vector<DateTime> dts;
@@ -2263,14 +2265,14 @@ log_error2("determining platforms is not implemented", F, g_util_ident);
         var_name != dgd.indexes.lon_var) {
       stringstream dim_list_ss;
       ds_entry.second->attributes["DIMENSION_LIST"].print(dim_list_ss,
-          istream.reference_table_pointer());
+          is->reference_table_pointer());
       if (std::regex_search(dim_list_ss.str(), netcdf_var_re)) {
         if (gatherxml::verbose_operation) {
           cout << "Scanning netCDF variable '" << var_name << "' ..." <<
               endl;
         }
       }
-      auto var_ds = istream.dataset("/" + var_name);
+      auto var_ds = is->dataset("/" + var_name);
       if (var_ds == nullptr) {
         log_error2("unable to get data for variable '" + var_name + "'", F,
             g_util_ident);
@@ -2278,7 +2280,7 @@ log_error2("determining platforms is not implemented", F, g_util_ident);
       NetCDFVariableAttributeData nc_va_data;
       extract_from_hdf5_variable_attributes(var_ds->attributes, nc_va_data);
       HDF5::DataArray var_vals;
-      var_vals.fill(istream, *var_ds);
+      var_vals.fill(*is, *var_ds);
       datatypes_list.emplace_back(var_name + "<!>" + nc_va_data.long_name +
           "<!>" + nc_va_data.units + "<!>" + nc_va_data.cf_keyword);
       for (size_t n = 0; n < num_stns; ++n) {
@@ -2310,9 +2312,8 @@ log_error2("determining platforms is not implemented", F, g_util_ident);
   }
 }
 
-//void scan_cf_time_series_hdf5nc4_file(InputHDF5Stream& istream,
-void scan_cf_time_series_hdf5nc4_file(
-    ScanData& scan_data, gatherxml::markup::ObML::ObservationData& obs_data) {
+void scan_cf_time_series_hdf5nc4_file(ScanData& scan_data, gatherxml::markup::
+    ObML::ObservationData& obs_data) {
   static const string F = this_function_label(__func__);
   if (gatherxml::verbose_operation) {
     cout << "...beginning function " << F << "..." << endl;
@@ -2327,9 +2328,9 @@ void scan_cf_time_series_hdf5nc4_file(
   if (dgd.indexes.time_var.empty()) {
     log_error2("unable to determine time variable", F, g_util_ident);
   }
-  fill_dgd_index(*is, "cf_role", "profile_id", dgd.indexes.stn_id_var);
-  fill_dgd_index(*is, "sample_dimension", dgd.indexes.sample_dim_vars);
-  fill_dgd_index(*is, "instance_dimension", "",
+  fill_dgd_index("cf_role", "profile_id", dgd.indexes.stn_id_var);
+  fill_dgd_index("sample_dimension", dgd.indexes.sample_dim_vars);
+  fill_dgd_index("instance_dimension", "",
       dgd.indexes.instance_dim_var);
   auto ds = is->dataset("/" + dgd.indexes.time_var);
   auto attr_it = ds->attributes.find("_Netcdf4Dimid");
@@ -2337,8 +2338,8 @@ void scan_cf_time_series_hdf5nc4_file(
 
     // ex. H.2, H.4 (single version of H.2), H.5 (precise locations) stns w/same
     //     times
-    scan_cf_orthogonal_time_series_hdf5nc4_file(*is, dgd, time_data,
-        scan_data, obs_data);
+    scan_cf_orthogonal_time_series_hdf5nc4_file(dgd, time_data, scan_data,
+        obs_data);
   } else {
 
 // ex. H.3 stns w/varying times but same # of obs
@@ -2348,31 +2349,31 @@ void scan_cf_time_series_hdf5nc4_file(
   scan_data.write_type = ScanData::ObML_type;
 }
 
-void scan_cf_non_orthogonal_profile_hdf5nc4_file(InputHDF5Stream& istream,
-    const DiscreteGeometriesData& dgd,
-    const metautils::NcTime::TimeData& time_data,
-    const HDF5::DataArray& time_vals,
-    const NetCDFVariableAttributeData& nc_ta_data, ScanData& scan_data,
-    gatherxml::markup::ObML::ObservationData& obs_data, string obs_type) {
+void scan_cf_non_orthogonal_profile_hdf5nc4_file(const DiscreteGeometriesData&
+    dgd, const metautils::NcTime::TimeData& time_data, const HDF5::DataArray&
+    time_vals, const NetCDFVariableAttributeData& nc_ta_data, ScanData&
+    scan_data, gatherxml::markup::ObML::ObservationData& obs_data, string
+    obs_type) {
   static const string F = this_function_label(__func__);
+  auto is = reinterpret_cast<InputHDF5Stream *>(g_istream.get());
   if (gatherxml::verbose_operation) {
     cout << "...beginning function " << F << "..." << endl;
   }
-  auto ds = istream.dataset("/" + dgd.indexes.stn_id_var);
+  auto ds = is->dataset("/" + dgd.indexes.stn_id_var);
   if (ds == nullptr) {
     log_error2("unable to access station ID variable", F, g_util_ident);
   }
-  HDF5::DataArray id_vals(istream, *ds);
-  ds = istream.dataset("/" + dgd.indexes.lat_var);
+  HDF5::DataArray id_vals(*is, *ds);
+  ds = is->dataset("/" + dgd.indexes.lat_var);
   if (ds == nullptr) {
     log_error2("unable to access latitude variable", F, g_util_ident);
   }
-  HDF5::DataArray lat_vals(istream, *ds);
-  ds = istream.dataset("/" + dgd.indexes.lon_var);
+  HDF5::DataArray lat_vals(*is, *ds);
+  ds = is->dataset("/" + dgd.indexes.lon_var);
   if (ds == nullptr) {
     log_error2("unable to access longitude variable", F, g_util_ident);
   }
-  HDF5::DataArray lon_vals(istream, *ds);
+  HDF5::DataArray lon_vals(*is, *ds);
   if (id_vals.num_values != time_vals.num_values || lat_vals.num_values !=
         id_vals.num_values || lon_vals.num_values != lat_vals.num_values) {
     log_error2("profile data does not follow the CF conventions", F,
@@ -2401,55 +2402,55 @@ id_types.emplace_back("unknown");
   } else {
     log_error2("undefined platform type", F, g_util_ident);
   }
-  ds = istream.dataset("/" + dgd.indexes.z_var);
+  ds = is->dataset("/" + dgd.indexes.z_var);
   if (ds == nullptr) {
     log_error2("unable to access vertical level variable", F, g_util_ident);
   }
-  HDF5::DataArray z_vals(istream, *ds);
+  HDF5::DataArray z_vals(*is, *ds);
   auto attr_it = ds->attributes.find("DIMENSION_LIST");
   if (attr_it == ds->attributes.end()) {
     log_error2("unable to get vertical level row size variable", F,
         g_util_ident);
   }
   stringstream val_ss;
-  attr_it->second.print(val_ss, istream.reference_table_pointer());
-  auto var_list = istream.datasets_with_attribute("DIMENSION_LIST");
+  attr_it->second.print(val_ss, is->reference_table_pointer());
+  auto var_list = is->datasets_with_attribute("DIMENSION_LIST");
   auto dims = split(val_ss.str(), ",");
   strutils::replace_all(dims.front(), "[", "");
   strutils::replace_all(dims.front(), "]", "");
   trim(dims.front());
-  ds = istream.dataset("/" + dgd.indexes.sample_dim_vars.at(dims.front()));
+  ds = is->dataset("/" + dgd.indexes.sample_dim_vars.at(dims.front()));
   if (ds == nullptr) {
     log_error2("unable to get vertical level row sizes", F, g_util_ident);
   }
-  HDF5::DataArray z_rowsize_vals(istream, *ds);
+  HDF5::DataArray z_rowsize_vals(*is, *ds);
   if (dgd.indexes.sample_dim_vars.size() > 0) {
 // continuous ragged array H.10
     for (const auto& var : var_list) {
       auto& var_name = var.first;
       auto& dset_ptr = var.second;
       val_ss.str("");
-      dset_ptr->attributes["DIMENSION_LIST"].print(val_ss,
-          istream.reference_table_pointer());
+      dset_ptr->attributes["DIMENSION_LIST"].print(val_ss, is->
+          reference_table_pointer());
       auto dims = split(val_ss.str(), ",");
       strutils::replace_all(dims.front(), "[", "");
       strutils::replace_all(dims.front(), "]", "");
       trim(dims.front());
       if (dgd.indexes.sample_dim_vars.find(dims.front()) !=
           dgd.indexes.sample_dim_vars.end() && var_name != dgd.indexes.z_var) {
-        ds = istream.dataset("/" + dgd.indexes.sample_dim_vars.at(
+        ds = is->dataset("/" + dgd.indexes.sample_dim_vars.at(
             dims.front()));
         if (ds == nullptr) {
           log_error2("unable to get row size data for " + var_name, F,
               g_util_ident);
         }
-        HDF5::DataArray rowsize_vals(istream, *ds);
-        ds = istream.dataset("/" + var_name);
+        HDF5::DataArray rowsize_vals(*is, *ds);
+        ds = is->dataset("/" + var_name);
         if (ds == nullptr) {
           log_error2("unable to get variable values for " + var_name, F,
               g_util_ident);
         }
-        HDF5::DataArray var_vals(istream, *ds);
+        HDF5::DataArray var_vals(*is, *ds);
         if (var_vals.type != HDF5::DataArray::Type::_NULL) {
           NetCDFVariableAttributeData nc_va_data;
           extract_from_hdf5_variable_attributes(dset_ptr->attributes,
@@ -2523,10 +2524,10 @@ log_error2("indexed ragged array not implemented", F, g_util_ident);
   }
 }
 
-void scan_cf_orthogonal_profile_hdf5nc4_file(InputHDF5Stream& istream,
-    const DiscreteGeometriesData& dgd, const HDF5::DataArray& time_vals,
-    const NetCDFVariableAttributeData& nc_ta_data, ScanData& scan_data,
-    gatherxml::markup::ObML::ObservationData& obs_data, string obs_type) {
+void scan_cf_orthogonal_profile_hdf5nc4_file(const DiscreteGeometriesData& dgd,
+    const HDF5::DataArray& time_vals, const NetCDFVariableAttributeData&
+    nc_ta_data, ScanData& scan_data, gatherxml::markup::ObML::ObservationData&
+    obs_data, string obs_type) {
   static const string F = this_function_label(__func__);
   if (gatherxml::verbose_operation) {
     cout << "...beginning function " << F << "..." << endl;
@@ -2536,9 +2537,8 @@ void scan_cf_orthogonal_profile_hdf5nc4_file(InputHDF5Stream& istream,
   }
 }
 
-//void scan_cf_profile_hdf5nc4_file(InputHDF5Stream& istream, ScanData& scan_data,
-void scan_cf_profile_hdf5nc4_file(ScanData& scan_data,
-     gatherxml::markup::ObML::ObservationData& obs_data) {
+void scan_cf_profile_hdf5nc4_file(ScanData& scan_data, gatherxml::markup::ObML::
+    ObservationData& obs_data) {
   static const string F = this_function_label(__func__);
   if (gatherxml::verbose_operation) {
     cout << "...beginning function " << F << "..." << endl;
@@ -2550,9 +2550,9 @@ void scan_cf_profile_hdf5nc4_file(ScanData& scan_data,
   for (const auto& ds_entry : ds_entry_list) {
     process_units_attribute(ds_entry, dgd, time_data);
   }
-  fill_dgd_index(*is, "cf_role", "profile_id", dgd.indexes.stn_id_var);
-  fill_dgd_index(*is, "sample_dimension", dgd.indexes.sample_dim_vars);
-  fill_dgd_index(*is, "instance_dimension", "",
+  fill_dgd_index("cf_role", "profile_id", dgd.indexes.stn_id_var);
+  fill_dgd_index("sample_dimension", dgd.indexes.sample_dim_vars);
+  fill_dgd_index("instance_dimension", "",
       dgd.indexes.instance_dim_var);
   HDF5::DataArray time_vals;
   NetCDFVariableAttributeData nc_ta_data;
@@ -2571,16 +2571,16 @@ void scan_cf_profile_hdf5nc4_file(ScanData& scan_data,
     time_vals.fill(*is, *ds);
     extract_from_hdf5_variable_attributes(ds->attributes, nc_ta_data);
   }
-  fill_dgd_index(*is, "axis", "Z", dgd.indexes.z_var);
+  fill_dgd_index("axis", "Z", dgd.indexes.z_var);
   if (dgd.indexes.z_var.empty()) {
-    fill_dgd_index(*is, "positive", "", dgd.indexes.z_var);
+    fill_dgd_index("positive", "", dgd.indexes.z_var);
   }
   string obs_type;
   if (dgd.indexes.z_var.empty()) {
     log_error2("unable to determine vertical coordinate variable", F,
         g_util_ident);
   } else {
-    process_vertical_coordinate_variable(*is, dgd, obs_type);
+    process_vertical_coordinate_variable(dgd, obs_type);
   }
   if (obs_type.empty()) {
     log_error2("unable to determine observation type", F, g_util_ident);
@@ -2593,12 +2593,12 @@ void scan_cf_profile_hdf5nc4_file(ScanData& scan_data,
       !dgd.indexes.instance_dim_var.empty()) {
 
     // ex. H.10, H.11
-    scan_cf_non_orthogonal_profile_hdf5nc4_file(*is, dgd, time_data,
-        time_vals, nc_ta_data, scan_data, obs_data, obs_type);
+    scan_cf_non_orthogonal_profile_hdf5nc4_file(dgd, time_data, time_vals,
+        nc_ta_data, scan_data, obs_data, obs_type);
   } else {
 
     // ex. H.8, H.9
-    scan_cf_orthogonal_profile_hdf5nc4_file(*is, dgd, time_vals, nc_ta_data,
+    scan_cf_orthogonal_profile_hdf5nc4_file(dgd, time_vals, nc_ta_data,
         scan_data, obs_data, obs_type);
   }
   scan_data.write_type = ScanData::ObML_type;
@@ -2607,10 +2607,11 @@ void scan_cf_profile_hdf5nc4_file(ScanData& scan_data,
   }
 }
 
-void find_coordinate_variables(InputHDF5Stream& istream, CoordinateVariables&
-    coord_vars, GridData& grid_data) {
+void find_coordinate_variables(CoordinateVariables& coord_vars, GridData&
+    grid_data) {
   static const string F = this_function_label(__func__);
-  auto dim_vars = istream.datasets_with_attribute("CLASS=DIMENSION_SCALE");
+  auto is = reinterpret_cast<InputHDF5Stream *>(g_istream.get());
+  auto dim_vars = is->datasets_with_attribute("CLASS=DIMENSION_SCALE");
   if (gatherxml::verbose_operation) {
     cout << "...found " << dim_vars.size() << " 'DIMENSION_SCALE' "
         "variables:" << endl;
@@ -2750,14 +2751,15 @@ void find_coordinate_variables(InputHDF5Stream& istream, CoordinateVariables&
   coord_vars.forecast_period->calendar = coord_vars.nc_time->calendar;
 }
 
-void check_for_forecasts(InputHDF5Stream& istream, GridData& grid_data,
-      std::shared_ptr<metautils::NcTime::TimeData>& time_data) {
+void check_for_forecasts(GridData& grid_data, std::shared_ptr<metautils::
+    NcTime::TimeData>& time_data) {
   static const string F = this_function_label(__func__);
   if (gatherxml::verbose_operation) {
     cout << "...checking for forecasts..." << endl;
   }
-  auto vars = istream.datasets_with_attribute(
-      "standard_name=forecast_reference_time");
+  auto is = reinterpret_cast<InputHDF5Stream *>(g_istream.get());
+  auto vars = is->datasets_with_attribute("standard_name="
+      "forecast_reference_time");
   if (vars.size() > 1) {
     log_error2("multiple forecast reference times", F, g_util_ident);
   } else if (!vars.empty()) {
@@ -2785,14 +2787,15 @@ void check_for_forecasts(InputHDF5Stream& istream, GridData& grid_data,
   }
 }
 
-void find_vertical_level_coordinates(InputHDF5Stream& istream,
-    CoordinateVariables& coord_vars, GridData& grid_data) {
+void find_vertical_level_coordinates(CoordinateVariables& coord_vars, GridData&
+    grid_data) {
   if (gatherxml::verbose_operation) {
     cout << "...looking for vertical level coordinates..." << endl;
   }
-  auto vars = istream.datasets_with_attribute("units=Pa");
+  auto is = reinterpret_cast<InputHDF5Stream *>(g_istream.get());
+  auto vars = is->datasets_with_attribute("units=Pa");
   if (vars.size() == 0) {
-    vars = istream.datasets_with_attribute("units=hPa");
+    vars = is->datasets_with_attribute("units=hPa");
   }
   for (const auto& v : vars) {
     auto& var_name = v.first;
@@ -2812,7 +2815,7 @@ void find_vertical_level_coordinates(InputHDF5Stream& istream,
       grid_data.coordinate_variables_set.emplace(var_name);
     }
   }
-  vars = istream.datasets_with_attribute("positive");
+  vars = is->datasets_with_attribute("positive");
   for (const auto& v : vars) {
     auto& var_name = v.first;
     auto& dset_ptr = v.second;
@@ -2854,23 +2857,24 @@ void add_surface_level(CoordinateVariables& coord_vars) {
   coord_vars.level_info.back().write = false;
 }
 
-void get_forecast_data(InputHDF5Stream& is, GridData& gd) {
+void get_forecast_data(GridData& gd) {
   static const string F = this_function_label(__func__);
+  auto is = reinterpret_cast<InputHDF5Stream *>(g_istream.get());
   if (gd.reference_time.id == gd.valid_time.id) {
     if (!gd.forecast_period.id.empty()) {
-      gd.forecast_period.ds = is.dataset("/" + gd.forecast_period.id);
+      gd.forecast_period.ds = is->dataset("/" + gd.forecast_period.id);
       if (gd.forecast_period.ds != nullptr) {
-        gd.forecast_period.data_array.fill(is, *gd.forecast_period.ds);
+        gd.forecast_period.data_array.fill(*is, *gd.forecast_period.ds);
       }
     }
   } else {
     if (!gd.reference_time.id.empty()) {
-      gd.reference_time.ds = is.dataset("/" + gd.  reference_time.id);
+      gd.reference_time.ds = is->dataset("/" + gd.  reference_time.id);
       if (gd.reference_time.ds  == nullptr) {
         log_error2("unable to access the /" + gd.reference_time.id + " dataset "
             "for the forecast reference times", F, g_util_ident);
       }
-      gd.reference_time.data_array.fill(is, *gd.reference_time.ds);
+      gd.reference_time.data_array.fill(*is, *gd.reference_time.ds);
       if (gd.reference_time.data_array.num_values != gd.valid_time.data_array.
           num_values) {
         log_error2("number of forecast reference times does not equal number "
@@ -2896,28 +2900,29 @@ void get_forecast_data(InputHDF5Stream& is, GridData& gd) {
   }
 }
 
-metautils::NcTime::TimeBounds time_bounds(InputHDF5Stream& is, const metautils::
-    NcTime::TimeData& nc_time, GridData& gd) {
+metautils::NcTime::TimeBounds time_bounds(const metautils::NcTime::TimeData&
+    nc_time, GridData& gd) {
   static const string F = this_function_label(__func__);
+  auto is = reinterpret_cast<InputHDF5Stream *>(g_istream.get());
   metautils::NcTime::TimeBounds tbnds; // return value
   if (!gd.time_bounds.id.empty()) {
-    gd.time_bounds.ds = is.dataset("/" + gd.time_bounds.id);
+    gd.time_bounds.ds = is->dataset("/" + gd.time_bounds.id);
     if (gd.time_bounds.ds == nullptr) {
       log_error2("unable to access the /" + gd.time_bounds.id + " dataset for "
           "the time bounds", F, g_util_ident);
     }
-    HDF5::DataArray bounds(is, *gd.time_bounds.ds);
+    HDF5::DataArray bounds(*is, *gd.time_bounds.ds);
     if (bounds.num_values > 0) {
       fill_time_bounds(bounds, gd.time_bounds.ds.get(), gd.time_range_entry,
           nc_time, tbnds);
     }
   } else if (!gd.climo_bounds.id.empty()) {
-    gd.climo_bounds.ds = is.dataset("/" + gd.climo_bounds.id);
+    gd.climo_bounds.ds = is->dataset("/" + gd.climo_bounds.id);
     if (gd.climo_bounds.ds == nullptr) {
       log_error2("unable to access the /" + gd.climo_bounds.id + " dataset for "
           "the climatology bounds", F, g_util_ident);
     }
-    HDF5::DataArray bounds(is, *gd.climo_bounds.ds);
+    HDF5::DataArray bounds(*is, *gd.climo_bounds.ds);
     if (bounds.num_values > 0) {
       fill_time_bounds(bounds, gd.climo_bounds.ds.get(), gd.time_range_entry,
           nc_time, tbnds);
@@ -2974,24 +2979,25 @@ void set_month_end_date(GridData& gd, string calendar) {
   }
 }
 
-bool found_alternate_lat_lon_coordinates(InputHDF5Stream& istream, GridData&
-    grid_data, vector<string>& lat_ids, vector<string>& lon_ids) {
+bool found_alternate_lat_lon_coordinates(GridData& grid_data, vector<string>&
+    lat_ids, vector<string>& lon_ids) {
+  auto is = reinterpret_cast<InputHDF5Stream *>(g_istream.get());
   vector<string> compass{"north", "east"};
   unordered_map<string, string> dim_map[compass.size()];
   for (size_t n = 0; n < compass.size(); ++n) {
-    auto vars = istream.datasets_with_attribute("units=degrees_" + compass[n]);
+    auto vars = is->datasets_with_attribute("units=degrees_" + compass[n]);
     if (vars.empty()) {
-      vars = istream.datasets_with_attribute("units=degree_" + compass[n]);
+      vars = is->datasets_with_attribute("units=degree_" + compass[n]);
     }
     for (const auto& v : vars) {
       auto& var_name = v.first;
-      auto test_vars = istream.datasets_with_attribute("bounds=" + var_name);
+      auto test_vars = is->datasets_with_attribute("bounds=" + var_name);
       if (test_vars.empty()) {
         if (gatherxml::verbose_operation) {
           cout << "   ...found '" << var_name << "'" << endl;
         }
         stringstream dimension_list;
-        v.second->attributes["DIMENSION_LIST"].print(dimension_list, istream.
+        v.second->attributes["DIMENSION_LIST"].print(dimension_list, is->
             reference_table_pointer());
         dim_map[n].emplace(dimension_list.str(), var_name);
         grid_data.coordinate_variables_set.emplace(var_name);
@@ -3011,14 +3017,13 @@ bool found_alternate_lat_lon_coordinates(InputHDF5Stream& istream, GridData&
   return !(lat_ids.empty() || lon_ids.empty());
 }
 
-void find_alternate_lat_lon_coordinates(InputHDF5Stream& istream, GridData&
-    grid_data, vector<string>& lat_ids, vector<string>& lon_ids) {
+void find_alternate_lat_lon_coordinates(GridData& grid_data, vector<string>&
+    lat_ids, vector<string>& lon_ids) {
   if (gatherxml::verbose_operation) {
     cout << "...looking for alternate latitude and longitude coordinates..."
         << endl;
   }
-  if (!found_alternate_lat_lon_coordinates(istream, grid_data, lat_ids,
-      lon_ids)) {
+  if (!found_alternate_lat_lon_coordinates(grid_data, lat_ids, lon_ids)) {
     cerr << "Terminating - could not find any latitude/longitude coordinates"
         << endl;
     exit(1);
@@ -3363,14 +3368,13 @@ bool grid_is_lambert_conformal(const GridData& grid_data,
   return false;
 }
 
-void add_new_grid(InputHDF5Stream& is, GridData& gd, CoordinateVariables& cv,
-    size_t nlev, size_t lidx, ScanData& sd, metautils::NcTime::TimeBounds& tb,
-    ParameterData& pd, string pkey, string gkey) {
+void add_new_grid(GridData& gd, CoordinateVariables& cv, size_t nlev, size_t
+    lidx, ScanData& sd, metautils::NcTime::TimeBounds& tb, ParameterData& pd,
+    string pkey, string gkey) {
   grid_entry_ptr->level_table.clear();
   level_entry_ptr->parameter_code_table.clear();
   parameter_entry_ptr->num_time_steps = 0;
-  add_gridded_parameters_to_netcdf_level_entry(is, grid_entry_key, gd, sd, tb,
-      pd);
+  add_gridded_parameters_to_netcdf_level_entry(grid_entry_key, gd, sd, tb, pd);
   if (!level_entry_ptr->parameter_code_table.empty()) {
     for (size_t l = 0; l < nlev; ++l) {
       level_entry_key = "ds" + metautils::args.dsnum + "," + gd.level.id + ":";
@@ -3411,9 +3415,9 @@ void add_new_grid(InputHDF5Stream& is, GridData& gd, CoordinateVariables& cv,
   }
 }
 
-void update_existing_grid(InputHDF5Stream& is, GridData& gd,
-    CoordinateVariables& cv, size_t nlev, size_t lidx, ScanData& sd, metautils::
-    NcTime::TimeBounds& tb, ParameterData& pd, string pkey, string gkey) {
+void update_existing_grid(GridData& gd, CoordinateVariables& cv, size_t nlev,
+    size_t lidx, ScanData& sd, metautils::NcTime::TimeBounds& tb, ParameterData&
+    pd, string pkey, string gkey) {
   for (size_t l = 0; l < nlev; ++l) {
     level_entry_key = "ds" + metautils::args.dsnum + "," + gd.level.id + ":";
     auto v = gd.level.ds == nullptr ? 0. : data_array_value(gd.level.data_array,
@@ -3426,14 +3430,14 @@ void update_existing_grid(InputHDF5Stream& is, GridData& gd,
     if (grid_entry_ptr->level_table.find(level_entry_key) == grid_entry_ptr->
         level_table.end()) {
       level_entry_ptr->parameter_code_table.clear();
-      add_gridded_parameters_to_netcdf_level_entry(is, grid_entry_key, gd, sd,
-          tb, pd);
+      add_gridded_parameters_to_netcdf_level_entry(grid_entry_key, gd, sd, tb,
+          pd);
       if (!level_entry_ptr->parameter_code_table.empty()) {
         grid_entry_ptr->level_table.emplace(level_entry_key, *level_entry_ptr);
         cv.level_info[lidx].write = 1;
       }
     } else {
-       update_level_entry(is, tb, gd, sd, pd, cv.level_info[lidx].write);
+       update_level_entry(tb, gd, sd, pd, cv.level_info[lidx].write);
     }
     if (cv.level_info[lidx].write == 1 && g_inv.stream.is_open()) {
       update_inventory(g_inv.maps.U[pkey], g_inv.maps.G[gkey], gd);
@@ -3478,16 +3482,16 @@ void scan_gridded_hdf5nc4_file(ScanData& scan_data) {
   }
   CoordinateVariables coord_vars;
   GridData grid_data;
-  find_coordinate_variables(*is, coord_vars, grid_data);
+  find_coordinate_variables(coord_vars, grid_data);
 
   // if the reference and valid times are different, look for forecasts
   if (grid_data.reference_time.id != grid_data.valid_time.id) {
-    check_for_forecasts(*is, grid_data, coord_vars.nc_time);
+    check_for_forecasts(grid_data, coord_vars.nc_time);
   }
 
   // if no lat/lon coordinate variables found, look for alternates
   if (coord_vars.lat_ids.empty() && coord_vars.lon_ids.empty()) {
-    find_alternate_lat_lon_coordinates(*is, grid_data, coord_vars.lat_ids,
+    find_alternate_lat_lon_coordinates(grid_data, coord_vars.lat_ids,
       coord_vars.lon_ids);
   }
   if (coord_vars.lat_ids.size() != coord_vars.lon_ids.size()) {
@@ -3496,7 +3500,7 @@ void scan_gridded_hdf5nc4_file(ScanData& scan_data) {
     exit(1);
   }
   if (coord_vars.level_info.empty()) {
-    find_vertical_level_coordinates(*is, coord_vars, grid_data);
+    find_vertical_level_coordinates(coord_vars, grid_data);
   }
   add_surface_level(coord_vars);
   if (grid_data.valid_time.id.empty()) {
@@ -3532,10 +3536,10 @@ void scan_gridded_hdf5nc4_file(ScanData& scan_data) {
   grid_data.time_range_entry.instantaneous.last_valid_datetime = metautils::
       NcTime::actual_date_time(nctime.t2, *coord_vars.nc_time, e);
   if (!e.empty()) log_error2(e, F, g_util_ident);
-  get_forecast_data(*is, grid_data);
+  get_forecast_data(grid_data);
   grid_data.time_range_entry.num_steps = grid_data.valid_time.data_array.
       num_values;
-  auto tm_bnds = time_bounds(*is, *coord_vars.nc_time, grid_data);
+  auto tm_bnds = time_bounds(*coord_vars.nc_time, grid_data);
   if (coord_vars.nc_time->units == "months") {
     set_month_end_date(grid_data, coord_vars.nc_time->calendar);
   }
@@ -3777,7 +3781,7 @@ void scan_gridded_hdf5nc4_file(ScanData& scan_data) {
         grid_data.time_range_entry = e;
         grid_data.time_data = grid_data.forecast_period.id.empty() ?
             coord_vars.nc_time : coord_vars.forecast_period;
-        add_gridded_lat_lon_keys(grid_entry_set, dim, def, grid_data, *is);
+        add_gridded_lat_lon_keys(grid_entry_set, dim, def, grid_data);
         for (const auto& grid_entry : grid_entry_set) {
           if (gatherxml::verbose_operation) {
             cout << "...processing grid entry: " << grid_entry << " ..." <<
@@ -3794,10 +3798,10 @@ void scan_gridded_hdf5nc4_file(ScanData& scan_data) {
             }
           }
           if (grid_table_ptr->find(grid_entry_key) == grid_table_ptr->end()) {
-            add_new_grid(*is, grid_data, coord_vars, num_levels, m,
-                scan_data, tm_bnds, parameter_data, product_key, grid_key);
+            add_new_grid(grid_data, coord_vars, num_levels, m, scan_data,
+                tm_bnds, parameter_data, product_key, grid_key);
            } else {
-            update_existing_grid(*is, grid_data, coord_vars, num_levels, m,
+            update_existing_grid(grid_data, coord_vars, num_levels, m,
                 scan_data, tm_bnds, parameter_data, product_key, grid_key);
           }
         }
@@ -3827,9 +3831,8 @@ g_inv.maps.R.emplace("x", 0);
   }
 }
 
-//void scan_hdf5nc4_file(InputHDF5Stream& istream, ScanData& scan_data,
-void scan_hdf5nc4_file(ScanData& scan_data,
-    gatherxml::markup::ObML::ObservationData& obs_data) {
+void scan_hdf5nc4_file(ScanData& scan_data, gatherxml::markup::ObML::
+    ObservationData& obs_data) {
   static const string F = this_function_label(__func__);
   auto is = reinterpret_cast<InputHDF5Stream *>(g_istream.get());
   auto ds = is->dataset("/");
