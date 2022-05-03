@@ -47,7 +47,9 @@ string mywarning = "";
 /* global variables                                                          */
 /*****************************************************************************/
 
-unique_ptr<idstream> g_istream;
+enum class ISTREAM_TYPE { _NULL, _HDF4, _HDF5 };
+ISTREAM_TYPE g_istream_type;
+unique_ptr<idstream> g_istream(nullptr);
 stringstream g_warn_ss;
 
 /*****************************************************************************/
@@ -192,6 +194,37 @@ extern "C" void int_handler(int) {
   metautils::cmd_unregister();
 }
 
+void stream_set(ISTREAM_TYPE type) {
+  g_istream_type = type;
+  switch (type) {
+    case ISTREAM_TYPE::_HDF4:
+      g_istream.reset(new InputHDF4Stream);
+      break;
+    case ISTREAM_TYPE::_HDF5:
+      g_istream.reset(new InputHDF5Stream);
+      break;
+    default:
+      cerr << "Terminating - undefined input stream type" << endl;
+      exit(1);
+  }
+}
+
+InputHDF4Stream *sget_hdf4() {
+  if (g_istream_type == ISTREAM_TYPE::_HDF4) {
+    return reinterpret_cast<InputHDF4Stream *>(g_istream.get());
+  }
+  cerr << "Terminating - wrong input stream type" << endl;
+  exit(1);
+}
+
+InputHDF5Stream *sget_hdf5() {
+  if (g_istream_type == ISTREAM_TYPE::_HDF5) {
+    return reinterpret_cast<InputHDF5Stream *>(g_istream.get());
+  }
+  cerr << "Terminating - wrong input stream type" << endl;
+  exit(1);
+}
+
 void grid_initialize() {
   if (grid_table_ptr == nullptr) {
     grid_table_ptr.reset(new unordered_map<string, gatherxml::markup::GrML::
@@ -203,14 +236,14 @@ void grid_initialize() {
 }
 
 void scan_quikscat_hdf4_file() {
-  auto is = reinterpret_cast<InputHDF4Stream *>(g_istream.get());
+  auto is = sget_hdf4();
 is->print_data_descriptors(1965);
 }
 
 void scan_hdf4_file(std::list<string>& filelist, ScanData& scan_data) {
   static const string F = this_function_label(__func__);
-  g_istream.reset(new InputHDF4Stream);
-  auto is = reinterpret_cast<InputHDF4Stream *>(g_istream.get());
+  stream_set(ISTREAM_TYPE::_HDF4);
+  auto is = sget_hdf4();
 
   for (const auto& file : filelist) {
     if (!is->open(file.c_str())) {
@@ -674,7 +707,7 @@ string ispd_hdf5_id_entry(const std::tuple<string, string, float, float, short,
 void scan_ispd_hdf5_file(ScanData& scan_data, gatherxml::markup::ObML::
     ObservationData& obs_data) {
   static const string F = this_function_label(__func__);
-  auto is = reinterpret_cast<InputHDF5Stream *>(g_istream.get());
+  auto is = sget_hdf5();
   auto ds = is->dataset("/ISPD_Format_Version");
   if (ds == nullptr || ds->datatype.class_ != 3) {
     log_error2("unable to determine format version", F, g_util_ident);
@@ -1154,7 +1187,7 @@ void scan_ispd_hdf5_file(ScanData& scan_data, gatherxml::markup::ObML::
 void scan_usarray_transportable_hdf5_file(
     ScanData& scan_data, gatherxml::markup::ObML::ObservationData& obs_data) {
   static const string F = this_function_label(__func__);
-  auto is = reinterpret_cast<InputHDF5Stream *>(g_istream.get());
+  auto is = sget_hdf5();
   obs_data.set_track_unique_observations(false);
 
   // load the pressure dataset
@@ -1284,7 +1317,7 @@ string gridded_time_method(
 void add_gridded_time_range(string key_start, std::unordered_set<string>&
     grid_entry_set, const GridData& grid_data) {
   static const string F = this_function_label(__func__);
-  auto is = reinterpret_cast<InputHDF5Stream *>(g_istream.get());
+  auto is = sget_hdf5();
   string grid_entry_key, inv_key;
   bool found_no_method = false;
   auto vars = is->datasets_with_attribute("DIMENSION_LIST");
@@ -1509,7 +1542,7 @@ void add_gridded_netcdf_parameter(const InputHDF5Stream::DatasetEntry& var,
 bool parameter_matches_dimensions(const InputHDF5Stream::DataValue&
     dimension_list, const GridData& grid_data) {
   static const string F = this_function_label(__func__);
-  auto is = reinterpret_cast<InputHDF5Stream *>(g_istream.get());
+  auto is = sget_hdf5();
   bool parameter_matches = false;
   auto off = 4;
   size_t first = 1;
@@ -1636,7 +1669,7 @@ void add_gridded_parameters_to_netcdf_level_entry(string& grid_entry_key, const
     GridData& grid_data, ScanData& scan_data, const metautils::NcTime::
     TimeBounds& time_bounds, ParameterData& parameter_data) {
   static const string F = this_function_label(__func__);
-  auto is = reinterpret_cast<InputHDF5Stream *>(g_istream.get());
+  auto is = sget_hdf5();
 
   // find all of the variables
   auto vars = is->datasets_with_attribute("DIMENSION_LIST");
@@ -1707,7 +1740,7 @@ void update_level_entry(const metautils::NcTime::TimeBounds& time_bounds, const
     GridData& grid_data, ScanData& scan_data, ParameterData& parameter_data,
     bool& level_write) {
   static const string F = this_function_label(__func__);
-  auto is = reinterpret_cast<InputHDF5Stream *>(g_istream.get());
+  auto is = sget_hdf5();
   auto vars = is->datasets_with_attribute("DIMENSION_LIST");
   for (const auto& var : vars) {
     auto& dset_ptr = var.second;
@@ -1891,7 +1924,7 @@ void process_units_attribute(const InputHDF5Stream::DatasetEntry& ds_entry,
 void fill_dgd_index(string attribute_name_to_match, string
     attribute_value_to_match, string& dgd_index) {
   static const string F = this_function_label(__func__);
-  auto is = reinterpret_cast<InputHDF5Stream *>(g_istream.get());
+  auto is = sget_hdf5();
   auto ds_entry_list = is->datasets_with_attribute(attribute_name_to_match);
   if (ds_entry_list.size() > 1) {
     log_error2("more than one " + attribute_name_to_match + " variable found",
@@ -1916,7 +1949,7 @@ void fill_dgd_index(string attribute_name_to_match, string
 void fill_dgd_index(string attribute_name_to_match, unordered_map<string,
     string>& dgd_index) {
   static const string F = this_function_label(__func__);
-  auto is = reinterpret_cast<InputHDF5Stream *>(g_istream.get());
+  auto is = sget_hdf5();
   auto ds_entry_list = is->datasets_with_attribute(attribute_name_to_match);
   for (const auto& ds_entry : ds_entry_list) {
     auto aval = ds_entry.second->attributes[attribute_name_to_match];
@@ -1933,7 +1966,7 @@ void fill_dgd_index(string attribute_name_to_match, unordered_map<string,
 void process_vertical_coordinate_variable(DiscreteGeometriesData& dgd, string&
     obs_type) {
   static const string F = this_function_label(__func__);
-  auto is = reinterpret_cast<InputHDF5Stream *>(g_istream.get());
+  auto is = sget_hdf5();
   obs_type = "";
   auto ds = is->dataset("/" + dgd.indexes.z_var);
   auto attr_it = ds->attributes.find("units");
@@ -1979,7 +2012,7 @@ void process_vertical_coordinate_variable(DiscreteGeometriesData& dgd, string&
 void scan_cf_point_hdf5nc4_file(ScanData& scan_data, gatherxml::markup::ObML::
     ObservationData& obs_data) {
   static const string F = this_function_label(__func__);
-  auto is = reinterpret_cast<InputHDF5Stream *>(g_istream.get());
+  auto is = sget_hdf5();
   auto ds_entry_list = is->datasets_with_attribute("units");
   DiscreteGeometriesData dgd;
   metautils::NcTime::TimeData time_data;
@@ -2156,7 +2189,7 @@ void scan_cf_orthogonal_time_series_hdf5nc4_file(const DiscreteGeometriesData&
   if (gatherxml::verbose_operation) {
     cout << "...beginning function " << F << "..." << endl;
   }
-  auto is = reinterpret_cast<InputHDF5Stream *>(g_istream.get());
+  auto is = sget_hdf5();
   if (dgd.indexes.lat_var.empty()) {
     log_error2("latitude could not be identified", F, g_util_ident);
   }
@@ -2318,7 +2351,7 @@ void scan_cf_time_series_hdf5nc4_file(ScanData& scan_data, gatherxml::markup::
   if (gatherxml::verbose_operation) {
     cout << "...beginning function " << F << "..." << endl;
   }
-  auto is = reinterpret_cast<InputHDF5Stream *>(g_istream.get());
+  auto is = sget_hdf5();
   auto ds_entry_list = is->datasets_with_attribute("units");
   DiscreteGeometriesData dgd;
   metautils::NcTime::TimeData time_data;
@@ -2355,7 +2388,7 @@ void scan_cf_non_orthogonal_profile_hdf5nc4_file(const DiscreteGeometriesData&
     scan_data, gatherxml::markup::ObML::ObservationData& obs_data, string
     obs_type) {
   static const string F = this_function_label(__func__);
-  auto is = reinterpret_cast<InputHDF5Stream *>(g_istream.get());
+  auto is = sget_hdf5();
   if (gatherxml::verbose_operation) {
     cout << "...beginning function " << F << "..." << endl;
   }
@@ -2543,7 +2576,7 @@ void scan_cf_profile_hdf5nc4_file(ScanData& scan_data, gatherxml::markup::ObML::
   if (gatherxml::verbose_operation) {
     cout << "...beginning function " << F << "..." << endl;
   }
-  auto is = reinterpret_cast<InputHDF5Stream *>(g_istream.get());
+  auto is = sget_hdf5();
   auto ds_entry_list = is->datasets_with_attribute("units");
   DiscreteGeometriesData dgd;
   metautils::NcTime::TimeData time_data;
@@ -2610,7 +2643,7 @@ void scan_cf_profile_hdf5nc4_file(ScanData& scan_data, gatherxml::markup::ObML::
 void find_coordinate_variables(CoordinateVariables& coord_vars, GridData&
     grid_data) {
   static const string F = this_function_label(__func__);
-  auto is = reinterpret_cast<InputHDF5Stream *>(g_istream.get());
+  auto is = sget_hdf5();
   auto dim_vars = is->datasets_with_attribute("CLASS=DIMENSION_SCALE");
   if (gatherxml::verbose_operation) {
     cout << "...found " << dim_vars.size() << " 'DIMENSION_SCALE' "
@@ -2757,7 +2790,7 @@ void check_for_forecasts(GridData& grid_data, std::shared_ptr<metautils::
   if (gatherxml::verbose_operation) {
     cout << "...checking for forecasts..." << endl;
   }
-  auto is = reinterpret_cast<InputHDF5Stream *>(g_istream.get());
+  auto is = sget_hdf5();
   auto vars = is->datasets_with_attribute("standard_name="
       "forecast_reference_time");
   if (vars.size() > 1) {
@@ -2792,7 +2825,7 @@ void find_vertical_level_coordinates(CoordinateVariables& coord_vars, GridData&
   if (gatherxml::verbose_operation) {
     cout << "...looking for vertical level coordinates..." << endl;
   }
-  auto is = reinterpret_cast<InputHDF5Stream *>(g_istream.get());
+  auto is = sget_hdf5();
   auto vars = is->datasets_with_attribute("units=Pa");
   if (vars.size() == 0) {
     vars = is->datasets_with_attribute("units=hPa");
@@ -2859,7 +2892,7 @@ void add_surface_level(CoordinateVariables& coord_vars) {
 
 void get_forecast_data(GridData& gd) {
   static const string F = this_function_label(__func__);
-  auto is = reinterpret_cast<InputHDF5Stream *>(g_istream.get());
+  auto is = sget_hdf5();
   if (gd.reference_time.id == gd.valid_time.id) {
     if (!gd.forecast_period.id.empty()) {
       gd.forecast_period.ds = is->dataset("/" + gd.forecast_period.id);
@@ -2903,7 +2936,7 @@ void get_forecast_data(GridData& gd) {
 metautils::NcTime::TimeBounds time_bounds(const metautils::NcTime::TimeData&
     nc_time, GridData& gd) {
   static const string F = this_function_label(__func__);
-  auto is = reinterpret_cast<InputHDF5Stream *>(g_istream.get());
+  auto is = sget_hdf5();
   metautils::NcTime::TimeBounds tbnds; // return value
   if (!gd.time_bounds.id.empty()) {
     gd.time_bounds.ds = is->dataset("/" + gd.time_bounds.id);
@@ -2981,7 +3014,7 @@ void set_month_end_date(GridData& gd, string calendar) {
 
 bool found_alternate_lat_lon_coordinates(GridData& grid_data, vector<string>&
     lat_ids, vector<string>& lon_ids) {
-  auto is = reinterpret_cast<InputHDF5Stream *>(g_istream.get());
+  auto is = sget_hdf5();
   vector<string> compass{"north", "east"};
   unordered_map<string, string> dim_map[compass.size()];
   for (size_t n = 0; n < compass.size(); ++n) {
@@ -3452,7 +3485,7 @@ void scan_gridded_hdf5nc4_file(ScanData& scan_data) {
     cout << "...beginning function scan_gridded_hdf5nc4_file()..." <<
         endl;
   }
-  auto is = reinterpret_cast<InputHDF5Stream *>(g_istream.get());
+  auto is = sget_hdf5();
   grid_initialize();
 
   // open a file inventory unless this is a test run
@@ -3834,7 +3867,7 @@ g_inv.maps.R.emplace("x", 0);
 void scan_hdf5nc4_file(ScanData& scan_data, gatherxml::markup::ObML::
     ObservationData& obs_data) {
   static const string F = this_function_label(__func__);
-  auto is = reinterpret_cast<InputHDF5Stream *>(g_istream.get());
+  auto is = sget_hdf5();
   auto ds = is->dataset("/");
   if (ds == nullptr) {
     log_error2("unable to access global attributes", F, g_util_ident);
@@ -3894,8 +3927,8 @@ void scan_hdf5_file(std::list<string>& filelist, ScanData& scan_data) {
   if (gatherxml::verbose_operation) {
     cout << "Beginning HDF5 file scan..." << endl;
   }
-  g_istream.reset(new InputHDF5Stream);
-  auto is = reinterpret_cast<InputHDF5Stream *>(g_istream.get());
+  stream_set(ISTREAM_TYPE::_HDF5);
+  auto is = sget_hdf5();
   gatherxml::markup::ObML::ObservationData obs_data;
   for (const auto& file : filelist) {
     if (gatherxml::verbose_operation) {
