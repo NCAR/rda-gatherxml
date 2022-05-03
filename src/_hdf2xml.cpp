@@ -23,6 +23,8 @@ using std::cerr;
 using std::cout;
 using std::endl;
 using std::move;
+using std::regex;
+using std::regex_search;
 using std::string;
 using std::stringstream;
 using std::unique_ptr;
@@ -32,6 +34,7 @@ using std::vector;
 using strutils::ftos;
 using strutils::itos;
 using strutils::split;
+using strutils::to_lower;
 using strutils::trim;
 using strutils::vector_to_string;
 using unixutils::mysystem2;
@@ -42,6 +45,8 @@ bool gatherxml::verbose_operation;
 extern const string USER = getenv("USER");
 string myerror = "";
 string mywarning = "";
+
+typedef unordered_map<string, InputHDF5Stream::DataValue> AttributeMap;
 
 /*****************************************************************************/
 /* global variables                                                          */
@@ -976,11 +981,11 @@ void scan_ispd_hdf5_file(ScanData& scan_data, gatherxml::markup::ObML::
         key += string(reinterpret_cast<char *>(uon_val.get()));
         auto entry = stn_library.find(key);
         if (entry != stn_library.end()) {
-          if (std::regex_search(timestamp, std::regex("99$"))) {
+          if (regex_search(timestamp, regex("99$"))) {
             strutils::chop(timestamp, 2);
 
             // patch for some bad timestamps
-            if (std::regex_search(timestamp, std::regex(" $"))) {
+            if (regex_search(timestamp, regex(" $"))) {
               strutils::chop(timestamp);
               timestamp.insert(8, "0");
             }
@@ -1088,7 +1093,7 @@ void scan_ispd_hdf5_file(ScanData& scan_data, gatherxml::markup::ObML::
     ds = is->dataset("/Data/AssimilationFeedback/AssimilationFeedBack");
   }
   if (ds != nullptr && ds->datatype.class_ == 6) {
-    auto ts_regex = std::regex("99$");
+    auto ts_regex = regex("99$");
 //    InputHDF5Stream::DataValue p_val, ens_fg_val, ens_p_val;
     vector<InputHDF5Stream::DataValue> dv(feedback_versions[format_version].
         size());
@@ -1111,7 +1116,7 @@ void scan_ispd_hdf5_file(ScanData& scan_data, gatherxml::markup::ObML::
           auto entry = stn_library.find(key);
           if (entry != stn_library.end()) {
             if (!timestamp.empty()) {
-              if (std::regex_search(timestamp, ts_regex)) {
+              if (regex_search(timestamp, ts_regex)) {
                 strutils::chop(timestamp, 2);
                 timestamp += "00";
               }
@@ -1719,7 +1724,7 @@ void add_gridded_parameters_to_netcdf_level_entry(string& grid_entry_key, const
           log_error2(error + "; var name '" + var.first + "'", F, g_util_ident);
         }
         tr_description = strutils::capitalize(tr_description);
-        if (std::regex_search(grid_entry_key, std::regex(tr_description +
+        if (regex_search(grid_entry_key, regex(tr_description +
             "$"))) {
 //          if (attr.value.dim_sizes[0] == 4 || attr.value.dim_sizes[0] == 3 || (attr.value.dim_sizes[0] == 2 && grid_data.valid_time.data_array.num_values == 1)) {
             parameter_entry_key = "ds" + metautils::args.dsnum + ":" +
@@ -1785,7 +1790,7 @@ void update_level_entry(const metautils::NcTime::TimeBounds& time_bounds, const
           log_error2(error, F, g_util_ident);
         }
         tr_description = strutils::capitalize(tr_description);
-        if (std::regex_search(grid_entry_key, std::regex(tr_description +
+        if (regex_search(grid_entry_key, regex(tr_description +
             "$"))) {
           auto pe = level_entry_ptr->parameter_code_table[parameter_entry_key];
           if (time_method.empty() || (floatutils::myequalf(time_bounds.t1, 0,
@@ -1903,7 +1908,7 @@ void process_units_attribute(const InputHDF5Stream::DatasetEntry& ds_entry,
   auto attr_val = ds_entry.second->attributes["units"];
   string units_value(reinterpret_cast<char *>(attr_val.get()),
       attr_val.size);
-  if (std::regex_search(units_value, std::regex("since"))) {
+  if (regex_search(units_value, regex("since"))) {
     if (!dgd.indexes.time_var.empty()) {
       log_error2("time was already identified - don't know what to do with "
           "variable: " + var_name, F, g_util_ident);
@@ -1984,8 +1989,8 @@ void process_vertical_coordinate_variable(DiscreteGeometriesData& dgd, string&
   }
   if (dgd.z_pos.empty() && !dgd.z_units.empty()) {
     auto z_units_l = strutils::to_lower(dgd.z_units);
-    if (std::regex_search(dgd.z_units, std::regex("Pa$")) || std::regex_search(
-        z_units_l, std::regex("^mb(ar){0,1}$")) || z_units_l == "millibars") {
+    if (regex_search(dgd.z_units, regex("Pa$")) || regex_search(
+        z_units_l, regex("^mb(ar){0,1}$")) || z_units_l == "millibars") {
       dgd.z_pos = "down";
       obs_type = "upper_air";
     }
@@ -1998,8 +2003,8 @@ void process_vertical_coordinate_variable(DiscreteGeometriesData& dgd, string&
       obs_type = "upper_air";
     } else if (dgd.z_pos == "down") {
       auto z_units_l = strutils::to_lower(dgd.z_units);
-      if (std::regex_search(dgd.z_units, std::regex("Pa$")) ||
-          std::regex_search(z_units_l, std::regex("^mb(ar){0,1}$")) ||
+      if (regex_search(dgd.z_units, regex("Pa$")) ||
+          regex_search(z_units_l, regex("^mb(ar){0,1}$")) ||
           z_units_l == "millibars") {
         obs_type = "upper_air";
       } else if (dgd.z_units == "m") {
@@ -2030,9 +2035,9 @@ void scan_cf_point_hdf5nc4_file(ScanData& scan_data, gatherxml::markup::ObML::
           3) {
         string attribute_value(reinterpret_cast<char *>(attr_it->
             second.get()), attr_it->second.size);
-        if (std::regex_search(attribute_value, std::regex("ID")) ||
-            std::regex_search(attribute_value, std::regex("ident",
-            std::regex::icase))) {
+        if (regex_search(attribute_value, regex("ID")) ||
+            regex_search(attribute_value, regex("ident",
+            regex::icase))) {
           dgd.indexes.stn_id_var = ds_entry.first;
         }
       }
@@ -2111,7 +2116,7 @@ void scan_cf_point_hdf5nc4_file(ScanData& scan_data, gatherxml::markup::ObML::
       for (const auto& attr_entry : ds->attributes) {
       auto lkey = strutils::to_lower(attr_entry.first);
         if (lkey == "long_name" || (descr.empty() && (lkey == "description" ||
-            std::regex_search(lkey, std::regex("^comment"))))) {
+            regex_search(lkey, regex("^comment"))))) {
           descr.assign(reinterpret_cast<char *>(attr_entry.second.array));
         } else if (lkey == "units") {
           units.assign(reinterpret_cast<char *>(attr_entry.second.array));
@@ -2288,7 +2293,7 @@ log_error2("determining platforms is not implemented", F, g_util_ident);
     }
   }
   auto ds_entry_list = is->datasets_with_attribute("DIMENSION_LIST");
-  auto netcdf_var_re = std::regex("^\\[" + dgd.indexes.time_var +
+  auto netcdf_var_re = regex("^\\[" + dgd.indexes.time_var +
       "(,.{1,}){0,1}\\]$");
   vector<DateTime> dts;
   vector<string> datatypes_list;
@@ -2299,7 +2304,7 @@ log_error2("determining platforms is not implemented", F, g_util_ident);
       stringstream dim_list_ss;
       ds_entry.second->attributes["DIMENSION_LIST"].print(dim_list_ss,
           is->reference_table_pointer());
-      if (std::regex_search(dim_list_ss.str(), netcdf_var_re)) {
+      if (regex_search(dim_list_ss.str(), netcdf_var_re)) {
         if (gatherxml::verbose_operation) {
           cout << "Scanning netCDF variable '" << var_name << "' ..." <<
               endl;
@@ -2690,7 +2695,7 @@ void find_coordinate_variables(CoordinateVariables& coord_vars, GridData&
               second.vlen.buffer[4]), len);
         }
       }
-      if (std::regex_search(units_value, std::regex("since"))) {
+      if (regex_search(units_value, regex("since"))) {
         if (found_time) {
           log_error2("time was already identified - don't know what to do with "
               "variable: " + var_name, F, g_util_ident);
@@ -2801,7 +2806,7 @@ void check_for_forecasts(GridData& grid_data, std::shared_ptr<metautils::
     if (attr_it != var.second->attributes.end() && attr_it->second._class_ ==
         3) {
       string units_value = reinterpret_cast<char *>(attr_it->second.array);
-      if (std::regex_search(units_value, std::regex("since"))) {
+      if (regex_search(units_value, regex("since"))) {
         units_value = units_value.substr(0, units_value.find("since"));
         trim(units_value);
         if (units_value != time_data->units) {
@@ -3864,6 +3869,25 @@ g_inv.maps.R.emplace("x", 0);
   }
 }
 
+string feature_type(AttributeMap& attributes) {
+  string s; // return value
+  auto it = attributes.find("featureType");
+  if (it != attributes.end()) {
+    s = reinterpret_cast<char *>(it->second.array);
+  }
+  return s;
+}
+
+void patch_icoads_netcdf4_ids(AttributeMap& attributes, ScanData& sd) {
+  auto it = attributes.find("product_version");
+  if (it != attributes.end()) {
+    string s = reinterpret_cast<char *>(it->second.array);
+    if (regex_search(s, regex("ICOADS")) && regex_search(s, regex("netCDF4"))) {
+      sd.convert_ids_to_upper_case = true;
+    }
+  }
+}
+
 void scan_hdf5nc4_file(ScanData& scan_data, gatherxml::markup::ObML::
     ObservationData& obs_data) {
   static const string F = this_function_label(__func__);
@@ -3893,32 +3917,23 @@ void scan_hdf5nc4_file(ScanData& scan_data, gatherxml::markup::ObML::
       }
     }
   }
-  attr_it = ds->attributes.find("featureType");
-  if (attr_it != ds->attributes.end()) {
-    string feature_type = reinterpret_cast<char *>(attr_it->second.array);
-    auto l_feature_type = strutils::to_lower(feature_type);
+  auto ftype = feature_type(ds->attributes);
+  if (ftype.empty()) {
+    scan_gridded_hdf5nc4_file(scan_data);
+  } else {
+    auto l_ftype = to_lower(ftype);
 
     // patch for ICOADS netCDF4 IDs, which may be a mix, so ignore case
-    attr_it = ds->attributes.find("product_version");
-    if (attr_it != ds->attributes.end()) {
-      string product_version = reinterpret_cast<char *>(attr_it->second.array);
-      if (std::regex_search(product_version, std::regex("ICOADS")) &&
-          std::regex_search(product_version, std::regex("netCDF4"))) {
-        scan_data.convert_ids_to_upper_case = true;
-      }
-    }
-    if (l_feature_type == "point") {
+    patch_icoads_netcdf4_ids(ds->attributes, scan_data);
+    if (l_ftype == "point") {
       scan_cf_point_hdf5nc4_file(scan_data, obs_data);
-    } else if (l_feature_type == "timeseries") {
+    } else if (l_ftype == "timeseries") {
       scan_cf_time_series_hdf5nc4_file(scan_data, obs_data);
-    } else if (l_feature_type == "profile") {
+    } else if (l_ftype == "profile") {
       scan_cf_profile_hdf5nc4_file(scan_data, obs_data);
     } else {
-      log_error2("featureType '" + feature_type + "' not recognized", F,
-          g_util_ident);
+      log_error2("featureType '" + ftype + "' not recognized", F, g_util_ident);
     }
-  } else {
-    scan_gridded_hdf5nc4_file(scan_data);
   }
 }
 
@@ -4020,9 +4035,9 @@ void scan_file(ScanData& scan_data) {
     log_error2("unable to create a temporary directory in " +
         metautils::directives.temp_path, F, g_util_ident);
   }
-  if (std::regex_search(metautils::args.data_format, std::regex("hdf4"))) {
+  if (regex_search(metautils::args.data_format, regex("hdf4"))) {
     scan_hdf4_file(filelist, scan_data);
-  } else if (std::regex_search(metautils::args.data_format, std::regex(
+  } else if (regex_search(metautils::args.data_format, regex(
       "hdf5"))) {
     scan_hdf5_file(filelist, scan_data);
   } else {
@@ -4056,6 +4071,25 @@ void show_usage_and_exit() {
   cerr << "                 - URLs must begin with \"http://rda.ucar.edu\"" <<
       endl;
   exit(1);
+}
+
+string scm_flags() {
+  string s; // return value
+  if (!metautils::args.update_summary) {
+    s += " -S ";
+  }
+  if (!metautils::args.regenerate) {
+    s += " -R ";
+  }
+  if (!xml_directory.empty()) {
+    s += " -t " + xml_directory;
+  }
+  if (regex_search(metautils::args.path, regex("^https://rda.ucar.edu"))) {
+    s += " -wf";
+  } else {
+    s += " -f";
+  }
+  return s;
 }
 
 void print_output_location(int write_type) {
@@ -4122,29 +4156,13 @@ int main(int argc, char **argv) {
   scan_file(scan_data);
   if (!metautils::args.inventory_only) {
     if (metautils::args.update_db) {
-      string flags;
-      if (!metautils::args.update_summary) {
-        flags += " -S ";
-      }
-      if (!metautils::args.regenerate) {
-        flags += " -R ";
-      }
-      if (!xml_directory.empty()) {
-        flags += " -t " + xml_directory;
-      }
-      if (std::regex_search(metautils::args.path, std::regex(
-          "^https://rda.ucar.edu"))) {
-        flags += " -wf";
-      } else {
-        flags += " -f";
-      }
       if (scan_data.cmd_type.empty()) {
         log_error2("content metadata type was not specified", F, g_util_ident);
       }
       stringstream oss, ess;
       if (mysystem2(metautils::directives.local_root + "/bin/scm -d " +
-          metautils::args.dsnum + " " + flags + " " + metautils::args.filename +
-          "." + scan_data.cmd_type, oss, ess) < 0) {
+          metautils::args.dsnum + " " + scm_flags() + " " + metautils::args.
+          filename + "." + scan_data.cmd_type, oss, ess) < 0) {
         cerr << ess.str() << endl;
       }
     } else if (metautils::args.dsnum == "test" && !xml_directory.empty()) {
