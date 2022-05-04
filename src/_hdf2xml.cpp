@@ -201,16 +201,10 @@ extern "C" void clean_up() {
     if (!g_warn_ss.str().empty()) {
       metautils::log_warning(g_warn_ss.str(), "hdf2xml", USER);
     }
-    if (!myerror.empty()) {
-      log_error2(myerror, "clean_up()", g_util_ident);
-    }
+    if (!myerror.empty()) log_error2(myerror, "clean_up()", g_util_ident);
   } else {
-    if (!g_warn_ss.str().empty()) {
-      cerr << g_warn_ss.str() << endl;
-    }
-    if (!myerror.empty()) {
-      cerr << myerror << endl;
-    }
+    if (!g_warn_ss.str().empty()) cerr << g_warn_ss.str() << endl;
+    if (!myerror.empty()) cerr << myerror << endl;
   }
 }
 
@@ -262,9 +256,7 @@ InputHDF5Stream *sget_hdf5() {
 }
 
 void grid_initialize() {
-  if (g_grml_data == nullptr) {
-    g_grml_data.reset(new GrMLData);
-  }
+  if (g_grml_data == nullptr) g_grml_data.reset(new GrMLData);
 }
 
 void scan_quikscat_hdf4_file() {
@@ -280,10 +272,10 @@ void scan_hdf4_file(std::list<string>& filelist, ScanData& scan_data) {
   for (const auto& file : filelist) {
     if (!is->open(file.c_str())) {
       auto error = move(myerror);
-       log_error2(error + " - file: '" + file + "'", F, g_util_ident);
+      log_error2(error + " - file: '" + file + "'", F, g_util_ident);
     }
     if (metautils::args.data_format == "quikscathdf4") {
-       scan_quikscat_hdf4_file();
+      scan_quikscat_hdf4_file();
     }
     is->close();
   }
@@ -298,17 +290,17 @@ void extract_from_hdf5_variable_attributes(unordered_map<string,
   nc_attribute_data.missing_value.clear();
   for (const auto& attribute : attributes) {
     if (attribute.first == "long_name") {
-      nc_attribute_data.long_name.assign(
-         reinterpret_cast<char *>(attribute.second.array));
-     trim(nc_attribute_data.long_name);
+      nc_attribute_data.long_name.assign(reinterpret_cast<char *>(attribute.
+          second.array));
+      trim(nc_attribute_data.long_name);
     } else if (attribute.first == "units") {
-      nc_attribute_data.units.assign(
-         reinterpret_cast<char *>(attribute.second.array));
-     trim(nc_attribute_data.units);
+      nc_attribute_data.units.assign(reinterpret_cast<char *>(attribute.second.
+          array));
+      trim(nc_attribute_data.units);
     } else if (attribute.first == "standard_name") {
-      nc_attribute_data.cf_keyword.assign(
-         reinterpret_cast<char *>(attribute.second.array));
-     trim(nc_attribute_data.cf_keyword);
+      nc_attribute_data.cf_keyword.assign(reinterpret_cast<char *>(attribute.
+          second.array));
+      trim(nc_attribute_data.cf_keyword);
     } else if (attribute.first == "_FillValue" || attribute.first ==
         "missing_value") {
       nc_attribute_data.missing_value = attribute.second;
@@ -325,43 +317,43 @@ bool found_missing(const double& time, HDF5::DataArray::Type time_type,
   if (time_missing_value != nullptr && time_missing_value->_class_ != -1) {
     switch (time_type) {
        case (HDF5::DataArray::Type::BYTE): {
-         if (floatutils::myequalf(time,
-             *(reinterpret_cast<unsigned char *>(time_missing_value->array)))) {
+         if (floatutils::myequalf(time, *(reinterpret_cast<unsigned char *>(
+             time_missing_value->array)))) {
            missing = true;
          }
          break;
        }
        case (HDF5::DataArray::Type::SHORT): {
-         if (floatutils::myequalf(time,
-             *(reinterpret_cast<short *>(time_missing_value->array)))) {
+         if (floatutils::myequalf(time, *(reinterpret_cast<short *>(
+             time_missing_value->array)))) {
            missing = true;
          }
          break;
        }
        case (HDF5::DataArray::Type::INT): {
-         if (floatutils::myequalf(time,
-             *(reinterpret_cast<int *>(time_missing_value->array)))) {
+         if (floatutils::myequalf(time, *(reinterpret_cast<int *>(
+             time_missing_value->array)))) {
            missing = true;
          }
          break;
        }
        case (HDF5::DataArray::Type::LONG_LONG): {
-         if (floatutils::myequalf(time,
-             *(reinterpret_cast<long long *>(time_missing_value->array)))) {
+         if (floatutils::myequalf(time, *(reinterpret_cast<long long *>(
+             time_missing_value->array)))) {
            missing = true;
          }
          break;
        }
        case (HDF5::DataArray::Type::FLOAT): {
-         if (floatutils::myequalf(time,
-             *(reinterpret_cast<float *>(time_missing_value->array)))) {
+         if (floatutils::myequalf(time, *(reinterpret_cast<float *>(
+             time_missing_value->array)))) {
            missing = true;
          }
          break;
        }
        case (HDF5::DataArray::Type::DOUBLE): {
-         if (floatutils::myequalf(time,
-             *(reinterpret_cast<double *>(time_missing_value->array)))) {
+         if (floatutils::myequalf(time, *(reinterpret_cast<double *>(
+             time_missing_value->array)))) {
            missing = true;
          }
          break;
@@ -372,57 +364,54 @@ bool found_missing(const double& time, HDF5::DataArray::Type time_type,
        }
     }
   }
-  if (missing) {
-    return true;
-  }
+  if (missing) return true;
   if (var_missing_value.size > 0) {
     switch (var_vals.type) {
        case (HDF5::DataArray::Type::BYTE): {
-         if (var_vals.byte_value(var_val_index) ==
-             *(reinterpret_cast<unsigned char *>(var_missing_value.array))) {
+         if (var_vals.byte_value(var_val_index) == *(reinterpret_cast<
+             unsigned char *>(var_missing_value.array))) {
            missing = true;
          }
          break;
        }
        case (HDF5::DataArray::Type::SHORT): {
-         if (var_vals.short_value(var_val_index) ==
-             *(reinterpret_cast<short *>(var_missing_value.array))) {
+         if (var_vals.short_value(var_val_index) == *(reinterpret_cast<short *>(
+             var_missing_value.array))) {
            missing = true;
          }
          break;
        }
        case (HDF5::DataArray::Type::INT): {
-         if (var_vals.int_value(var_val_index) ==
-             *(reinterpret_cast<int *>(var_missing_value.array))) {
+         if (var_vals.int_value(var_val_index) == *(reinterpret_cast<int *>(
+             var_missing_value.array))) {
            missing = true;
          }
          break;
        }
        case (HDF5::DataArray::Type::LONG_LONG): {
-         if (var_vals.long_long_value(var_val_index) ==
-             *(reinterpret_cast<long long *>(var_missing_value.array))) {
+         if (var_vals.long_long_value(var_val_index) == *(reinterpret_cast<
+             long long *>(var_missing_value.array))) {
            missing = true;
          }
          break;
        }
        case (HDF5::DataArray::Type::FLOAT): {
-         if (var_vals.float_value(var_val_index) ==
-             *(reinterpret_cast<float *>(var_missing_value.array))) {
+         if (var_vals.float_value(var_val_index) == *(reinterpret_cast<float *>(
+             var_missing_value.array))) {
            missing = true;
          }
          break;
        }
        case (HDF5::DataArray::Type::DOUBLE): {
-         if (var_vals.double_value(var_val_index) ==
-             *(reinterpret_cast<double *>(var_missing_value.array))) {
+         if (var_vals.double_value(var_val_index) == *(reinterpret_cast<
+             double *>(var_missing_value.array))) {
            missing = true;
          }
          break;
        }
        case (HDF5::DataArray::Type::STRING): {
-         if (var_vals.string_value(var_val_index) == string(
-             reinterpret_cast<char *>(var_missing_value.array),
-             var_missing_value.size)) {
+         if (var_vals.string_value(var_val_index) == string(reinterpret_cast<
+             char *>(var_missing_value.array), var_missing_value.size)) {
            missing = true;
          }
          break;
@@ -445,139 +434,133 @@ string ispd_hdf5_platform_type(const std::tuple<string, string, float, float,
   bool already_counted;
   std::tie(id, ispd_id, lat, lon, plat_type, isrc, csrc, already_counted) =
       library_entry;
-  if (plat_type == -1) {
-    return "land_station";
-  } else {
-    switch (plat_type) {
-      case 0:
-      case 1:
-      case 5:
-      case 2002: {
-        return "roving_ship";
-      }
-      case 2:
-      case 3:
-      case 1007: {
-        return "ocean_station";
-      }
-      case 4: {
-        return "lightship";
-      }
-      case 6: {
-        return "moored_buoy";
-      }
-      case 7:
-      case 1009:
-      case 2007: {
-        if (ispd_id == "008000" || ispd_id == "008001") {
-          return "unknown";
-        } else {
-          return "drifting_buoy";
-        }
-      }
-      case 9: {
-        return "ice_station";
-      }
-      case 10:
-      case 11:
-      case 12:
-      case 17:
-      case 18:
-      case 19:
-      case 20:
-      case 21: {
-        return "oceanographic";
-      }
-      case 13: {
-        return "CMAN_station";
-      }
-      case 1001:
-      case 1002:
-      case 2001:
-      case 2003:
-      case 2004:
-      case 2005:
-      case 2010:
-      case 2011:
-      case 2012:
-      case 2013:
-      case 2020:
-      case 2021:
-      case 2022:
-      case 2023:
-      case 2024:
-      case 2025:
-      case 2031:
-      case 2040: {
+  if (plat_type == -1) return "land_station";
+  switch (plat_type) {
+    case 0:
+    case 1:
+    case 5:
+    case 2002: {
+      return "roving_ship";
+    }
+    case 2:
+    case 3:
+    case 1007: {
+      return "ocean_station";
+    }
+    case 4: {
+      return "lightship";
+    }
+    case 6: {
+      return "moored_buoy";
+    }
+    case 7:
+    case 1009:
+    case 2007: {
+      if (ispd_id == "008000" || ispd_id == "008001") return "unknown";
+      return "drifting_buoy";
+    }
+    case 9: {
+      return "ice_station";
+    }
+    case 10:
+    case 11:
+    case 12:
+    case 17:
+    case 18:
+    case 19:
+    case 20:
+    case 21: {
+      return "oceanographic";
+    }
+    case 13: {
+      return "CMAN_station";
+    }
+    case 1001:
+    case 1002:
+    case 2001:
+    case 2003:
+    case 2004:
+    case 2005:
+    case 2010:
+    case 2011:
+    case 2012:
+    case 2013:
+    case 2020:
+    case 2021:
+    case 2022:
+    case 2023:
+    case 2024:
+    case 2025:
+    case 2031:
+    case 2040: {
+      return "land_station";
+    }
+    case 14: {
+      return "coastal_station";
+    }
+    case 15: {
+      return "fixed_ocean_platform";
+    }
+    case 2030: {
+      return "bogus";
+    }
+    case 1003:
+    case 1006: {
+      if ((ispd_id == "001000" && ((csrc >= '2' && csrc <= '5') || (csrc >=
+          'A' && csrc <= 'H') || csrc == 'N')) || ispd_id == "001003" ||
+          (ispd_id == "001005" && plat_type == 1003) || ispd_id == "003002" ||
+          ispd_id == "003004" || ispd_id == "003005" || ispd_id == "003006" ||
+          ispd_id == "003007" || ispd_id == "003007" || ispd_id == "003008" ||
+          ispd_id == "003009" || ispd_id == "003011" || ispd_id == "003014" ||
+          ispd_id == "003015" || ispd_id == "003021" || ispd_id == "003022" ||
+          ispd_id == "003026" || ispd_id == "004000" || ispd_id == "004003") {
         return "land_station";
-      }
-      case 14: {
-        return "coastal_station";
-      }
-      case 15: {
-        return "fixed_ocean_platform";
-      }
-      case 2030: {
-        return "bogus";
-      }
-      case 1003:
-      case 1006: {
-        if ((ispd_id == "001000" && ((csrc >= '2' && csrc <= '5') || (csrc >=
-            'A' && csrc <= 'H') || csrc == 'N')) || ispd_id == "001003" ||
-            (ispd_id == "001005" && plat_type == 1003) || ispd_id == "003002" ||
-            ispd_id == "003004" || ispd_id == "003005" || ispd_id == "003006" ||
-            ispd_id == "003007" || ispd_id == "003007" || ispd_id == "003008" ||
-            ispd_id == "003009" || ispd_id == "003011" || ispd_id == "003014" ||
-            ispd_id == "003015" || ispd_id == "003021" || ispd_id == "003022" ||
-            ispd_id == "003026" || ispd_id == "004000" || ispd_id == "004003") {
-          return "land_station";
-        } else if (ispd_id == "002000") {
-          if (id.length() == 5) {
-            if (std::stoi(id) < 99000) {
-              return "land_station";
-            } else if (std::stoi(id) < 99100) {
-              return "fixed_ship";
-            } else {
-              return "roving_ship";
-            }
-          } else {
-            return "unknown";
-          }
-        } else if (ispd_id == "002001" || (ispd_id == "001005" && plat_type ==
-            1006)) {
-          return "unknown";
-        } else if (ispd_id == "003010") {
-          std::deque<string> sp = split(id, "-");
-          if (sp.size() == 2 && sp[1].length() == 5 &&
-              strutils::is_numeric(sp[1])) {
+      } else if (ispd_id == "002000") {
+        if (id.length() == 5) {
+          if (std::stoi(id) < 99000) {
             return "land_station";
-          }
-        } else if (ispd_id >= "010000" && ispd_id <= "019999") {
-          if (plat_type == 1006 && id.length() == 5 &&
-              strutils::is_numeric(id)) {
-            if (id < "99000") {
-              return "land_station";
-            } else if (id >= "99200" && id <= "99299") {
-              return "drifting_buoy";
-            }
+          } else if (std::stoi(id) < 99100) {
+            return "fixed_ship";
           } else {
-            return "unknown";
+            return "roving_ship";
           }
         } else {
-          g_warn_ss << "unknown platform type (1) for station '" << id << "' "
-              << ftos(lat, 4) << " " << ftos(lon, 4) << " " << ispd_id << " " <<
-              itos(plat_type) << " " << itos(isrc) << " '" << string(1, csrc) <<
-              "'" << endl;
-          return "";
+          return "unknown";
         }
-      }
-      default: {
-        g_warn_ss << "unknown platform type (2) for station '" << id << "' " <<
-            ftos(lat, 4) << " " << ftos(lon, 4) << " " << ispd_id << " " <<
+      } else if (ispd_id == "002001" || (ispd_id == "001005" && plat_type ==
+          1006)) {
+        return "unknown";
+      } else if (ispd_id == "003010") {
+        auto sp = split(id, "-");
+        if (sp.size() == 2 && sp[1].length() == 5 &&
+            strutils::is_numeric(sp[1])) {
+          return "land_station";
+        }
+      } else if (ispd_id >= "010000" && ispd_id <= "019999") {
+        if (plat_type == 1006 && id.length() == 5 &&
+            strutils::is_numeric(id)) {
+          if (id < "99000") {
+            return "land_station";
+          } else if (id >= "99200" && id <= "99299") {
+            return "drifting_buoy";
+          }
+        } else {
+          return "unknown";
+        }
+      } else {
+        g_warn_ss << "unknown platform type (1) for station '" << id << "' "
+            << ftos(lat, 4) << " " << ftos(lon, 4) << " " << ispd_id << " " <<
             itos(plat_type) << " " << itos(isrc) << " '" << string(1, csrc) <<
             "'" << endl;
         return "";
       }
+    }
+    default: {
+      g_warn_ss << "unknown platform type (2) for station '" << id << "' " <<
+          ftos(lat, 4) << " " << ftos(lon, 4) << " " << ispd_id << " " <<
+          itos(plat_type) << " " << itos(isrc) << " '" << string(1, csrc) <<
+          "'" << endl;
+      return "";
     }
   }
 }
@@ -649,8 +632,8 @@ string ispd_hdf5_id_entry(const std::tuple<string, string, float, float, short,
     } else if (id == "999999999999") {
       ientry_key = platform_type + "[!]unknown[!]" + id;
     }
-  } else if ((ispd_id == "001007" && plat_type == 1001) || ispd_id == "002000" ||
-      ispd_id == "003002" || ispd_id == "003008" || ispd_id == "003015" ||
+  } else if ((ispd_id == "001007" && plat_type == 1001) || ispd_id == "002000"
+      || ispd_id == "003002" || ispd_id == "003008" || ispd_id == "003015" ||
       ispd_id == "004000" || ispd_id == "004001" || ispd_id == "004003") {
     ientry_key = platform_type + "[!]WMO[!]" + id;
   } else if (((ispd_id == "001011" && plat_type == 1002) || ispd_id ==
@@ -681,11 +664,13 @@ string ispd_hdf5_id_entry(const std::tuple<string, string, float, float, short,
     }
   } else if (ispd_id == "003004") {
     ientry_key = platform_type + "[!]CANADA[!]" + id;
-  } else if ((ispd_id == "003006" || ispd_id == "003030") && plat_type == 1006) {
+  } else if ((ispd_id == "003006" || ispd_id == "003030") && plat_type ==
+      1006) {
     ientry_key = platform_type + "[!]AUSTRALIA[!]" + id;
   } else if (ispd_id == "003009" && plat_type == 1006) {
     ientry_key = platform_type + "[!]SPAIN[!]" + id;
-  } else if ((ispd_id == "003010" || ispd_id == "003011") && plat_type == 1003) {
+  } else if ((ispd_id == "003010" || ispd_id == "003011") && plat_type ==
+      1003) {
     auto parts = split(id, "-");
     if (parts.size() == 2 && parts[1].length() == 5 &&
         strutils::is_numeric(parts[1])) {
@@ -699,8 +684,8 @@ string ispd_hdf5_id_entry(const std::tuple<string, string, float, float, short,
     ientry_key = platform_type + "[!]NORWAY[!]" + id;
   } else if (ispd_id == "003016" && plat_type == 1002) {
     ientry_key = platform_type + "[!]PORTUGAL[!]" + id;
-  } else if ((ispd_id == "003019" || ispd_id == "003100") && plat_type == 1002 &&
-      !id.empty()) {
+  } else if ((ispd_id == "003019" || ispd_id == "003100") && plat_type == 1002
+      && !id.empty()) {
     ientry_key = platform_type + "[!]NEWZEALAND[!]" + id;
   } else if ((ispd_id == "003007" || ispd_id == "003021" || ispd_id ==
       "003022" || ispd_id == "003023" || ispd_id == "003025" || ispd_id ==
@@ -752,7 +737,8 @@ void scan_ispd_hdf5_file(ScanData& scan_data, gatherxml::markup::ObML::
   // load the station library
   ds = is->dataset("/Data/SpatialTemporalLocation/SpatialTemporalLocation");
   if (ds == nullptr || ds->datatype.class_ != 6) {
-    log_error2("unable to locate spatial/temporal information", F, g_util_ident);
+    log_error2("unable to locate spatial/temporal information", F,
+        g_util_ident);
   }
   unordered_map<string, std::tuple<string, string, float, float, short,
       short, char, bool>> stn_library;
@@ -815,12 +801,14 @@ void scan_ispd_hdf5_file(ScanData& scan_data, gatherxml::markup::ObML::
                 cpd.members[2].byte_offset], is->size_of_offsets(),
                 is->size_of_lengths(),
                 cpd.members[2].datatype, ds->dataspace);
-            std::get<5>(entry->second) = *(reinterpret_cast<int *>(id_val.get()));
+            std::get<5>(entry->second) = *(reinterpret_cast<int *>(id_val.
+                get()));
             plat_val.set(*is->file_stream(), &chunk.buffer[l +
                 cpd.members[4].byte_offset], is->size_of_offsets(),
                 is->size_of_lengths(),
                 cpd.members[4].datatype, ds->dataspace);
-            std::get<4>(entry->second) = *(reinterpret_cast<int *>(plat_val.get()));
+            std::get<4>(entry->second) = *(reinterpret_cast<int *>(plat_val.
+                get()));
           } else {
             log_error2("no entry for '" + key + "' in station library", F,
                 g_util_ident);
@@ -855,7 +843,8 @@ void scan_ispd_hdf5_file(ScanData& scan_data, gatherxml::markup::ObML::
                   cpd.members[2].byte_offset], is->size_of_offsets(),
                   is->size_of_lengths(),
                   cpd.members[2].datatype, ds->dataspace);
-              std::get<4>(entry->second) = 1000 + *(reinterpret_cast<int *>(id_val.get()));
+              std::get<4>(entry->second) = 1000 + *(reinterpret_cast<int *>(
+                  id_val.get()));
             }
             coll_val.set(*is->file_stream(), &chunk.buffer[l +
                 cpd.members[4].byte_offset], is->size_of_offsets(),
@@ -895,7 +884,8 @@ void scan_ispd_hdf5_file(ScanData& scan_data, gatherxml::markup::ObML::
                 cpd.members[2].byte_offset], is->size_of_offsets(),
                 is->size_of_lengths(),
                 cpd.members[2].datatype, ds->dataspace);
-            std::get<6>(entry->second) = (reinterpret_cast<char *>(src_flag_val.get()))[0];
+            std::get<6>(entry->second) = (reinterpret_cast<char *>(src_flag_val.
+                get()))[0];
             rpt_type_val.set(*is->file_stream(), &chunk.buffer[l +
                 cpd.members[3].byte_offset], is->size_of_offsets(),
                 is->size_of_lengths(),
@@ -3188,11 +3178,11 @@ bool grid_is_centered_lambert_conformal(const GridData& grid_data, Grid::
           ym * grid_data.longitude.data_array.dimensions[1] + xm, grid_data.
           longitude.ds.get()) + data_array_value(grid_data.longitude.data_array,
           ym * grid_data.longitude.data_array.dimensions[1] + dx2, grid_data.
-          longitude.ds.get())), (data_array_value(grid_data.longitude.data_array,
-          yp * grid_data.longitude.data_array.dimensions[1] + xm, grid_data.
-          longitude.ds.get()) + data_array_value(grid_data.longitude.data_array,
-          yp * grid_data.longitude.data_array.dimensions[1] + dx2, grid_data.
-          longitude.ds.get())), 0.00001) && floatutils::myequalf(
+          longitude.ds.get())), (data_array_value(grid_data.longitude.
+          data_array, yp * grid_data.longitude.data_array.dimensions[1] + xm,
+          grid_data.longitude.ds.get()) + data_array_value(grid_data.longitude.
+          data_array, yp * grid_data.longitude.data_array.dimensions[1] + dx2,
+          grid_data.longitude.ds.get())), 0.00001) && floatutils::myequalf(
           data_array_value(grid_data.latitude.data_array, dy2 * grid_data.
           longitude.data_array.dimensions[1] + xm, grid_data.latitude.ds.get()),
           data_array_value(grid_data.latitude.data_array, dy2 * grid_data.
@@ -3208,22 +3198,22 @@ bool grid_is_centered_lambert_conformal(const GridData& grid_data, Grid::
         } else {
           def.projection_flag = 1;
         }
-        def.olongitude = lround((data_array_value(grid_data.longitude.data_array,
-            dy2 * grid_data.longitude.data_array.dimensions[1] + xm, grid_data.
-            longitude.ds.get()) + data_array_value(grid_data.longitude.
-            data_array, dy2 * grid_data.longitude.data_array.dimensions[1] + dx2,
-             grid_data.longitude.ds.get())) / 2.);
-        def.dx = def.dy = lround(111.1 * cos(data_array_value(grid_data.latitude.
+        def.olongitude = lround((data_array_value(grid_data.longitude.
+            data_array, dy2 * grid_data.longitude.data_array.dimensions[1] + xm,
+            grid_data.longitude.ds.get()) + data_array_value(grid_data.
+            longitude.data_array, dy2 * grid_data.longitude.data_array.
+            dimensions[1] + dx2, grid_data.longitude.ds.get())) / 2.);
+        def.dx = def.dy = lround(111.1 * cos(data_array_value(grid_data.
+            latitude.data_array, dy2 * grid_data.longitude.data_array.
+            dimensions[1] + dx2 - 1, grid_data.latitude.ds.get()) * 3.141592654
+            / 180.) * (data_array_value(grid_data.longitude.data_array, dy2 *
+            grid_data.longitude.data_array.dimensions[1] + dx2, grid_data.
+            longitude.ds.get()) - data_array_value(grid_data.longitude.
             data_array, dy2 * grid_data.longitude.data_array.dimensions[1] + dx2
-            - 1, grid_data.latitude.ds.get()) * 3.141592654/180.) *
-            (data_array_value(grid_data.longitude.data_array, dy2 * grid_data.
-            longitude.data_array.dimensions[1] + dx2, grid_data.longitude.ds.
-            get()) - data_array_value(grid_data.longitude.data_array, dy2 *
-            grid_data.longitude.data_array.dimensions[1] + dx2 - 1, grid_data.
-            longitude.ds.get())));
+            - 1, grid_data.longitude.ds.get())));
         if (gatherxml::verbose_operation) {
-          cout << "...confirmed a centered Lambert-Conformal "
-              "projection." << endl;
+          cout << "...confirmed a centered Lambert-Conformal projection." <<
+              endl;
         }
         return true;
       }
@@ -3255,16 +3245,16 @@ bool grid_is_centered_lambert_conformal(const GridData& grid_data, Grid::
             dy2 * grid_data.longitude.data_array.dimensions[1] + dx2, grid_data.
             longitude.ds.get()));
         def.dx = def.dy = lround(111.1*cos(data_array_value(grid_data.latitude.
-            data_array, dy2 * grid_data.longitude.data_array.dimensions[1] + dx2,
-            grid_data.latitude.ds.get()) * 3.141592654 / 180.) *
+            data_array, dy2 * grid_data.longitude.data_array.dimensions[1] +
+            dx2, grid_data.latitude.ds.get()) * 3.141592654 / 180.) *
             (data_array_value(grid_data.longitude.data_array, dy2 * grid_data.
-            longitude.data_array.dimensions[1] + dx2 + 1, grid_data.longitude.ds.
-            get()) - data_array_value(grid_data.longitude.data_array, dy2 *
+            longitude.data_array.dimensions[1] + dx2 + 1, grid_data.longitude.
+            ds.get()) - data_array_value(grid_data.longitude.data_array, dy2 *
             grid_data.longitude.data_array.dimensions[1] + dx2, grid_data.
             longitude.ds.get())));
         if (gatherxml::verbose_operation) {
-          cout << "...confirmed a centered Lambert-Conformal "
-              "projection." << endl;
+          cout << "...confirmed a centered Lambert-Conformal projection." <<
+              endl;
         }
         return true;
       }
@@ -3508,9 +3498,9 @@ void scan_gridded_hdf5nc4_file(ScanData& scan_data) {
     gatherxml::fileInventory::open(g_inv.file, g_inv.dir, g_inv.stream, "GrML",
         "hdf2xml", USER);
   }
-  scan_data.map_name = unixutils::remote_web_file("https://rda.ucar.edu/"
-      "metadata/ParameterTables/netCDF4.ds" + g_dsid + ".xml", scan_data.tdir->
-      name());
+  auto f = "https://rda.ucar.edu/metadata/ParameterTables/netCDF4.ds" + g_dsid +
+      ".xml";
+  scan_data.map_name = unixutils::remote_web_file(f, scan_data.tdir->name());
   ParameterData parameter_data;
   if (!scan_data.map_name.empty()) {
 
@@ -3856,9 +3846,7 @@ void scan_gridded_hdf5nc4_file(ScanData& scan_data) {
       }
     }
     auto e = metautils::NcLevel::write_level_map(coord_vars.level_info);
-    if (!e.empty()) {
-      log_error2(e, F, g_util_ident);
-    }
+    if (!e.empty()) log_error2(e, F, g_util_ident);
   }
   scan_data.write_type = ScanData::GrML_type;
   if (g_grml_data->gtb.empty()) {
@@ -4006,9 +3994,7 @@ void scan_hdf5_file(std::list<string>& filelist, ScanData& scan_data) {
   auto error = metautils::NcParameter::write_parameter_map(scan_data.varlist,
       scan_data.var_changes_table, map_type, scan_data.map_name,
       scan_data.found_map, warning);
-  if (!error.empty()) {
-    log_error2(error, F, g_util_ident);
-  }
+  if (!error.empty()) log_error2(error, F, g_util_ident);
   if (gatherxml::verbose_operation) {
     cout << "HDF5 file scan completed." << endl;
   }
@@ -4037,9 +4023,7 @@ void scan_file(ScanData& scan_data) {
     log_error2(error + "'", F + ": "
         "prepare_file_for_metadata_scanning()", g_util_ident);
   }
-  if (filelist.empty()) {
-    filelist.emplace_back(work_file->name());
-  }
+  if (filelist.empty()) filelist.emplace_back(work_file->name());
   scan_data.tdir.reset(new TempDir);
   if (!scan_data.tdir->create(metautils::directives.temp_path)) {
     log_error2("unable to create a temporary directory in " +
@@ -4054,9 +4038,7 @@ void scan_file(ScanData& scan_data) {
     cerr << "Error: bad data format specified" << endl;
     exit(1);
   }
-  if (gatherxml::verbose_operation) {
-    cout << "File scan complete." << endl;
-  }
+  if (gatherxml::verbose_operation) cout << "File scan complete." << endl;
 }
 
 void show_usage_and_exit() {
