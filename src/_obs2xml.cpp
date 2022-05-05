@@ -23,6 +23,7 @@
 
 using std::string;
 using std::stringstream;
+using std::unique_ptr;
 using strutils::is_numeric;
 using strutils::replace_all;
 using strutils::split;
