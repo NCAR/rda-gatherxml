@@ -40,7 +40,7 @@ gatherxml::markup::ObML::IDEntry ientry;
 std::unique_ptr<TempFile> tfile;
 string inv_file;
 std::unique_ptr<TempDir> tdir;
-TempDir *inv_dir=nullptr;
+unique_ptr<TempDir> inv_dir(nullptr);
 std::ofstream inv_stream;
 bool verbose_operation=false;
 
@@ -303,40 +303,37 @@ bool processed_imma_observation(std::unique_ptr<Observation>& obs,gatherxml::mar
   }
   string platform_type;
   switch (o->platform_type().atti) {
-    case 1:
-    {
+    case 1: {
       switch (o->platform_type().code) {
         case 0:
         case 1:
-        case 5:
-        {
-          platform_type="roving_ship";
+        case 5: {
+          platform_type = "roving_ship";
           break;
         }
         case 2:
-        case 3:
-        {
-          platform_type="ocean_station";
+        case 3: {
+          platform_type = "ocean_station";
           break;
         }
-        case 4:
-        {
-          platform_type="lightship";
+        case 4: {
+          platform_type = "lightship";
           break;
         }
-        case 6:
-        {
-          platform_type="moored_buoy";
+        case 6: {
+          platform_type = "moored_buoy";
           break;
         }
-        case 7:
-        {
-          platform_type="drifting_buoy";
+        case 7: {
+          platform_type = "drifting_buoy";
           break;
         }
-        case 9:
-        {
-          platform_type="ice_station";
+        case 8: {
+          platform_type = "ice_buoy";
+          break;
+        }
+        case 9: {
+          platform_type = "ice_station";
           break;
         }
         case 10:
@@ -346,47 +343,38 @@ bool processed_imma_observation(std::unique_ptr<Observation>& obs,gatherxml::mar
         case 18:
         case 19:
         case 20:
-        case 21:
-        {
-          platform_type="oceanographic";
+        case 21: {
+          platform_type = "oceanographic";
           break;
         }
-        case 13:
-        {
-          platform_type="CMAN_station";
+        case 13: {
+          platform_type = "CMAN_station";
           break;
         }
-        case 14:
-        {
-          platform_type="coastal_station";
+        case 14: {
+          platform_type = "coastal_station";
           break;
         }
-        case 15:
-        {
-          platform_type="fixed_ocean_platform";
+        case 15: {
+          platform_type = "fixed_ocean_platform";
           break;
         }
-        case 16:
-        {
-          platform_type="automated_gauge";
+        case 16: {
+          platform_type = "automated_gauge";
           break;
         }
-        default:
-        {
+        default: {
           switch (o->ID_type()) {
             case 3:
-            case 4:
-            {
-              platform_type="drifting_buoy";
+            case 4: {
+              platform_type = "drifting_buoy";
               break;
             }
-            case 7:
-            {
-              platform_type="roving_ship";
+            case 7: {
+              platform_type = "roving_ship";
               break;
             }
-            default:
-            {
+            default: {
               metautils::log_error("platform type "+strutils::itos(o->platform_type().atti)+"/"+strutils::itos(o->platform_type().code)+" not recognized - obs date: "+obs->date_time().to_string()+", ID type: "+strutils::itos(o->ID_type()),"obs2xml",USER);
             }
           }
@@ -394,23 +382,19 @@ bool processed_imma_observation(std::unique_ptr<Observation>& obs,gatherxml::mar
       }
       break;
     }
-    case 2:
-    {
+    case 2: {
       switch (o->platform_type().code) {
-        case 6:
-        {
-          platform_type="CMAN_station";
+        case 6: {
+          platform_type = "CMAN_station";
           break;
         }
-        default:
-        {
+        default: {
           metautils::log_error("platform type "+strutils::itos(o->platform_type().atti)+"/"+strutils::itos(o->platform_type().code)+" not recognized","obs2xml",USER);
         }
       }
       break;
     }
-    default:
-    {
+    default: {
       metautils::log_error("platform type "+strutils::itos(o->platform_type().atti)+"/"+strutils::itos(o->platform_type().code)+" not recognized","obs2xml",USER);
     }
   }
@@ -956,7 +940,7 @@ void scan_file(gatherxml::markup::ObML::ObservationData& obs_data)
       metautils::log_error("scan_file(): unable to open file for input","obs2xml",USER);
     }
     if (file_format.empty() && metautils::args.data_format == "isd") {
-      gatherxml::fileInventory::open(inv_file,&inv_dir,inv_stream,"ObML","obs2xml",USER);
+      gatherxml::fileInventory::open(inv_file,inv_dir,inv_stream,"ObML","obs2xml",USER);
     } else if (metautils::args.inventory_only) {
       metautils::log_error("scan_file(): unable to inventory "+metautils::args.path+"/"+metautils::args.filename+" because archive format is '"+file_format+"' and data format is '"+metautils::args.data_format+"'","obs2xml",USER);
     }
@@ -1117,7 +1101,7 @@ int main(int argc,char **argv)
     }
   }
   if (inv_stream.is_open()) {
-    gatherxml::fileInventory::close(inv_file,&inv_dir,inv_stream,"ObML",metautils::args.update_summary,true,"obs2xml",USER);
+    gatherxml::fileInventory::close(inv_file,inv_dir,inv_stream,"ObML",metautils::args.update_summary,true,"obs2xml",USER);
   }
   return 0;
 }
