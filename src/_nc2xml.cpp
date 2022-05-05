@@ -3040,7 +3040,7 @@ bool found_auxiliary_lat_lon_coordinates(GridData& grid_data) {
       size();
 }
 
-void check_for_centered_lambert_conformal(const unique_ptr<double[]>& lats,
+bool grid_is_centered_lambert_conformal(const unique_ptr<double[]>& lats,
     const unique_ptr<double[]>& lons, Grid::GridDimensions& dims, Grid::
     GridDefinition& def) {
   if (gatherxml::verbose_operation) {
@@ -3074,6 +3074,7 @@ void check_for_centered_lambert_conformal(const unique_ptr<double[]>& lats,
           cout << "            ... confirmed a centered Lambert-Conformal "
               "projection." << endl;
         }
+        return true;
       }
       break;
     }
@@ -3097,6 +3098,7 @@ void check_for_centered_lambert_conformal(const unique_ptr<double[]>& lats,
           cout << "            ... confirmed a centered Lambert-Conformal "
               "projection." << endl;
         }
+        return true;
       }
       break;
     }
@@ -3104,9 +3106,10 @@ void check_for_centered_lambert_conformal(const unique_ptr<double[]>& lats,
   if (gatherxml::verbose_operation) {
     cout << "         ... done." << endl;
   }
+  return false;
 }
 
-void check_for_non_centered_lambert_conformal(const unique_ptr<double[]>& lats,
+bool grid_is_non_centered_lambert_conformal(const unique_ptr<double[]>& lats,
     const unique_ptr<double[]>& lons, Grid::GridDimensions& dims, Grid::
     GridDefinition& def) {
   if (gatherxml::verbose_operation) {
@@ -3116,7 +3119,7 @@ void check_for_non_centered_lambert_conformal(const unique_ptr<double[]>& lats,
   def.type = Grid::Type::not_set;
 
   // find the x-offsets in each row where the change in latitude goes from
-  //  positive to negative
+  //   positive to negative
   vector<double> v;
   v.reserve(dims.y);
   double s = 0.;
@@ -3133,95 +3136,101 @@ void check_for_non_centered_lambert_conformal(const unique_ptr<double[]>& lats,
   }
 
   // find the variance in the x-offsets
-  auto r = lround(accumulate(v.begin(), v.end(), 0.) / v.size());
+  auto xbar = lround(accumulate(v.begin(), v.end(), 0.) / v.size());
   double d = 0.;
   for (const auto& e : v) {
-    auto x = e - r;
+    auto x = e - xbar;
     d += x * x;
   }
   auto var = d / (v.size() - 1);
+  if (var >= 1.) return false;
 
   // if the variance is low, confident that we found the orientation longitude
-  if (var < 1.) {
-    def.type = Grid::Type::lambertConformal;
-    def.olongitude = lround(s / v.size());
+  def.type = Grid::Type::lambertConformal;
+  def.olongitude = lround(s / v.size());
 
-    // find the x-direction distance for each row at the orientation longitude
-    const double PI = 3.141592654;
-    const double DEGRAD = PI / 180.;
-    const double KMDEG = 111.1;
-    v.clear();
-    for (auto n = r; n < dims.x * dims.y; n += dims.x) {
-      auto dy = (lons[n + 1] - lons[n]) * KMDEG * cos(lats[n] * DEGRAD);
-      auto dx = (lats[n + 1] - lats[n]) * KMDEG;
-      v.emplace_back(sqrt(dx * dx + dy * dy));
-    }
-    def.dx = lround(accumulate(v.begin(), v.end(), 0.) / v.size());
-    def.stdparallel1 = def.stdparallel2 = -99.;
-    size_t i = 0;
-    for (size_t n = 0; n < v.size(); ++n) {
-      if (myequalf(v[n], def.dx, 0.001)) {
-        auto p = lround(lats[r + n  * dims.x]);
-        if (def.stdparallel1 < -90.) {
-          def.stdparallel1 = p;
-          i = r + n * dims.x;
-        } else if (def.stdparallel2 < -90.) {
-          if (p != def.stdparallel1) {
-            def.stdparallel2 = p;
-          }
-        } else if (p != def.stdparallel2) {
-          if (gatherxml::verbose_operation) {
-            cout << "            ... check for a non-centered projection "
-                "failed. Too many tangent latitudes." << endl;
-          }
-          def.type = Grid::Type::not_set;
-          return;
+  // find the x-direction distance for each row at the orientation longitude
+  const double PI = 3.141592654;
+  const double DEGRAD = PI / 180.;
+  const double KMDEG = 111.1;
+  v.clear();
+  for (auto n = xbar; n < dims.x * dims.y; n += dims.x) {
+    auto dy = (lons[n + 1] - lons[n]) * KMDEG * cos(lats[n] * DEGRAD);
+    auto dx = (lats[n + 1] - lats[n]) * KMDEG;
+    v.emplace_back(sqrt(dx * dx + dy * dy));
+  }
+  def.dx = lround(accumulate(v.begin(), v.end(), 0.) / v.size());
+  def.stdparallel1 = def.stdparallel2 = -99.;
+  size_t i = 0;
+  for (size_t n = 0; n < v.size(); ++n) {
+    if (myequalf(v[n], def.dx, 0.001)) {
+      auto p = lround(lats[xbar + n  * dims.x]);
+      if (def.stdparallel1 < -90.) {
+        def.stdparallel1 = p;
+        i = xbar + n * dims.x;
+      } else if (def.stdparallel2 < -90.) {
+        if (p != def.stdparallel1) def.stdparallel2 = p;
+      } else if (p != def.stdparallel2) {
+        if (gatherxml::verbose_operation) {
+          cout << "            ... check for a non-centered projection "
+              "failed. Too many tangent latitudes." << endl;
         }
+        def.type = Grid::Type::not_set;
+        return false;
       }
-    }
-    if (def.stdparallel1 < -90.) {
-      if (gatherxml::verbose_operation) {
-        cout << "            ... check for a non-centered projection failed. "
-            "No tangent latitude could be identified." << endl;
-      }
-      def.type = Grid::Type::not_set;
-      return;
-    } else if (def.stdparallel2 < -90.) {
-      def.stdparallel2 = def.stdparallel1;
-    }
-    def.llatitude = def.stdparallel1;
-    if (def.llatitude >= 0.) {
-      def.projection_flag = 0;
-    } else {
-      def.projection_flag = 1;
-    }
-    auto dx = (lons[i] - lons[i - dims.x]) * KMDEG * cos(lats[i - dims.x] *
-        DEGRAD);
-    auto dy = (lats[i] - lats[i - dims.x]) * KMDEG;
-    def.dy = lround(sqrt(dx * dx + dy * dy));
-    if (gatherxml::verbose_operation) {
-      cout << "            ... confirmed a non-centered Lambert-conformal "
-          "projection." << endl;
     }
   }
+  if (def.stdparallel1 < -90.) {
+    if (gatherxml::verbose_operation) {
+      cout << "            ... check for a non-centered projection failed. "
+          "No tangent latitude could be identified." << endl;
+    }
+    def.type = Grid::Type::not_set;
+    return false;
+  } else if (def.stdparallel2 < -90.) {
+    def.stdparallel2 = def.stdparallel1;
+  }
+  def.llatitude = def.stdparallel1;
+  def.projection_flag = def.llatitude >= 0. ? 0 : 1;
+  auto dx = (lons[i] - lons[i - dims.x]) * KMDEG * cos(lats[i - dims.x] *
+      DEGRAD);
+  auto dy = (lats[i] - lats[i - dims.x]) * KMDEG;
+  def.dy = lround(sqrt(dx * dx + dy * dy));
   if (gatherxml::verbose_operation) {
+    cout << "            ... confirmed a non-centered Lambert-conformal "
+        "projection." << endl;
     cout << "         ... done." << endl;
   }
+  return true;
 }
 
-void check_for_lambert_conformal(const unique_ptr<double[]>& lats, const
+bool grid_is_lambert_conformal(const unique_ptr<double[]>& lats, const
     unique_ptr<double[]>& lons, Grid::GridDimensions& dims, Grid::
     GridDefinition& def) {
   if (gatherxml::verbose_operation) {
     cout << "      ... checking for Lambert-Conformal projection ..." << endl;
   }
-  check_for_centered_lambert_conformal(lats, lons, dims, def);
-  if (def.type == Grid::Type::not_set) {
-    check_for_non_centered_lambert_conformal(lats, lons, dims, def);
+  if (grid_is_centered_lambert_conformal(lats, lons, dims, def)) {
+    return true;
   }
   if (gatherxml::verbose_operation) {
-    cout << "      ... done." << endl;
+    cout << "      ...check for a centered Lambert-Conformal projection "
+        "failed, checking for a non-centered projection..." << endl;
   }
+  if (grid_is_non_centered_lambert_conformal(lats, lons, dims, def)) {
+    return true;
+  }
+  if (gatherxml::verbose_operation) {
+    cout << "      ...check for a Lambert-Conformal projection finished. Not "
+        "an LC projection." << endl;
+  }
+}
+
+bool found_grid_projection(bool b) {
+  if (gatherxml::verbose_operation) {
+    cout << "   ... done." << endl;
+  }
+  return b;
 }
 
 bool filled_grid_projection(const unique_ptr<double[]>& lats, const unique_ptr<
@@ -3262,162 +3271,155 @@ bool filled_grid_projection(const unique_ptr<double[]>& lats, const unique_ptr<
       f.elongitude = lons[d.size - 1];
       f.laincrement = xdy;
       f.loincrement = xdx;
-    } else {
-      auto la1 = lats[0];
-      auto la2 = lats[d.size - 1];
-      if ((la1 >= 0. && la2 < 0.) || (la1 < 0. && la2 >= 0.)) {
-        if (fabs(la1) <= fabs(la2)) {
-          const double PI = 3.141592654;
-          if (fabs(cos(la2 * PI / 180.) - (ndy / xdy)) < 0.01) {
-            f.type = Grid::Type::mercator;
-            f.elatitude = lats[d.size - 1];
-            f.elongitude = lons[d.size - 1];
-            double ma = 99999.;
-            int l = -1;
-            for (int n = 0, m = 0; n < d.y; ++n, m += d.x) {
-              double a = fabs(lats[m] - lround(lats[m]));
-              if (a < ma) {
-                ma = a;
-                l = m;
-              }
+      return found_grid_projection(true);
+    }
+    auto la1 = lats[0];
+    auto la2 = lats[d.size - 1];
+    if ((la1 >= 0. && la2 < 0.) || (la1 < 0. && la2 >= 0.)) {
+      if (fabs(la1) <= fabs(la2)) {
+        const double PI = 3.141592654;
+        if (fabs(cos(la2 * PI / 180.) - (ndy / xdy)) < 0.01) {
+          f.type = Grid::Type::mercator;
+          f.elatitude = lats[d.size - 1];
+          f.elongitude = lons[d.size - 1];
+          double ma = 99999.;
+          int l = -1;
+          for (int n = 0, m = 0; n < d.y; ++n, m += d.x) {
+            double a = fabs(lats[m] - lround(lats[m]));
+            if (a < ma) {
+              ma = a;
+              l = m;
             }
-            f.dx = lround(cos(lats[l] * PI / 180.) * ndx * 111.2);
-            f.dy = lround((fabs(lats[l + d.x] - lats[l]) + fabs(lats[l] - lats[
-                l - d.x])) / 2. * 111.2);
-            f.stdparallel1 = lats[l];
           }
+          f.dx = lround(cos(lats[l] * PI / 180.) * ndx * 111.2);
+          f.dy = lround((fabs(lats[l + d.x] - lats[l]) + fabs(lats[l] - lats[l -
+              d.x])) / 2. * 111.2);
+          f.stdparallel1 = lats[l];
+          return found_grid_projection(true);
         }
       }
     }
   }
-  if (f.type == Grid::Type::not_set) {
 
-    // check as two-dimensional coordinates
-    auto dx = fabs(lons[1] - lons[0]);
+  // check as two-dimensional coordinates
+  auto dx = fabs(lons[1] - lons[0]);
+  for (short n = 0; n < d.y; ++n) {
+    for (short m = 1; m < d.x; ++m) {
+      auto x = n * d.x + m;
+      if (!myequalf(fabs(lons[x] - lons[x - 1]), dx, 0.000001)) {
+        dx = 1.e36;
+        n = d.y;
+        m = d.x;
+      }
+    }
+  }
+  if (!myequalf(dx, 1.e36)) {
+    auto dy = fabs(lats[1] - lats[0]);
+    for (short m = 0; m < d.x; ++m) {
+      for (short n = 1; n < d.y; ++n) {
+        auto x = m * d.y + n;
+        if (!myequalf(fabs(lats[x] - lats[x - 1]), dy, 0.000001)) {
+          dy = 1.e36;
+          m = d.x;
+          n = d.y;
+        }
+      }
+    }
+    if (!myequalf(dy, 1.e36)) {
+      f.type = Grid::Type::latitudeLongitude;
+      f.elatitude = lats[nlats - 1];
+      f.elongitude = lons[nlons - 1];
+      f.laincrement = dy;
+      f.loincrement = dx;
+      return found_grid_projection(true);
+    }
     for (short n = 0; n < d.y; ++n) {
-      for (short m = 1; m < d.x; ++m) {
+      auto x = n * d.x;
+      dy = fabs(lats[x + 1] - lats[x]);
+      for (short m = 2; m < d.x; ++m) {
         auto x = n * d.x + m;
-        if (!myequalf(fabs(lons[x] - lons[x - 1]), dx, 0.000001)) {
-          dx = 1.e36;
+        if (!myequalf(fabs(lats[x] - lats[x - 1]), dy, 0.000001)) {
+          dy = 1.e36;
           n = d.y;
           m = d.x;
         }
       }
     }
-    if (!myequalf(dx, 1.e36)) {
-      auto dy = fabs(lats[1] - lats[0]);
-      for (short m = 0; m < d.x; ++m) {
-        for (short n = 1; n < d.y; ++n) {
-          auto x = m * d.y + n;
-          if (!myequalf(fabs(lats[x] - lats[x - 1]), dy, 0.000001)) {
-            dy = 1.e36;
-            m = d.x;
-            n = d.y;
-          }
-        }
-      }
-      if (!myequalf(dy, 1.e36)) {
-        f.type = Grid::Type::latitudeLongitude;
+    if (!myequalf(dy, 1.e36)) {
+      const double PI = 3.141592654;
+      auto ny2 = d.y / 2 - 1;
+      auto a = log(tan(PI / 4. + lats[0] * PI / 360.));
+      auto b = log(tan(PI / 4. + lats[ny2 * d.x] * PI / 360.));
+      auto c = log(tan(PI / 4. + lats[ny2 * 2 * d.x] * PI / 360.));
+      if (myequalf((b - a) / ny2, (c - a) / (ny2 * 2), 0.000001)) {
+        f.type = Grid::Type::mercator;
         f.elatitude = lats[nlats - 1];
         f.elongitude = lons[nlons - 1];
-        f.laincrement = dy;
+        f.laincrement = (f.elatitude - f.slatitude) / (d.y - 1);
         f.loincrement = dx;
-      } else {
-        for (short n = 0; n < d.y; ++n) {
-          auto x = n * d.x;
-          dy = fabs(lats[x + 1] - lats[x]);
-          for (short m = 2; m < d.x; ++m) {
-            auto x = n * d.x + m;
-            if (!myequalf(fabs(lats[x] - lats[x - 1]), dy, 0.000001)) {
-              dy = 1.e36;
-              n = d.y;
-              m = d.x;
-            }
-          }
-        }
-        if (!myequalf(dy, 1.e36)) {
-          const double PI = 3.141592654;
-          auto ny2 = d.y / 2 - 1;
-          auto a = log(tan(PI / 4. + lats[0] * PI / 360.));
-          auto b = log(tan(PI / 4. + lats[ny2 * d.x] * PI / 360.));
-          auto c = log(tan(PI / 4. + lats[ny2 * 2 * d.x] * PI / 360.));
-          if (myequalf((b - a) / ny2, (c - a) / (ny2 * 2), 0.000001)) {
-            f.type = Grid::Type::mercator;
-            f.elatitude = lats[nlats - 1];
-            f.elongitude = lons[nlons - 1];
-            f.laincrement = (f.elatitude - f.slatitude) / (d.y - 1);
-            f.loincrement = dx;
-          }
-        }
+        return found_grid_projection(true);
       }
     }
   }
-  if (f.type == Grid::Type::not_set) {
 
-    // check for a polar-stereographic grid
-    auto ny2 = d.y / 2 - 1;
-    auto nx2 = d.x / 2 - 1;
+  // check for a polar-stereographic grid
+  auto ny2 = d.y / 2 - 1;
+  auto nx2 = d.x / 2 - 1;
 
-    // check the four points that surround the center of the grid to see if the
-    //    center is the pole:
-    //        1) all four latitudes must be the same
-    //        2) the sum of the absolute values of opposing longitudes must
-    //           equal 180.
-    if (myequalf(lats[ny2 * d.x + nx2], lats[(ny2 + 1) * d.x + nx2], 0.00001) &&
-        myequalf(lats[(ny2 + 1) * d.x + nx2], lats[(ny2 + 1) * d.x + nx2 + 1],
-        0.00001) && myequalf(lats[(ny2 + 1) * d.x + nx2 + 1], lats[ny2 * d.x +
-        nx2 + 1], 0.00001) && myequalf(fabs(lons[ny2 * d.x + nx2]) + fabs(lons[(
-        ny2 + 1) * d.x + nx2 + 1]), 180., 0.001) && myequalf(fabs(lons[(ny2 + 1)
-        * d.x + nx2]) + fabs(lons[ny2 * d.x + nx2 + 1]), 180., 0.001)) {
-      f.type = Grid::Type::polarStereographic;
-      if (lats[ny2 * d.x + nx2] > 0) {
-        f.projection_flag = 0;
-        f.llatitude = 60.;
-      } else {
-        f.projection_flag = 1;
-        f.llatitude = -60.;
-      }
-      f.olongitude = lroundf((lons[nx2] + lons[nx2 + 1]) / 2.);
-      if (f.olongitude > 180.) {
-        f.olongitude -= 360.;
-      }
-
-      // look for dx and dy at the 60-degree parallel
-      // great circle formula:
-      //    theta = 2 * arcsin[ sqrt( sin^2( delta_phi / 2 ) + cos(phi_1) *
-      //        cos(phi_2) * sin^2( delta_lambda / 2 ) ) ]
-      //    phi_1 and phi_2 are latitudes
-      //    lambda_1 and lambda_2 are longitudes
-      //    dist = 6372.8 * theta
-      //    6372.8 is radius of Earth in km
-      double a, na = 999.;
-      int nm = 0;
-      for (size_t m = 0; m < nlats; ++m) {
-        if ( (a = fabs(f.llatitude - lats[m])) < na) {
-          na = a;
-          nm = m;
-        }
-      }
-      const double RAD = 3.141592654 / 180.;
-      f.dx = lroundf(asin(sqrt(sin(fabs(lats[nm] - lats[nm + 1]) / 2. * RAD) *
-          sin(fabs(lats[nm] - lats[nm + 1]) / 2. * RAD) + sin(fabs(lons[nm] -
-          lons[nm + 1]) / 2. * RAD) * sin(fabs(lons[nm] - lons[nm + 1]) / 2. *
-          RAD) * cos(lats[nm] * RAD) * cos(lats[nm + 1] * RAD))) * 12745.6);
-      f.dy = lroundf(asin(sqrt(sin(fabs(lats[nm] - lats[nm + d.x]) / 2. * RAD) *
-          sin(fabs(lats[nm] - lats[nm + d.x]) / 2. * RAD) + sin(fabs(lons[nm] -
-          lons[nm + d.x]) / 2. * RAD) * sin(fabs(lons[nm] - lons[nm + d.x]) / 2.
-          * RAD) * cos(lats[nm] * RAD) * cos(lats[nm + d.x] * RAD))) * 12745.6);
+  // check the four points that surround the center of the grid to see if the
+  //    center is the pole:
+  //        1) all four latitudes must be the same
+  //        2) the sum of the absolute values of opposing longitudes must
+  //           equal 180.
+  if (myequalf(lats[ny2 * d.x + nx2], lats[(ny2 + 1) * d.x + nx2], 0.00001) &&
+      myequalf(lats[(ny2 + 1) * d.x + nx2], lats[(ny2 + 1) * d.x + nx2 + 1],
+      0.00001) && myequalf(lats[(ny2 + 1) * d.x + nx2 + 1], lats[ny2 * d.x +
+      nx2 + 1], 0.00001) && myequalf(fabs(lons[ny2 * d.x + nx2]) + fabs(lons[(
+      ny2 + 1) * d.x + nx2 + 1]), 180., 0.001) && myequalf(fabs(lons[(ny2 + 1)
+      * d.x + nx2]) + fabs(lons[ny2 * d.x + nx2 + 1]), 180., 0.001)) {
+    f.type = Grid::Type::polarStereographic;
+    if (lats[ny2 * d.x + nx2] > 0) {
+      f.projection_flag = 0;
+      f.llatitude = 60.;
+    } else {
+      f.projection_flag = 1;
+      f.llatitude = -60.;
     }
-  }
-  if (f.type == Grid::Type::not_set) {
+    f.olongitude = lroundf((lons[nx2] + lons[nx2 + 1]) / 2.);
+    if (f.olongitude > 180.) {
+      f.olongitude -= 360.;
+    }
 
-    // check for a lambert-conformal grid
-    check_for_lambert_conformal(lats, lons, d, f);
+    // look for dx and dy at the 60-degree parallel
+    // great circle formula:
+    //    theta = 2 * arcsin[ sqrt( sin^2( delta_phi / 2 ) + cos(phi_1) *
+    //        cos(phi_2) * sin^2( delta_lambda / 2 ) ) ]
+    //    phi_1 and phi_2 are latitudes
+    //    lambda_1 and lambda_2 are longitudes
+    //    dist = 6372.8 * theta
+    //    6372.8 is radius of Earth in km
+    double a, na = 999.;
+    int nm = 0;
+    for (size_t m = 0; m < nlats; ++m) {
+      if ( (a = fabs(f.llatitude - lats[m])) < na) {
+        na = a;
+        nm = m;
+      }
+    }
+    const double RAD = 3.141592654 / 180.;
+    f.dx = lroundf(asin(sqrt(sin(fabs(lats[nm] - lats[nm + 1]) / 2. * RAD) *
+        sin(fabs(lats[nm] - lats[nm + 1]) / 2. * RAD) + sin(fabs(lons[nm] -
+        lons[nm + 1]) / 2. * RAD) * sin(fabs(lons[nm] - lons[nm + 1]) / 2. *
+        RAD) * cos(lats[nm] * RAD) * cos(lats[nm + 1] * RAD))) * 12745.6);
+    f.dy = lroundf(asin(sqrt(sin(fabs(lats[nm] - lats[nm + d.x]) / 2. * RAD) *
+        sin(fabs(lats[nm] - lats[nm + d.x]) / 2. * RAD) + sin(fabs(lons[nm] -
+        lons[nm + d.x]) / 2. * RAD) * sin(fabs(lons[nm] - lons[nm + d.x]) / 2.
+        * RAD) * cos(lats[nm] * RAD) * cos(lats[nm + d.x] * RAD))) * 12745.6);
+    return found_grid_projection(true);
   }
-  if (gatherxml::verbose_operation) {
-    cout << "   ... done." << endl;
-  }
-  return !(f.type == Grid::Type::not_set);
+
+  // check for a lambert-conformal grid
+  return found_grid_projection(grid_is_lambert_conformal(lats, lons, d, f));
 }
 
 void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
@@ -5775,7 +5777,6 @@ int main(int argc, char **argv) {
     if (!metautils::args.inventory_only) {
       if (sd.num_not_missing > 0) {
         gatherxml::markup::ObML::write(od, "nc2xml", USER);
-        tdir = metautils::directives.temp_path;
       } else {
         log_error2("Terminating - data variables could not be identified or "
             "they only contain missing values. No content metadata will be "
