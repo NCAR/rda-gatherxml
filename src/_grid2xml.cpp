@@ -31,6 +31,7 @@ using std::regex_search;
 using std::string;
 using std::stringstream;
 using std::unique_ptr;
+using std::unordered_map;
 using strutils::ftos;
 using strutils::itos;
 using strutils::lltos;
@@ -44,12 +45,11 @@ metautils::Args metautils::args;
 bool gatherxml::verbose_operation;
 extern const string USER = getenv("USER");
 
-my::map<gatherxml::markup::GrML::GridEntry> grid_table;
+unordered_map<string, gatherxml::markup::GrML::GridEntry> grid_table;
 unique_ptr<TempFile> tfile;
 string tfile_name, inv_file;
 unique_ptr<TempDir> tdir;
 TempDir *inv_dir = nullptr;
-std::ofstream inv_stream;
 string myerror = "";
 string mywarning = "";
 const char *grib1_time_unit[] = { "minute", "hour", "day", "month", "year",
@@ -61,6 +61,14 @@ const char *grib2_time_unit[] = { "minute", "hour", "day", "month", "year",
 const int grib2_per_day[] = { 1440, 24, 1, 0, 0, 0, 0, 0, 0, 0, 24, 24, 24,
     86400 };
 const int grib2_unit_mult[] = { 1, 1, 1, 1, 1, 10, 30, 100, 1, 1, 3, 6, 12, 1 };
+
+struct Inventory {
+  Inventory() : file(), dir(nullptr), stream() { }
+
+  string file;
+  unique_ptr<TempDir> dir;
+  std::ofstream stream;
+} g_inv;
 
 extern "C" void clean_up() {
 
@@ -231,7 +239,7 @@ void scan_file() {
   if ((f.empty() || f == "TAR") && (metautils::args.data_format == "grib" ||
       metautils::args.data_format == "grib0" || metautils::args.data_format ==
       "grib2")) {
-    gatherxml::fileInventory::open(inv_file, &inv_dir, inv_stream, "GrML",
+    gatherxml::fileInventory::open(g_inv.file, g_inv.dir, g_inv.stream, "GrML",
         "grid2xml", USER);
   } else if (metautils::args.inventory_only) {
     log_error2("unable to inventory " + metautils::args.path + "/" + metautils::
@@ -240,9 +248,6 @@ void scan_file() {
   }
   xmlutils::LevelMapper lmap("/glade/u/home/rdadata/share/metadata"
       "/LevelTables");
-  gatherxml::markup::GrML::GridEntry ge;
-  gatherxml::markup::GrML::LevelEntry le;
-  gatherxml::markup::GrML::ParameterEntry pe;
   unordered_map<string, int> U_map, G_map, L_map, P_map, R_map, E_map;
   std::list<string> U_lst, G_lst, L_lst, P_lst, R_lst, E_lst;
   std::list<string> ilst;
@@ -318,36 +323,38 @@ void scan_file() {
     }
     if (def.type != Grid::Type::not_set) {
       auto dt1 = grid->valid_date_time();
-      ge.key = itos(static_cast<int>(def.type)) + "<!>";
+      auto gkey = itos(static_cast<int>(def.type)) + "<!>";
       if (def.type != Grid::Type::sphericalHarmonics) {
         auto dim = grid->dimensions();
-        ge.key += itos(dim.x) + "<!>" + itos(dim.y) + "<!>" + ftos(def.
+        gkey += itos(dim.x) + "<!>" + itos(dim.y) + "<!>" + ftos(def.
             slatitude, 3) + "<!>" + ftos(def.slongitude, 3) + "<!>" + ftos(def.
             elatitude, 3) + "<!>" + ftos(def.elongitude, 3) + "<!>" + ftos(def.
             loincrement, 3) + "<!>";
         switch (def.type) {
           case Grid::Type::gaussianLatitudeLongitude: {
-            ge.key += itos(def.num_circles);
+            gkey += itos(def.num_circles);
             break;
           }
           default: {
-            ge.key += ftos(def.laincrement, 3);
+            gkey += ftos(def.laincrement, 3);
           }
         }
         if (def.type == Grid::Type::polarStereographic || def.type == Grid::
             Type::lambertConformal) {
           auto pole = def.projection_flag ==  0 ? "N" : "S";
-          ge.key += string("<!>") + pole;
+          gkey += string("<!>") + pole;
           if (def.type == Grid::Type::lambertConformal) {
-            ge.key += "<!>" + ftos(def.stdparallel1, 3) + "<!>" + ftos(def.
+            gkey += "<!>" + ftos(def.stdparallel1, 3) + "<!>" + ftos(def.
                 stdparallel2);
           }
         }
       } else {
-        ge.key += itos(def.trunc1) + "<!>" + itos(def.trunc2) + "<!>" + itos(
+        gkey += itos(def.trunc1) + "<!>" + itos(def.trunc2) + "<!>" + itos(
             def.trunc3);
       }
+      string pe_key = "";
       string pkey = "";
+      string le_key = "";
       string ekey = "";
       auto fhr = grid->forecast_time() / 10000;
       DateTime dt2;
@@ -358,17 +365,17 @@ void scan_file() {
         }
         dt2 = dt1;
         dt1 = grid->forecast_date_time();
-        le.key = ftos(grid->source()) + "-" + ftos((reinterpret_cast<GRIBGrid *>
-            (grid))->sub_center_id());
-        pe.key = le.key;
+        le_key = ftos(grid->source()) + "-" + ftos((reinterpret_cast<
+            GRIBGrid *>(grid))->sub_center_id());
+        pe_key = le_key;
         if (metautils::args.data_format == "grib") {
-          pe.key += "." + ftos((reinterpret_cast<GRIBGrid *>(grid))->
+          pe_key += "." + ftos((reinterpret_cast<GRIBGrid *>(grid))->
               parameter_table_code());
         }
-        pe.key += ":" + ftos(grid->parameter());
-        ge.key += "<!>" + (reinterpret_cast<GRIBGrid *>(grid))->
+        pe_key += ":" + ftos(grid->parameter());
+        gkey += "<!>" + (reinterpret_cast<GRIBGrid *>(grid))->
             product_description();
-        pkey = le.key + ":" + itos((reinterpret_cast<GRIBGrid *>(grid))->
+        pkey = le_key + ":" + itos((reinterpret_cast<GRIBGrid *>(grid))->
             process());
         auto e = grid->ensemble_data();
         if (!e.fcst_type.empty()) {
@@ -388,41 +395,41 @@ void scan_file() {
         } else {
           f = "WMO_GRIB0";
         }
-        if (lmap.level_is_a_layer(f, l, le.key) < 0) {
-          log_error2("no entry for " + l + ", '" + le.key + "' in level map on "
+        if (lmap.level_is_a_layer(f, l, le_key) < 0) {
+          log_error2("no entry for " + l + ", '" + le_key + "' in level map on "
               + grid->valid_date_time().to_string(), F, "grid2xml", USER);
         }
-        le.key += ",";
-        if (lmap.level_is_a_layer(f, l, le.key)) {
-          le.key += l + ":" + ftos(grid->first_level_value(), 5) + ":" + ftos(
+        le_key += ",";
+        if (lmap.level_is_a_layer(f, l, le_key)) {
+          le_key += l + ":" + ftos(grid->first_level_value(), 5) + ":" + ftos(
               grid->second_level_value(), 5);
         } else {
-          le.key += l + ":" + ftos(grid->first_level_value(), 5);
+          le_key += l + ":" + ftos(grid->first_level_value(), 5);
         }
-        auto idx = ge.key.rfind("<!>");
-        if (inv_stream.is_open()) {
+        auto idx = gkey.rfind("<!>");
+        if (g_inv.stream.is_open()) {
           auto i = lltos((reinterpret_cast<InputGRIBStream *>(istream.get()))->
               current_record_offset()) + "|" + itos(message->length()) + "|" +
               grid->valid_date_time().to_string("%Y%m%d%H%MM");
-          auto key = ge.key.substr(idx + 3);
+          auto key = gkey.substr(idx + 3);
           if (U_map.find(key) == U_map.end()) {
             U_map.emplace(key, U_map.size());
             U_lst.emplace_back(key);
           }
           i += "|" + itos(U_map[key]);
-          key = substitute(ge.key.substr(0, idx), "<!>", ",");
+          key = substitute(gkey.substr(0, idx), "<!>", ",");
           if (G_map.find(key) == G_map.end()) {
             G_map.emplace(key, G_map.size());
             G_lst.emplace_back(key);
           }
           i += "|" + itos(G_map[key]);
-          key = le.key;
+          key = le_key;
           if (L_map.find(key) == L_map.end()) {
             L_map.emplace(key, L_map.size());
             L_lst.emplace_back(key);
           }
           i += "|" + itos(L_map[key]);
-          key = pe.key;
+          key = pe_key;
           if (P_map.find(key) == P_map.end()) {
             P_map.emplace(key, P_map.size());
             P_lst.emplace_back(key);
@@ -451,48 +458,48 @@ void scan_file() {
       } else if (metautils::args.data_format == "grib2") {
 //        dt2=dt1;
 //dt1=grid->reference_date_time().hours_added(grid->forecast_time() / 10000);
-        le.key = ftos(grid->source()) + "-" + ftos((reinterpret_cast<
+        le_key = ftos(grid->source()) + "-" + ftos((reinterpret_cast<
             GRIB2Grid *>(grid))->sub_center_id());
-        pe.key = le.key + "." + ftos((reinterpret_cast<GRIB2Grid *>(grid))->
+        pe_key = le_key + "." + ftos((reinterpret_cast<GRIB2Grid *>(grid))->
             parameter_table_code()) + "-" + ftos((reinterpret_cast<GRIB2Grid *>(
             grid))->local_table_code()) + ":" + ftos((reinterpret_cast<
             GRIB2Grid *>(grid))->discipline()) + "." + ftos((reinterpret_cast<
             GRIB2Grid *>(grid))->parameter_category()) + "." + ftos(grid->
             parameter());
-        pkey = le.key + ":" + itos((reinterpret_cast<GRIBGrid *>(grid))->
+        pkey = le_key + ":" + itos((reinterpret_cast<GRIBGrid *>(grid))->
             process()) + "." + itos((reinterpret_cast<GRIB2Grid *>(grid))->
             background_process()) + "." + itos((reinterpret_cast<GRIB2Grid *>(
             grid))->forecast_process());
         auto level_type = itos((reinterpret_cast<GRIB2Grid *>(grid))->
             first_level_type());
         auto n = (reinterpret_cast<GRIB2Grid *>(grid))->second_level_type();
-        le.key += ",";
+        le_key += ",";
         if (n != 255) {
-          le.key += level_type + "-" + itos(n) + ":";
+          le_key += level_type + "-" + itos(n) + ":";
           if (!floatutils::myequalf(grid->first_level_value(),
               Grid::MISSING_VALUE)) {
-            le.key += ftos(grid->first_level_value(), 5);
+            le_key += ftos(grid->first_level_value(), 5);
           } else {
-            le.key += "0";
+            le_key += "0";
           }
-          le.key += ":";
+          le_key += ":";
           if (!floatutils::myequalf(grid->second_level_value(),
               Grid::MISSING_VALUE)) {
-            le.key += ftos(grid->second_level_value(), 5);
+            le_key += ftos(grid->second_level_value(), 5);
           } else {
-            le.key += "0";
+            le_key += "0";
           }
         } else {
-          le.key += level_type + ":";
+          le_key += level_type + ":";
           if (!floatutils::myequalf(grid->first_level_value(),
               Grid::MISSING_VALUE)) {
-            le.key += ftos(grid->first_level_value(), 5);
+            le_key += ftos(grid->first_level_value(), 5);
           } else {
-            le.key += "0";
+            le_key += "0";
           }
         }
         short p =( reinterpret_cast<GRIB2Grid *>(grid))->product_type();
-        ge.key += "<!>" + (reinterpret_cast<GRIB2Grid *>(grid))->
+        gkey += "<!>" + (reinterpret_cast<GRIB2Grid *>(grid))->
             product_description();
         dt1 = grid->forecast_date_time();
         dt2 = grid->valid_date_time();
@@ -532,30 +539,30 @@ void scan_file() {
             break;
           }
         }
-        auto idx = ge.key.rfind("<!>");
-        if (inv_stream.is_open()) {
+        auto idx = gkey.rfind("<!>");
+        if (g_inv.stream.is_open()) {
           auto inv_line = lltos((reinterpret_cast<InputGRIBStream *>(istream.
               get()))->current_record_offset()) + "|" + lltos(message->length())
               + "|" + dt2.to_string("%Y%m%d%H%MM");
-          auto key = ge.key.substr(idx + 3);
+          auto key = gkey.substr(idx + 3);
           if (U_map.find(key) == U_map.end()) {
             U_map.emplace(key, U_map.size());
             U_lst.emplace_back(key);
           }
           inv_line += "|" + itos(U_map[key]);
-          key = substitute(ge.key.substr(0, idx), "<!>", ",");
+          key = substitute(gkey.substr(0, idx), "<!>", ",");
           if (G_map.find(key) == G_map.end()) {
             G_map.emplace(key, G_map.size());
             G_lst.emplace_back(key);
           }
           inv_line += "|" + itos(G_map[key]);
-          key = le.key;
+          key = le_key;
           if (L_map.find(key) == L_map.end()) {
             L_map.emplace(key, L_map.size());
             L_lst.emplace_back(key);
           }
           inv_line += "|" + itos(L_map[key]);
-          key = pe.key;
+          key = pe_key;
           if (P_map.find(key) == P_map.end()) {
             P_map.emplace(key, P_map.size());
             P_lst.emplace_back(key);
@@ -586,77 +593,77 @@ void scan_file() {
           metautils::args.data_format == "slp" || metautils::args.data_format ==
           "navy") {
         dt2 = dt1;
-        pe.key = itos(grid->parameter());
+        pe_key = itos(grid->parameter());
         if (fhr == 0) {
           if (dt1.day() == 0) {
             dt1.add_days(1);
             dt2.add_months(1);
-            ge.key += "<!>Monthly Mean of Analyses";
+            gkey += "<!>Monthly Mean of Analyses";
           } else {
-            ge.key += "<!>Analysis";
+            gkey += "<!>Analysis";
           }
         } else {
           if (dt1.day() == 0) {
             dt1.add_days(1);
             dt2.add_months(1);
-            ge.key += "<!>Monthly Mean of " + itos(fhr) + "-hour Forecasts";
+            gkey += "<!>Monthly Mean of " + itos(fhr) + "-hour Forecasts";
           } else {
-            ge.key += "<!>" + itos(fhr) + "-hour Forecast";
+            gkey += "<!>" + itos(fhr) + "-hour Forecast";
           }
           dt1.add_hours(fhr);
         }
         if (floatutils::myequalf(grid->second_level_value(), 0.)) {
-          le.key = "0:" + itos(grid->first_level_value());
+          le_key = "0:" + itos(grid->first_level_value());
         } else {
-          le.key = "1:" + itos(grid->first_level_value()) + ":" + itos(grid->
+          le_key = "1:" + itos(grid->first_level_value()) + ":" + itos(grid->
               second_level_value());
         }
       } else if (metautils::args.data_format == "jraieeemm") {
         dt2 = dt1;
         dt2.set_day(dateutils::days_in_month(dt1.year(), dt1.month()));
         dt2.add_hours(18);
-        pe.key = itos(grid->parameter());
-        ge.key += "<!>Monthly Mean (4 per day) of ";
+        pe_key = itos(grid->parameter());
+        gkey += "<!>Monthly Mean (4 per day) of ";
         if (grid->forecast_time() == 0) {
-          ge.key += "Analyses";
+          gkey += "Analyses";
         } else {
-          ge.key += "Forecasts";
+          gkey += "Forecasts";
           auto f = (reinterpret_cast<JRAIEEEMMGrid *>(grid))->time_range();
           if (f == "MN  ") {
-            ge.key += " of 6-hour Average";
+            gkey += " of 6-hour Average";
           } else if (f == "AC  ") {
-            ge.key += " of 6-hour Accumulation";
+            gkey += " of 6-hour Accumulation";
           } else if (f == "MAX ") {
-            ge.key += " of 6-hour Maximum";
+            gkey += " of 6-hour Maximum";
           } else if (f == "MIN ") {
-            ge.key += " of 6-hour Minimum";
+            gkey += " of 6-hour Minimum";
           }
         }
-        le.key = itos(grid->first_level_type()) + ":" + ftos(grid->
+        le_key = itos(grid->first_level_type()) + ":" + ftos(grid->
             first_level_value(), 5);
       } else if (metautils::args.data_format == "ussrslp") {
-        pe.key = itos(grid->parameter());
+        pe_key = itos(grid->parameter());
         if (fhr == 0) {
-          ge.key += "<!>Analysis";
+          gkey += "<!>Analysis";
         } else {
-          ge.key += "<!>" + itos(fhr) + "-hour Forecast";
+          gkey += "<!>" + itos(fhr) + "-hour Forecast";
         }
       } else if (metautils::args.data_format == "on84") {
         dt2 = dt1;
-        pe.key = itos(grid->parameter());
+        pe_key = itos(grid->parameter());
         switch ((reinterpret_cast<ON84Grid *>(grid))->time_marker()) {
           case 0: {
-            ge.key += "<!>Analysis";
+            gkey += "<!>Analysis";
             break;
           }
           case 3: {
             fhr -= (reinterpret_cast<ON84Grid *>(grid))->F2();
-            ge.key += "<!>";
+            gkey += "<!>";
             if (fhr > 0) {
-              ge.key += itos(fhr + (reinterpret_cast<ON84Grid *>(grid))->F2()) +
+              gkey += itos(fhr + (reinterpret_cast<ON84Grid *>(grid))->F2()) +
                   "-hour Forecast of ";
             }
-            ge.key += itos((reinterpret_cast<ON84Grid *>(grid))->F2()) +
+            gkey += itos((reinterpret_cast<ON84Grid *>(grid))->F2()) +
                 "-hour Accumulation";
             break;
           }
@@ -664,9 +671,9 @@ void scan_file() {
             dt1.set_day(1);
             short n = dateutils::days_in_month(dt2.year(), dt2.month());
             if (grid->number_averaged() == n) {
-              ge.key += "<!>Monthly Mean of Analyses";
+              gkey += "<!>Monthly Mean of Analyses";
             } else {
-              ge.key += "<!>Mean of " + itos(grid->number_averaged()) +
+              gkey += "<!>Mean of " + itos(grid->number_averaged()) +
                   " Analyses";
             }
             dt2.set_day(grid->number_averaged());
@@ -687,99 +694,104 @@ void scan_file() {
             case 146:
             case 147:
             case 148: {
-              le.key = itos((reinterpret_cast<ON84Grid *>(grid))->
+              le_key = itos((reinterpret_cast<ON84Grid *>(grid))->
                   first_level_type()) + ":1:0";
               break;
             }
             default: {
-              le.key = itos((reinterpret_cast<ON84Grid *>(grid))->
+              le_key = itos((reinterpret_cast<ON84Grid *>(grid))->
                   first_level_type()) + ":" + ftos(grid->first_level_value(),
                   5);
             }
           }
         } else {
-          le.key = itos((reinterpret_cast<ON84Grid *>(grid))->
+          le_key = itos((reinterpret_cast<ON84Grid *>(grid))->
               first_level_type()) + ":" + ftos(grid->first_level_value(), 5) +
               ":" + ftos(grid->second_level_value(), 5);
         }
       } else if (metautils::args.data_format == "cgcm1") {
-        pe.key = (reinterpret_cast<CGCM1Grid *>(grid))->parameter_name();
-        trim(pe.key);
-        replace_all(pe.key, "\"", "&quot;");
+        pe_key = (reinterpret_cast<CGCM1Grid *>(grid))->parameter_name();
+        trim(pe_key);
+        replace_all(pe_key, "\"", "&quot;");
         dt2 = dt1;
         if (fhr == 0) {
           if (dt1.day() > 0) {
-            ge.key += "<!>Analysis";
+            gkey += "<!>Analysis";
           } else {
-            ge.key += "<!>Monthly Mean of Analyses";
+            gkey += "<!>Monthly Mean of Analyses";
             dt1.set_day(1);
             dt2.set_day(dateutils::days_in_month(dt2.year(), dt2.month()));
           }
         } else {
-          ge.key += "<!>" + itos(fhr) + "-hour Forecast";
+          gkey += "<!>" + itos(fhr) + "-hour Forecast";
         }
-        le.key = itos(grid->first_level_value());
+        le_key = itos(grid->first_level_value());
       } else if (metautils::args.data_format == "cmorph025") {
-        pe.key = (reinterpret_cast<InputCMORPH025GridStream *>(istream.get()))->
+        pe_key = (reinterpret_cast<InputCMORPH025GridStream *>(istream.get()))->
             parameter_code();
-        trim(pe.key);
+        trim(pe_key);
         dt2 = dt1;
-        ge.key += "<!>Analysis";
-        le.key = "surface";
+        gkey += "<!>Analysis";
+        le_key = "surface";
       } else if (metautils::args.data_format == "cmorph8km") {
-        pe.key = "CMORPH";
+        pe_key = "CMORPH";
         dt2 = dt1;
         dt1 = grid->reference_date_time();
-        ge.key += "<!>30-minute Average (initial+0 to initial+30)";
-        le.key = "surface";
+        gkey += "<!>30-minute Average (initial+0 to initial+30)";
+        le_key = "surface";
       } else if (metautils::args.data_format == "gpcp") {
-        pe.key = reinterpret_cast<GPCPGrid *>(grid)->parameter_name();
+        pe_key = reinterpret_cast<GPCPGrid *>(grid)->parameter_name();
         dt2 = dt1;
         dt1 = grid->reference_date_time();
         size_t h = dt2.hours_since(dt1);
         if (h == 24) {
-          ge.key += "<!>Daily Mean";
+          gkey += "<!>Daily Mean";
         } else if (h == dateutils::days_in_month(dt1.year(), dt1.month()) *
             24) {
-          ge.key += "<!>Monthly Mean";
+          gkey += "<!>Monthly Mean";
         } else {
           log_error2("can't figure out gridded product type", F, "grid2xml",
               USER);
         }
-        le.key = "surface";
+        le_key = "surface";
       }
-      if (!grid_table.found(ge.key, ge)) {
-        ge.level_table.clear();
-        le.parameter_code_table.clear();
+      if (grid_table.find(gkey) == grid_table.end()) {
+        gatherxml::markup::GrML::ParameterEntry pe;
         pe.start_date_time = dt1;
         pe.end_date_time = dt2;
         pe.num_time_steps = 1;
-        le.parameter_code_table.insert(pe);
-        ge.level_table.insert(le);
-        ge.process_table.clear();
+        gatherxml::markup::GrML::LevelEntry le;
+        le.parameter_code_table.emplace(pe_key, pe);
+        gatherxml::markup::GrML::GridEntry ge;
+        ge.level_table.emplace(le_key, le);
         if (!pkey.empty()) {
           ge.process_table.emplace(pkey);
         }
-        ge.ensemble_table.clear();
         if (!ekey.empty()) {
           ge.ensemble_table.emplace(ekey);
         }
-        grid_table.insert(ge);
+        grid_table.emplace(gkey, ge);
       } else {
-        if (!ge.level_table.found(le.key, le)) {
-          le.parameter_code_table.clear();
+        auto& ge = grid_table[gkey];
+        if (ge.level_table.find(le_key) == ge.level_table.end()) {
+          gatherxml::markup::GrML::ParameterEntry pe;
           pe.start_date_time = dt1;
           pe.end_date_time = dt2;
           pe.num_time_steps = 1;
-          le.parameter_code_table.insert(pe);
-          ge.level_table.insert(le);
+          gatherxml::markup::GrML::LevelEntry le;
+          le.parameter_code_table.emplace(pe_key, pe);
+          ge.level_table.emplace(le_key, le);
         } else {
-          if (!le.parameter_code_table.found(pe.key, pe)) {
+          auto& le = ge.level_table[le_key];
+          if (le.parameter_code_table.find(pe_key) == le.parameter_code_table.
+              end()) {
+            gatherxml::markup::GrML::ParameterEntry pe;
             pe.start_date_time = dt1;
             pe.end_date_time = dt2;
             pe.num_time_steps = 1;
-            le.parameter_code_table.insert(pe);
+            le.parameter_code_table.emplace(pe_key, pe);
           } else {
+            auto& pe = le.parameter_code_table[pe_key];
             if (dt1 < pe.start_date_time) {
               pe.start_date_time = dt1;
             }
@@ -787,9 +799,7 @@ void scan_file() {
               pe.end_date_time = dt2;
             }
             ++pe.num_time_steps;
-            le.parameter_code_table.replace(pe);
           }
-          ge.level_table.replace(le);
         }
         if (!pkey.empty() && ge.process_table.find(pkey) == ge.
             process_table.end()) {
@@ -799,7 +809,6 @@ void scan_file() {
             ensemble_table.end()) {
           ge.ensemble_table.emplace(ekey);
         }
-        grid_table.replace(ge);
       }
     }
   }
@@ -810,26 +819,26 @@ void scan_file() {
   }
   if (ilst.size() > 0) {
     for (const auto& key : U_lst) {
-      inv_stream << "U<!>" << U_map[key] << "<!>" << key << endl;
+      g_inv.stream << "U<!>" << U_map[key] << "<!>" << key << endl;
     }
     for (const auto& key : G_lst) {
-      inv_stream << "G<!>" << G_map[key] << "<!>" << key << endl;
+      g_inv.stream << "G<!>" << G_map[key] << "<!>" << key << endl;
     }
     for (const auto& key : L_lst) {
-      inv_stream << "L<!>" << L_map[key] << "<!>" << key << endl;
+      g_inv.stream << "L<!>" << L_map[key] << "<!>" << key << endl;
     }
     for (const auto& key : P_lst) {
-      inv_stream << "P<!>" << P_map[key] << "<!>" << key << endl;
+      g_inv.stream << "P<!>" << P_map[key] << "<!>" << key << endl;
     }
     for (const auto& key : R_lst) {
-      inv_stream << "R<!>" << R_map[key] << "<!>" << key << endl;
+      g_inv.stream << "R<!>" << R_map[key] << "<!>" << key << endl;
     }
     for (const auto& key : E_lst) {
-      inv_stream << "E<!>" << E_map[key] << "<!>" << key << endl;
+      g_inv.stream << "E<!>" << E_map[key] << "<!>" << key << endl;
     }
-    inv_stream << "-----" << endl;
+    g_inv.stream << "-----" << endl;
     for (const auto& l : ilst)
-      inv_stream << l << endl;
+      g_inv.stream << l << endl;
   }
 }
 
@@ -943,8 +952,8 @@ int main(int argc, char **argv) {
           endl;
     }
   }
-  if (inv_stream.is_open()) {
-    gatherxml::fileInventory::close(inv_file, &inv_dir, inv_stream, "GrML",
+  if (g_inv.stream.is_open()) {
+    gatherxml::fileInventory::close(g_inv.file, g_inv.dir, g_inv.stream, "GrML",
         true, metautils::args.update_summary, "grid2xml", USER);
   }
   tmr.stop();
