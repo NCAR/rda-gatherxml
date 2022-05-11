@@ -1363,6 +1363,10 @@ void add_vertical_levels(TokenDocument& tdoc, const vector<string>& data_types,
       sort(llst.begin(), llst.end(), compare_levels);
       tdoc.add_replacement("__VERTICAL_LEVELS__", create_table_from_strings(
           llst, 4, "#c8daff", "#e1eaff"));
+      for (const auto& e : llst) {
+        append(json, "\"" + e + "\"", ", ");
+      }
+      json = "\"list\": [" + json + "]";
     }
   }
   if (!json.empty()) {
