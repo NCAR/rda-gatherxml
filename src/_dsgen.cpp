@@ -485,8 +485,8 @@ void add_acknowledgement(TokenDocument& tdoc) {
   update_wagtail("acknowledgement", ack, F);
 }
 
-void decode_missing_pages(string journal_number, stringstream& ss, string&
-    json) {
+void decode_missing_journal_pages(string journal_number, stringstream& ss,
+    string& json) {
   if (journal_number == "0") {
     string s = "Submitted";
     ss << s;
@@ -502,8 +502,8 @@ void decode_missing_pages(string journal_number, stringstream& ss, string&
   }
 }
 
-void decode_non_missing_pages(string pages, string journal_number, stringstream&
-    ss, string& json) {
+void decode_non_missing_journal_pages(string pages, string journal_number,
+    stringstream& ss, string& json) {
   string s = "<b>" + journal_number + "</b>, ";
   ss << s;
   json += s;
@@ -543,10 +543,10 @@ void add_journal_to_publication(const XMLElement& e, stringstream& ss, string&
   ss << "  <i>" << pd.content() << "</i>, ";
   json += " <i>" + pd.content() + "</i>, ";
   if (pd.attribute_value("pages") == "0-0") {
-    decode_missing_pages(pd.attribute_value("number"), ss, json);
+    decode_missing_journal_pages(pd.attribute_value("number"), ss, json);
   } else {
-    decode_non_missing_pages(pd.attribute_value("pages"), pd.attribute_value(
-        "number"), ss, json);
+    decode_non_missing_journal_pages(pd.attribute_value("pages"), pd.
+        attribute_value("number"), ss, json);
   }
   auto doi = e.element("doi").content();
   if (!doi.empty()) {
