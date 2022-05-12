@@ -485,6 +485,44 @@ void add_acknowledgement(TokenDocument& tdoc) {
   update_wagtail("acknowledgement", ack, F);
 }
 
+void decode_missing_pages(string journal_number, stringstream& ss, string&
+    json) {
+  if (journal_number == "0") {
+    string s = "Submitted";
+    ss << s;
+    json += s;
+  } else if (journal_number == "1") {
+    string s = "Accepted";
+    ss << s;
+    json += s;
+  } else if (journal_number == "2") {
+    string s = "In Press";
+    ss << s;
+    json += s;
+  }
+}
+
+void decode_non_missing_pages(string pages, string journal_number, stringstream&
+    ss, string& json) {
+  string s = "<b>" + journal_number + "</b>, ";
+  ss << s;
+  json += s;
+  if (has_beginning(pages, "AGU:")) {
+    s = pages.substr(4);
+    ss << s;
+    json += s;
+  } else {
+    auto sp = split(pages, "-"); 
+    if (sp.size() == 2 && sp[0] == sp[1]) {
+      ss << sp[0];
+      json += sp[0];
+    } else {
+      ss << pages;
+      json += pages;
+    }
+  }
+}
+
 void add_journal_to_publication(const XMLElement& e, stringstream& ss, string&
     json) {
   static const string F = this_function_label(__func__);
@@ -505,33 +543,10 @@ void add_journal_to_publication(const XMLElement& e, stringstream& ss, string&
   ss << "  <i>" << pd.content() << "</i>, ";
   json += " <i>" + pd.content() + "</i>, ";
   if (pd.attribute_value("pages") == "0-0") {
-    if (pd.attribute_value("number") == "0") {
-      ss << "Submitted";
-      json += "Submitted";
-    } else if (pd.attribute_value("number") == "1") {
-      ss << "Accepted";
-      json += "Accepted";
-    } else if (pd.attribute_value("number") == "2") {
-      ss << "In Press";
-      json += "In Press";
-    }
+    decode_missing_pages(pd.attribute_value("number"), ss, json);
   } else {
-    ss << "<b>" << pd.attribute_value("number") << "</b>, ";
-    json += "<b>" + pd.attribute_value("number") + "</b>, ";
-    auto pg = pd.attribute_value("pages");
-    if (has_beginning(pg, "AGU:")) {
-      ss << pg.substr(4);
-      json += pg.substr(4);
-    } else {
-      auto sp = split(pg, "-"); 
-      if (sp.size() == 2 && sp[0] == sp[1]) {
-        ss << sp[0];
-        json += sp[0];
-      } else {
-        ss << pd.attribute_value("pages");
-        json += pd.attribute_value("pages");
-      }
-    }
+    decode_non_missing_pages(pd.attribute_value("pages"), pd.attribute_value(
+        "number"), ss, json);
   }
   auto doi = e.element("doi").content();
   if (!doi.empty()) {
