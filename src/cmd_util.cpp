@@ -83,8 +83,8 @@ void show_gatherxml_usage() {
   cout << "                    in the dataset do not have inventories and "
       "generate all of" << endl;
   cout << "                    them in a single call" << endl;
-  cout << "  PATH            (4): this is the full path of the file to be "
-      "tested" << endl;
+  cout << "  PATH            (4): this is the path of the file to be tested" <<
+      endl;
   cout << "\noptions:" << endl;
   cout << "  -R              (1): save time by not regenerating the dataset "
       "web description" << endl;
@@ -224,14 +224,25 @@ string gatherxml_utility(string user) {
   }
   if (sp_a.back()[0] != '/' && !regex_search(sp_a.back(), regex("^https://rda."
       "ucar.edu/"))) {
-    auto idx = metautils::args.args_string.rfind("!");
-    if (idx == string::npos) {
-      log_error2("bad arguments string: '" + metautils::args.args_string, F,
-          "gatherxml", user);
+    if (metautils::args.dsnum == "test") {
+      char buf[32768];
+      auto b = getcwd(buf, 32768);
+      if (b == nullptr) {
+        cerr << "Error determining current working directory and PATH is not "              "an absolute path." << endl;
+        exit(1);
+      }
+      replace_all(metautils::args.args_string, "!" + sp_a.back(), "!" + string(
+          buf) + "/" + sp_a.back());
+    } else {
+      auto idx = metautils::args.args_string.rfind("!");
+      if (idx == string::npos) {
+        log_error2("bad arguments string: '" + metautils::args.args_string, F,
+            "gatherxml", user);
+      }
+      metautils::args.args_string = metautils::args.args_string.substr(0, idx +
+          1) + "https://rda.ucar.edu" + webhome() + "/" + metautils::args.
+          args_string.substr(idx + 1);
     }
-    metautils::args.args_string = metautils::args.args_string.substr(0, idx + 1)
-        + "https://rda.ucar.edu" + webhome() + "/" + metautils::args.
-        args_string.substr(idx + 1);
   }
   return util.substr(1);
 }
@@ -268,28 +279,26 @@ int main(int argc, char **argv) {
   string cmd;
   if (regex_search(util, regex("_s$"))) {
     chop(util, 2);
-    if (util == "gatherxml") {
-      util = gatherxml_utility(u);
-    }
-    auto s = whereis_singularity();
-    if (s.empty()) {
-      log_error2("unable to find singularity", "main()", util, u);
-    }
-    string b = "/glade/u/home/dattore/conf,/glade/scratch/rdadata,/glade/u/"
-        "home/rdadata,/glade/collections/rda/data,/gpfs/fs1/collections/rda/"
-        "work/logs/md";
-    auto sp = split(metautils::args.args_string, "!");
-    if (sp.size() > 0 && sp.back()[0] == '/') {
-
-      // test run must specify full path, so bind that path
-      auto idx = sp.back().rfind("/");
-      b += "," + sp.back().substr(0, idx);
-    }
-    cmd = s + " -s exec -B " + b + " /glade/u/home/rdadata/bin/singularity/"
-        "gatherxml-exec.sif /usr/local/bin/_" + util;
-  } else {
-    cmd = metautils::directives.decs_bindir + "/_" + util;
   }
+  if (util == "gatherxml") {
+    util = gatherxml_utility(u);
+  }
+  auto s = whereis_singularity();
+  if (s.empty()) {
+    log_error2("unable to find singularity", "main()", util, u);
+  }
+  string b = "/glade/u/home/dattore/conf,/glade/scratch/rdadata,/glade/u/home/"
+      "rdadata,/glade/collections/rda/data,/gpfs/fs1/collections/rda/work/logs/"
+      "md";
+  auto sp = split(metautils::args.args_string, "!");
+  if (sp.size() > 0 && sp.back()[0] == '/') {
+
+    // test run must specify full path, so bind that path
+    auto idx = sp.back().rfind("/");
+    b += "," + sp.back().substr(0, idx);
+  }
+  cmd = s + " -s exec -B " + b + " /glade/u/home/rdadata/bin/singularity/"
+      "gatherxml-exec.sif /usr/local/bin/_" + util;
   if (!metautils::args.args_string.empty()) {
     cmd += " " + substitute(metautils::args.args_string, "!", " ");
   }
