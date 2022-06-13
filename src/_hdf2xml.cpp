@@ -24,12 +24,14 @@ using metautils::NcTime::TimeRangeEntry;
 using metautils::NcTime::actual_date_time;
 using metautils::log_error2;
 using miscutils::this_function_label;
+using std::accumulate;
 using std::cerr;
 using std::cout;
 using std::endl;
 using std::move;
 using std::regex;
 using std::regex_search;
+using std::shared_ptr;
 using std::string;
 using std::stringstream;
 using std::unique_ptr;
@@ -53,6 +55,7 @@ string myerror = "";
 string mywarning = "";
 
 typedef unordered_map<string, InputHDF5Stream::DataValue> AttributeMap;
+typedef shared_ptr<InputHDF5Stream::Dataset> DatasetPointer;
 
 /*****************************************************************************/
 /* global variables                                                          */
@@ -89,8 +92,8 @@ struct CoordinateVariables {
   CoordinateVariables() : nc_time(new TimeData), forecast_period(new TimeData),
     lat_ids(), lon_ids(), level_info()  { }
 
-  std::shared_ptr<TimeData> nc_time;
-  std::shared_ptr<TimeData> forecast_period;
+  shared_ptr<TimeData> nc_time;
+  shared_ptr<TimeData> forecast_period;
   vector<string> lat_ids, lon_ids;
   vector<metautils::NcLevel::LevelInfo> level_info;
 };
@@ -100,18 +103,18 @@ struct GridData {
     CoordinateData() : id(), ds(nullptr), data_array() {}
 
     string id;
-    std::shared_ptr<InputHDF5Stream::Dataset> ds;
+    DatasetPointer ds;
     HDF5::DataArray data_array;
   };
   GridData() : time_range_entry(), time_data(nullptr), reference_time(),
       valid_time(), time_bounds(), climo_bounds(), forecast_period(),
-      latitude(), longitude(), level(), level_bounds(),
+      lat(), lon(), level(), level_bounds(),
       coordinate_variables_set() {}
 
   TimeRangeEntry time_range_entry;
-  std::shared_ptr<TimeData> time_data;
+  shared_ptr<TimeData> time_data;
   CoordinateData reference_time, valid_time, time_bounds, climo_bounds,
-      forecast_period, latitude, longitude, level, level_bounds;
+      forecast_period, lat, lon, level, level_bounds;
   unordered_set<string> coordinate_variables_set;
 };
 
@@ -1316,9 +1319,7 @@ void scan_usarray_transportable_hdf5_file(
   scan_data.write_type = ScanData::ObML_type;
 }
 
-string gridded_time_method(
-    const std::shared_ptr<InputHDF5Stream::Dataset> ds,
-    const GridData& grid_data) {
+string gridded_time_method(const DatasetPointer ds, const GridData& grid_data) {
   static const string F = this_function_label(__func__);
   auto attr_it = ds->attributes.find("cell_methods");
   if (attr_it != ds->attributes.end() && attr_it->second._class_ == 3) {
@@ -1587,17 +1588,17 @@ bool parameter_matches_dimensions(const InputHDF5Stream::DataValue&
       //     time
       if (grid_data.level.id == "sfc" && (dimension_list.dim_sizes[0] == 3 ||
           grid_data.valid_time.data_array.num_values == 1)) {
-        if (rtp_it[0]->second == grid_data.latitude.id && rtp_it[1]->second ==
-            grid_data.longitude.id) {
+        if (rtp_it[0]->second == grid_data.lat.id && rtp_it[1]->second ==
+            grid_data.lon.id) {
 
           // latitude and longitude are coordinate variables
           parameter_matches = true;
-        } else if (rtp_it[0]->second != grid_data.latitude.id && rtp_it[1]->
-            second != grid_data.longitude.id) {
+        } else if (rtp_it[0]->second != grid_data.lat.id && rtp_it[1]->
+            second != grid_data.lon.id) {
 
           // check for auxiliary coordinate variables for latitude and longitude
-          auto lat_ds = is->dataset("/" + grid_data.latitude.id);
-          auto lon_ds = is->dataset("/" + grid_data.longitude.id);
+          auto lat_ds = is->dataset("/" + grid_data.lat.id);
+          auto lon_ds = is->dataset("/" + grid_data.lon.id);
           if (lat_ds != nullptr && lon_ds != nullptr) {
             stringstream lat_dims;
             lat_ds->attributes["DIMENSION_LIST"].print(lat_dims, is->
@@ -1638,16 +1639,16 @@ bool parameter_matches_dimensions(const InputHDF5Stream::DataValue&
         }
       }
       if (can_continue) {
-        if (rtp_it[off + 1]->second == grid_data.latitude.id && rtp_it[off +
-            2]->second == grid_data.longitude.id) {
+        if (rtp_it[off + 1]->second == grid_data.lat.id && rtp_it[off +
+            2]->second == grid_data.lon.id) {
 
           // latitude and longitude are coordinate variables
           parameter_matches = true;
         } else {
 
           // check for auxiliary coordinate variables for latitude and longitude
-          auto lat_ds = is->dataset("/" + grid_data.latitude.id);
-          auto lon_ds = is->dataset("/" + grid_data.longitude.id);
+          auto lat_ds = is->dataset("/" + grid_data.lat.id);
+          auto lon_ds = is->dataset("/" + grid_data.lon.id);
           if (lat_ds != nullptr && lon_ds != nullptr) {
             stringstream lat_dims;
             lat_ds->attributes["DIMENSION_LIST"].print(lat_dims, is->
@@ -1792,7 +1793,7 @@ void update_level_entry(const TimeBounds& time_bounds, const GridData&
         }
         d = capitalize(d);
         if (regex_search(g_grml_data->g.key, regex(d + "$"))) {
-          auto pe = g_grml_data->l.entry.parameter_code_table[g_grml_data->p.
+          auto& pe = g_grml_data->l.entry.parameter_code_table[g_grml_data->p.
               key];
           if (time_method.empty() || (floatutils::myequalf(time_bounds.t1, 0,
               0.0001) && floatutils::myequalf(time_bounds.t1, time_bounds.t2,
@@ -1838,11 +1839,30 @@ void fill_time_bounds(const HDF5::DataArray& data_array, InputHDF5Stream::
   static const string F = this_function_label(__func__);
   time_bounds.t1 = data_array_value(data_array, 0, ds);
   time_bounds.diff = data_array_value(data_array, 1, ds)-time_bounds.t1;
+  auto is_month = false;
+  if (time_data.units == "days") {
+    string e;
+    auto a = actual_date_time(time_bounds.t1, time_data, e);
+    if (dateutils::days_in_month(a.year(), a.month(), time_data.calendar) ==
+        time_bounds.diff) {
+      is_month = true;
+    }
+  }
   for (size_t n = 2; n < data_array.num_values; n += 2) {
-    if (!floatutils::myequalf((data_array_value(data_array, n + 1, ds) -
-        data_array_value(data_array, n, ds)), time_bounds.diff)) {
-      time_bounds.changed = true;
-      break;
+    auto curr_diff = data_array.value(n + 1) - data_array.value(n);
+    if (!floatutils::myequalf(curr_diff, time_bounds.diff)) {
+      if (time_data.units == "days" && is_month) {
+        string e;
+        auto a = actual_date_time(data_array.value(n), time_data, e);
+        if (dateutils::days_in_month(a.year(), a.month(), time_data.calendar) !=
+            curr_diff) {
+          time_bounds.changed = true;
+          break;
+        }
+      } else {
+        time_bounds.changed = true;
+        break;
+      }
     }
   }
   time_bounds.t2 = data_array_value(data_array, data_array.num_values - 1, ds);
@@ -1936,8 +1956,8 @@ void fill_dgd_index(string attribute_name_to_match, string
     log_error2("more than one " + attribute_name_to_match + " variable found",
         F, g_util_ident);
   } else if (ds_entry_list.size() > 0) {
-    auto aval = ds_entry_list.front().second->
-        attributes[attribute_name_to_match];
+    auto aval = ds_entry_list.front().second->attributes[
+        attribute_name_to_match];
     string attr_val(reinterpret_cast<char *>(aval.get()), aval.size);
     if (attribute_value_to_match.empty() || attr_val ==
         attribute_value_to_match) {
@@ -2787,7 +2807,7 @@ void find_coordinate_variables(CoordinateVariables& coord_vars, GridData&
   coord_vars.forecast_period->calendar = coord_vars.nc_time->calendar;
 }
 
-void check_for_forecasts(GridData& grid_data, std::shared_ptr<TimeData>&
+void check_for_forecasts(GridData& grid_data, shared_ptr<TimeData>&
     time_data) {
   static const string F = this_function_label(__func__);
   if (gatherxml::verbose_operation) {
@@ -3071,37 +3091,37 @@ bool grid_is_polar_stereographic(const GridData& grid_data,
   auto center_y = dim.y / 2;
   auto xm = center_x - 1;
   auto ym = center_y - 1;
-  if (floatutils::myequalf(data_array_value(grid_data.latitude.data_array,
-      ym * dim.x + xm, grid_data.latitude.ds.get()), data_array_value(
-      grid_data.latitude.data_array, center_y * dim.x + xm,
-      grid_data.latitude.ds.get()), 0.00001) && floatutils::myequalf(
-      data_array_value(grid_data.latitude.data_array, center_y * dim.x + xm,
-      grid_data.latitude.ds.get()), data_array_value(
-      grid_data.latitude.data_array, center_y * dim.x + center_x,
-      grid_data.latitude.ds.get()), 0.00001) && floatutils::myequalf(
-      data_array_value(grid_data.latitude.data_array, center_y * dim.x +
-      center_x, grid_data.latitude.ds.get()), data_array_value(
-      grid_data.latitude.data_array, ym * dim.x + center_x,
-      grid_data.latitude.ds.get()), 0.00001) && floatutils::myequalf(
-      fabs(data_array_value(grid_data.longitude.data_array, ym * dim.x + xm,
-      grid_data.longitude.ds.get())) + fabs(data_array_value(
-      grid_data.longitude.data_array, center_y * dim.x + xm,
-      grid_data.longitude.ds.get())) + fabs(data_array_value(
-      grid_data.longitude.data_array, center_y * dim.x + center_x,
-      grid_data.longitude.ds.get())) + fabs(data_array_value(
-      grid_data.longitude.data_array, ym * dim.x + center_x,
-      grid_data.longitude.ds.get())), 360., 0.00001)) {
+  if (floatutils::myequalf(data_array_value(grid_data.lat.data_array,
+      ym * dim.x + xm, grid_data.lat.ds.get()), data_array_value(
+      grid_data.lat.data_array, center_y * dim.x + xm,
+      grid_data.lat.ds.get()), 0.00001) && floatutils::myequalf(
+      data_array_value(grid_data.lat.data_array, center_y * dim.x + xm,
+      grid_data.lat.ds.get()), data_array_value(
+      grid_data.lat.data_array, center_y * dim.x + center_x,
+      grid_data.lat.ds.get()), 0.00001) && floatutils::myequalf(
+      data_array_value(grid_data.lat.data_array, center_y * dim.x +
+      center_x, grid_data.lat.ds.get()), data_array_value(
+      grid_data.lat.data_array, ym * dim.x + center_x,
+      grid_data.lat.ds.get()), 0.00001) && floatutils::myequalf(
+      fabs(data_array_value(grid_data.lon.data_array, ym * dim.x + xm,
+      grid_data.lon.ds.get())) + fabs(data_array_value(
+      grid_data.lon.data_array, center_y * dim.x + xm,
+      grid_data.lon.ds.get())) + fabs(data_array_value(
+      grid_data.lon.data_array, center_y * dim.x + center_x,
+      grid_data.lon.ds.get())) + fabs(data_array_value(
+      grid_data.lon.data_array, ym * dim.x + center_x,
+      grid_data.lon.ds.get())), 360., 0.00001)) {
     def.type = Grid::Type::polarStereographic;
-    if (data_array_value(grid_data.latitude.data_array, ym * dim.x + xm,
-        grid_data.latitude.ds.get()) >= 0.) {
+    if (data_array_value(grid_data.lat.data_array, ym * dim.x + xm,
+        grid_data.lat.ds.get()) >= 0.) {
       def.projection_flag = 0;
       def.llatitude = 60.;
     } else {
       def.projection_flag = 1;
       def.llatitude = -60.;
     }
-    def.olongitude = lroundf(data_array_value(grid_data.longitude.data_array,
-        ym * dim.x + xm, grid_data.longitude.ds.get()) + 45.);
+    def.olongitude = lroundf(data_array_value(grid_data.lon.data_array,
+        ym * dim.x + xm, grid_data.lon.ds.get()) + 45.);
     if (def.olongitude > 180.) {
       def.olongitude -= 360.;
     }
@@ -3109,9 +3129,9 @@ bool grid_is_polar_stereographic(const GridData& grid_data,
     // look for dx and dy at the 60-degree parallel
     double min_fabs = 999.;
     int min_m = 0;
-    for (size_t m = 0; m < grid_data.latitude.data_array.num_values; ++m) {
+    for (size_t m = 0; m < grid_data.lat.data_array.num_values; ++m) {
       auto f = fabs(def.llatitude-data_array_value(
-          grid_data.latitude.data_array, m, grid_data.latitude.ds.get()));
+          grid_data.lat.data_array, m, grid_data.lat.ds.get()));
       if (f < min_fabs) {
         min_fabs = f;
         min_m = m;
@@ -3127,39 +3147,39 @@ bool grid_is_polar_stereographic(const GridData& grid_data,
     //     dist = 6372.8 * theta
     //     6372.8 is radius of Earth in km
     def.dx = lroundf(asin(sqrt(sin(fabs(data_array_value(
-        grid_data.latitude.data_array, min_m, grid_data.latitude.ds.get()) -
-        data_array_value(grid_data.latitude.data_array, min_m + 1,
-        grid_data.latitude.ds.get())) / 2. * rad) * sin(fabs(
-        data_array_value(grid_data.latitude.data_array, min_m,
-        grid_data.latitude.ds.get()) - data_array_value(
-        grid_data.latitude.data_array, min_m + 1,
-        grid_data.latitude.ds.get())) / 2. * rad) + sin(fabs(data_array_value(
-        grid_data.longitude.data_array, min_m, grid_data.longitude.ds.get()) -
-        data_array_value(grid_data.longitude.data_array, min_m + 1,
-        grid_data.longitude.ds.get())) / 2. * rad) * sin(fabs(
-        data_array_value(grid_data.longitude.data_array, min_m,
-        grid_data.longitude.ds.get()) - data_array_value(
-        grid_data.longitude.data_array, min_m + 1,
-        grid_data.longitude.ds.get())) / 2. * rad) * cos(data_array_value(
-        grid_data.latitude.data_array, min_m, grid_data.latitude.ds.get()) *
-        rad) * cos(data_array_value(grid_data.latitude.data_array, min_m + 1,
-        grid_data.latitude.ds.get()) * rad))) * 12745.6);
+        grid_data.lat.data_array, min_m, grid_data.lat.ds.get()) -
+        data_array_value(grid_data.lat.data_array, min_m + 1,
+        grid_data.lat.ds.get())) / 2. * rad) * sin(fabs(
+        data_array_value(grid_data.lat.data_array, min_m,
+        grid_data.lat.ds.get()) - data_array_value(
+        grid_data.lat.data_array, min_m + 1,
+        grid_data.lat.ds.get())) / 2. * rad) + sin(fabs(data_array_value(
+        grid_data.lon.data_array, min_m, grid_data.lon.ds.get()) -
+        data_array_value(grid_data.lon.data_array, min_m + 1,
+        grid_data.lon.ds.get())) / 2. * rad) * sin(fabs(
+        data_array_value(grid_data.lon.data_array, min_m,
+        grid_data.lon.ds.get()) - data_array_value(
+        grid_data.lon.data_array, min_m + 1,
+        grid_data.lon.ds.get())) / 2. * rad) * cos(data_array_value(
+        grid_data.lat.data_array, min_m, grid_data.lat.ds.get()) *
+        rad) * cos(data_array_value(grid_data.lat.data_array, min_m + 1,
+        grid_data.lat.ds.get()) * rad))) * 12745.6);
     def.dy = lroundf(asin(sqrt(sin(fabs(data_array_value(
-        grid_data.latitude.data_array, min_m, grid_data.latitude.ds.get()) -
-        data_array_value(grid_data.latitude.data_array, min_m + dim.x,
-        grid_data.latitude.ds.get())) / 2. * rad) * sin(fabs(data_array_value(
-        grid_data.latitude.data_array, min_m, grid_data.latitude.ds.get()) -
-        data_array_value(grid_data.latitude.data_array, min_m + dim.x,
-        grid_data.latitude.ds.get())) / 2. * rad) + sin(fabs(data_array_value(
-        grid_data.longitude.data_array, min_m, grid_data.longitude.ds.get()) -
-        data_array_value(grid_data.longitude.data_array, min_m + dim.x,
-        grid_data.longitude.ds.get())) / 2. * rad) * sin(fabs(data_array_value(
-        grid_data.longitude.data_array, min_m, grid_data.longitude.ds.get()) -
-        data_array_value(grid_data.longitude.data_array, min_m + dim.x,
-        grid_data.longitude.ds.get())) / 2. * rad) * cos(data_array_value(
-        grid_data.latitude.data_array, min_m, grid_data.latitude.ds.get()) *
-        rad) * cos(data_array_value(grid_data.latitude.data_array, min_m +
-        dim.x, grid_data.latitude.ds.get()) * rad))) * 12745.6);
+        grid_data.lat.data_array, min_m, grid_data.lat.ds.get()) -
+        data_array_value(grid_data.lat.data_array, min_m + dim.x,
+        grid_data.lat.ds.get())) / 2. * rad) * sin(fabs(data_array_value(
+        grid_data.lat.data_array, min_m, grid_data.lat.ds.get()) -
+        data_array_value(grid_data.lat.data_array, min_m + dim.x,
+        grid_data.lat.ds.get())) / 2. * rad) + sin(fabs(data_array_value(
+        grid_data.lon.data_array, min_m, grid_data.lon.ds.get()) -
+        data_array_value(grid_data.lon.data_array, min_m + dim.x,
+        grid_data.lon.ds.get())) / 2. * rad) * sin(fabs(data_array_value(
+        grid_data.lon.data_array, min_m, grid_data.lon.ds.get()) -
+        data_array_value(grid_data.lon.data_array, min_m + dim.x,
+        grid_data.lon.ds.get())) / 2. * rad) * cos(data_array_value(
+        grid_data.lat.data_array, min_m, grid_data.lat.ds.get()) *
+        rad) * cos(data_array_value(grid_data.lat.data_array, min_m +
+        dim.x, grid_data.lat.ds.get()) * rad))) * 12745.6);
     return true;
   }
   return false;
@@ -3174,43 +3194,43 @@ bool grid_is_centered_lambert_conformal(const GridData& grid_data, Grid::
       auto xm = dx2 - 1;
       auto ym = dy2 - 1;
       auto yp = dy2 + 1;
-      if (floatutils::myequalf((data_array_value(grid_data.longitude.data_array,
-          ym * grid_data.longitude.data_array.dimensions[1] + xm, grid_data.
-          longitude.ds.get()) + data_array_value(grid_data.longitude.data_array,
-          ym * grid_data.longitude.data_array.dimensions[1] + dx2, grid_data.
-          longitude.ds.get())), (data_array_value(grid_data.longitude.
-          data_array, yp * grid_data.longitude.data_array.dimensions[1] + xm,
-          grid_data.longitude.ds.get()) + data_array_value(grid_data.longitude.
-          data_array, yp * grid_data.longitude.data_array.dimensions[1] + dx2,
-          grid_data.longitude.ds.get())), 0.00001) && floatutils::myequalf(
-          data_array_value(grid_data.latitude.data_array, dy2 * grid_data.
-          longitude.data_array.dimensions[1] + xm, grid_data.latitude.ds.get()),
-          data_array_value(grid_data.latitude.data_array, dy2 * grid_data.
-          longitude.data_array.dimensions[1] + dx2, grid_data.latitude.ds.
+      if (floatutils::myequalf((data_array_value(grid_data.lon.data_array,
+          ym * grid_data.lon.data_array.dimensions[1] + xm, grid_data.
+          lon.ds.get()) + data_array_value(grid_data.lon.data_array,
+          ym * grid_data.lon.data_array.dimensions[1] + dx2, grid_data.
+          lon.ds.get())), (data_array_value(grid_data.lon.
+          data_array, yp * grid_data.lon.data_array.dimensions[1] + xm,
+          grid_data.lon.ds.get()) + data_array_value(grid_data.lon.
+          data_array, yp * grid_data.lon.data_array.dimensions[1] + dx2,
+          grid_data.lon.ds.get())), 0.00001) && floatutils::myequalf(
+          data_array_value(grid_data.lat.data_array, dy2 * grid_data.
+          lon.data_array.dimensions[1] + xm, grid_data.lat.ds.get()),
+          data_array_value(grid_data.lat.data_array, dy2 * grid_data.
+          lon.data_array.dimensions[1] + dx2, grid_data.lat.ds.
           get()))) {
         def.type = Grid::Type::lambertConformal;
         def.llatitude = def.stdparallel1 = def.stdparallel2 = lround(
-            data_array_value(grid_data.latitude.data_array, dy2 * grid_data.
-            longitude.data_array.dimensions[1] + dx2, grid_data.latitude.ds.
+            data_array_value(grid_data.lat.data_array, dy2 * grid_data.
+            lon.data_array.dimensions[1] + dx2, grid_data.lat.ds.
             get()));
         if (def.llatitude >= 0.) {
           def.projection_flag = 0;
         } else {
           def.projection_flag = 1;
         }
-        def.olongitude = lround((data_array_value(grid_data.longitude.
-            data_array, dy2 * grid_data.longitude.data_array.dimensions[1] + xm,
-            grid_data.longitude.ds.get()) + data_array_value(grid_data.
-            longitude.data_array, dy2 * grid_data.longitude.data_array.
-            dimensions[1] + dx2, grid_data.longitude.ds.get())) / 2.);
+        def.olongitude = lround((data_array_value(grid_data.lon.
+            data_array, dy2 * grid_data.lon.data_array.dimensions[1] + xm,
+            grid_data.lon.ds.get()) + data_array_value(grid_data.
+            lon.data_array, dy2 * grid_data.lon.data_array.
+            dimensions[1] + dx2, grid_data.lon.ds.get())) / 2.);
         def.dx = def.dy = lround(111.1 * cos(data_array_value(grid_data.
-            latitude.data_array, dy2 * grid_data.longitude.data_array.
-            dimensions[1] + dx2 - 1, grid_data.latitude.ds.get()) * 3.141592654
-            / 180.) * (data_array_value(grid_data.longitude.data_array, dy2 *
-            grid_data.longitude.data_array.dimensions[1] + dx2, grid_data.
-            longitude.ds.get()) - data_array_value(grid_data.longitude.
-            data_array, dy2 * grid_data.longitude.data_array.dimensions[1] + dx2
-            - 1, grid_data.longitude.ds.get())));
+            lat.data_array, dy2 * grid_data.lon.data_array.
+            dimensions[1] + dx2 - 1, grid_data.lat.ds.get()) * 3.141592654
+            / 180.) * (data_array_value(grid_data.lon.data_array, dy2 *
+            grid_data.lon.data_array.dimensions[1] + dx2, grid_data.
+            lon.ds.get()) - data_array_value(grid_data.lon.
+            data_array, dy2 * grid_data.lon.data_array.dimensions[1] + dx2
+            - 1, grid_data.lon.ds.get())));
         if (gatherxml::verbose_operation) {
           cout << "...confirmed a centered Lambert-Conformal projection." <<
               endl;
@@ -3221,37 +3241,37 @@ bool grid_is_centered_lambert_conformal(const GridData& grid_data, Grid::
     }
     case 1: {
       auto xp = dx2 + 1;
-      if (floatutils::myequalf(data_array_value(grid_data.longitude.data_array,
-          (dy2 - 1) * grid_data.longitude.data_array.dimensions[1] + dx2,
-          grid_data.longitude.ds.get()), data_array_value(grid_data.longitude.
-          data_array, (dy2 + 1) * grid_data.longitude.data_array.dimensions[1] +
-          dx2, grid_data.longitude.ds.get()), 0.00001) && floatutils::myequalf(
-          data_array_value(grid_data.latitude.data_array, dy2 * grid_data.
-          longitude.data_array.dimensions[1] + dx2 - 1, grid_data.latitude.ds.
-          get()), data_array_value(grid_data.latitude.data_array, dy2 *
-          grid_data.longitude.data_array.dimensions[1] + xp, grid_data.latitude.
+      if (floatutils::myequalf(data_array_value(grid_data.lon.data_array,
+          (dy2 - 1) * grid_data.lon.data_array.dimensions[1] + dx2,
+          grid_data.lon.ds.get()), data_array_value(grid_data.lon.
+          data_array, (dy2 + 1) * grid_data.lon.data_array.dimensions[1] +
+          dx2, grid_data.lon.ds.get()), 0.00001) && floatutils::myequalf(
+          data_array_value(grid_data.lat.data_array, dy2 * grid_data.
+          lon.data_array.dimensions[1] + dx2 - 1, grid_data.lat.ds.
+          get()), data_array_value(grid_data.lat.data_array, dy2 *
+          grid_data.lon.data_array.dimensions[1] + xp, grid_data.lat.
           ds.get()), 0.00001)) {
         def.type = Grid::Type::lambertConformal;
         def.llatitude = def.stdparallel1 = def.stdparallel2 = lround(
-            data_array_value(grid_data.latitude.data_array, dy2 * grid_data.
-            longitude.data_array.dimensions[1] + dx2, grid_data.latitude.ds.
+            data_array_value(grid_data.lat.data_array, dy2 * grid_data.
+            lon.data_array.dimensions[1] + dx2, grid_data.lat.ds.
             get()));
         if (def.llatitude >= 0.) {
           def.projection_flag = 0;
         } else {
           def.projection_flag = 1;
         }
-        def.olongitude = lround(data_array_value(grid_data.longitude.data_array,
-            dy2 * grid_data.longitude.data_array.dimensions[1] + dx2, grid_data.
-            longitude.ds.get()));
-        def.dx = def.dy = lround(111.1*cos(data_array_value(grid_data.latitude.
-            data_array, dy2 * grid_data.longitude.data_array.dimensions[1] +
-            dx2, grid_data.latitude.ds.get()) * 3.141592654 / 180.) *
-            (data_array_value(grid_data.longitude.data_array, dy2 * grid_data.
-            longitude.data_array.dimensions[1] + dx2 + 1, grid_data.longitude.
-            ds.get()) - data_array_value(grid_data.longitude.data_array, dy2 *
-            grid_data.longitude.data_array.dimensions[1] + dx2, grid_data.
-            longitude.ds.get())));
+        def.olongitude = lround(data_array_value(grid_data.lon.data_array,
+            dy2 * grid_data.lon.data_array.dimensions[1] + dx2, grid_data.
+            lon.ds.get()));
+        def.dx = def.dy = lround(111.1*cos(data_array_value(grid_data.lat.
+            data_array, dy2 * grid_data.lon.data_array.dimensions[1] +
+            dx2, grid_data.lat.ds.get()) * 3.141592654 / 180.) *
+            (data_array_value(grid_data.lon.data_array, dy2 * grid_data.
+            lon.data_array.dimensions[1] + dx2 + 1, grid_data.lon.
+            ds.get()) - data_array_value(grid_data.lon.data_array, dy2 *
+            grid_data.lon.data_array.dimensions[1] + dx2, grid_data.
+            lon.ds.get())));
         if (gatherxml::verbose_operation) {
           cout << "...confirmed a centered Lambert-Conformal projection." <<
               endl;
@@ -3264,120 +3284,106 @@ bool grid_is_centered_lambert_conformal(const GridData& grid_data, Grid::
   return false;
 }
 
-bool grid_is_non_centered_lambert_conformal(const GridData& grid_data,
-    Grid::GridDimensions& dim, Grid::GridDefinition& def) {
+bool grid_is_non_centered_lambert_conformal(const HDF5::DataArray& lats, const
+    HDF5::DataArray& lons, Grid::GridDimensions& dims, Grid::GridDefinition&
+    def) {
+  if (gatherxml::verbose_operation) {
+    cout << "... checking for non-centered Lambert-Conformal projection ..." <<
+        endl;
+  }
+  def.type = Grid::Type::not_set;
 
-  // try to detect a non-centered LC projection
   // find the x-offsets in each row where the change in latitude goes from
-  //     positive to negative
-  vector<double> olon_x_offsets;
-  olon_x_offsets.reserve(dim.y);
-  double avg_olon = 0.;
-  for (auto n = 0; n < dim.y; ++n) {
-    auto off = n*dim.x;
-    for (auto m = 0; m < dim.x - 1; ++m) {
-      auto x_offset = off + m;
-      if (data_array_value(grid_data.latitude.data_array, x_offset + 1,
-          grid_data.latitude.ds.get()) <= data_array_value(
-          grid_data.latitude.data_array, x_offset,
-          grid_data.latitude.ds.get())) {
-        olon_x_offsets.emplace_back(x_offset - off);
-        avg_olon += data_array_value(grid_data.longitude.data_array, x_offset,
-            grid_data.longitude.ds.get());
+  //   positive to negative
+  vector<double> v;
+  v.reserve(dims.y);
+  double s = 0.;
+  for (auto n = 0; n < dims.y; ++n) {
+    auto yoff = n * dims.x;
+    for (auto m = 0; m < dims.x - 1; ++m) {
+      auto xoff = yoff + m;
+      if (lats.value(xoff + 1) <= lats.value(xoff)) {
+        v.emplace_back(xoff - yoff);
+        s += lons.value(xoff);
         break;
       }
     }
   }
 
   // find the variance in the x-offsets
-  auto olon_x_offsets_mean = lround(std::accumulate(olon_x_offsets.begin(),
-      olon_x_offsets.end(), 0.) / olon_x_offsets.size());
+  auto xbar = lround(accumulate(v.begin(), v.end(), 0.) / v.size());
   double ss = 0.;
-  for (const auto& olon_x_offset : olon_x_offsets) {
-    auto diff = olon_x_offset - olon_x_offsets_mean;
+  for (const auto& off : v) {
+    auto diff = off - xbar;
     ss += diff*diff;
   }
-  auto var = ss / (olon_x_offsets.size() - 1);
-// if the variance is low, confident that we found the orientation longitude
-  if (var < 1.) {
-    def.type = Grid::Type::lambertConformal;
-    auto olon_x_offset = lround(std::accumulate(olon_x_offsets.begin(),
-        olon_x_offsets.end(), 0.) / olon_x_offsets.size());
-    def.olongitude = lround(avg_olon / olon_x_offsets.size());
-    // find the x-direction distance for each row at the orientation longitude
-    const double PI = 3.141592654;
-    const double DEGRAD = PI / 180.;
-    vector<double> dist_x_list;
-    dist_x_list.reserve(dim.y);
-    for (auto n = olon_x_offset; n < dim.x * dim.y; n +=  dim.x) {
-      auto dist_lon = (data_array_value(grid_data.longitude.data_array, n + 1,
-          grid_data.longitude.ds.get())-data_array_value(
-          grid_data.longitude.data_array, n, grid_data.longitude.ds.get())) *
-          111.1 * cos(data_array_value(grid_data.latitude.data_array, n,
-          grid_data.latitude.ds.get()) * DEGRAD);
-      auto dist_lat = (data_array_value(grid_data.latitude.data_array, n + 1,
-          grid_data.latitude.ds.get())-data_array_value(
-          grid_data.latitude.data_array, n, grid_data.latitude.ds.get())) *
-          111.1;
-      dist_x_list.emplace_back(sqrt(dist_lon * dist_lon + dist_lat * dist_lat));
-    }
-    def.dx = lround(std::accumulate(dist_x_list.begin(), dist_x_list.end(),
-        0.) / dist_x_list.size());
-    def.stdparallel1 = def.stdparallel2 = -99.;
-    size_t first_dy_index = 0;
-    for (size_t n = 0; n < dist_x_list.size(); ++n) {
-      if (floatutils::myequalf(dist_x_list[n], def.dx, 0.001)) {
-        auto tanlat = lround(data_array_value(grid_data.latitude.data_array,
-            olon_x_offset + n * dim.x, grid_data.latitude.ds.get()));
-        if (def.stdparallel1 < -90.) {
-          def.stdparallel1 = tanlat;
-          first_dy_index = olon_x_offset + n * dim.x;
-        } else if (def.stdparallel2 < -90.) {
-          if (tanlat != def.stdparallel1) {
-            def.stdparallel2 = tanlat;
-          }
-        } else if (tanlat != def.stdparallel2) {
-          if (gatherxml::verbose_operation) {
-            cout << "...check for a non-centered projection failed. Too "
-                "many tangent latitudes." << endl;
-          }
-          return false;
-        }
-      }
-    }
-    if (def.stdparallel1 < -90.) {
-      if (gatherxml::verbose_operation) {
-        cout << "...check for a non-centered projection failed. No "
-            "tangent latitude could be identified." << endl;
-      }
-      return false;
-    } else if (def.stdparallel2 < -90.) {
-      def.stdparallel2 = def.stdparallel1;
-    }
-    def.llatitude = def.stdparallel1;
-    if (def.llatitude >= 0.) {
-      def.projection_flag = 0;
-    } else {
-      def.projection_flag = 1;
-    }
-    auto dist_lon = (data_array_value(grid_data.longitude.data_array,
-        first_dy_index, grid_data.longitude.ds.get()) - data_array_value(
-        grid_data.longitude.data_array, first_dy_index - dim.x,
-        grid_data.longitude.ds.get())) * 111.1 * cos(data_array_value(
-        grid_data.latitude.data_array, first_dy_index - dim.x,
-        grid_data.latitude.ds.get()) * DEGRAD);
-    auto dist_lat = (data_array_value(grid_data.latitude.data_array,
-        first_dy_index, grid_data.latitude.ds.get()) - data_array_value(
-        grid_data.latitude.data_array, first_dy_index - dim.x,
-        grid_data.latitude.ds.get())) * 111.1;
-    def.dy = lround(sqrt(dist_lon*dist_lon + dist_lat*dist_lat));
-    if (gatherxml::verbose_operation) {
-      cout << "...confirmed a non-centered Lambert-Conformal "
-          "projection." << endl;
-    }
-    return true;
+  auto var = ss / (v.size() - 1);
+  if (var >= 1.) return false;
+
+  // if the variance is low, confident that we found the orientation longitude
+  def.type = Grid::Type::lambertConformal;
+  def.olongitude = lround(s / v.size());
+
+  // find the x-direction distance for each row at the orientation longitude
+  const double PI = 3.141592654;
+  const double DEGRAD = PI / 180.;
+  const double KMDEG = 111.1;
+  v.clear();
+  for (auto n = xbar; n < dims.x * dims.y; n +=  dims.x) {
+    auto x1 = lons.value(n);
+    auto x2 = lons.value(n + 1);
+    auto dx = (x2 - x1) * KMDEG * cos(x1 * DEGRAD);
+    auto y1 = lats.value(n);
+    auto y2 = lats.value(n + 1);
+    auto dy = (y2 - y1) * KMDEG;
+    v.emplace_back(sqrt(dx * dx + dy * dy));
   }
-  return false;
+  def.dx = lround(accumulate(v.begin(), v.end(), 0.) / v.size());
+  def.stdparallel1 = def.stdparallel2 = -99.;
+  size_t i = 0;
+  for (size_t n = 0; n < v.size(); ++n) {
+    if (floatutils::myequalf(v[n], def.dx, 0.001)) {
+      auto p = lround(lats.value(xbar + n * dims.x));
+      if (def.stdparallel1 < -90.) {
+        def.stdparallel1 = p;
+        i = xbar + n * dims.x;
+      } else if (def.stdparallel2 < -90.) {
+        if (p != def.stdparallel1) def.stdparallel2 = p;
+      } else if (p != def.stdparallel2) {
+        if (gatherxml::verbose_operation) {
+          cout << "...check for a non-centered projection failed. Too "
+              "many tangent latitudes." << endl;
+        }
+        def.type = Grid::Type::not_set;
+        return false;
+      }
+    }
+  }
+  if (def.stdparallel1 < -90.) {
+    if (gatherxml::verbose_operation) {
+      cout << "...check for a non-centered projection failed. No tangent "
+          "latitude could be identified." << endl;
+    }
+    def.type = Grid::Type::not_set;
+    return false;
+  } else if (def.stdparallel2 < -90.) {
+    def.stdparallel2 = def.stdparallel1;
+  }
+  def.llatitude = def.stdparallel1;
+  def.projection_flag = def.llatitude >= 0. ? 0 : 1;
+  auto x1 = lons.value(i - dims.x);
+  auto x2 = lons.value(i);
+  auto dx = (x2 - x1) * KMDEG * cos(x1 * DEGRAD);
+  auto y1 = lats.value(i - dims.x);
+  auto y2 = lats.value(i);
+  auto dy = (y2 - y1) * KMDEG;
+  def.dy = lround(sqrt(dx * dx + dy * dy));
+  if (gatherxml::verbose_operation) {
+    cout << "...confirmed a non-centered Lambert-Conformal projection." <<
+        endl;
+    cout << "... done." << endl;
+  }
+  return true;
 }
 
 bool grid_is_lambert_conformal(const GridData& grid_data,
@@ -3393,7 +3399,8 @@ bool grid_is_lambert_conformal(const GridData& grid_data,
     cout << "...check for a centered Lambert-Conformal projection failed, "
         "checking for a non-centered projection..." << endl;
   }
-  if (grid_is_non_centered_lambert_conformal(grid_data, dim, def)) {
+  if (grid_is_non_centered_lambert_conformal(grid_data.lat.data_array,
+      grid_data.lon.data_array, dim, def)) {
     return true;
   }
   if (gatherxml::verbose_operation) {
@@ -3604,32 +3611,31 @@ void scan_gridded_hdf5nc4_file(ScanData& scan_data) {
     time_ranges.emplace_back(grid_data.time_range_entry);
   }
   for (size_t n = 0; n < coord_vars.lat_ids.size(); ++n) {
-    grid_data.latitude.id = coord_vars.lat_ids[n];
-    grid_data.latitude.ds = is->dataset("/" + coord_vars.lat_ids[n]);
-    if (grid_data.latitude.ds == nullptr) {
+    grid_data.lat.id = coord_vars.lat_ids[n];
+    grid_data.lat.ds = is->dataset("/" + coord_vars.lat_ids[n]);
+    if (grid_data.lat.ds == nullptr) {
       log_error2("unable to access the /" + coord_vars.lat_ids[n] + " dataset "
           "for the latitudes", F, g_util_ident);
     }
-    grid_data.latitude.data_array.fill(*is, *grid_data.latitude.ds);
+    grid_data.lat.data_array.fill(*is, *grid_data.lat.ds);
     Grid::GridDefinition def;
-    def.slatitude = data_array_value(grid_data.latitude.data_array, 0,
-        grid_data.latitude.ds.get());
-    grid_data.longitude.id = coord_vars.lon_ids[n];
-    grid_data.longitude.ds = is->dataset("/" + coord_vars.lon_ids[n]);
-    if (grid_data.longitude.ds == nullptr) {
+    def.slatitude = data_array_value(grid_data.lat.data_array, 0,
+        grid_data.lat.ds.get());
+    grid_data.lon.id = coord_vars.lon_ids[n];
+    grid_data.lon.ds = is->dataset("/" + coord_vars.lon_ids[n]);
+    if (grid_data.lon.ds == nullptr) {
       log_error2("unable to access the /" + coord_vars.lon_ids[n] + " dataset "
           "for the longitudes", F, g_util_ident);
     }
-    grid_data.longitude.data_array.fill(*is, *grid_data.longitude.ds);
-    def.slongitude = data_array_value(grid_data.longitude.data_array, 0,
-        grid_data.longitude.ds.get());
-    std::shared_ptr<InputHDF5Stream::Dataset> lat_bounds_ds(nullptr),
-        lon_bounds_ds(nullptr);
+    grid_data.lon.data_array.fill(*is, *grid_data.lon.ds);
+    def.slongitude = data_array_value(grid_data.lon.data_array, 0,
+        grid_data.lon.ds.get());
+    DatasetPointer lat_bounds_ds(nullptr), lon_bounds_ds(nullptr);
     HDF5::DataArray lat_bounds_array, lon_bounds_array;
-    auto lat_bounds_it = grid_data.latitude.ds->attributes.find("bounds");
-    auto lon_bounds_it = grid_data.longitude.ds->attributes.find("bounds");
-    if (lat_bounds_it != grid_data.latitude.ds->attributes.end() &&
-        lon_bounds_it != grid_data.longitude.ds->attributes.end() &&
+    auto lat_bounds_it = grid_data.lat.ds->attributes.find("bounds");
+    auto lon_bounds_it = grid_data.lon.ds->attributes.find("bounds");
+    if (lat_bounds_it != grid_data.lat.ds->attributes.end() &&
+        lon_bounds_it != grid_data.lon.ds->attributes.end() &&
         lat_bounds_it->second._class_ == 3 && lon_bounds_it->second._class_ ==
         3) {
       if ( (lat_bounds_ds = is->dataset("/" + string(
@@ -3642,13 +3648,13 @@ void scan_gridded_hdf5nc4_file(ScanData& scan_data) {
       }
     }
     Grid::GridDimensions dim;
-    auto lat_attr_it = grid_data.latitude.ds->attributes.find("DIMENSION_LIST");
+    auto lat_attr_it = grid_data.lat.ds->attributes.find("DIMENSION_LIST");
     auto& lat_dim_list = lat_attr_it->second;
-    auto lon_attr_it = grid_data.longitude.ds->attributes.find(
+    auto lon_attr_it = grid_data.lon.ds->attributes.find(
         "DIMENSION_LIST");
     auto& lon_dim_list = lon_attr_it->second;
-    if (lat_attr_it != grid_data.latitude.ds->attributes.end() && lon_attr_it !=
-        grid_data.longitude.ds->attributes.end() && lat_dim_list.dim_sizes.
+    if (lat_attr_it != grid_data.lat.ds->attributes.end() && lon_attr_it !=
+        grid_data.lon.ds->attributes.end() && lat_dim_list.dim_sizes.
         size() == 1 && lat_dim_list.dim_sizes[0] == 2 && lat_dim_list._class_ ==
         9 && lon_dim_list.dim_sizes.size() == 1 && lon_dim_list.dim_sizes[0] ==
         2 && lon_dim_list._class_ == 9) {
@@ -3736,10 +3742,10 @@ void scan_gridded_hdf5nc4_file(ScanData& scan_data) {
             g_util_ident);
       }
     } else {
-      auto it = grid_data.latitude.ds->attributes.find("DIMENSION_LIST");
-      if (it == grid_data.latitude.ds->attributes.end()) {
-        dim.y = grid_data.latitude.data_array.num_values;
-        dim.x = grid_data.longitude.data_array.num_values;
+      auto it = grid_data.lat.ds->attributes.find("DIMENSION_LIST");
+      if (it == grid_data.lat.ds->attributes.end()) {
+        dim.y = grid_data.lat.data_array.num_values;
+        dim.x = grid_data.lon.data_array.num_values;
       }
       else {
         stringstream ss;
@@ -3747,13 +3753,13 @@ void scan_gridded_hdf5nc4_file(ScanData& scan_data) {
         auto sp = split(ss.str().substr(1, ss.str().length() - 2));
         switch (sp.size()) {
           case 1: {
-            dim.y = grid_data.latitude.data_array.num_values;
-            dim.x = grid_data.longitude.data_array.num_values;
+            dim.y = grid_data.lat.data_array.num_values;
+            dim.x = grid_data.lon.data_array.num_values;
             break;
           }
           case 2: {
-            dim.y = grid_data.latitude.data_array.dimensions[0];
-            dim.x = grid_data.latitude.data_array.dimensions[1];
+            dim.y = grid_data.lat.data_array.dimensions[0];
+            dim.x = grid_data.lat.data_array.dimensions[1];
             break;
           }
           default: {
@@ -3764,10 +3770,10 @@ void scan_gridded_hdf5nc4_file(ScanData& scan_data) {
         }
       }
       def.type = Grid::Type::latitudeLongitude;
-      def.elatitude = data_array_value(grid_data.latitude.data_array, grid_data.
-          latitude.data_array.num_values - 1, grid_data.latitude.ds.get());
-      def.elongitude = data_array_value(grid_data.longitude.data_array,
-          grid_data.longitude.data_array.num_values - 1, grid_data.longitude.ds.
+      def.elatitude = data_array_value(grid_data.lat.data_array, grid_data.
+          lat.data_array.num_values - 1, grid_data.lat.ds.get());
+      def.elongitude = data_array_value(grid_data.lon.data_array,
+          grid_data.lon.data_array.num_values - 1, grid_data.lon.ds.
           get());
       def.laincrement = fabs((def.elatitude - def.slatitude)/(dim.y - 1));
       def.loincrement = fabs((def.elongitude - def.slongitude)/(dim.x - 1));
