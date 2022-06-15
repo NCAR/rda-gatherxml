@@ -1242,29 +1242,29 @@ void scan_usarray_transportable_hdf5_file(
   gatherxml::markup::ObML::IDEntry ientry;
   string platform_type, datatype, title;
   float lat = -1.e38, lon = -1.e38;
-  for (const auto& attr_entry : ds->attributes) {
-    if (attr_entry.first == "NROWS") {
-      num_values = *(reinterpret_cast<int *>(attr_entry.second.array));
-    } else if (attr_entry.first == "LATITUDE_DDEG") {
-      lat = *(reinterpret_cast<float *>(attr_entry.second.array));
-    } else if (attr_entry.first == "LONGITUDE_DDEG") {
-      lon = *(reinterpret_cast<float *>(attr_entry.second.array));
-    } else if (attr_entry.first == "CHAR_STATION_ID") {
+  for (const auto& a : ds->attributes) {
+    if (a.first == "NROWS") {
+      num_values = *(reinterpret_cast<int *>(a.second.array));
+    } else if (a.first == "LATITUDE_DDEG") {
+      lat = *(reinterpret_cast<float *>(a.second.array));
+    } else if (a.first == "LONGITUDE_DDEG") {
+      lon = *(reinterpret_cast<float *>(a.second.array));
+    } else if (a.first == "CHAR_STATION_ID") {
       if (platform_type.empty()) {
         platform_type = "land_station";
-        ientry.key.assign(reinterpret_cast<char *>(attr_entry.second.array));
+        ientry.key.assign(reinterpret_cast<char *>(a.second.array));
         ientry.key.insert(0, platform_type + "[!]USArray[!]TA.");
       } else {
         log_error2("multiple station IDs not expected", F, g_util_ident);
       }
-    } else if (attr_entry.first == "NUMERIC_STATION_ID") {
-      numeric_id = *(reinterpret_cast<short *>(attr_entry.second.array));
-    } else if (attr_entry.first == "FIELD_2_NAME") {
-      datatype.assign(reinterpret_cast<char *>(attr_entry.second.array));
-    } else if (attr_entry.first == "FIELD_2_FILL") {
-      pres_miss_val = *(reinterpret_cast<float *>(attr_entry.second.array));
-    } else if (attr_entry.first == "FIELD_2_DESCRIPTION") {
-      title.assign(reinterpret_cast<char *>(attr_entry.second.array));
+    } else if (a.first == "NUMERIC_STATION_ID") {
+      numeric_id = *(reinterpret_cast<short *>(a.second.array));
+    } else if (a.first == "FIELD_2_NAME") {
+      datatype.assign(reinterpret_cast<char *>(a.second.array));
+    } else if (a.first == "FIELD_2_FILL") {
+      pres_miss_val = *(reinterpret_cast<float *>(a.second.array));
+    } else if (a.first == "FIELD_2_DESCRIPTION") {
+      title.assign(reinterpret_cast<char *>(a.second.array));
     }
   }
   if (platform_type.empty()) {
@@ -1360,15 +1360,14 @@ void add_gridded_time_range(string key_start, unordered_set<string>&
   auto is = sget_hdf5();
   auto b = false;
   auto vars = is->datasets_with_attribute("DIMENSION_LIST");
-  for (const auto& var : vars) {
-    auto& dset_ptr = var.second;
-    auto attr_it = dset_ptr->attributes.find("DIMENSION_LIST");
-    if (attr_it != dset_ptr->attributes.end() && grid_data.
-        coordinate_variables_set.find(var.first) == grid_data.
+  for (const auto& dse : vars) {
+    auto attr_it = dse.p_ds->attributes.find("DIMENSION_LIST");
+    if (attr_it != dse.p_ds->attributes.end() && grid_data.
+        coordinate_variables_set.find(dse.key) == grid_data.
         coordinate_variables_set.end() && attr_it->second.dim_sizes.size() == 1
         && (attr_it->second.dim_sizes[0] > 2 || (attr_it->second.dim_sizes[0] ==
         2 && grid_data.valid_time.data_array.num_values == 1))) {
-      auto tm = gridded_time_method(dset_ptr, grid_data);
+      auto tm = gridded_time_method(dse.p_ds, grid_data);
       if (tm.empty()) {
         b = true;
       } else {
@@ -1484,12 +1483,12 @@ double data_array_value(const HDF5::DataArray& data_array, size_t index,
   return value;
 }
 
-void add_gridded_netcdf_parameter(const InputHDF5Stream::DatasetEntry& var,
+void add_gridded_netcdf_parameter(const InputHDF5Stream::DatasetEntry& dse,
     ScanData& scan_data, const TimeRange& time_range, ParameterData&
     parameter_data, int num_steps) {
   string description;
   string units;
-  auto& attributes = var.second->attributes;
+  auto& attributes = dse.p_ds->attributes;
   auto attr_it = attributes.find("units");
   if (attr_it != attributes.end() && attr_it->second._class_ == 3) {
     units = reinterpret_cast<char *>(attr_it->second.array);
@@ -1523,7 +1522,7 @@ void add_gridded_netcdf_parameter(const InputHDF5Stream::DatasetEntry& var,
   if (attr_it != attributes.end() && attr_it->second._class_ == 3) {
     standard_name = reinterpret_cast<char *>(attr_it->second.array);
   }
-  auto var_name = var.first;
+  auto var_name = dse.key;
   trim(var_name);
   trim(description);
   trim(units);
@@ -1531,16 +1530,16 @@ void add_gridded_netcdf_parameter(const InputHDF5Stream::DatasetEntry& var,
   auto key = var_name + "<!>" + description + "<!>" + units + "<!>" +
       standard_name;
   if (parameter_data.set.find(key) == parameter_data.set.end()) {
-    auto short_name = parameter_data.map.short_name(var.first);
+    auto short_name = parameter_data.map.short_name(dse.key);
     if (!scan_data.found_map || short_name.empty()) {
       parameter_data.set.emplace(key);
       scan_data.varlist.emplace_back(key);
     } else {
       parameter_data.set.emplace(key);
       scan_data.varlist.emplace_back(key);
-      if (scan_data.var_changes_table.find(var.first) == scan_data.
+      if (scan_data.var_changes_table.find(dse.key) == scan_data.
           var_changes_table.end()) {
-        scan_data.var_changes_table.emplace(var.first);
+        scan_data.var_changes_table.emplace(dse.key);
       }
     }
   }
@@ -1685,13 +1684,13 @@ void add_gridded_parameters_to_netcdf_level_entry(string& grid_entry_key, const
 
   // find all of the variables
   auto vars = is->datasets_with_attribute("DIMENSION_LIST");
-  for (const auto& var : vars) {
-    if (grid_data.coordinate_variables_set.find(var.first) ==
+  for (const auto& dse : vars) {
+    if (grid_data.coordinate_variables_set.find(dse.key) ==
         grid_data.coordinate_variables_set.end()) {
-      auto& dset_ptr = var.second;
+      auto& dset_ptr = dse.p_ds;
       auto attr_it = dset_ptr->attributes.find("DIMENSION_LIST");
       if (gatherxml::verbose_operation) {
-        cout << "    '" << var.first << "' has a DIMENSION_LIST: ";
+        cout << "    '" << dse.key << "' has a DIMENSION_LIST: ";
         attr_it->second.print(cout, is->reference_table_pointer());
         cout << endl;
       }
@@ -1701,7 +1700,7 @@ void add_gridded_parameters_to_netcdf_level_entry(string& grid_entry_key, const
           second.vlen.class_ == 7 && parameter_matches_dimensions(attr_it->
           second, grid_data)) {
         if (gatherxml::verbose_operation) {
-          cout << "    ...is a netCDF variable" << endl;
+          cout << "*** is a netCDF variable ***" << endl;
         }
         auto time_method = gridded_time_method(dset_ptr, grid_data);
         TimeRange time_range;
@@ -1726,13 +1725,13 @@ void add_gridded_parameters_to_netcdf_level_entry(string& grid_entry_key, const
         auto d = metautils::NcTime::gridded_netcdf_time_range_description(
             grid_data.time_range_entry, *grid_data.time_data, time_method, e);
         if (!e.empty()) {
-          log_error2(e + "; var name '" + var.first + "'", F, g_util_ident);
+          log_error2(e + "; var name '" + dse.key + "'", F, g_util_ident);
         }
         d = capitalize(d);
         if (regex_search(grid_entry_key, regex(d + "$"))) {
 //          if (attr.value.dim_sizes[0] == 4 || attr.value.dim_sizes[0] == 3 || (attr.value.dim_sizes[0] == 2 && grid_data.valid_time.data_array.num_values == 1)) {
-            g_grml_data->p.key = "ds" + g_dsid + ":" + var.first;
-            add_gridded_netcdf_parameter(var, scan_data, time_range,
+            g_grml_data->p.key = "ds" + g_dsid + ":" + dse.key;
+            add_gridded_netcdf_parameter(dse, scan_data, time_range,
                 parameter_data, grid_data.time_range_entry.num_steps);
             if (g_inv.maps.P.find(g_grml_data->p.key) == g_inv.maps.P.end()) {
               g_inv.maps.P.emplace(g_grml_data->p.key, g_inv.maps.P.size());
@@ -1750,14 +1749,13 @@ void update_level_entry(const TimeBounds& time_bounds, const GridData&
   static const string F = this_function_label(__func__);
   auto is = sget_hdf5();
   auto vars = is->datasets_with_attribute("DIMENSION_LIST");
-  for (const auto& var : vars) {
-    auto& dset_ptr = var.second;
-    auto attr_it = dset_ptr->attributes.find("DIMENSION_LIST");
+  for (const auto& dse : vars) {
+    auto attr_it = dse.p_ds->attributes.find("DIMENSION_LIST");
     if (attr_it->second._class_ == 9 && attr_it->second.dim_sizes.size() == 1 &&
         attr_it->second.dim_sizes[0] > 2 && attr_it->second.vlen.class_ == 7 &&
         parameter_matches_dimensions(attr_it->second, grid_data)) {
-      g_grml_data->p.key = "ds" + g_dsid + ":" + var.first;
-      auto time_method = gridded_time_method(dset_ptr, grid_data);
+      g_grml_data->p.key = "ds" + g_dsid + ":" + dse.key;
+      auto time_method = gridded_time_method(dse.p_ds, grid_data);
       time_method = strutils::capitalize(time_method);
       TimeRange time_range;
       if (g_grml_data->l.entry.parameter_code_table.find(g_grml_data->p.key)
@@ -1769,7 +1767,7 @@ void update_level_entry(const TimeBounds& time_bounds, const GridData&
               instantaneous.first_valid_datetime;
           time_range.last_valid_datetime = grid_data.time_range_entry.
               instantaneous.last_valid_datetime;
-          add_gridded_netcdf_parameter(var, scan_data, time_range,
+          add_gridded_netcdf_parameter(dse, scan_data, time_range,
               parameter_data, grid_data.time_range_entry.num_steps);
         } else {
           if (time_bounds.changed) {
@@ -1779,7 +1777,7 @@ void update_level_entry(const TimeBounds& time_bounds, const GridData&
               first_valid_datetime;
           time_range.last_valid_datetime = grid_data.time_range_entry.bounded.
               last_valid_datetime;
-          add_gridded_netcdf_parameter(var, scan_data, time_range,
+          add_gridded_netcdf_parameter(dse, scan_data, time_range,
               parameter_data, grid_data.time_range_entry.num_steps);
         }
         g_grml_data->g.entry.level_table[g_grml_data->l.key] = g_grml_data->l.
@@ -1926,8 +1924,8 @@ void update_inventory(int unum, int gnum, const GridData& grid_data) {
 void process_units_attribute(const InputHDF5Stream::DatasetEntry& ds_entry,
     DiscreteGeometriesData& dgd, TimeData& time_data) {
   static const string F = this_function_label(__func__);
-  auto& var_name = ds_entry.first;
-  auto attr_val = ds_entry.second->attributes["units"];
+  auto& var_name = ds_entry.key;
+  auto attr_val = ds_entry.p_ds->attributes["units"];
   string units_value(reinterpret_cast<char *>(attr_val.get()), attr_val.size);
   if (regex_search(units_value, regex("since"))) {
     if (!dgd.indexes.time_var.empty()) {
@@ -1956,17 +1954,16 @@ void fill_dgd_index(string attribute_name_to_match, string
     log_error2("more than one " + attribute_name_to_match + " variable found",
         F, g_util_ident);
   } else if (ds_entry_list.size() > 0) {
-    auto aval = ds_entry_list.front().second->attributes[
-        attribute_name_to_match];
+    auto aval = ds_entry_list.front().p_ds->attributes[attribute_name_to_match];
     string attr_val(reinterpret_cast<char *>(aval.get()), aval.size);
     if (attribute_value_to_match.empty() || attr_val ==
         attribute_value_to_match) {
       if (!dgd_index.empty()) {
         log_error2(attribute_name_to_match + " was already identified - don't "
-            "know what to do with variable: " + ds_entry_list.front().first, F,
+            "know what to do with variable: " + ds_entry_list.front().key, F,
             g_util_ident);
       } else {
-        dgd_index = ds_entry_list.front().first;
+        dgd_index = ds_entry_list.front().key;
       }
     }
   }
@@ -1978,13 +1975,13 @@ void fill_dgd_index(string attribute_name_to_match, unordered_map<string,
   auto is = sget_hdf5();
   auto ds_entry_list = is->datasets_with_attribute(attribute_name_to_match);
   for (const auto& ds_entry : ds_entry_list) {
-    auto aval = ds_entry.second->attributes[attribute_name_to_match];
+    auto aval = ds_entry.p_ds->attributes[attribute_name_to_match];
     string attr_val(reinterpret_cast<char *>(aval.get()), aval.size);
     if (dgd_index.find(attr_val) == dgd_index.end()) {
-      dgd_index.emplace(attr_val, ds_entry.first);
+      dgd_index.emplace(attr_val, ds_entry.key);
     } else {
       log_error2(attribute_name_to_match + " was already identified - don't "
-          "know what to do with variable: " + ds_entry.first, F, g_util_ident);
+          "know what to do with variable: " + ds_entry.key, F, g_util_ident);
     }
   }
 }
@@ -2049,17 +2046,16 @@ void scan_cf_point_hdf5nc4_file(ScanData& scan_data, gatherxml::markup::ObML::
 
   // look for a "station ID"
   for (const auto& ds_entry : ds_entry_list) {
-    auto& dset_ptr = ds_entry.second;
-    if (dset_ptr->datatype.class_ == 3) {
-      auto attr_it = dset_ptr->attributes.find("long_name");
-      if (attr_it != dset_ptr->attributes.end() && attr_it->second._class_ ==
-          3) {
+    if (ds_entry.p_ds->datatype.class_ == 3) {
+      auto attr_it = ds_entry.p_ds->attributes.find("long_name");
+      if (attr_it != ds_entry.p_ds->attributes.end() && attr_it->second._class_
+          == 3) {
         string attribute_value(reinterpret_cast<char *>(attr_it->
             second.get()), attr_it->second.size);
         if (regex_search(attribute_value, regex("ID")) ||
             regex_search(attribute_value, regex("ident",
             regex::icase))) {
-          dgd.indexes.stn_id_var = ds_entry.first;
+          dgd.indexes.stn_id_var = ds_entry.key;
         }
       }
     }
@@ -2127,7 +2123,7 @@ void scan_cf_point_hdf5nc4_file(ScanData& scan_data, gatherxml::markup::ObML::
   gatherxml::markup::ObML::IDEntry ientry;
   ientry.key.reserve(32768);
   for (const auto& ds_entry : ds_entry_list) {
-    auto& var_name = ds_entry.first;
+    auto& var_name = ds_entry.key;
     if (var_name != dgd.indexes.time_var && var_name != dgd.indexes.lat_var &&
         var_name != dgd.indexes.lon_var && var_name != dgd.indexes.stn_id_var) {
       unique_data_type_observation_set.clear();
@@ -2318,11 +2314,11 @@ log_error2("determining platforms is not implemented", F, g_util_ident);
   vector<DateTime> dts;
   vector<string> datatypes_list;
   for (const auto& ds_entry : ds_entry_list) {
-    auto& var_name = ds_entry.first;
+    auto& var_name = ds_entry.key;
     if (var_name != dgd.indexes.time_var && var_name != dgd.indexes.lat_var &&
         var_name != dgd.indexes.lon_var) {
       stringstream dim_list_ss;
-      ds_entry.second->attributes["DIMENSION_LIST"].print(dim_list_ss,
+      ds_entry.p_ds->attributes["DIMENSION_LIST"].print(dim_list_ss,
           is->reference_table_pointer());
       if (regex_search(dim_list_ss.str(), netcdf_var_re)) {
         if (gatherxml::verbose_operation) {
@@ -2484,11 +2480,10 @@ id_types.emplace_back("unknown");
   HDF5::DataArray z_rowsize_vals(*is, *ds);
   if (dgd.indexes.sample_dim_vars.size() > 0) {
 // continuous ragged array H.10
-    for (const auto& var : var_list) {
-      auto& var_name = var.first;
-      auto& dset_ptr = var.second;
+    for (const auto& dse : var_list) {
+      auto& var_name = dse.key;
       val_ss.str("");
-      dset_ptr->attributes["DIMENSION_LIST"].print(val_ss, is->
+      dse.p_ds->attributes["DIMENSION_LIST"].print(val_ss, is->
           reference_table_pointer());
       auto dims = split(val_ss.str(), ",");
       strutils::replace_all(dims.front(), "[", "");
@@ -2511,7 +2506,7 @@ id_types.emplace_back("unknown");
         HDF5::DataArray var_vals(*is, *ds);
         if (var_vals.type != HDF5::DataArray::Type::_NULL) {
           NetCDFVariableAttributeData nc_va_data;
-          extract_from_hdf5_variable_attributes(dset_ptr->attributes,
+          extract_from_hdf5_variable_attributes(dse.p_ds->attributes,
               nc_va_data);
           auto key = var_name + "<!>" + nc_va_data.long_name + "<!>" +
               nc_va_data.units;
@@ -2675,14 +2670,13 @@ void find_coordinate_variables(CoordinateVariables& coord_vars, GridData&
   }
   unordered_set<string> unique_level_id_set;
   auto found_time = false;
-  for (const auto& var : dim_vars) {
-    auto& var_name = var.first;
-    auto& dset_ptr = var.second;
+  for (const auto& dse : dim_vars) {
+    auto& var_name = dse.key;
     if (gatherxml::verbose_operation) {
       cout << "  '" << var_name << "'" << endl;
     }
-    auto attr_it = dset_ptr->attributes.find("units");
-    if (attr_it != dset_ptr->attributes.end() && (attr_it->second._class_ ==
+    auto attr_it = dse.p_ds->attributes.find("units");
+    if (attr_it != dse.p_ds->attributes.end() && (attr_it->second._class_ ==
         3 || (attr_it->second._class_ == 9 && attr_it->second.vlen.class_ ==
         3))) {
       string units_value;
@@ -2699,8 +2693,8 @@ void find_coordinate_variables(CoordinateVariables& coord_vars, GridData&
         cout << "    units attribute: '" << units_value << "'" << endl;
       }
       string standard_name_value;
-      attr_it = dset_ptr->attributes.find("standard_name");
-      if (attr_it != dset_ptr->attributes.end() && (attr_it->second._class_ ==
+      attr_it = dse.p_ds->attributes.find("standard_name");
+      if (attr_it != dse.p_ds->attributes.end() && (attr_it->second._class_ ==
           3 || (attr_it->second._class_ == 9 && attr_it->second.vlen.class_ ==
           3))) {
         if (attr_it->second._class_ == 3) {
@@ -2718,7 +2712,7 @@ void find_coordinate_variables(CoordinateVariables& coord_vars, GridData&
           log_error2("time was already identified - don't know what to do with "
               "variable: " + var_name, F, g_util_ident);
         }
-        for (const auto& attribute : dset_ptr->attributes) {
+        for (const auto& attribute : dse.p_ds->attributes) {
           if (attribute.second._class_ == 3) {
             if (attribute.first == "bounds") {
               grid_data.time_bounds.id = reinterpret_cast<char *>(
@@ -2740,16 +2734,16 @@ void find_coordinate_variables(CoordinateVariables& coord_vars, GridData&
         grid_data.coordinate_variables_set.emplace(grid_data.valid_time.id);
         if (standard_name_value == "forecast_reference_time") {
           grid_data.reference_time.id = var_name;
-          grid_data.coordinate_variables_set.emplace(
-              grid_data.reference_time.id);
+          grid_data.coordinate_variables_set.emplace(grid_data.reference_time.
+              id);
         }
         coord_vars.nc_time->reference = metautils::NcTime::reference_date_time(
             units_value);
         if (coord_vars.nc_time->reference.year() == 0) {
           log_error2("bad netcdf date in units for time", F, g_util_ident);
         }
-        attr_it = dset_ptr->attributes.find("calendar");
-        if (attr_it != dset_ptr->attributes.end()) {
+        attr_it = dse.p_ds->attributes.find("calendar");
+        if (attr_it != dse.p_ds->attributes.end()) {
           coord_vars.nc_time->calendar.assign(reinterpret_cast<char *>(attr_it->
               second.get()), attr_it->second.size);
         }
@@ -2773,8 +2767,8 @@ void find_coordinate_variables(CoordinateVariables& coord_vars, GridData&
           if (unique_level_id_set.find(var_name) == unique_level_id_set.end()) {
             coord_vars.level_info.emplace_back();
             coord_vars.level_info.back().ID = var_name;
-            attr_it = dset_ptr->attributes.find("long_name");
-            if (attr_it != dset_ptr->attributes.end() && attr_it->
+            attr_it = dse.p_ds->attributes.find("long_name");
+            if (attr_it != dse.p_ds->attributes.end() && attr_it->
                 second._class_ == 3) {
               coord_vars.level_info.back().description = reinterpret_cast<
                   char *>(attr_it->second.array);
@@ -2786,13 +2780,13 @@ void find_coordinate_variables(CoordinateVariables& coord_vars, GridData&
         }
       }
     } else {
-      attr_it = dset_ptr->attributes.find("positive");
-      if (attr_it != dset_ptr->attributes.end() && attr_it->second._class_ ==
+      attr_it = dse.p_ds->attributes.find("positive");
+      if (attr_it != dse.p_ds->attributes.end() && attr_it->second._class_ ==
           3 && unique_level_id_set.find(var_name) ==
           unique_level_id_set.end()) {
         coord_vars.level_info.back().ID = var_name;
-        attr_it = dset_ptr->attributes.find("long_name");
-        if (attr_it != dset_ptr->attributes.end() && attr_it->second._class_ ==
+        attr_it = dse.p_ds->attributes.find("long_name");
+        if (attr_it != dse.p_ds->attributes.end() && attr_it->second._class_ ==
             3) {
           coord_vars.level_info.back().description = reinterpret_cast<char *>(
               attr_it->second.array);
@@ -2820,8 +2814,8 @@ void check_for_forecasts(GridData& grid_data, shared_ptr<TimeData>&
     log_error2("multiple forecast reference times", F, g_util_ident);
   } else if (!vars.empty()) {
     auto var = vars.front();
-    auto attr_it = var.second->attributes.find("units");
-    if (attr_it != var.second->attributes.end() && attr_it->second._class_ ==
+    auto attr_it = var.p_ds->attributes.find("units");
+    if (attr_it != var.p_ds->attributes.end() && attr_it->second._class_ ==
         3) {
       string units_value = reinterpret_cast<char *>(attr_it->second.array);
       if (regex_search(units_value, regex("since"))) {
@@ -2831,7 +2825,7 @@ void check_for_forecasts(GridData& grid_data, shared_ptr<TimeData>&
           log_error2("time and forecast reference time have different units", F,
               g_util_ident);
         }
-        grid_data.reference_time.id = var.first;
+        grid_data.reference_time.id = var.key;
         grid_data.coordinate_variables_set.emplace(grid_data.reference_time.id);
         auto ref_dt = metautils::NcTime::reference_date_time(units_value);
         if (ref_dt.year() == 0) {
@@ -2853,11 +2847,10 @@ void find_vertical_level_coordinates(CoordinateVariables& coord_vars, GridData&
   if (vars.size() == 0) {
     vars = is->datasets_with_attribute("units=hPa");
   }
-  for (const auto& v : vars) {
-    auto& var_name = v.first;
-    auto& dset_ptr = v.second;
-    auto attr_it = dset_ptr->attributes.find("DIMENSION_LIST");
-    if (attr_it != dset_ptr->attributes.end() && attr_it->
+  for (const auto& dse : vars) {
+    auto& var_name = dse.key;
+    auto attr_it = dse.p_ds->attributes.find("DIMENSION_LIST");
+    if (attr_it != dse.p_ds->attributes.end() && attr_it->
         second.dim_sizes.size() == 1 && attr_it->second.dim_sizes[0] == 1 &&
         attr_it->second._class_ == 9) {
       coord_vars.level_info.emplace_back();
@@ -2872,11 +2865,10 @@ void find_vertical_level_coordinates(CoordinateVariables& coord_vars, GridData&
     }
   }
   vars = is->datasets_with_attribute("positive");
-  for (const auto& v : vars) {
-    auto& var_name = v.first;
-    auto& dset_ptr = v.second;
-    auto attr_it = dset_ptr->attributes.find("DIMENSION_LIST");
-    if (attr_it != dset_ptr->attributes.end() && attr_it->
+  for (const auto& dse : vars) {
+    auto& var_name = dse.key;
+    auto attr_it = dse.p_ds->attributes.find("DIMENSION_LIST");
+    if (attr_it != dse.p_ds->attributes.end() && attr_it->
         second.dim_sizes.size() == 1 && attr_it->second.dim_sizes[0] == 1 &&
         attr_it->second._class_ == 9) {
       coord_vars.level_info.emplace_back();
@@ -2884,16 +2876,16 @@ void find_vertical_level_coordinates(CoordinateVariables& coord_vars, GridData&
       if (gatherxml::verbose_operation) {
         cout << "   ...found '" << var_name << "'" << endl;
       }
-      attr_it = dset_ptr->attributes.find("description");
-      if (attr_it != dset_ptr->attributes.end() && attr_it->second._class_ ==
+      attr_it = dse.p_ds->attributes.find("description");
+      if (attr_it != dse.p_ds->attributes.end() && attr_it->second._class_ ==
           3) {
         coord_vars.level_info.back().description = reinterpret_cast<char *>(
             attr_it->second.array);
       } else {
         coord_vars.level_info.back().description = "";
       }
-      attr_it = dset_ptr->attributes.find("units");
-      if (attr_it != dset_ptr->attributes.end() && attr_it->second._class_ ==
+      attr_it = dse.p_ds->attributes.find("units");
+      if (attr_it != dse.p_ds->attributes.end() && attr_it->second._class_ ==
           3) {
         coord_vars.level_info.back().units = reinterpret_cast<char *>(
             attr_it->second.array);
@@ -3044,15 +3036,15 @@ bool found_alternate_lat_lon_coordinates(GridData& grid_data, vector<string>&
     if (vars.empty()) {
       vars = is->datasets_with_attribute("units=degree_" + compass[n]);
     }
-    for (const auto& v : vars) {
-      auto& var_name = v.first;
+    for (const auto& dse : vars) {
+      auto& var_name = dse.key;
       auto test_vars = is->datasets_with_attribute("bounds=" + var_name);
       if (test_vars.empty()) {
         if (gatherxml::verbose_operation) {
           cout << "   ...found '" << var_name << "'" << endl;
         }
         stringstream dimension_list;
-        v.second->attributes["DIMENSION_LIST"].print(dimension_list, is->
+        dse.p_ds->attributes["DIMENSION_LIST"].print(dimension_list, is->
             reference_table_pointer());
         dim_map[n].emplace(dimension_list.str(), var_name);
         grid_data.coordinate_variables_set.emplace(var_name);
@@ -3794,6 +3786,10 @@ void scan_gridded_hdf5nc4_file(ScanData& scan_data) {
           "..." << endl;
     }
     for (size_t m = 0; m < coord_vars.level_info.size(); ++m) {
+      if (gatherxml::verbose_operation) {
+        cout << "...processing verical level entry: " << coord_vars.level_info[
+            m].ID << " ..." << endl;
+      }
       grid_data.level.id = coord_vars.level_info[m].ID;
       size_t num_levels;
       if (m == (coord_vars.level_info.size() - 1) && grid_data.level.id ==
@@ -3822,6 +3818,9 @@ void scan_gridded_hdf5nc4_file(ScanData& scan_data) {
       }
       unordered_set<string> grid_entry_set;
       for (const auto& e : time_ranges) {
+        if (gatherxml::verbose_operation) {
+          cout << "...processing time range entry: " << e.key << " ..." << endl;
+        }
         grid_data.time_range_entry = e;
         grid_data.time_data = grid_data.forecast_period.id.empty() ?
             coord_vars.nc_time : coord_vars.forecast_period;
