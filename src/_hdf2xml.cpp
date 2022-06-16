@@ -28,7 +28,9 @@ using std::accumulate;
 using std::cerr;
 using std::cout;
 using std::endl;
+using std::make_pair;
 using std::move;
+using std::pair;
 using std::regex;
 using std::regex_search;
 using std::shared_ptr;
@@ -136,7 +138,7 @@ struct Inventory {
   struct Maps {
     Maps() : U(), G(), L(), P(), R() { }
 
-    unordered_map<string, size_t> U, G, L, P, R;
+    unordered_map<string, pair<size_t, size_t>> U, G, L, P, R;
   };
 
   Inventory() : file(), dir(nullptr), stream(), maps(), lines() { }
@@ -1350,7 +1352,7 @@ void update_grid_entry_set(string key_start, string time_method, const
     grid_entry_set.emplace(k);
   }
   if (g_inv.stream.is_open() && g_inv.maps.U.find(d) == g_inv.maps.U.end()) {
-    g_inv.maps.U.emplace(d, g_inv.maps.U.size());
+    g_inv.maps.U.emplace(d, make_pair(g_inv.maps.U.size(), 0));
   }
 }
 
@@ -1432,7 +1434,7 @@ void add_gridded_lat_lon_keys(unordered_set<string>& grid_entry_set, Grid::
   auto key = strutils::substitute(key_start, "<!>", ",");
   strutils::chop(key);
   if (g_inv.stream.is_open() && g_inv.maps.G.find(key) == g_inv.maps.G.end()) {
-    g_inv.maps.G.emplace(key, g_inv.maps.G.size());
+    g_inv.maps.G.emplace(key, make_pair(g_inv.maps.G.size(), 0));
   }
 }
 
@@ -1685,10 +1687,9 @@ void add_gridded_parameters_to_netcdf_level_entry(string& grid_entry_key, const
   // find all of the variables
   auto vars = is->datasets_with_attribute("DIMENSION_LIST");
   for (const auto& dse : vars) {
-    if (grid_data.coordinate_variables_set.find(dse.key) ==
-        grid_data.coordinate_variables_set.end()) {
-      auto& dset_ptr = dse.p_ds;
-      auto attr_it = dset_ptr->attributes.find("DIMENSION_LIST");
+    if (grid_data.coordinate_variables_set.find(dse.key) == grid_data.
+        coordinate_variables_set.end()) {
+      auto attr_it = dse.p_ds->attributes.find("DIMENSION_LIST");
       if (gatherxml::verbose_operation) {
         cout << "    '" << dse.key << "' has a DIMENSION_LIST: ";
         attr_it->second.print(cout, is->reference_table_pointer());
@@ -1702,7 +1703,8 @@ void add_gridded_parameters_to_netcdf_level_entry(string& grid_entry_key, const
         if (gatherxml::verbose_operation) {
           cout << "*** is a netCDF variable ***" << endl;
         }
-        auto time_method = gridded_time_method(dset_ptr, grid_data);
+        auto time_method = gridded_time_method(dse.p_ds, grid_data);
+        time_method = strutils::capitalize(time_method);
         TimeRange time_range;
         if (time_method.empty() || (floatutils::myequalf(time_bounds.t1, 0,
             0.0001) && floatutils::myequalf(time_bounds.t1, time_bounds.t2,
@@ -1720,7 +1722,6 @@ void add_gridded_parameters_to_netcdf_level_entry(string& grid_entry_key, const
           time_range.last_valid_datetime = grid_data.time_range_entry.bounded.
               last_valid_datetime;
         }
-        time_method = strutils::capitalize(time_method);
         string e;
         auto d = metautils::NcTime::gridded_netcdf_time_range_description(
             grid_data.time_range_entry, *grid_data.time_data, time_method, e);
@@ -1729,14 +1730,13 @@ void add_gridded_parameters_to_netcdf_level_entry(string& grid_entry_key, const
         }
         d = capitalize(d);
         if (regex_search(grid_entry_key, regex(d + "$"))) {
-//          if (attr.value.dim_sizes[0] == 4 || attr.value.dim_sizes[0] == 3 || (attr.value.dim_sizes[0] == 2 && grid_data.valid_time.data_array.num_values == 1)) {
-            g_grml_data->p.key = "ds" + g_dsid + ":" + dse.key;
-            add_gridded_netcdf_parameter(dse, scan_data, time_range,
-                parameter_data, grid_data.time_range_entry.num_steps);
-            if (g_inv.maps.P.find(g_grml_data->p.key) == g_inv.maps.P.end()) {
-              g_inv.maps.P.emplace(g_grml_data->p.key, g_inv.maps.P.size());
-            }
-//          }
+          g_grml_data->p.key = "ds" + g_dsid + ":" + dse.key;
+          add_gridded_netcdf_parameter(dse, scan_data, time_range,
+              parameter_data, grid_data.time_range_entry.num_steps);
+          if (g_inv.maps.P.find(g_grml_data->p.key) == g_inv.maps.P.end()) {
+            g_inv.maps.P.emplace(g_grml_data->p.key, make_pair(g_inv.maps.P.
+                size(), 0));
+          }
         }
       }
     }
@@ -1748,84 +1748,98 @@ void update_level_entry(const TimeBounds& time_bounds, const GridData&
     level_write) {
   static const string F = this_function_label(__func__);
   auto is = sget_hdf5();
+
+  // find all of the variables
   auto vars = is->datasets_with_attribute("DIMENSION_LIST");
   for (const auto& dse : vars) {
-    auto attr_it = dse.p_ds->attributes.find("DIMENSION_LIST");
-    if (attr_it->second._class_ == 9 && attr_it->second.dim_sizes.size() == 1 &&
-        attr_it->second.dim_sizes[0] > 2 && attr_it->second.vlen.class_ == 7 &&
-        parameter_matches_dimensions(attr_it->second, grid_data)) {
-      g_grml_data->p.key = "ds" + g_dsid + ":" + dse.key;
-      auto time_method = gridded_time_method(dse.p_ds, grid_data);
-      time_method = strutils::capitalize(time_method);
-      TimeRange time_range;
-      if (g_grml_data->l.entry.parameter_code_table.find(g_grml_data->p.key)
-          == g_grml_data->l.entry.parameter_code_table.end()) {
-        if (time_method.empty() || (floatutils::myequalf(time_bounds.t1, 0,
-            0.0001) && floatutils::myequalf(time_bounds.t1, time_bounds.t2,
-            0.0001))) {
-          time_range.first_valid_datetime = grid_data.time_range_entry.
-              instantaneous.first_valid_datetime;
-          time_range.last_valid_datetime = grid_data.time_range_entry.
-              instantaneous.last_valid_datetime;
-          add_gridded_netcdf_parameter(dse, scan_data, time_range,
-              parameter_data, grid_data.time_range_entry.num_steps);
-        } else {
-          if (time_bounds.changed) {
-            log_error2("time bounds changed", F, g_util_ident);
-          }
-          time_range.first_valid_datetime = grid_data.time_range_entry.bounded.
-              first_valid_datetime;
-          time_range.last_valid_datetime = grid_data.time_range_entry.bounded.
-              last_valid_datetime;
-          add_gridded_netcdf_parameter(dse, scan_data, time_range,
-              parameter_data, grid_data.time_range_entry.num_steps);
+    if (grid_data.coordinate_variables_set.find(dse.key) == grid_data.
+        coordinate_variables_set.end()) {
+      auto attr_it = dse.p_ds->attributes.find("DIMENSION_LIST");
+      if (gatherxml::verbose_operation) {
+        cout << "    '" << dse.key << "' has a DIMENSION_LIST: ";
+        attr_it->second.print(cout, is->reference_table_pointer());
+        cout << endl;
+      }
+      if (attr_it->second._class_ == 9 && attr_it->second.dim_sizes.size() == 1
+          && attr_it->second.dim_sizes[0] > 2 && attr_it->second.vlen.class_ ==
+          7 && parameter_matches_dimensions(attr_it->second, grid_data)) {
+        if (gatherxml::verbose_operation) {
+          cout << "*** is a netCDF variable ***" << endl;
         }
-        g_grml_data->g.entry.level_table[g_grml_data->l.key] = g_grml_data->l.
-            entry;
-      } else {
-        string e;
-        auto d = metautils::NcTime::gridded_netcdf_time_range_description(
-            grid_data.time_range_entry, *grid_data.time_data, time_method, e);
-        if (!e.empty()) {
-          log_error2(e, F, g_util_ident);
-        }
-        d = capitalize(d);
-        if (regex_search(g_grml_data->g.key, regex(d + "$"))) {
-          auto& pe = g_grml_data->l.entry.parameter_code_table[g_grml_data->p.
-              key];
+        g_grml_data->p.key = "ds" + g_dsid + ":" + dse.key;
+        auto time_method = gridded_time_method(dse.p_ds, grid_data);
+        time_method = strutils::capitalize(time_method);
+        TimeRange time_range;
+        if (g_grml_data->l.entry.parameter_code_table.find(g_grml_data->p.key)
+            == g_grml_data->l.entry.parameter_code_table.end()) {
           if (time_method.empty() || (floatutils::myequalf(time_bounds.t1, 0,
               0.0001) && floatutils::myequalf(time_bounds.t1, time_bounds.t2,
               0.0001))) {
-            if (grid_data.time_range_entry.instantaneous.first_valid_datetime <
-                pe.start_date_time) {
-              pe.start_date_time = grid_data.time_range_entry.instantaneous.
-                  first_valid_datetime;
-            }
-            if (grid_data.time_range_entry.instantaneous.last_valid_datetime >
-                pe.end_date_time) {
-              pe.end_date_time = grid_data.time_range_entry.instantaneous.
-                  last_valid_datetime;
-            }
+            time_range.first_valid_datetime = grid_data.time_range_entry.
+                instantaneous.first_valid_datetime;
+            time_range.last_valid_datetime = grid_data.time_range_entry.
+                instantaneous.last_valid_datetime;
+            add_gridded_netcdf_parameter(dse, scan_data, time_range,
+                parameter_data, grid_data.time_range_entry.num_steps);
           } else {
-            if (grid_data.time_range_entry.bounded.first_valid_datetime <
-                pe.start_date_time) {
-              pe.start_date_time = grid_data.time_range_entry.bounded.
-                  first_valid_datetime;
+            if (time_bounds.changed) {
+              log_error2("time bounds changed", F, g_util_ident);
             }
-            if (grid_data.time_range_entry.bounded.last_valid_datetime >
-                pe.end_date_time) {
-              pe.end_date_time = grid_data.time_range_entry.bounded.
-                  last_valid_datetime;
-            }
+            time_range.first_valid_datetime = grid_data.time_range_entry.bounded.
+                first_valid_datetime;
+            time_range.last_valid_datetime = grid_data.time_range_entry.bounded.
+                last_valid_datetime;
+            add_gridded_netcdf_parameter(dse, scan_data, time_range,
+                parameter_data, grid_data.time_range_entry.num_steps);
           }
-          pe.num_time_steps += grid_data.time_range_entry.num_steps;
-          g_grml_data->g.entry.level_table[g_grml_data->l.key] = g_grml_data->
-              l.entry;
+          g_grml_data->g.entry.level_table[g_grml_data->l.key] = g_grml_data->l.
+              entry;
+        } else {
+          string e;
+          auto d = metautils::NcTime::gridded_netcdf_time_range_description(
+              grid_data.time_range_entry, *grid_data.time_data, time_method, e);
+          if (!e.empty()) {
+            log_error2(e, F, g_util_ident);
+          }
+          d = capitalize(d);
+          if (regex_search(g_grml_data->g.key, regex(d + "$"))) {
+            auto& pe = g_grml_data->l.entry.parameter_code_table[g_grml_data->p.
+                key];
+            if (time_method.empty() || (floatutils::myequalf(time_bounds.t1, 0,
+                0.0001) && floatutils::myequalf(time_bounds.t1, time_bounds.t2,
+                0.0001))) {
+              if (grid_data.time_range_entry.instantaneous.first_valid_datetime <
+                  pe.start_date_time) {
+                pe.start_date_time = grid_data.time_range_entry.instantaneous.
+                    first_valid_datetime;
+              }
+              if (grid_data.time_range_entry.instantaneous.last_valid_datetime >
+                  pe.end_date_time) {
+                pe.end_date_time = grid_data.time_range_entry.instantaneous.
+                    last_valid_datetime;
+              }
+            } else {
+              if (grid_data.time_range_entry.bounded.first_valid_datetime <
+                  pe.start_date_time) {
+                pe.start_date_time = grid_data.time_range_entry.bounded.
+                    first_valid_datetime;
+              }
+              if (grid_data.time_range_entry.bounded.last_valid_datetime >
+                  pe.end_date_time) {
+                pe.end_date_time = grid_data.time_range_entry.bounded.
+                    last_valid_datetime;
+              }
+            }
+            pe.num_time_steps += grid_data.time_range_entry.num_steps;
+            g_grml_data->g.entry.level_table[g_grml_data->l.key] = g_grml_data->
+                l.entry;
+          }
         }
-      }
-      level_write = true;
-      if (g_inv.maps.P.find(g_grml_data->p.key) == g_inv.maps.P.end()) {
-        g_inv.maps.P.emplace(g_grml_data->p.key, g_inv.maps.P.size());
+        level_write = true;
+        if (g_inv.maps.P.find(g_grml_data->p.key) == g_inv.maps.P.end()) {
+          g_inv.maps.P.emplace(g_grml_data->p.key, make_pair(g_inv.maps.P.
+              size(), 0));
+        }
       }
     }
   }
@@ -1903,9 +1917,9 @@ DateTime compute_nc_time(const HDF5::DataArray& times, const TimeData&
   return dt;
 }
 
-void update_inventory(int unum, int gnum, const GridData& grid_data) {
+void update_inventory(string pkey, string gkey, const GridData& grid_data) {
   if (g_inv.maps.L.find(g_grml_data->l.key) == g_inv.maps.L.end()) {
-    g_inv.maps.L.emplace(g_grml_data->l.key, g_inv.maps.L.size());
+    g_inv.maps.L.emplace(g_grml_data->l.key, make_pair(g_inv.maps.L.size(), 0));
   }
   for (size_t n = 0; n < grid_data.valid_time.data_array.num_values; ++n) {
     for (const auto& e : g_grml_data->l.entry.parameter_code_table) {
@@ -1913,10 +1927,16 @@ void update_inventory(int unum, int gnum, const GridData& grid_data) {
       string error;
       inv_line << "0|0|" << actual_date_time(data_array_value(grid_data.
           valid_time.data_array, n, grid_data.valid_time.ds.get()), *grid_data.
-          time_data, error).to_string("%Y%m%d%H%MM") << "|" << unum << "|" <<
-          gnum << "|" << g_inv.maps.L[g_grml_data->l.key] << "|" << g_inv.maps.
-          P[e.first] << "|0";
+          time_data, error).to_string("%Y%m%d%H%MM") << "|" << g_inv.maps.U[
+          pkey].first << "|" << g_inv.maps.G[gkey].first << "|" << g_inv.maps.L[
+          g_grml_data->l.key].first << "|" << g_inv.maps.P[e.first].first <<
+          "|0";
       g_inv.lines.emplace_back(inv_line.str());
+      ++g_inv.maps.U[pkey].second;
+      ++g_inv.maps.G[gkey].second;
+      ++g_inv.maps.L[g_grml_data->l.key].second;
+      ++g_inv.maps.P[e.first].second;
+++g_inv.maps.R["x"].second;
     }
   }
 }
@@ -3442,7 +3462,7 @@ void add_new_grid(GridData& gd, CoordinateVariables& cv, size_t nlev, size_t
           l.entry);
       cv.level_info[lidx].write = 1;
       if (g_inv.stream.is_open()) {
-        update_inventory(g_inv.maps.U[pkey], g_inv.maps.G[gkey], gd);
+        update_inventory(pkey, gkey, gd);
       }
     }
   }
@@ -3477,7 +3497,7 @@ void update_existing_grid(GridData& gd, CoordinateVariables& cv, size_t nlev,
        update_level_entry(tb, gd, sd, pd, cv.level_info[lidx].write);
     }
     if (cv.level_info[lidx].write == 1 && g_inv.stream.is_open()) {
-      update_inventory(g_inv.maps.U[pkey], g_inv.maps.G[gkey], gd);
+      update_inventory(pkey, gkey, gd);
     }
   }
   g_grml_data->gtb[g_grml_data->g.key] = g_grml_data->g.entry;
@@ -3787,7 +3807,7 @@ void scan_gridded_hdf5nc4_file(ScanData& scan_data) {
     }
     for (size_t m = 0; m < coord_vars.level_info.size(); ++m) {
       if (gatherxml::verbose_operation) {
-        cout << "...processing verical level entry: " << coord_vars.level_info[
+        cout << "...processing vertical level entry: " << coord_vars.level_info[
             m].ID << " ..." << endl;
       }
       grid_data.level.id = coord_vars.level_info[m].ID;
@@ -3839,15 +3859,25 @@ void scan_gridded_hdf5nc4_file(ScanData& scan_data) {
               grid_key += "," + sp[nn];
             }
           }
-          if (g_grml_data->gtb.find(g_grml_data->g.key) == g_grml_data->
-              gtb.end()) {
+          if (g_grml_data->gtb.find(g_grml_data->g.key) == g_grml_data->gtb.
+              end()) {
             add_new_grid(grid_data, coord_vars, num_levels, m, scan_data,
                 tm_bnds, parameter_data, product_key, grid_key);
            } else {
             update_existing_grid(grid_data, coord_vars, num_levels, m,
                 scan_data, tm_bnds, parameter_data, product_key, grid_key);
           }
+          if (gatherxml::verbose_operation) {
+            cout << "...grid entry: " << key << " done." << endl;
+          }
         }
+        if (gatherxml::verbose_operation) {
+          cout << "...time range entry: " << e.key << " done." << endl;
+        }
+      }
+      if (gatherxml::verbose_operation) {
+        cout << "...vertical level entry: " << coord_vars.level_info[
+            m].ID << " done." << endl;
       }
     }
     auto e = metautils::NcLevel::write_level_map(coord_vars.level_info);
@@ -3865,7 +3895,7 @@ void scan_gridded_hdf5nc4_file(ScanData& scan_data) {
     exit(1);
   }
 if (g_inv.stream.is_open()) {
-g_inv.maps.R.emplace("x", 0);
+g_inv.maps.R.emplace("x", make_pair(0, 0));
 }
   if (gatherxml::verbose_operation) {
     cout << "...function scan_gridded_hdf5nc4_file() done." << endl;
@@ -4108,9 +4138,13 @@ void print_output_location(int write_type) {
   cout << "ML" << endl;
 }
 
-void write_map(string prefix, const unordered_map<string, size_t>& map) {
+void write_map(string prefix, const unordered_map<string, pair<size_t, size_t>>&
+    map) {
   for (const auto& e : map) {
-    g_inv.stream << prefix << "<!>" << e.second << "<!>" << e.first << endl;
+    if (e.second.second > 0) {
+      g_inv.stream << prefix << "<!>" << e.second.first << "<!>" << e.first <<
+          endl;
+    }
   }
 }
 
