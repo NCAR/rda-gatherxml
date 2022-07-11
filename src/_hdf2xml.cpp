@@ -1321,13 +1321,12 @@ void scan_usarray_transportable_hdf5_file(
   scan_data.write_type = ScanData::ObML_type;
 }
 
-string gridded_time_method(const DatasetPointer ds, const GridData& grid_data) {
+string gridded_time_method(const DatasetPointer ds, string valid_time_id) {
   static const string F = this_function_label(__func__);
   auto attr_it = ds->attributes.find("cell_methods");
   if (attr_it != ds->attributes.end() && attr_it->second._class_ == 3) {
     auto time_method = metautils::NcTime::time_method_from_cell_methods(
-        reinterpret_cast<char *>(attr_it->second.array),
-        grid_data.valid_time.id);
+        reinterpret_cast<char *>(attr_it->second.array), valid_time_id);
     if (time_method[0] == '!') {
       log_error2("cell method '" + time_method.substr(1) + "' is not valid CF",
           F, g_util_ident);
@@ -1369,7 +1368,7 @@ void add_gridded_time_range(string key_start, unordered_set<string>&
         coordinate_variables_set.end() && attr_it->second.dim_sizes.size() == 1
         && (attr_it->second.dim_sizes[0] > 2 || (attr_it->second.dim_sizes[0] ==
         2 && grid_data.valid_time.data_array.num_values == 1))) {
-      auto tm = gridded_time_method(dse.p_ds, grid_data);
+      auto tm = gridded_time_method(dse.p_ds, grid_data.valid_time.id);
       if (tm.empty()) {
         b = true;
       } else {
@@ -1678,10 +1677,11 @@ bool parameter_matches_dimensions(const InputHDF5Stream::DataValue&
   return parameter_matches;
 }
 
-void add_gridded_parameters_to_netcdf_level_entry(string& grid_entry_key, const
-    GridData& grid_data, ScanData& scan_data, const TimeBounds& time_bounds,
-    ParameterData& parameter_data) {
+bool added_gridded_parameters_to_netcdf_level_entry(string& grid_entry_key,
+    const GridData& grid_data, ScanData& scan_data, const TimeBounds&
+    time_bounds, ParameterData& parameter_data) {
   static const string F = this_function_label(__func__);
+  bool b = false; // return value
   auto is = sget_hdf5();
 
   // find all of the variables
@@ -1703,7 +1703,8 @@ void add_gridded_parameters_to_netcdf_level_entry(string& grid_entry_key, const
         if (gatherxml::verbose_operation) {
           cout << "*** is a netCDF variable ***" << endl;
         }
-        auto time_method = gridded_time_method(dse.p_ds, grid_data);
+        auto time_method = gridded_time_method(dse.p_ds, grid_data.valid_time.
+            id);
         time_method = strutils::capitalize(time_method);
         TimeRange time_range;
         if (time_method.empty() || (floatutils::myequalf(time_bounds.t1, 0,
@@ -1737,10 +1738,12 @@ void add_gridded_parameters_to_netcdf_level_entry(string& grid_entry_key, const
             g_inv.maps.P.emplace(g_grml_data->p.key, make_pair(g_inv.maps.P.
                 size(), 0));
           }
+          b = true;
         }
       }
     }
   }
+  return b;
 }
 
 void update_level_entry(const TimeBounds& time_bounds, const GridData&
@@ -1767,7 +1770,8 @@ void update_level_entry(const TimeBounds& time_bounds, const GridData&
           cout << "*** is a netCDF variable ***" << endl;
         }
         g_grml_data->p.key = "ds" + g_dsid + ":" + dse.key;
-        auto time_method = gridded_time_method(dse.p_ds, grid_data);
+        auto time_method = gridded_time_method(dse.p_ds, grid_data.valid_time.
+          id);
         time_method = strutils::capitalize(time_method);
         TimeRange time_range;
         if (g_grml_data->l.entry.parameter_code_table.find(g_grml_data->p.key)
@@ -2055,6 +2059,9 @@ void process_vertical_coordinate_variable(DiscreteGeometriesData& dgd, string&
 void scan_cf_point_hdf5nc4_file(ScanData& scan_data, gatherxml::markup::ObML::
     ObservationData& obs_data) {
   static const string F = this_function_label(__func__);
+  if (gatherxml::verbose_operation) {
+    cout << "  Beginning " << F << "..." << endl;
+  }
   auto is = sget_hdf5();
   auto ds_entry_list = is->datasets_with_attribute("units");
   DiscreteGeometriesData dgd;
@@ -2087,6 +2094,10 @@ void scan_cf_point_hdf5nc4_file(ScanData& scan_data, gatherxml::markup::ObML::
   if (dgd.indexes.time_var.empty()) {
     log_error2("unable to determine time variable", F, g_util_ident);
   } else {
+    if (gatherxml::verbose_operation) {
+      cout << "    found time variable '" << dgd.indexes.time_var << "'." <<
+          endl;
+    }
     auto ds = is->dataset("/" + dgd.indexes.time_var);
     if (ds == nullptr) {
       log_error2("unable to access time variable", F, g_util_ident);
@@ -2102,6 +2113,10 @@ void scan_cf_point_hdf5nc4_file(ScanData& scan_data, gatherxml::markup::ObML::
   if (dgd.indexes.lat_var.empty()) {
     log_error2("unable to determine latitude variable", F, g_util_ident);
   } else {
+    if (gatherxml::verbose_operation) {
+      cout << "    found latitude variable '" << dgd.indexes.lat_var << "'." <<
+          endl;
+    }
     auto ds = is->dataset("/" + dgd.indexes.lat_var);
     if (ds == nullptr) {
       log_error2("unable to access latitude variable", F, g_util_ident);
@@ -2112,6 +2127,10 @@ void scan_cf_point_hdf5nc4_file(ScanData& scan_data, gatherxml::markup::ObML::
   if (dgd.indexes.lon_var.empty()) {
     log_error2("unable to determine longitude variable", F, g_util_ident);
   } else {
+    if (gatherxml::verbose_operation) {
+      cout << "    found longitude variable '" << dgd.indexes.lon_var << "'." <<
+          endl;
+    }
     auto ds = is->dataset("/" + dgd.indexes.lon_var);
     if (ds == nullptr) {
       log_error2("unable to access longitude variable", F, g_util_ident);
@@ -2122,6 +2141,10 @@ void scan_cf_point_hdf5nc4_file(ScanData& scan_data, gatherxml::markup::ObML::
   if (dgd.indexes.stn_id_var.empty()) {
     log_error2("unable to determine report ID variable", F, g_util_ident);
   } else {
+    if (gatherxml::verbose_operation) {
+      cout << "    found report ID variable '" << dgd.indexes.stn_id_var << "'."
+          << endl;
+    }
     auto ds = is->dataset("/" + dgd.indexes.stn_id_var);
     if (ds == nullptr) {
       log_error2("unable to access report ID variable", F, g_util_ident);
@@ -2142,6 +2165,9 @@ void scan_cf_point_hdf5nc4_file(ScanData& scan_data, gatherxml::markup::ObML::
   string platform_type = "unknown";
   gatherxml::markup::ObML::IDEntry ientry;
   ientry.key.reserve(32768);
+  if (gatherxml::verbose_operation) {
+    cout << "    Ready to scan netCDF variables ..." << endl;
+  }
   for (const auto& ds_entry : ds_entry_list) {
     auto& var_name = ds_entry.key;
     if (var_name != dgd.indexes.time_var && var_name != dgd.indexes.lat_var &&
@@ -2171,6 +2197,10 @@ void scan_cf_point_hdf5nc4_file(ScanData& scan_data, gatherxml::markup::ObML::
       var_data.fill(*is, *ds);
       auto var_missing_value = HDF5::decode_data_value(ds->datatype,
           ds->fillvalue.bytes, 1.e33);
+      if (gatherxml::verbose_operation) {
+        cout << "      checking " << time_vals.num_values << " times for '" <<
+            key << "' ..." << endl;
+      }
       for (size_t n = 0; n < time_vals.num_values; ++n) {
         if (n == date_times.size()) {
           date_times.emplace_back(compute_nc_time(time_vals, time_data, n));
@@ -3428,7 +3458,7 @@ void add_new_grid(GridData& gd, CoordinateVariables& cv, size_t nlev, size_t
   g_grml_data->g.entry.level_table.clear();
   g_grml_data->l.entry.parameter_code_table.clear();
   g_grml_data->p.entry.num_time_steps = 0;
-  add_gridded_parameters_to_netcdf_level_entry(g_grml_data->g.key, gd, sd, tb,
+  added_gridded_parameters_to_netcdf_level_entry(g_grml_data->g.key, gd, sd, tb,
       pd);
   if (!g_grml_data->l.entry.parameter_code_table.empty()) {
     for (size_t l = 0; l < nlev; ++l) {
@@ -3474,6 +3504,7 @@ void add_new_grid(GridData& gd, CoordinateVariables& cv, size_t nlev, size_t
 void update_existing_grid(GridData& gd, CoordinateVariables& cv, size_t nlev,
     size_t lidx, ScanData& sd, TimeBounds& tb, ParameterData& pd, string pkey,
     string gkey) {
+  bool b = false;
   for (size_t l = 0; l < nlev; ++l) {
     g_grml_data->l.key = "ds" + g_dsid + "," + gd.level.id + ":";
     auto v = gd.level.ds == nullptr ? 0. : data_array_value(gd.level.data_array,
@@ -3486,8 +3517,10 @@ void update_existing_grid(GridData& gd, CoordinateVariables& cv, size_t nlev,
     if (g_grml_data->g.entry.level_table.find(g_grml_data->l.key) ==
         g_grml_data->g.entry.level_table.end()) {
       g_grml_data->l.entry.parameter_code_table.clear();
-      add_gridded_parameters_to_netcdf_level_entry(g_grml_data->g.key, gd, sd,
-          tb, pd);
+      if (added_gridded_parameters_to_netcdf_level_entry(g_grml_data->g.key, gd,
+          sd, tb, pd)) {
+        b = true;
+      }
       if (!g_grml_data->l.entry.parameter_code_table.empty()) {
         g_grml_data->g.entry.level_table.emplace(g_grml_data->l.key,
             g_grml_data->l.entry);
@@ -3500,7 +3533,9 @@ void update_existing_grid(GridData& gd, CoordinateVariables& cv, size_t nlev,
       update_inventory(pkey, gkey, gd);
     }
   }
-  g_grml_data->gtb[g_grml_data->g.key] = g_grml_data->g.entry;
+  if (b) {
+    g_grml_data->gtb[g_grml_data->g.key] = g_grml_data->g.entry;
+  }
 }
 
 void scan_gridded_hdf5nc4_file(ScanData& scan_data) {
@@ -3839,7 +3874,8 @@ void scan_gridded_hdf5nc4_file(ScanData& scan_data) {
       unordered_set<string> grid_entry_set;
       for (const auto& e : time_ranges) {
         if (gatherxml::verbose_operation) {
-          cout << "...processing time range entry: " << e.key << " ..." << endl;
+          cout << "...processing time range entry: " << static_cast<int>(e.key)
+              << " ..." << endl;
         }
         grid_data.time_range_entry = e;
         grid_data.time_data = grid_data.forecast_period.id.empty() ?
@@ -3951,6 +3987,9 @@ void scan_hdf5nc4_file(ScanData& scan_data, gatherxml::markup::ObML::
     }
   }
   auto ftype = feature_type(ds->attributes);
+  if (gatherxml::verbose_operation) {
+    cout << "Feature type is '" << ftype << "'." << endl;
+  }
   if (ftype.empty()) {
     scan_gridded_hdf5nc4_file(scan_data);
   } else {
