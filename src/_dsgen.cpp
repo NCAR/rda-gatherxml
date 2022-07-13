@@ -704,7 +704,7 @@ void add_publications(TokenDocument& tdoc, XMLDocument& g_xdoc) {
     update_wagtail("publications", "[" + json + "]", F);
   }
   auto ulist = g_xdoc.element_list("dsOverview/referenceURL");
-  if (ulist.size() > 0) {
+  if (!ulist.empty()) {
     if (ss.str().empty()) {
       tdoc.add_if("__HAS_PUBLICATIONS__");
     }
@@ -1000,21 +1000,21 @@ bool add_temporal_range(TokenDocument& tdoc, string dsnum2, size_t& swp_cnt) {
         "p.time_end, p.end_flag, p.time_zone, g.title, g.grpid from dssdb"
         ".dsperiod as p left join dssdb.dsgroup as g on (p.dsid = g.dsid and p"
         ".gindex = g.gindex) where p.dsid = 'ds" + metautils::args.dsnum +
-        "' and g.pindex = 0 and date_start > '0000-00-00' and date_start < "
-        "'3000-01-01' and date_end > '0000-00-00' and date_end < '3000-01-01' "
+        "' and g.pindex = 0 and date_start > '0001-01-01' and date_start < "
+        "'3000-01-01' and date_end > '0001-01-01' and date_end < '3000-01-01' "
         "union select p.date_start, p.time_start, p.start_flag, p.date_end, p"
         ".time_end, p.end_flag, p.time_zone, g2.title, g.grpid from dssdb"
         ".dsperiod as p left join dssdb.dsgroup as g on (p.dsid = g.dsid and p"
         ".gindex = g.gindex) left join dssdb.dsgroup as g2 on (p.dsid = g2"
         ".dsid and g.pindex = g2.gindex) where p.dsid = 'ds" + metautils::
-        args.dsnum + "' and date_start > '0000-00-00' and date_start < '3000-01"
-        "-01' and date_end > '0000-00-00' and date_end < '3000-01-01' and "
+        args.dsnum + "' and date_start > '0001-01-01' and date_start < '3000-01"
+        "-01' and date_end > '0001-01-01' and date_end < '3000-01-01' and "
         "!isnull(g2.title) order by title");
   } else {
     q.set("select date_start, time_start, start_flag, date_end, time_end, "
         "end_flag, time_zone, NULL, NULL from dssdb.dsperiod where dsid = 'ds" +
-        metautils::args.dsnum + "' and date_start > '0000-00-00' and "
-        "date_start < '3000-01-01' and date_end > '0000-00-00' and date_end < "
+        metautils::args.dsnum + "' and date_start > '0001-01-01' and "
+        "date_start < '3000-01-01' and date_end > '0001-01-01' and date_end < "
         "'3000-01-01'");
   }
   if (q.submit(server) < 0) {
@@ -1024,8 +1024,8 @@ bool add_temporal_range(TokenDocument& tdoc, string dsnum2, size_t& swp_cnt) {
   if (q.num_rows() == 0) {
     q.set("select date_start, time_start, start_flag, date_end, time_end, "
         "end_flag, time_zone, NULL, NULL from dssdb.dsperiod where dsid = "
-        "'ds" + metautils::args.dsnum + "' and date_start > '0000-00-00' and "
-        "date_start < '3000-01-01' and date_end > '0000-00-00' and date_end < "
+        "'ds" + metautils::args.dsnum + "' and date_start > '0001-01-01' and "
+        "date_start < '3000-01-01' and date_end > '0001-01-01' and date_end < "
         "'3000-01-01'");
     if (q.submit(server) < 0) {
       log_error2("query: " + q.show() + " returned error: " + q.error(), F,
@@ -1049,8 +1049,8 @@ bool add_temporal_range(TokenDocument& tdoc, string dsnum2, size_t& swp_cnt) {
             "time_start)), min(start_flag), max(concat(date_end, ' ', "
             "time_end)), min(end_flag), any_value(time_zone) from dssdb"
             ".dsperiod where dsid = 'ds" + metautils::args.dsnum + "' and "
-            "date_start > '0000-00-00' and date_start < '3000-01-01' and "
-            "date_end > '0000-00-00' and date_end < '3000-01-01' group by "
+            "date_start > '0001-01-01' and date_start < '3000-01-01' and "
+            "date_end > '0001-01-01' and date_end < '3000-01-01' group by "
             "dsid");
         if (qdt.submit(server) < 0) {
           log_error2("query: " + qdt.show() + " returned error: " + qdt.error(),
