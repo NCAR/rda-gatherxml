@@ -74,19 +74,22 @@ void summarize_grid_levels(string database, string caller, string user) {
   }
   string e;
   if (srv.command("lock table " + database + ".ds" + d + "_levels write", e) 
-      < 0)
+      < 0) {
     log_error2("summarize_grid_levels(): " + srv.error() + " while locking "
         "table " + database + ".ds" + d + "_levels", F, caller, user);
+  }
   srv._delete(database + ".ds" + d + "_levels");
   for (const auto& e : uset) {
-    if (srv.insert(database + ".ds" + d + "_levels", e) < 0)
+    if (srv.insert(database + ".ds" + d + "_levels", e) < 0) {
       log_error2("summarize_grid_levels(): " + srv.error() + " while inserting "
           "'" + e + "' into " + database + ".ds" + d + "_levels", F, caller,
           user);
+    }
   }
-  if (srv.command("unlock tables", e) < 0)
+  if (srv.command("unlock tables", e) < 0) {
     log_error2("summarize_grid_levels(): " + srv.error() + " while unlocking "
         "tables", F, caller, user);
+  }
   srv.disconnect();
 }
 
@@ -120,8 +123,7 @@ void summarize_grids(string database, string caller, string user, string
       + " as p left join " + database + ".formats as f on f.code = p."
       "format_code");
   if (q.submit(srv) < 0) {
-    log_error2("summarize_grids(): " + q.error() + " for query '" + q.show() +
-        "'", F, caller, user);
+    log_error2(q.error() + " for query '" + q.show() + "'", F, caller, user);
   }
   string fc;
   unordered_map<string, string> ff_map;
@@ -134,8 +136,7 @@ void summarize_grids(string database, string caller, string user, string
         "left join " + database + ".formats as f on f.code = p.format_code "
         "where !isnull(f.code)");
     if (q.submit(srv) < 0) {
-      log_error2("summarize_grids(): " + q.error() + " for query '" + q.show() +
-          "'", F, caller, user);
+      log_error2(q.error() + " for query '" + q.show() + "'", F, caller, user);
     }
     for (const auto& r : q) {
       ff_map.emplace(r[0], r[1]);
@@ -153,8 +154,7 @@ void summarize_grids(string database, string caller, string user, string
   }
   q.set(s);
   if (q.submit(srv) < 0) {
-    log_error2("summarize_grids(): " + q.error() + " for query '" + q.show() +
-        "'", F, caller, user);
+    log_error2(q.error() + " for query '" + q.show() + "'", F, caller, user);
   }
   unordered_map<string, vector<size_t>> tr_map, gd_map, l_map;
   my::map<GridSummaryEntry> summ_map(99999);
@@ -230,7 +230,7 @@ void summarize_grids(string database, string caller, string user, string
   }
   string e;
   if (srv.command("lock table " + database + ".summary write", e) < 0) {
-    log_error2("summarize_grids(): " + srv.error(), F, caller, user);
+    log_error2(srv.error(), F, caller, user);
   }
   if (fileID_code.empty()) {
     srv._delete(database + ".summary","dsid = '" + metautils::args.dsnum + "'");
@@ -258,7 +258,7 @@ void summarize_grids(string database, string caller, string user, string
             "= " + sp[1] + " and gridDefinition_code = " + sp[2] + " and "
             "parameter = " + sp[3]);
         if (q.submit(srv) < 0) {
-          log_error2("summarize_grids(): " + q.error(), F, caller, user);
+          log_error2(q.error(), F, caller, user);
         }
         MySQL::Row row;
         q.fetch_row(row);
@@ -282,21 +282,21 @@ void summarize_grids(string database, string caller, string user, string
             "levelType_codes = '" + b + "', start_date = if (" + d1 + " < "
             "start_date, " + d1 + ", start_date), end_date = if (" + d2 + " > "
             "end_date, " + d2 + ", end_date)") < 0) {
-          log_error2("summarize_grids(): " + srv.error() + " while trying to "
-              "insert ('" + metautils::args.dsnum + "', " + gse.key + ", '" + b
-              + "', " + d1 + ", " + d2 + ")", F, caller, user);
+          log_error2(srv.error() + " while trying to insert ('" + metautils::
+              args.dsnum + "', " + gse.key + ", '" + b + "', " + d1 + ", " + d2
+              + ")", F, caller, user);
         }
       } else {
-        log_error2("summarize_grids(): " + srv.error() + " while trying to "
-            "insert ('" + metautils::args.dsnum + "', " + gse.key + ", '" + b +
-            "', " + d1 + ", " + d2 + ")", F, caller, user);
+        log_error2(srv.error() + " while trying to insert ('" + metautils::args.
+            dsnum + "', " + gse.key + ", '" + b + "', " + d1 + ", " + d2 + ")",
+            F, caller, user);
       }
     }
     gse.data->level_code_set.clear();
     gse.data.reset();
   }
   if (srv.command("unlock tables", e) < 0) {
-    log_error2("summarize_grids(): " + srv.error(), F, caller, user);
+    log_error2(srv.error(), F, caller, user);
   }
   srv.disconnect();
 }
@@ -308,8 +308,8 @@ struct GridDefinitionEntry {
   string definition, def_params;
 };
 
-void summarize_grid_resolutions(string caller, string user, string file_id_code)
-    {
+void summarize_grid_resolutions(string caller, string user, string
+    file_id_code) {
   static const string F = string(__func__) + "()";
   MySQL::Server srv(metautils::directives.database_server, metautils::
       directives.metadb_username, metautils::directives.metadb_password, "");
