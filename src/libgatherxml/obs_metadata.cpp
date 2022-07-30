@@ -410,7 +410,7 @@ ObservationData::ObservationData() : num_types(0), observation_types(),
     track_unique_observations(true), is_empty(true) {
   MySQL::Server mysrv(metautils::directives.database_server, metautils::
       directives.metadb_username, metautils::directives.metadb_password, "");
-  MySQL::LocalQuery q("obsType", "ObML.obsTypes");
+  MySQL::LocalQuery q("obsType", "WObML.obsTypes");
   if (q.submit(mysrv) == 0) {
     for (const auto& r : q) {
       observation_types.emplace(num_types, r[0]);
