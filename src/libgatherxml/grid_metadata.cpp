@@ -19,6 +19,8 @@ using floatutils::myequalf;
 using metautils::log_error2;
 using metautils::log_warning;
 using miscutils::this_function_label;
+using std::cerr;
+using std::endl;
 using std::make_pair;
 using std::pair;
 using std::regex;
@@ -57,9 +59,11 @@ void summarize_grid_levels(string database, string caller, string user) {
   MySQL::LocalQuery q("select distinct p.format_code, g.levelType_codes from " +
       database + ".ds" + d + "_agrids as g left join " + database + ".ds" + d +
       t + " as p on p.code = g." + i + "_code where !isnull(p.format_code)");
+#ifdef DUMP_QUERIES
+    cerr << F << ": " << q.show() << endl;
+#endif
   if (q.submit(srv) < 0) {
-    log_error2("summarize_grid_levels(): '" + q.error() + "' for '" + q.show() +
-        "'", F, caller, user);
+    log_error2(q.error() + "' for '" + q.show() + "'", F, caller, user);
   }
   unordered_set<string> uset;
   for (const auto& row : q) {
@@ -75,20 +79,19 @@ void summarize_grid_levels(string database, string caller, string user) {
   string e;
   if (srv.command("lock table " + database + ".ds" + d + "_levels write", e) 
       < 0) {
-    log_error2("summarize_grid_levels(): " + srv.error() + " while locking "
-        "table " + database + ".ds" + d + "_levels", F, caller, user);
+    log_error2(srv.error() + " while locking table " + database + ".ds" + d +
+        "_levels", F, caller, user);
   }
   srv._delete(database + ".ds" + d + "_levels");
   for (const auto& e : uset) {
     if (srv.insert(database + ".ds" + d + "_levels", e) < 0) {
-      log_error2("summarize_grid_levels(): " + srv.error() + " while inserting "
-          "'" + e + "' into " + database + ".ds" + d + "_levels", F, caller,
+      log_error2(srv.error() + " while inserting '" + e + "' into " + database +
+          ".ds" + d + "_levels", F, caller,
           user);
     }
   }
   if (srv.command("unlock tables", e) < 0) {
-    log_error2("summarize_grid_levels(): " + srv.error() + " while unlocking "
-        "tables", F, caller, user);
+    log_error2(srv.error() + " while unlocking tables", F, caller, user);
   }
   srv.disconnect();
 }
@@ -122,6 +125,9 @@ void summarize_grids(string database, string caller, string user, string
   MySQL::LocalQuery q("select distinct f.code from " + database + ".ds" + d + t
       + " as p left join " + database + ".formats as f on f.code = p."
       "format_code");
+#ifdef DUMP_QUERIES
+    cerr << F << ": " << q.show() << endl;
+#endif
   if (q.submit(srv) < 0) {
     log_error2(q.error() + " for query '" + q.show() + "'", F, caller, user);
   }
@@ -135,6 +141,9 @@ void summarize_grids(string database, string caller, string user, string
     q.set("select p.code, f.code from " + database + ".ds" + d + t + " as p "
         "left join " + database + ".formats as f on f.code = p.format_code "
         "where !isnull(f.code)");
+#ifdef DUMP_QUERIES
+    cerr << F << ": " << q.show() << endl;
+#endif
     if (q.submit(srv) < 0) {
       log_error2(q.error() + " for query '" + q.show() + "'", F, caller, user);
     }
@@ -153,6 +162,9 @@ void summarize_grids(string database, string caller, string user, string
         ".ds" + d + "_agrids";
   }
   q.set(s);
+#ifdef DUMP_QUERIES
+  cerr << F << ": " << q.show() << endl;
+#endif
   if (q.submit(srv) < 0) {
     log_error2(q.error() + " for query '" + q.show() + "'", F, caller, user);
   }
@@ -257,6 +269,9 @@ void summarize_grids(string database, string caller, string user, string
             args.dsnum + "' and format_code = " + sp[0] + " and timeRange_code "
             "= " + sp[1] + " and gridDefinition_code = " + sp[2] + " and "
             "parameter = " + sp[3]);
+#ifdef DUMP_QUERIES
+        cerr << F << ": " << q.show() << endl;
+#endif
         if (q.submit(srv) < 0) {
           log_error2(q.error(), F, caller, user);
         }
@@ -314,6 +329,9 @@ void summarize_grid_resolutions(string caller, string user, string
   MySQL::Server srv(metautils::directives.database_server, metautils::
       directives.metadb_username, metautils::directives.metadb_password, "");
   MySQL::LocalQuery q("code, definition, defParams", "WGrML.gridDefinitions");
+#ifdef DUMP_QUERIES
+    cerr << F << ": " << q.show() << endl;
+#endif
   if (q.submit(srv) < 0) {
     log_error2(q.error(), F, caller, user);
   }
@@ -331,6 +349,9 @@ void summarize_grid_resolutions(string caller, string user, string
     q.set("select distinct gridDefinition_codes from WGrML.ds" + substitute(
         metautils::args.dsnum, ".", "") + "_agrids");
   }
+#ifdef DUMP_QUERIES
+  cerr << F << ": " << q.show() << endl;
+#endif
   if (q.submit(srv) < 0) {
     log_error2(q.error() + " for '" + q.show() + "'", F, caller, user);
   }
@@ -433,6 +454,9 @@ void aggregate_grids(string database, string caller, string user, string
           "timeRange_code, gridDefinition_code, parameter, levelType_codes "
           "order by parameter, levelType_codes, timeRange_code");
     }
+#ifdef DUMP_QUERIES
+    cerr << F << ": " << q.show() << endl;
+#endif
   } else if (database == "WGrML") {
     if (!fileID_code.empty()) {
       srv._delete("WGrML.ds" + d + "_agrids", "webID_code = " + fileID_code);
@@ -452,9 +476,12 @@ void aggregate_grids(string database, string caller, string user, string
           "timeRange_code, gridDefinition_code, parameter, levelType_codes "
           "order by parameter, levelType_codes, timeRange_code");
     }
+#ifdef DUMP_QUERIES
+    cerr << F << ": " << q.show() << endl;
+#endif
   }
   if (q.submit(srv) < 0) {
-    log_error2("aggregate_grids(): " + q.error(), F, caller, user);
+    log_error2(q.error(), F, caller, user);
   }
 //std::cerr << q.show() << std::endl;
   std::unordered_set<size_t> gd_set, ds_set;
@@ -477,9 +504,9 @@ void aggregate_grids(string database, string caller, string user, string
               }
               vss << value;
             }
-            log_error2("aggregate_grids(): bitmap for time ranges is too long "
-                "(2) - fileID_code: " + fileID_code + " key: \"" + lkey + "\" "
-                "bitmap: '" + trb + "'\nvalues: " + vss.str(), F, caller, user);
+            log_error2("bitmap for time ranges is too long (2) - fileID_code: "
+                + fileID_code + " key: \"" + lkey + "\" bitmap: '" + trb +
+                "'\nvalues: " + vss.str(), F, caller, user);
           }
           vector<size_t> gdv;
           gdv.reserve(gd_set.size());
@@ -494,15 +521,15 @@ void aggregate_grids(string database, string caller, string user, string
           string gdb;
           bitmap::compress_values(gdv, gdb);
           if (gdb.length() > 255) {
-            log_error2("aggregate_grids(): bitmap for grid definitions is too "
-                "long", F, caller, user);
+            log_error2("bitmap for grid definitions is too long", F, caller,
+                user);
           }
           if (srv.insert(database + ".ds" + d + "_agrids", fileID_code + ", '" +
               sql_ready(trb) + "', '" + sql_ready(gdb) + "', '" + lkey + "', " +
               d1 + ", " + d2) < 0) {
-            log_error2("aggregate_grids(): " + srv.error() + " while trying to "
-                "insert '" + fileID_code + ", '" + trb + "', '" + gdb + "', '" +
-                lkey + "', " + d1 + ", " + d2 + "'", F, caller, user);
+            log_error2(srv.error() + " while trying to insert '" + fileID_code +
+                ", '" + trb + "', '" + gdb + "', '" + lkey + "', " + d1 + ", " +
+                d2 + "'", F, caller, user);
           }
           stringstream ss;
           ss.str("");
@@ -540,9 +567,8 @@ void aggregate_grids(string database, string caller, string user, string
           }
           ss << "', " << d1 << ", " << d2;
           if (srv.insert(database + ".ds" + d+"_agrids2", ss.str()) < 0) {
-            log_error2("aggregate_grids(): " + srv.error() + " while trying to "
-                "insert '" + ss.str() + "' into " + database + ".ds" + d +
-                "_agrids2", F, caller, user);
+            log_error2(srv.error() + " while trying to insert '" + ss.str() +
+                "' into " + database + ".ds" + d + "_agrids2", F, caller, user);
           }
         }
         if (srv.insert(database + ".ds" + d + "_agrids_cache", "parameter, "
@@ -550,9 +576,8 @@ void aggregate_grids(string database, string caller, string user, string
             + d1 + ", " + d2, "update min_start_date=if(" + d1 + " < "
             "min_start_date, " + d1 + ", min_start_date),  max_end_date = if(" +
             d2 + " > max_end_date, " + d2 + ", max_end_date)") < 0) {
-          log_error2("aggregate_grids(): " + srv.error() + " while trying to "
-              "insert ('" + lkey + "', " + d1 + ", " + d2 + ")", F, caller,
-              user);
+          log_error2(srv.error() + " while trying to insert ('" + lkey + "', " +
+              d1 + ", " + d2 + ")", F, caller, user);
         }
       }
       trv.clear();
@@ -585,9 +610,9 @@ void aggregate_grids(string database, string caller, string user, string
           }
           vss << e;
         }
-        log_error2("aggregate_grids(): bitmap for time ranges is too long (1) "
-            "- fileID_code: " + fileID_code + " key: \"" + lkey + "\" bitmap: "
-            "'" + trb + "'\nvalues: " + vss.str(), F, caller, user);
+        log_error2("bitmap for time ranges is too long (1) - fileID_code: " +
+            fileID_code + " key: \"" + lkey + "\" bitmap: '" + trb +
+            "'\nvalues: " + vss.str(), F, caller, user);
       }
       vector<size_t> gdv;
       gdv.reserve(gd_set.size());
@@ -602,15 +627,14 @@ void aggregate_grids(string database, string caller, string user, string
       string gdb;
       bitmap::compress_values(gdv, gdb);
       if (gdb.length() > 255) {
-        log_error2("aggregate_grids(): bitmap for grid definitions is too long",
-            F, caller, user);
+        log_error2("bitmap for grid definitions is too long", F, caller, user);
       }
       if (!fileID_code.empty() && srv.insert(database + ".ds" + d + "_agrids",
           fileID_code + ", '" + sql_ready(trb) + "', '" + sql_ready(gdb) +
           "', '" + lkey + "', " + d1 + ", " + d2) < 0) {
-        log_error2("aggregate_grids(): "+srv.error()+" while trying to insert "
-            "'" + fileID_code + ", '" + trb + "', '" + gdb + "', '" + lkey +
-            "', " + d1 + ", " + d2, F, caller, user);
+        log_error2(srv.error() + " while trying to insert '" + fileID_code +
+            ", '" + trb + "', '" + gdb + "', '" + lkey + "', " + d1 + ", " + d2,
+            F, caller, user);
       }
       stringstream ss;
       ss.str("");
@@ -647,9 +671,8 @@ void aggregate_grids(string database, string caller, string user, string
       }
       ss << "', " << d1 << ", " << d2;
       if (srv.insert(database + ".ds" + d + "_agrids2", ss.str()) < 0) {
-        log_error2("aggregate_grids(): " + srv.error() + " while trying to "
-            "insert '" + ss.str() + "' into " + database + ".ds" + d +
-            "_agrids2", F, caller, user);
+        log_error2(srv.error() + " while trying to insert '" + ss.str() +
+            "' into " + database + ".ds" + d + "_agrids2", F, caller, user);
       }
     }
     if (srv.insert(database + ".ds" + d + "_agrids_cache", "parameter, "
@@ -657,8 +680,8 @@ void aggregate_grids(string database, string caller, string user, string
         + ", " + d2, "update min_start_date=if(" + d1 + " < min_start_date, " +
         d1 + ", min_start_date),  max_end_date = if(" + d2 + " > max_end_date, "
         + d2 + ", max_end_date)") < 0) {
-      log_error2("aggregate_grids(): " + srv.error() + " while trying to "
-          "insert ('" + lkey + "', " + d1 + ", " + d2 + ")", F, caller, user);
+      log_error2(srv.error() + " while trying to insert ('" + lkey + "', " + d1
+          + ", " + d2 + ")", F, caller, user);
     }
     std::sort(dsv.begin(), dsv.end(), std::less<size_t>());
     string dsb;
@@ -666,8 +689,8 @@ void aggregate_grids(string database, string caller, string user, string
     if (!fileID_code.empty() && srv.insert(database + ".ds" + d +
         "_grid_definitions", fileID_code + ", '" + sql_ready(dsb) + "'") < 0) {
       if (!regex_search(srv.error(), regex("^Duplicate entry"))) {
-        log_error2("aggregate_grids(): " + srv.error() + " while trying to "
-            "insert (" + fileID_code + ", '" + dsb + "')", F, caller, user);
+        log_error2(srv.error() + " while trying to insert (" + fileID_code +
+            ", '" + dsb + "')", F, caller, user);
       }
     }
   }
