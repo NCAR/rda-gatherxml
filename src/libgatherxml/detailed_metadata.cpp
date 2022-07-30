@@ -20,6 +20,7 @@
 
 using metautils::log_error2;
 using miscutils::this_function_label;
+using std::cerr;
 using std::endl;
 using std::get;
 using std::list;
@@ -205,11 +206,15 @@ bool compare_layers(const string& left, const string& right) {
   return false;
 }
 
-void fill_level_code_table(string db, unordered_map<size_t, tuple<string,
+void fill_level_code_map(string db, unordered_map<size_t, tuple<string,
     string, string>>& level_code_map) {
+  static const string F = this_function_label(__func__);
   MySQL::Server mysrv(metautils::directives.database_server, metautils::
       directives.metadb_username, metautils::directives.metadb_password, "");
   MySQL::LocalQuery q("code, map, type, value", db + ".levels");
+#ifdef DUMP_QUERIES
+  cerr << F << ": " << q.show() << endl;
+#endif
   if (q.submit(mysrv) < 0) {
     myerror = move(q.error());
     exit(1);
@@ -238,6 +243,9 @@ void generate_parameter_cross_reference(string format, string title, string
   MySQL::LocalQuery q("select distinct parameter from WGrML.summary as s left "
       "join WGrML.formats as f on f.code = s.format_code where s.dsid = '" +
       metautils::args.dsnum + "' and f.format = '" + format + "'");
+#ifdef DUMP_QUERIES
+  cerr << F << ": " << q.show() << endl;
+#endif
   if (q.submit(mysrv) < 0) {
     myerror = move(q.error());
     exit(1);
@@ -387,13 +395,18 @@ void generate_parameter_cross_reference(string format, string title, string
 void generate_level_cross_reference(string format, string title, string
      html_file, string caller, string user) {
   static const string F = this_function_label(__func__);
-  unordered_map<size_t, tuple<string, string, string>> lcmap;
-  fill_level_code_table("WGrML", lcmap);
+  static unordered_map<size_t, tuple<string, string, string>> lcmap;
+  if (lcmap.empty()) {
+    fill_level_code_map("WGrML", lcmap);
+  }
   MySQL::Server mysrv(metautils::directives.database_server, metautils::
       directives.metadb_username, metautils::directives.metadb_password, "");
   MySQL::LocalQuery q("select distinct levelType_codes from WGrML.summary as s "
       "left join WGrML.formats as f on f.code = s.format_code where s.dsid = '"
       + metautils::args.dsnum + "' and f.format = '" + format + "'");
+#ifdef DUMP_QUERIES
+  cerr << F << ": " << q.show() << endl;
+#endif
   if (q.submit(mysrv) < 0) {
     myerror = move(q.error());
     exit(1);
@@ -530,6 +543,9 @@ void add_to_formats(XMLDocument& xdoc, string database, string primaries_table,
   MySQL::LocalQuery q("select distinct f.format, f.code from " + database +
       ".formats as f left join " + primaries_table + " as p on p.format_code = "
       "f.code where !isnull(p.format_code)");
+#ifdef DUMP_QUERIES
+  cerr << F << ": " << q.show() << endl;
+#endif
   if (q.submit(mysrv) < 0) {
     log_error2("'" + q.error() + "'", F, caller, user);
   }
@@ -766,6 +782,9 @@ void generate_gridded_product_detail(MySQL::Server& mysrv, const DBData& dbdata,
   static const string F = this_function_label(__func__);
   MySQL::LocalQuery q;
   q.set("timeRange, code", dbdata.db + ".timeRanges");
+#ifdef DUMP_QUERIES
+  cerr << F << ": " << q.show() << endl;
+#endif
   if (q.submit(mysrv) < 0) {
     log_error2("unable to build the product hash", F, caller, user);
   }
@@ -774,6 +793,9 @@ void generate_gridded_product_detail(MySQL::Server& mysrv, const DBData& dbdata,
     trmap.emplace(stoi(r[1]), r[0]);
   }
   q.set("definition, defParams, code", dbdata.db + ".gridDefinitions");
+#ifdef DUMP_QUERIES
+  cerr << F << ": " << q.show() << endl;
+#endif
   if (q.submit(mysrv) < 0) {
     log_error2("unable to build the grid definition hash", F, caller, user);
   }
@@ -802,6 +824,9 @@ void generate_gridded_product_detail(MySQL::Server& mysrv, const DBData& dbdata,
         q.set("select timeRange_codes, gridDefinition_codes, min(start_date), "
             "max(end_date) from " + dbdata.db + ".ds" + d2 + "_agrids group by "            "timeRange_codes, gridDefinition_codes");
       }
+#ifdef DUMP_QUERIES
+      cerr << F << ": " << q.show() << endl;
+#endif
     }
     if (q.submit(mysrv) < 0) {
       log_error2("unable to build the product summary", F, caller, user);
@@ -862,6 +887,9 @@ void generate_gridded_product_detail(MySQL::Server& mysrv, const DBData& dbdata,
       q.set("select distinct parameter, levelType_codes from " + dbdata.db +
           ".summary where dsid = '" + metautils::args.dsnum + "' and "
           "format_code = " + fp.second);
+#ifdef DUMP_QUERIES
+      cerr << F << ": " << q.show() << endl;
+#endif
     }
     if (q.submit(mysrv) < 0) {
       log_error2("'" + q.error() + "'", F, caller, user);
@@ -988,14 +1016,19 @@ void generate_detailed_grid_summary(string file_type, string group_index,
   vector<string> pfv;
   unordered_map<string, ParameterData> pdmap;
   unordered_map<size_t, LevelSummary> lsmap;
-  unordered_map<size_t, tuple<string, string, string>> lcmap;
-  fill_level_code_table(dbdata.db, lcmap);
+  static unordered_map<size_t, tuple<string, string, string>> lcmap;
+  if (lcmap.empty()) {
+    fill_level_code_map(dbdata.db, lcmap);
+  }
   MySQL::Server mysrv(metautils::directives.database_server, metautils::
       directives.metadb_username, metautils::directives.metadb_password, "");
   MySQL::LocalQuery q;
   for (const auto& fp : format_list) {
     q.set(parameter_query(mysrv, dbdata, fp.second, group_index, format_list.
         size()));
+#ifdef DUMP_QUERIES
+    cerr << F << ": " << q.show() << endl;
+#endif
     if (q.submit(mysrv) < 0) {
       log_error2("'" + q.error() + "'", F, caller, user);
     }
@@ -1108,6 +1141,9 @@ void generate_detailed_grid_summary(string file_type, string group_index,
         to_capital(f) << " Format</th></tr>" << endl;
     MySQL::LocalQuery q(time_range_query(mysrv, dbdata, fp.second,
         group_index));
+#ifdef DUMP_QUERIES
+    cerr << F << ": " << q.show() << endl;
+#endif
     if (q.submit(mysrv) < 0) {
       log_error2("'" + q.error() + "'", F, caller, user);
     }
