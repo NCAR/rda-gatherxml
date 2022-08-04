@@ -30,6 +30,7 @@ using std::string;
 using std::stringstream;
 using std::tie;
 using std::tuple;
+using std::unique_ptr;
 using std::unordered_map;
 using std::unordered_set;
 using std::vector;
@@ -845,24 +846,6 @@ void fill_gindex_map(MySQL::Server& server, unordered_map<string, string>&
   }
 }
 
-void fill_rdadb_files_table(MySQL::Server& server, unordered_map<string, tuple<
-    string, string, string>>& rda_files_table, string caller, string user) {
-  static const string F = this_function_label(__func__);
-  MySQL::Query q("select wfile, gindex, file_format, data_size from dssdb."
-      "wfile where dsid = 'ds" + metautils::args.dsnum + "' and type = 'D' and "
-      "status = 'P'");
-#ifdef DUMP_QUERIES
-  cerr << F << ": " << q.show() << endl;
-#endif
-  if (q.submit(server) < 0) {
-    log_error2("'" + q.error() + "' while trying to get RDA file data", F,
-        caller, user);
-  }
-  for (const auto& r : q) {
-    rda_files_table.emplace(r[0], make_tuple(r[1], r[2], r[3]));
-  }
-}
-
 void fill_data_formats_table(MySQL::Server& server, string db, unordered_map<
     string, string>& data_formats, string caller, string user) {
   static const string F = this_function_label(__func__);
@@ -891,45 +874,37 @@ struct FileEntry {
 
 void get_file_data(MySQL::Server& server, MySQL::Query& query, string unit,
     string unit_plural, unordered_map<string, string>& gindex_map,
-    unordered_map<string, tuple<string, string, string>>& rda_files_table,
     unordered_map<string, string>& data_formats, unordered_map<string,
     FileEntry>& table) {
   for (const auto& row : query) {
-    auto it = rda_files_table.find(row[0]);
-    if (it != rda_files_table.end()) {
-      string g, f, s;
-      tie(g, f, s) = it->second;
-      FileEntry fe;
-      auto it2 = data_formats.find(row[1]);
-      fe.data_format = it2->second;
-      fe.units = row[2] + " " + unit;
-      if (row[2] != "1") {
-        fe.units += unit_plural;
-      }
-      fe.start = dateutils::string_ll_to_date_string(row[3]);
-      fe.end = dateutils::string_ll_to_date_string(row[4]);
-      auto it3 = gindex_map.find(g);
-      if (it3 != gindex_map.end()) {
-        if (!it3->second.empty()) {
-          fe.group_id = it3->second;
-        } else {
-          fe.group_id = g;
-        }
-        fe.group_id += "[!]" + g;
-      } else {
-        fe.group_id = "";
-      }
-      fe.file_format = f;
-      fe.data_size = s;
-      table.emplace(row[0], fe);
+    FileEntry fe;
+    fe.data_format = data_formats.find(row[1])->second;
+    fe.units = row[2] + " " + unit;
+    if (row[2] != "1") {
+      fe.units += unit_plural;
     }
+    fe.start = dateutils::string_ll_to_date_string(row[3]);
+    fe.end = dateutils::string_ll_to_date_string(row[4]);
+    auto it = gindex_map.find(row[5]);
+    if (it != gindex_map.end()) {
+      if (!it->second.empty()) {
+        fe.group_id = it->second;
+      } else {
+        fe.group_id = row[5];
+      }
+      fe.group_id += "[!]" + row[5];
+    } else {
+      fe.group_id = "";
+    }
+    fe.file_format = row[6];
+    fe.data_size = row[7];
+    table.emplace(row[0], fe);
   }
 }
 
 void grml_file_data(string file_type, unordered_map<string, string>&
-    gindex_map, unordered_map<string, tuple<string, string, string>>&
-    rda_files_table, unordered_map<string, FileEntry>& grml_file_data_table,
-    string& caller, string& user) {
+    gindex_map, unordered_map<string, FileEntry>& grml_file_data_table, string&
+    caller, string& user) {
   static const string F = this_function_label(__func__);
   auto d = substitute(metautils::args.dsnum, ".", "");
   MySQL::Server mysrv(metautils::directives.database_server, metautils::
@@ -943,8 +918,10 @@ void grml_file_data(string file_type, unordered_map<string, string>&
     fill_data_formats_table(mysrv, "WGrML", m, caller, user);
   }
   MySQL::Query q;
-  q.set("select webID, format_code, num_grids, start_date, end_date from WGrML."
-      "ds" + d + "_webfiles2 where num_grids > 0");
+  q.set("select webID, format_code, num_grids, start_date, end_date, gindex, "
+      "file_format, data_size from WGrML.ds" + d + "_webfiles2 as w left join "
+      "dssdb.wfile as d on d.wfile = w.webID where d.dsid = 'ds" + metautils::
+      args.dsnum + "' and d.type = 'D' and d.status = 'P' and num_grids > 0");
 #ifdef DUMP_QUERIES
   cerr << F << ": " << q.show() << endl;
 #endif
@@ -952,15 +929,13 @@ void grml_file_data(string file_type, unordered_map<string, string>&
     log_error2("'" + q.error() + "' while trying to get metadata file data", F,
         caller, user);
   }
-  get_file_data(mysrv, q, "Grid", "s", gindex_map, rda_files_table, m,
-      grml_file_data_table);
+  get_file_data(mysrv, q, "Grid", "s", gindex_map, m, grml_file_data_table);
   mysrv.disconnect();
 }
 
 void obml_file_data(string file_type, unordered_map<string, string>&
-    gindex_map, unordered_map<string,  tuple<string,  string, string>>&
-    rda_files_table, unordered_map<string,  FileEntry>& obml_file_data_table,
-    string& caller, string& user) {
+    gindex_map, unordered_map<string,  FileEntry>& obml_file_data_table, string&
+    caller, string& user) {
   static const string F = this_function_label(__func__);
   MySQL::Server mysrv(metautils::directives.database_server, metautils::
       directives.metadb_username, metautils::directives.metadb_password, "");
@@ -969,8 +944,10 @@ void obml_file_data(string file_type, unordered_map<string, string>&
     fill_data_formats_table(mysrv, "WObML", map, caller, user);
   }
   MySQL::Query q("select webID, format_code, num_observations, start_date, "
-      "end_date from WObML.ds" + substitute(metautils::args.dsnum, ".", "") +
-      "_webfiles2 where num_observations > 0");
+      "end_date, gindex, file_format, data_size from WObML.ds" + substitute(
+      metautils::args.dsnum, ".", "") + "_webfiles2 as w left join dssdb."
+      "wfile as d on d.wfile = w.webID where d.dsid = 'ds" + metautils::args.
+      dsnum + "' and d.type = 'D' and d.status = 'P' and num_observations > 0");
 #ifdef DUMP_QUERIES
   cerr << F << ": " << q.show() << endl;
 #endif
@@ -978,15 +955,14 @@ void obml_file_data(string file_type, unordered_map<string, string>&
     log_error2("'" + q.error() + "' while trying to get metadata file data", F,
         caller, user);
   }
-  get_file_data(mysrv, q, "Observation", "s", gindex_map, rda_files_table,
-      map, obml_file_data_table);
+  get_file_data(mysrv, q, "Observation", "s", gindex_map, map,
+      obml_file_data_table);
   mysrv.disconnect();
 }
 
 void fixml_file_data(string file_type, unordered_map<string, string>&
-     gindex_map, unordered_map<string, tuple<string, string, string>>&
-     rda_files_table, unordered_map<string, FileEntry>& fixml_file_data_table,
-     string caller, string user) {
+     gindex_map, unordered_map<string, FileEntry>& fixml_file_data_table, string
+     caller, string user) {
   static const string F = this_function_label(__func__);
   FileEntry fe;
 
@@ -1000,9 +976,11 @@ void fixml_file_data(string file_type, unordered_map<string, string>&
   if (data_formats.empty()) {
     fill_data_formats_table(mysrv, "WFixML", data_formats, caller, user);
   }
-  MySQL::Query q("select webID, format_code, num_fixes, start_date, end_date "
-      "from WFixML.ds" + substitute(metautils::args.dsnum, ".", "") +
-      "_webfiles2 where num_fixes > 0");
+  MySQL::Query q("select webID, format_code, num_fixes, start_date, end_date, "
+      "gindex, file_format, data_size from WFixML.ds" + substitute(metautils::
+      args.dsnum, ".", "") + "_webfiles2 as w left join dssdb.wfile as d on "
+      "d.wfile = w.webID where d.dsid = 'ds" + metautils::args.dsnum + "' and "
+      "d.type = 'D' and d.status = 'P' and num_fixes > 0");
 #ifdef DUMP_QUERIES
   cerr << F << ": " << q.show() << endl;
 #endif
@@ -1010,8 +988,8 @@ void fixml_file_data(string file_type, unordered_map<string, string>&
     log_error2("'" + q.error() + "' while trying to get metadata file data", F,
         caller, user);
   }
-  get_file_data(mysrv, q, "Cyclone Fix", "es", gindex_map, rda_files_table,
-      data_formats, fixml_file_data_table);
+  get_file_data(mysrv, q, "Cyclone Fix", "es", gindex_map, data_formats,
+      fixml_file_data_table);
   mysrv.disconnect();
 }
 
@@ -1096,24 +1074,18 @@ void write_grml_parameters(string file_type, string tindex, ofstream& ofs,
       }
     }
   }
-  static unordered_map<string, MySQL::LocalQuery> parameter_cache;
-  if (!parameter_cache[idtyp]) {
-    parameter_cache[idtyp].set("parameter, start_date, end_date, " + idtyp +
-        "ID_code", db + ".ds" + d2 + "_agrids");
-#ifdef DUMP_QUERIES
-    cerr << F << ": " << parameter_cache[idtyp].show() << endl;
-#endif
-    if (parameter_cache[idtyp].submit(mysrv) < 0) {
-      log_error2("'" + parameter_cache[idtyp].error() + "' while trying to get "
-          "agrids data", F, caller, user);
-    }
+  MySQL::Query qs("parameter, start_date, end_date, " + idtyp + "ID_code", db +
+      ".ds" + d2 + "_agrids");
+  if (qs.submit(mysrv) < 0) {
+    log_error2("'" + qs.error() + "' while trying to get agrids data", F,
+        caller, user);
   }
   xmlutils::ParameterMapper pmap(metautils::directives.parameter_map_path);
   unordered_set<string> u;
   vector<pair<string, ParameterEntry>> vp;
   unordered_map<string, size_t> idxmap; // map of vp indexes for updates
   auto cnt = 0;
-  for (const auto& r : parameter_cache[idtyp]) {
+  for (const auto& r : qs) {
     auto itm = ffmap[ffmap_key].find(r[3]); 
     if (itm != ffmap[ffmap_key].end()) {
       auto uu = itm->second + "!" + r[0];
@@ -1283,10 +1255,6 @@ void create_file_list_cache(string file_type, string caller, string user, string
   if (gmap.empty()) {
     fill_gindex_map(mysrv, gmap, caller, user);
   }
-  static unordered_map<string, tuple<string, string, string>> rdamap;
-  if (rdamap.empty()) {
-    fill_rdadb_files_table(mysrv, rdamap, caller, user);
-  }
   unordered_map<string, FileEntry> grmlmap, obmlmap, fixmlmap;
   MySQL::LocalQuery oq, sq;
   auto b = false;
@@ -1297,15 +1265,13 @@ void create_file_list_cache(string file_type, string caller, string user, string
         return;
       }
       if (file_type == "Web" && tindex.empty()) {
-        grml_file_data(file_type, gmap, rdamap, grmlmap, caller,
-            user);
+        grml_file_data(file_type, gmap, grmlmap, caller, user);
       }
       b = true;
     }
     if (table_exists(mysrv, "WObML.ds" + d2 + "_webfiles2")) {
       if (file_type == "Web" && tindex.empty()) {
-        obml_file_data(file_type, gmap, rdamap, obmlmap, caller,
-            user);
+        obml_file_data(file_type, gmap, obmlmap, caller, user);
       }
       if (file_type == "Web") {
         oq.set("select min(start_date), max(end_date) from WObML.ds" + d2 +
@@ -1332,7 +1298,7 @@ void create_file_list_cache(string file_type, string caller, string user, string
     }
     if (table_exists(mysrv, "WFixML.ds" + d2 + "_webfiles2")) {
       if (tindex.empty()) {
-        fixml_file_data(file_type, gmap, rdamap, fixmlmap, caller, user);
+        fixml_file_data(file_type, gmap, fixmlmap, caller, user);
       }
     }
   }
@@ -1380,9 +1346,11 @@ void create_file_list_cache(string file_type, string caller, string user, string
         ofs << " " << s;
       }
       ofs << endl;
+/*
       if (tindex.empty()) {
         write_groups(file_type, "GrML", ofs, caller, user);
       }
+*/
       ofs.close();
       if (max == "0") {
         string e;
