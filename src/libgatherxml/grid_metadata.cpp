@@ -161,16 +161,16 @@ void summarize_grids(string database, string caller, string user, string
         "parameter, levelType_codes, start_date, end_date from " + database +
         ".ds" + d + "_agrids";
   }
-  q.set(s);
+  MySQL::Query sq(s);
 #ifdef DUMP_QUERIES
-  cerr << F << ": " << q.show() << endl;
+  cerr << F << ": " << sq.show() << endl;
 #endif
-  if (q.submit(srv) < 0) {
-    log_error2(q.error() + " for query '" + q.show() + "'", F, caller, user);
+  if (sq.submit(srv) < 0) {
+    log_error2(sq.error() + " for query '" + sq.show() + "'", F, caller, user);
   }
   unordered_map<string, vector<size_t>> tr_map, gd_map, l_map;
   my::map<GridSummaryEntry> summ_map(99999);
-  for (const auto& row : q) {
+  for (const auto& row : sq) {
     vector<size_t> trv, gdv;
     if (!fileID_code.empty()) {
       trv.emplace_back(stoi(row[1]));
@@ -240,10 +240,6 @@ void summarize_grids(string database, string caller, string user, string
       }
     }
   }
-  string e;
-  if (srv.command("lock table " + database + ".summary write", e) < 0) {
-    log_error2(srv.error(), F, caller, user);
-  }
   if (fileID_code.empty()) {
     srv._delete(database + ".summary","dsid = '" + metautils::args.dsnum + "'");
   }
@@ -309,9 +305,6 @@ void summarize_grids(string database, string caller, string user, string
     }
     gse.data->level_code_set.clear();
     gse.data.reset();
-  }
-  if (srv.command("unlock tables", e) < 0) {
-    log_error2(srv.error(), F, caller, user);
   }
   srv.disconnect();
 }
