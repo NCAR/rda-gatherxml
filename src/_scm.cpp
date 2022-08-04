@@ -1252,9 +1252,10 @@ void *thread_summarize_file_ID_locations(void *args) {
   auto &a = *reinterpret_cast<vector<string> *>(args);
   MySQL::Server srv(metautils::directives.database_server, metautils::
       directives.metadb_username, metautils::directives.metadb_password, "");;
-  if (!srv)
+  if (!srv) {
     log_error2("could not connect to mysql server - error: " + srv.error(), F,
         "scm", USER);
+  }
   if (lmap.size() == 0) {
     MySQL::LocalQuery q("box1d_row, box1d_column, keyword", "search."
         "locations_by_point");
@@ -2201,7 +2202,7 @@ int main(int argc, char **argv) {
       { "ObML", vector<string>() },
       { "SatML", vector<string>() },
       { "FixML", vector<string>() },
-      };
+  };
   if (local_args.summarize_all) {
     stringstream oss, ess;
     if (mysystem2("/bin/tcsh -c \"wget -q -O - --post-data='authKey="
@@ -2373,7 +2374,7 @@ int main(int argc, char **argv) {
             g);
         if (!local_args.summarized_web_file) {
           gatherxml::summarizeMetadata::create_file_list_cache("inv", "scm",
-          USER, g);
+              USER, g);
         }
       }
       targs.emplace_back(vector<string>());
