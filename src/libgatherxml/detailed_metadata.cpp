@@ -395,10 +395,8 @@ void generate_parameter_cross_reference(string format, string title, string
 void generate_level_cross_reference(string format, string title, string
      html_file, string caller, string user) {
   static const string F = this_function_label(__func__);
-  static unordered_map<size_t, tuple<string, string, string>> lcmap;
-  if (lcmap.empty()) {
-    fill_level_code_map("WGrML", lcmap);
-  }
+  unordered_map<size_t, tuple<string, string, string>> lcmap;
+  fill_level_code_map("WGrML", lcmap);
   MySQL::Server mysrv(metautils::directives.database_server, metautils::
       directives.metadb_username, metautils::directives.metadb_password, "");
   MySQL::LocalQuery q("select distinct levelType_codes from WGrML.summary as s "
@@ -496,8 +494,8 @@ void generate_level_cross_reference(string format, string title, string
     string e;
     if (unixutils::rdadata_sync(t.name(), "metadata/", "/data/web/datasets/ds" +
         metautils::args.dsnum, metautils::directives.rdadata_home, e) < 0)
-      metautils::log_warning("generate_level_cross_reference() couldn't sync '"
-          + html_file + "' - rdadata_sync error(s): '" + e + "'", caller, user);
+      metautils::log_warning(F + " couldn't sync '" + html_file + "' - "
+          "rdadata_sync error(s): '" + e + "'", caller, user);
   } else {
 
     // remove the level table if it exists and there are no levels for this
@@ -506,9 +504,8 @@ void generate_level_cross_reference(string format, string title, string
     if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds" + metautils::args.
         dsnum + "/metadata/" + html_file, t.name(), metautils::directives.
         rdadata_home, e) < 0) {
-      metautils::log_warning("generate_level_cross_reference() tried to but "
-          "couldn't delete '" + html_file + "' - error: '" + e + "'", caller,
-          user);
+      metautils::log_warning(F + " tried to but couldn't delete '" + html_file +
+          "' - error: '" + e + "'", caller, user);
     }
   }
   mysrv.disconnect();
@@ -809,30 +806,31 @@ void generate_gridded_product_detail(MySQL::Server& mysrv, const DBData& dbdata,
     log_error2("unable to open output for product detail", F, caller, user);
   }
   for (const auto& fp : format_list) {
+    MySQL::Query qs;
     if (!group_index.empty()) {
-      q.set("");
+      qs.set("");
     } else {
       auto d2 = substitute(metautils::args.dsnum, ".", "");
       if (format_list.size() > 1) {
-        q.set("select a.timeRange_codes, a.gridDefinition_codes, min(a."
+        qs.set("select a.timeRange_codes, a.gridDefinition_codes, min(a."
             "start_date), max(a.end_date) from " + dbdata.db + ".ds" + d2 +
             "_agrids as a left join " + dbdata.db + ".ds" + d2 + dbdata.table +
             " as p on p.code = a." + dbdata.ID_type + "ID_code where p."
             "format_code = " + fp.second + " group by a.timeRange_codes, a."
             "gridDefinition_codes");
       } else {
-        q.set("select timeRange_codes, gridDefinition_codes, min(start_date), "
+        qs.set("select timeRange_codes, gridDefinition_codes, min(start_date), "
             "max(end_date) from " + dbdata.db + ".ds" + d2 + "_agrids group by "            "timeRange_codes, gridDefinition_codes");
       }
 #ifdef DUMP_QUERIES
       cerr << F << ": " << q.show() << endl;
 #endif
     }
-    if (q.submit(mysrv) < 0) {
+    if (qs.submit(mysrv) < 0) {
       log_error2("unable to build the product summary", F, caller, user);
     }
     unordered_map<size_t, ProductSummary> psmap;
-    for (const auto& r : q) {
+    for (const auto& r : qs) {
       vector<size_t> pv;
       bitmap::uncompress_values(r[0], pv);
       vector<size_t> gv;
@@ -1016,10 +1014,8 @@ void generate_detailed_grid_summary(string file_type, string group_index,
   vector<string> pfv;
   unordered_map<string, ParameterData> pdmap;
   unordered_map<size_t, LevelSummary> lsmap;
-  static unordered_map<size_t, tuple<string, string, string>> lcmap;
-  if (lcmap.empty()) {
-    fill_level_code_map(dbdata.db, lcmap);
-  }
+  unordered_map<size_t, tuple<string, string, string>> lcmap;
+  fill_level_code_map(dbdata.db, lcmap);
   MySQL::Server mysrv(metautils::directives.database_server, metautils::
       directives.metadb_username, metautils::directives.metadb_password, "");
   MySQL::LocalQuery q;
@@ -1406,8 +1402,8 @@ void generate_detailed_grid_summary(string file_type, string group_index,
   string e;
   if (unixutils::rdadata_sync(t.name(), "metadata/", "/data/web/datasets/ds" +
       metautils::args.dsnum, metautils::directives.rdadata_home, e) < 0) {
-    metautils::log_warning("generate_detailed_grid_summary() couldn't sync "
-        "detail files - rdadata_sync error(s): '" + e + "'", caller, user);
+    metautils::log_warning(F + " couldn't sync detail files - rdadata_sync "
+        "error(s): '" + e + "'", caller, user);
   }
   mysrv.disconnect();
   write_grid_html(ofs, pfv.size());
@@ -1882,7 +1878,7 @@ void generate_detailed_metadata_view(string caller, string user) {
     ofs << "</table></center>" << endl;
     for (size_t n = 0; n < svec.size(); ++n) {
       if (vv[n].size() > 0) {
-        auto& generate_summary=get<2>(svec[n]);
+        auto& generate_summary = get<2>(svec[n]);
         generate_summary("Web", "", ofs, vv[n], caller, user);
       }
     }
