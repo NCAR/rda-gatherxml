@@ -1036,8 +1036,9 @@ void write_grml_parameters(string file_type, string tindex, ofstream& ofs,
       rdafs.emplace(r[0]);
     }
   }
-  unordered_set<string> invs;
-  if (file_type == "inv") {
+  static unordered_set<string> invs;
+  static string idsel = "";
+  if (file_type == "inv" && invs.empty()) {
     MySQL::LocalQuery q("webID_code, dupe_vdates", "IGrML.ds" + d2 +
         "_inventory_summary");
 #ifdef DUMP_QUERIES
@@ -1047,35 +1048,39 @@ void write_grml_parameters(string file_type, string tindex, ofstream& ofs,
       log_error2("'" + q.error() + "' while trying to get inventory file codes",
           F, caller, user);
     }
-    init_date_selection = "";
     for (const auto& r : q) {
       invs.emplace(r[0]);
-      if (init_date_selection.empty() && r[1] == "Y") {
-        init_date_selection = "I";
+      if (idsel.empty() && r[1] == "Y") {
+        idsel = "I";
       }
     }
   }
-  static unordered_map<string, unordered_map<string, string>> ffmap;
-  auto ffmap_key = idtyp + db + d2 + mfil;
-  if (ffmap[ffmap_key].empty()) {
-    MySQL::LocalQuery q("code, " + idtyp + "ID, format_code", db + ".ds" + d2 +
+  init_date_selection = idsel;
+  unordered_map<string, string> ffmap;
+  auto qkey = idtyp + db + d2 + mfil;
+  static unordered_map<string, MySQL::LocalQuery> qcache;
+  if (!qcache[qkey]) {
+    qcache[qkey].set("code, " + idtyp + "ID, format_code", db + ".ds" + d2 +
         mfil);
 #ifdef DUMP_QUERIES
-    cerr << F << ": " << q.show() << endl;
+    cerr << F << ": " << qcache[qkey].show() << endl;
 #endif
-    if (q.submit(mysrv) < 0) {
-      log_error2("'" + q.error() + "' while trying to get metadata files from "
-          + db + ".ds" + d2 + mfil, F, caller, user);
+    if (qcache[qkey].submit(mysrv) < 0) {
+      log_error2("'" + qcache[qkey].error() + "' while trying to get metadata "
+          "files from " + db + ".ds" + d2 + mfil, F, caller, user);
     }
-    for (const auto& r : q) {
-      if ((rdafs.empty() || rdafs.find(r[1]) != rdafs.end()) && (invs.empty() ||
-          invs.find(r[0]) != invs.end())) {
-        ffmap[ffmap_key].emplace(r[0], r[2]);
-      }
+  }
+  for (const auto& r : qcache[qkey]) {
+    if ((rdafs.empty() || rdafs.find(r[1]) != rdafs.end()) && (invs.empty() ||
+        invs.find(r[0]) != invs.end())) {
+      ffmap.emplace(r[0], r[2]);
     }
   }
   MySQL::Query qs("parameter, start_date, end_date, " + idtyp + "ID_code", db +
       ".ds" + d2 + "_agrids");
+#ifdef DUMP_QUERIES
+    cerr << F << ": " << qs.show() << endl;
+#endif
   if (qs.submit(mysrv) < 0) {
     log_error2("'" + qs.error() + "' while trying to get agrids data", F,
         caller, user);
@@ -1086,8 +1091,8 @@ void write_grml_parameters(string file_type, string tindex, ofstream& ofs,
   unordered_map<string, size_t> idxmap; // map of vp indexes for updates
   auto cnt = 0;
   for (const auto& r : qs) {
-    auto itm = ffmap[ffmap_key].find(r[3]); 
-    if (itm != ffmap[ffmap_key].end()) {
+    auto itm = ffmap.find(r[3]); 
+    if (itm != ffmap.end()) {
       auto uu = itm->second + "!" + r[0];
       if (u.find(uu) == u.end()) {
         auto f = dfmap[itm->second];
