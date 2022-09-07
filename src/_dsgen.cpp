@@ -105,7 +105,8 @@ void update_wagtail(string column, string insert_value, string caller) {
       sql_ready(insert_value) + "'", "dsid = '" + metautils::args.dsnum + "'") <
       0) {
     log_error2("failed to update wagtail." + wagtail_db[column] + " " + column +
-        ": error '" + server.error() + "'", caller, "dsgen", USER);
+        ": error '" + server.error() + "'  insert value: '" + insert_value +
+        "'", caller, "dsgen", USER);
   }
 }
 
@@ -153,8 +154,8 @@ void generate_index(string tdir_name) {
           "; parse error: '" + g_xdoc.parse_error() + "'", F, "dsgen", USER);
     }
     stringstream ss;
-    if (!metadataExport::export_to_dc_meta_tags(ss, metautils::args.dsnum, g_xdoc,
-        0)) {
+    if (!metadataExport::export_to_dc_meta_tags(ss, metautils::args.dsnum,
+        g_xdoc, 0)) {
       log_error2("unable to export DC meta tags: '" + myerror + "'", F, "dsgen",
           USER);
     }
@@ -1923,7 +1924,9 @@ void add_related_datasets(TokenDocument& tdoc) {
             "#description\">" + row[0] + "</a></td><td>-</td><td>" + row[1] +
             "</td></tr>";
       }
-      append(json, "{\"dsid\": \"" + row[0] + "\", \"title\": \"" + row[1] +
+      auto title = row[1];
+      replace_all(title, "\"", "\\\\\"");
+      append(json, "{\"dsid\": \"" + row[0] + "\", \"title\": \"" + title +
           "\"}", ", ");
     }
     tdoc.add_if("__HAS_RELATED_DATASETS__");
