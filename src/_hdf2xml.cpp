@@ -3244,7 +3244,7 @@ bool grid_is_centered_lambert_conformal(const GridData& grid_data, Grid::
           data_array, yp * grid_data.lon.data_array.dimensions[1] + xm,
           grid_data.lon.ds.get()) + data_array_value(grid_data.lon.
           data_array, yp * grid_data.lon.data_array.dimensions[1] + dx2,
-          grid_data.lon.ds.get())), 0.00001) && floatutils::myequalf(
+          grid_data.lon.ds.get())), 0.0001) && floatutils::myequalf(
           data_array_value(grid_data.lat.data_array, dy2 * grid_data.
           lon.data_array.dimensions[1] + xm, grid_data.lat.ds.get()),
           data_array_value(grid_data.lat.data_array, dy2 * grid_data.
@@ -3287,12 +3287,12 @@ bool grid_is_centered_lambert_conformal(const GridData& grid_data, Grid::
           (dy2 - 1) * grid_data.lon.data_array.dimensions[1] + dx2,
           grid_data.lon.ds.get()), data_array_value(grid_data.lon.
           data_array, (dy2 + 1) * grid_data.lon.data_array.dimensions[1] +
-          dx2, grid_data.lon.ds.get()), 0.00001) && floatutils::myequalf(
+          dx2, grid_data.lon.ds.get()), 0.0001) && floatutils::myequalf(
           data_array_value(grid_data.lat.data_array, dy2 * grid_data.
           lon.data_array.dimensions[1] + dx2 - 1, grid_data.lat.ds.
           get()), data_array_value(grid_data.lat.data_array, dy2 *
           grid_data.lon.data_array.dimensions[1] + xp, grid_data.lat.
-          ds.get()), 0.00001)) {
+          ds.get()), 0.0001)) {
         def.type = Grid::Type::lambertConformal;
         def.llatitude = def.stdparallel1 = def.stdparallel2 = lround(
             data_array_value(grid_data.lat.data_array, dy2 * grid_data.
@@ -3658,6 +3658,10 @@ void scan_gridded_hdf5nc4_file(ScanData& scan_data) {
     time_ranges.emplace_back(grid_data.time_range_entry);
   }
   for (size_t n = 0; n < coord_vars.lat_ids.size(); ++n) {
+    if (gatherxml::verbose_operation) {
+      cout << "...checking projection for '" << coord_vars.lat_ids[n] <<
+          "' and '" << coord_vars.lon_ids[n] << "' ..." << endl;
+    }
     grid_data.lat.id = coord_vars.lat_ids[n];
     grid_data.lat.ds = is->dataset("/" + coord_vars.lat_ids[n]);
     if (grid_data.lat.ds == nullptr) {
