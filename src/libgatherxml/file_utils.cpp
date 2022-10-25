@@ -46,7 +46,7 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile, TempDir& tdir, list<
 
     // Web file
     auto w = metautils::relative_web_filename(args.path + "/" + args.filename);
-    MySQL::LocalQuery q("property, file_format, locflag", "wfile", "dsid = "
+    MySQL::LocalQuery q("status, file_format, locflag", "wfile", "dsid = "
         "'ds" + args.dsnum + "' and wfile = '" + w + "'");
     if (q.submit(mys) < 0) {
       error = q.error();
@@ -56,7 +56,7 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile, TempDir& tdir, list<
     q.fetch_row(row);
     auto loc = 'G';
     if (!args.override_primary_check) {
-      if (q.num_rows() == 0 || row[0] != "A") {
+      if (q.num_rows() == 0 || row[0] != "P") {
         error = "Terminating - " + args.path + "/" + args.filename + " is not "
             "active for this dataset";
         return false;
