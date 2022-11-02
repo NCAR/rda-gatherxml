@@ -397,7 +397,7 @@ void DataTypeEntry::fill_vertical_resolution_data(vector<double>& level_list,
   data->vdata->units = z_units;
   data->vdata->avg_nlev += level_list.size();
   auto a = 0.;
-  for (size_t n=1; n < level_list.size(); ++n) {
+  for (size_t n = 1; n < level_list.size(); ++n) {
     a += fabs(level_list[n] - level_list[n - 1]);
   }
   data->vdata->avg_res += (a / (level_list.size() - 1));
