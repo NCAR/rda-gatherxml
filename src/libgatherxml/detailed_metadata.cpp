@@ -1818,7 +1818,7 @@ void generate_detailed_metadata_view(string caller, string user) {
     ofs << "    print \"</ul></td></tr>\\n\";" << endl;
     ofs << "  }" << endl;
     ofs << "?>" << endl;
-    MySQL::LocalQuery query("primary_size","dataset","dsid = 'ds"+metautils::args.dsnum+"'");
+    MySQL::LocalQuery query("dweb_size","dataset","dsid = 'ds"+metautils::args.dsnum+"'");
     if (query.submit(server_d) < 0) {
       myerror = query.error();
       exit(1);
