@@ -17,6 +17,9 @@
 #include <xml.hpp>
 #include <gridutils.hpp>
 #include <myerror.hpp>
+#ifdef DUMP_QUERIES
+#include <timer.hpp>
+#endif
 
 using metautils::log_error2;
 using miscutils::this_function_label;
@@ -213,12 +216,20 @@ void fill_level_code_map(string db, unordered_map<size_t, tuple<string,
       directives.metadb_username, metautils::directives.metadb_password, "");
   MySQL::LocalQuery q("code, map, type, value", db + ".levels");
 #ifdef DUMP_QUERIES
-  cerr << F << ": " << q.show() << endl;
+  {
+  Timer tm;
+  tm.start();
 #endif
   if (q.submit(mysrv) < 0) {
     myerror = move(q.error());
     exit(1);
   }
+#ifdef DUMP_QUERIES
+  tm.stop();
+  cerr << "Elapsed time: " << tm.elapsed_time() << " " << F << ": " << q.show()
+      << endl;
+  }
+#endif
   for (const auto& r : q) {
     level_code_map.emplace(stoi(r[0]), make_tuple(r[1], r[2], r[3]));
   }
@@ -244,12 +255,20 @@ void generate_parameter_cross_reference(string format, string title, string
       "join WGrML.formats as f on f.code = s.format_code where s.dsid = '" +
       metautils::args.dsnum + "' and f.format = '" + format + "'");
 #ifdef DUMP_QUERIES
-  cerr << F << ": " << q.show() << endl;
+  {
+  Timer tm;
+  tm.start();
 #endif
   if (q.submit(mysrv) < 0) {
     myerror = move(q.error());
     exit(1);
   }
+#ifdef DUMP_QUERIES
+  tm.stop();
+  cerr << "Elapsed time: " << tm.elapsed_time() << " " << F << ": " << q.show()
+      << endl;
+  }
+#endif
   if (q.num_rows() > 0) {
     unordered_map<string, unordered_map<string, ParameterMetadata>> ptmap;
     xmlutils::ParameterMapper pmap(metautils::directives.parameter_map_path);
@@ -403,12 +422,20 @@ void generate_level_cross_reference(string format, string title, string
       "left join WGrML.formats as f on f.code = s.format_code where s.dsid = '"
       + metautils::args.dsnum + "' and f.format = '" + format + "'");
 #ifdef DUMP_QUERIES
-  cerr << F << ": " << q.show() << endl;
+  {
+  Timer tm;
+  tm.start();
 #endif
   if (q.submit(mysrv) < 0) {
     myerror = move(q.error());
     exit(1);
   }
+#ifdef DUMP_QUERIES
+  tm.stop();
+  cerr << "Elapsed time: " << tm.elapsed_time() << " " << F << ": " << q.show()
+      << endl;
+  }
+#endif
   vector<string> lv, yv;
   if (q.num_rows() > 0) {
     xmlutils::LevelMapper lmap(metautils::directives.level_map_path);
@@ -541,11 +568,19 @@ void add_to_formats(XMLDocument& xdoc, string database, string primaries_table,
       ".formats as f left join " + primaries_table + " as p on p.format_code = "
       "f.code where !isnull(p.format_code)");
 #ifdef DUMP_QUERIES
-  cerr << F << ": " << q.show() << endl;
+  {
+  Timer tm;
+  tm.start();
 #endif
   if (q.submit(mysrv) < 0) {
     log_error2("'" + q.error() + "'", F, caller, user);
   }
+#ifdef DUMP_QUERIES
+  tm.stop();
+  cerr << "Elapsed time: " << tm.elapsed_time() << " " << F << ": " << q.show()
+      << endl;
+  }
+#endif
   for (const auto& r : q) {
     format_list.emplace_back(make_pair(r[0], r[1]));
     auto e = xdoc.element("formatReferences/format@name=" + r[0]);
@@ -698,7 +733,7 @@ void write_grid_html(ofstream& ofs, size_t num_products) {
   ofs << "  cursor: pointer;" << endl;
   ofs << "}" << endl;
   ofs << "</style>" << endl;
-  ofs << "<script id = \"view_script\">" << endl;
+  ofs << "<script id=\"view_script\">" << endl;
   ofs << "function changeView(e,v) {" << endl;
   ofs << "  if (e.className == 'view_button_off') {" << endl;
   ofs << "    var x = document.getElementsByClassName('view_button_on');" <<
@@ -780,22 +815,38 @@ void generate_gridded_product_detail(MySQL::Server& mysrv, const DBData& dbdata,
   MySQL::LocalQuery q;
   q.set("timeRange, code", dbdata.db + ".timeRanges");
 #ifdef DUMP_QUERIES
-  cerr << F << ": " << q.show() << endl;
+  {
+  Timer tm;
+  tm.start();
 #endif
   if (q.submit(mysrv) < 0) {
     log_error2("unable to build the product hash", F, caller, user);
   }
+#ifdef DUMP_QUERIES
+  tm.stop();
+  cerr << "Elapsed time: " << tm.elapsed_time() << " " << F << ": " << q.show()
+      << endl;
+  }
+#endif
   unordered_map<size_t, string> trmap;
   for (const auto& r : q) {
     trmap.emplace(stoi(r[1]), r[0]);
   }
   q.set("definition, defParams, code", dbdata.db + ".gridDefinitions");
 #ifdef DUMP_QUERIES
-  cerr << F << ": " << q.show() << endl;
+  {
+  Timer tm;
+  tm.start();
 #endif
   if (q.submit(mysrv) < 0) {
     log_error2("unable to build the grid definition hash", F, caller, user);
   }
+#ifdef DUMP_QUERIES
+  tm.stop();
+  cerr << "Elapsed time: " << tm.elapsed_time() << " " << F << ": " << q.show()
+      << endl;
+  }
+#endif
   unordered_map<size_t, string> gdmap;
   for (const auto& r : q) {
     gdmap.emplace(stoi(r[2]), gridutils::convert_grid_definition(r[0] + "<!>" +
@@ -822,13 +873,21 @@ void generate_gridded_product_detail(MySQL::Server& mysrv, const DBData& dbdata,
         qs.set("select timeRange_codes, gridDefinition_codes, min(start_date), "
             "max(end_date) from " + dbdata.db + ".ds" + d2 + "_agrids group by "            "timeRange_codes, gridDefinition_codes");
       }
-#ifdef DUMP_QUERIES
-      cerr << F << ": " << q.show() << endl;
-#endif
     }
+#ifdef DUMP_QUERIES
+    {
+    Timer tm;
+    tm.start();
+#endif
     if (qs.submit(mysrv) < 0) {
       log_error2("unable to build the product summary", F, caller, user);
     }
+#ifdef DUMP_QUERIES
+    tm.stop();
+    cerr << "Elapsed time: " << tm.elapsed_time() << " " << F << ": " << qs.
+        show() << endl;
+    }
+#endif
     unordered_map<size_t, ProductSummary> psmap;
     for (const auto& r : qs) {
       vector<size_t> pv;
@@ -885,13 +944,23 @@ void generate_gridded_product_detail(MySQL::Server& mysrv, const DBData& dbdata,
       q.set("select distinct parameter, levelType_codes from " + dbdata.db +
           ".summary where dsid = '" + metautils::args.dsnum + "' and "
           "format_code = " + fp.second);
-#ifdef DUMP_QUERIES
-      cerr << F << ": " << q.show() << endl;
-#endif
+    } else {
+      q.set("");
     }
+#ifdef DUMP_QUERIES
+    {
+    Timer tm;
+    tm.start();
+#endif
     if (q.submit(mysrv) < 0) {
       log_error2("'" + q.error() + "'", F, caller, user);
     }
+#ifdef DUMP_QUERIES
+    tm.stop();
+    cerr << "Elapsed time: " << tm.elapsed_time() << " " << F << ": " << q.
+        show() << endl;
+    }
+#endif
     ofs << "<tr class=\"bg0\"><td align=\"left\" colspan=\"2\"><b>Parameter "
         "and Level Information:</b><br />";
     if (q.num_rows() > 1) {
@@ -1023,11 +1092,19 @@ void generate_detailed_grid_summary(string file_type, string group_index,
     q.set(parameter_query(mysrv, dbdata, fp.second, group_index, format_list.
         size()));
 #ifdef DUMP_QUERIES
-    cerr << F << ": " << q.show() << endl;
+    {
+    Timer tm;
+    tm.start();
 #endif
     if (q.submit(mysrv) < 0) {
       log_error2("'" + q.error() + "'", F, caller, user);
     }
+#ifdef DUMP_QUERIES
+    tm.stop();
+    cerr << "Elapsed time: " << tm.elapsed_time() << " " << F << ": " << q.
+        show() << endl;
+    }
+#endif
     unordered_map<string, string> m;
     for (const auto& r : q) {
       if (m.find(r[0]) == m.end())  {
@@ -1138,11 +1215,19 @@ void generate_detailed_grid_summary(string file_type, string group_index,
     MySQL::LocalQuery q(time_range_query(mysrv, dbdata, fp.second,
         group_index));
 #ifdef DUMP_QUERIES
-    cerr << F << ": " << q.show() << endl;
+    {
+    Timer tm;
+    tm.start();
 #endif
     if (q.submit(mysrv) < 0) {
       log_error2("'" + q.error() + "'", F, caller, user);
     }
+#ifdef DUMP_QUERIES
+    tm.stop();
+    cerr << "Elapsed time: " << tm.elapsed_time() << " " << F << ": " << q.
+        show() << endl;
+    }
+#endif
     ofs_p << "<tr class=\"bg0\"><td align=\"left\" colspan=\"" << ncols <<
         "\"><b>Product and Coverage Information:</b><br>";
     ofs_l << "<tr class=\"bg0\"><td align=\"left\" colspan=\"" << ncols <<

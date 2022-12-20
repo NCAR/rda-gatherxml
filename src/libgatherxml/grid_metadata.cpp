@@ -12,6 +12,9 @@
 #include <utils.hpp>
 #include <bitmap.hpp>
 #include <search.hpp>
+#ifdef DUMP_QUERIES
+#include <timer.hpp>
+#endif
 
 using bitmap::compress_values;
 using bitmap::uncompress_values;
@@ -60,11 +63,19 @@ void summarize_grid_levels(string database, string caller, string user) {
       database + ".ds" + d + "_agrids as g left join " + database + ".ds" + d +
       t + " as p on p.code = g." + i + "_code where !isnull(p.format_code)");
 #ifdef DUMP_QUERIES
-    cerr << F << ": " << q.show() << endl;
+  {
+  Timer tm;
+  tm.start();
 #endif
   if (q.submit(srv) < 0) {
     log_error2(q.error() + "' for '" + q.show() + "'", F, caller, user);
   }
+#ifdef DUMP_QUERIES
+  tm.stop();
+  cerr << "Elapsed time: " << tm.elapsed_time() << " " << F << ": " << q.show()
+      << endl;
+  }
+#endif
   unordered_set<string> uset;
   for (const auto& row : q) {
     vector<size_t> v;
@@ -126,11 +137,19 @@ void summarize_grids(string database, string caller, string user, string
       + " as p left join " + database + ".formats as f on f.code = p."
       "format_code");
 #ifdef DUMP_QUERIES
-    cerr << F << ": " << q.show() << endl;
+  {
+  Timer tm;
+  tm.start();
 #endif
   if (q.submit(srv) < 0) {
     log_error2(q.error() + " for query '" + q.show() + "'", F, caller, user);
   }
+#ifdef DUMP_QUERIES
+  tm.stop();
+  cerr << "Elapsed time: " << tm.elapsed_time() << " " << F << ": " << q.show()
+      << endl;
+  }
+#endif
   string fc;
   unordered_map<string, string> ff_map;
   if (q.num_rows() == 1) {
@@ -142,11 +161,19 @@ void summarize_grids(string database, string caller, string user, string
         "left join " + database + ".formats as f on f.code = p.format_code "
         "where !isnull(f.code)");
 #ifdef DUMP_QUERIES
-    cerr << F << ": " << q.show() << endl;
+    {
+    Timer tm;
+    tm.start();
 #endif
     if (q.submit(srv) < 0) {
       log_error2(q.error() + " for query '" + q.show() + "'", F, caller, user);
     }
+#ifdef DUMP_QUERIES
+    tm.stop();
+    cerr << "Elapsed time: " << tm.elapsed_time() << " " << F << ": " << q.
+        show() << endl;
+    }
+#endif
     for (const auto& r : q) {
       ff_map.emplace(r[0], r[1]);
     }
@@ -163,11 +190,19 @@ void summarize_grids(string database, string caller, string user, string
   }
   MySQL::Query sq(s);
 #ifdef DUMP_QUERIES
-  cerr << F << ": " << sq.show() << endl;
+  {
+  Timer tm;
+  tm.start();
 #endif
   if (sq.submit(srv) < 0) {
     log_error2(sq.error() + " for query '" + sq.show() + "'", F, caller, user);
   }
+#ifdef DUMP_QUERIES
+  tm.stop();
+  cerr << "Elapsed time: " << tm.elapsed_time() << " " << F << ": " << sq.show()
+      << endl;
+  }
+#endif
   unordered_map<string, vector<size_t>> tr_map, gd_map, l_map;
   my::map<GridSummaryEntry> summ_map(99999);
   for (const auto& row : sq) {
@@ -266,11 +301,19 @@ void summarize_grids(string database, string caller, string user, string
             "= " + sp[1] + " and gridDefinition_code = " + sp[2] + " and "
             "parameter = " + sp[3]);
 #ifdef DUMP_QUERIES
-        cerr << F << ": " << q.show() << endl;
+        {
+        Timer tm;
+        tm.start();
 #endif
         if (q.submit(srv) < 0) {
           log_error2(q.error(), F, caller, user);
         }
+#ifdef DUMP_QUERIES
+        tm.stop();
+        cerr << "Elapsed time: " << tm.elapsed_time() << " " << F << ": " << q.
+            show() << endl;
+        }
+#endif
         MySQL::Row row;
         q.fetch_row(row);
         vector<size_t> v2;
@@ -323,11 +366,19 @@ void summarize_grid_resolutions(string caller, string user, string
       directives.metadb_username, metautils::directives.metadb_password, "");
   MySQL::LocalQuery q("code, definition, defParams", "WGrML.gridDefinitions");
 #ifdef DUMP_QUERIES
-    cerr << F << ": " << q.show() << endl;
+  {
+  Timer tm;
+  tm.start();
 #endif
   if (q.submit(srv) < 0) {
     log_error2(q.error(), F, caller, user);
   }
+#ifdef DUMP_QUERIES
+  tm.stop();
+  cerr << "Elapsed time: " << tm.elapsed_time() << " " << F << ": " << q.show()
+      << endl;
+  }
+#endif
   unordered_map<string, pair<string, string>> gd_map;
   for (const auto& r : q) {
     gd_map.emplace(r[0], make_pair(r[1], r[2]));
@@ -343,11 +394,19 @@ void summarize_grid_resolutions(string caller, string user, string
         metautils::args.dsnum, ".", "") + "_agrids");
   }
 #ifdef DUMP_QUERIES
-  cerr << F << ": " << q.show() << endl;
+  {
+  Timer tm;
+  tm.start();
 #endif
   if (q.submit(srv) < 0) {
     log_error2(q.error() + " for '" + q.show() + "'", F, caller, user);
   }
+#ifdef DUMP_QUERIES
+  tm.stop();
+  cerr << "Elapsed time: " << tm.elapsed_time() << " " << F << ": " << q.show()
+      << endl;
+  }
+#endif
   for (const auto& r : q) {
     vector<size_t> v;
     uncompress_values(r[0], v);
@@ -428,29 +487,7 @@ void aggregate_grids(string database, string caller, string user, string
   MySQL::Server srv(metautils::directives.database_server, metautils::
       directives.metadb_username, metautils::directives.metadb_password, "");
   MySQL::LocalQuery q;
-  if (database == "GrML") {
-    if (!fileID_code.empty()) {
-      srv._delete("GrML.ds" + d + "_agrids","mssID_code = " + fileID_code);
-      srv._delete("GrML.ds" + d + "_agrids2","mssID_code = " + fileID_code);
-      srv._delete("GrML.ds" + d + "_grid_definitions","mssID_code = " +
-          fileID_code);
-      q.set("select timeRange_code, gridDefinition_code, parameter, "
-          "levelType_codes, min(start_date), max(end_date) from GrML.ds" + d +
-          "_grids where mssID_code = " + fileID_code + " group by "
-          "timeRange_code, gridDefinition_code, parameter, levelType_codes "
-          "order by parameter, levelType_codes, timeRange_code");
-    } else {
-      srv._delete("GrML.ds" + d + "_agrids_cache");
-      q.set("select timeRange_code, gridDefinition_code, parameter, "
-          "levelType_codes, min(start_date), max(end_date) from GrML.summary "
-          "where dsid = '" + metautils::args.dsnum + "' group by "
-          "timeRange_code, gridDefinition_code, parameter, levelType_codes "
-          "order by parameter, levelType_codes, timeRange_code");
-    }
-#ifdef DUMP_QUERIES
-    cerr << F << ": " << q.show() << endl;
-#endif
-  } else if (database == "WGrML") {
+  if (database == "WGrML") {
     if (!fileID_code.empty()) {
       srv._delete("WGrML.ds" + d + "_agrids", "webID_code = " + fileID_code);
       srv._delete("WGrML.ds" + d + "_agrids2", "webID_code = " + fileID_code);
@@ -469,13 +506,23 @@ void aggregate_grids(string database, string caller, string user, string
           "timeRange_code, gridDefinition_code, parameter, levelType_codes "
           "order by parameter, levelType_codes, timeRange_code");
     }
-#ifdef DUMP_QUERIES
-    cerr << F << ": " << q.show() << endl;
-#endif
+  } else {
+    q.set("");
   }
+#ifdef DUMP_QUERIES
+  {
+  Timer tm;
+  tm.start();
+#endif
   if (q.submit(srv) < 0) {
     log_error2(q.error(), F, caller, user);
   }
+#ifdef DUMP_QUERIES
+  tm.stop();
+  cerr << "Elapsed time: " << tm.elapsed_time() << " " << F << ": " << q.show()
+      << endl;
+  }
+#endif
 //std::cerr << q.show() << std::endl;
   std::unordered_set<size_t> gd_set, ds_set;
   vector<size_t> dsv;
