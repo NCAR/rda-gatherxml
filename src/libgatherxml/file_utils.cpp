@@ -4,6 +4,7 @@
 #include <sys/stat.h>
 #include <sstream>
 #include <regex>
+#include <MySQL.hpp>
 #include <metadata.hpp>
 #include <strutils.hpp>
 #include <utils.hpp>
