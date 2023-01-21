@@ -14,6 +14,7 @@
 #ifdef DUMP_QUERIES
 #include <timer.hpp>
 #endif
+#include <mutex.hpp>
 
 using metautils::log_error2;
 using miscutils::this_function_label;
@@ -1147,29 +1148,6 @@ void write_grml_parameters(string file_type, string tindex, ofstream& ofs,
   if (dfmap.empty()) {
     fill_data_formats_table(mysrv, db, dfmap, caller, user);
   }
-  unordered_set<string> rdafs;
-  if (!tindex.empty()) {
-    MySQL::LocalQuery q(dssfil, "dssdb." + dssfil, "dsid = 'ds" + metautils::
-        args.dsnum + "' and tindex = " + tindex + " and " + wc);
-#ifdef DUMP_QUERIES
-    {
-    Timer tm;
-    tm.start();
-#endif
-    if (q.submit(mysrv) < 0) {
-      log_error2("'" + q.error() + "' while trying to get RDA files from dssdb."
-          + dssfil, F, caller, user);
-    }
-#ifdef DUMP_QUERIES
-    tm.stop();
-    cerr << "Elapsed time: " << tm.elapsed_time() << " " << F << ": " << q.
-        show() << endl;
-    }
-#endif
-    for (const auto& r : q) {
-      rdafs.emplace(r[0]);
-    }
-  }
   static unordered_set<string> invs;
   static string idsel = "";
   if (file_type == "inv" && invs.empty()) {
@@ -1199,8 +1177,31 @@ void write_grml_parameters(string file_type, string tindex, ofstream& ofs,
   }
   init_date_selection = idsel;
   static unordered_map<string, unordered_map<string, string>> ffmap;
-  auto fkey = idtyp + db + d2 + mfil;
-  if (ffmap[fkey].size() == 0) {
+  static unordered_map<string, unordered_set<string>> rdafs;
+  auto fkey = idtyp + db + d2 + mfil + tindex;
+  if (ffmap[fkey].empty()) {
+    if (!tindex.empty()) {
+      MySQL::LocalQuery q(dssfil, "dssdb." + dssfil, "dsid = 'ds" + metautils::
+          args.dsnum + "' and tindex = " + tindex + " and " + wc);
+#ifdef DUMP_QUERIES
+      {
+      Timer tm;
+      tm.start();
+#endif
+      if (q.submit(mysrv) < 0) {
+        log_error2("'" + q.error() + "' while trying to get RDA files from dssdb."
+            + dssfil, F, caller, user);
+      }
+#ifdef DUMP_QUERIES
+      tm.stop();
+      cerr << "Elapsed time: " << tm.elapsed_time() << " " << F << ": " << q.
+          show() << endl;
+      }
+#endif
+      for (const auto& r : q) {
+        rdafs[tindex].emplace(r[0]);
+      }
+    }
     MySQL::LocalQuery q("code, " + idtyp + "ID, format_code", db + ".ds" + d2 +
         mfil);
 #ifdef DUMP_QUERIES
@@ -1219,54 +1220,68 @@ void write_grml_parameters(string file_type, string tindex, ofstream& ofs,
     }
 #endif
     for (const auto& r : q) {
-      if ((rdafs.empty() || rdafs.find(r[1]) != rdafs.end()) && (invs.empty() ||
-          invs.find(r[0]) != invs.end())) {
+      if ((rdafs[tindex].empty() || rdafs[tindex].find(r[1]) != rdafs[tindex].
+          end()) && (invs.empty() || invs.find(r[0]) != invs.end())) {
         ffmap[fkey].emplace(r[0], r[2]);
       }
     }
   }
-  MySQL::Query qs("parameter, start_date, end_date, " + idtyp + "ID_code", db +
-      ".ds" + d2 + "_agrids");
+  static Mutex pd_mutex;
+  static vector<tuple<string, string, string, string>> parameter_data;
+  if (parameter_data.empty() && !pd_mutex.is_locked()) {
+    pd_mutex.lock();
+    MySQL::LocalQuery qs("parameter, start_date, end_date, " + idtyp +
+        "ID_code", db + ".ds" + d2 + "_agrids");
 #ifdef DUMP_QUERIES
-  {
-  Timer tm;
-  tm.start();
+    {
+    Timer tm;
+    tm.start();
 #endif
-  if (qs.submit(mysrv) < 0) {
-    log_error2("'" + qs.error() + "' while trying to get agrids data", F,
-        caller, user);
-  }
+    if (qs.submit(mysrv) < 0) {
+      log_error2("'" + qs.error() + "' while trying to get agrids data", F,
+          caller, user);
+    }
 #ifdef DUMP_QUERIES
-  tm.stop();
-  cerr << "Elapsed time: " << tm.elapsed_time() << " " << F << ": " << qs.show()
-      << endl;
-  }
+    tm.stop();
+    cerr << "Elapsed time: " << tm.elapsed_time() << " " << F << ": " << qs.
+        show() << endl;
+    }
 #endif
+    parameter_data.reserve(qs.num_rows());
+    for (const auto& r : qs) {
+      parameter_data.emplace_back(make_tuple(r[0], r[1], r[2], r[3]));
+    }
+    pd_mutex.unlock();
+  } else if (pd_mutex.is_locked()) {
+    while (pd_mutex.is_locked()) { }
+  }
   xmlutils::ParameterMapper pmap(metautils::directives.parameter_map_path);
   unordered_set<string> u;
   vector<pair<string, ParameterEntry>> vp;
   unordered_map<string, size_t> idxmap; // map of vp indexes for updates
   auto cnt = 0;
-  for (const auto& r : qs) {
-    auto itm = ffmap[fkey].find(r[3]); 
+  for (const auto& t : parameter_data) {
+    string param, sd, ed, file_code;
+    tie(param, sd, ed, file_code) = t;
+    auto itm = ffmap[fkey].find(file_code); 
     if (itm != ffmap[fkey].end()) {
-      auto uu = itm->second + "!" + r[0];
+      auto uu = itm->second + "!" + param;
       if (u.find(uu) == u.end()) {
         auto f = dfmap[itm->second];
-        auto k = pmap.description(f, r[0]);
+        auto k = pmap.description(f, param);
         auto iti = idxmap.find(k);
+        auto pcode = itm->second + "!" + param;
         if (iti == idxmap.end()) {
           vp.emplace_back(make_pair(k, ParameterEntry()));
-          vp.back().second.id = itm->second + "!" + r[0];
+          vp.back().second.id = pcode;
           auto x = vp.back().first.find("@");
           if (x != string::npos) {
             vp.back().first = vp.back().first.substr(0, x);
           }
-          vp.back().second.short_name = pmap.short_name(f, r[0]);
+          vp.back().second.short_name = pmap.short_name(f, param);
           idxmap.emplace(k, cnt);
           ++cnt;
         } else {
-          auto pcode = itm->second + "!" + r[0];
           if (regex_search(pcode, regex("@"))) {
             pcode = pcode.substr(0, pcode.find("@"));
           }
@@ -1276,11 +1291,11 @@ void write_grml_parameters(string file_type, string tindex, ofstream& ofs,
         }
         u.emplace(uu);
       }
-      if (r[1] < min) {
-        min = r[1];
+      if (sd < min) {
+        min = sd;
       }
-      if (r[2] > max) {
-        max = r[2];
+      if (ed > max) {
+        max = ed;
       }
     }
   }
