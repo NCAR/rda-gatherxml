@@ -4,7 +4,6 @@
 #include <deque>
 #include <regex>
 #include <unordered_set>
-#include <sstream>
 #include <numeric>
 #include <stdlib.h>
 #include <unistd.h>
@@ -68,11 +67,10 @@ ISTREAM_TYPE g_istream_type;
 unique_ptr<idstream> g_istream(nullptr);
 stringstream g_warn_ss;
 auto& g_dsid = metautils::args.dsnum; // alias
+const metautils::UtilityIdentification g_util_ident("hdf2xml", USER);
+unique_ptr<TempFile> g_work_file;
 
 /*****************************************************************************/
-
-const metautils::UtilityIdentification g_util_ident("hdf2xml", USER);
-unique_ptr<TempFile> work_file;
 
 struct ScanData {
   ScanData() : num_not_missing(0), write_type(-1), cmd_type(), tdir(nullptr),
@@ -135,17 +133,19 @@ struct DiscreteGeometriesData {
 };
 
 struct Inventory {
-  struct Maps {
-    Maps() : U(), G(), L(), P(), R() { }
+  struct Map {
+    Map() : map(), lst() { }
 
-    unordered_map<string, pair<size_t, size_t>> U, G, L, P, R;
+    unordered_map<string, pair<size_t, size_t>> map;
+    vector<string> lst;
   };
 
-  Inventory() : file(), dir(nullptr), stream(), maps(), lines() { }
+  Inventory() : file(), dir(nullptr), stream(), U(), G(), L(), P(), R(),
+      lines() { }
   string file;
   unique_ptr<TempDir> dir;
   std::ofstream stream;
-  Maps maps;
+  Map U, G, L, P, R;
   vector<string> lines;
 } g_inv;
 
@@ -1350,8 +1350,9 @@ void update_grid_entry_set(string key_start, string time_method, const
   if (grid_entry_set.find(k) == grid_entry_set.end()) {
     grid_entry_set.emplace(k);
   }
-  if (g_inv.stream.is_open() && g_inv.maps.U.find(d) == g_inv.maps.U.end()) {
-    g_inv.maps.U.emplace(d, make_pair(g_inv.maps.U.size(), 0));
+  if (g_inv.stream.is_open() && g_inv.U.map.find(d) == g_inv.U.map.end()) {
+    g_inv.U.map.emplace(d, make_pair(g_inv.U.map.size(), 0));
+    g_inv.U.lst.emplace_back(d);
   }
 }
 
@@ -1432,8 +1433,9 @@ void add_gridded_lat_lon_keys(unordered_set<string>& grid_entry_set, Grid::
   }
   auto key = strutils::substitute(key_start, "<!>", ",");
   strutils::chop(key);
-  if (g_inv.stream.is_open() && g_inv.maps.G.find(key) == g_inv.maps.G.end()) {
-    g_inv.maps.G.emplace(key, make_pair(g_inv.maps.G.size(), 0));
+  if (g_inv.stream.is_open() && g_inv.G.map.find(key) == g_inv.G.map.end()) {
+    g_inv.G.map.emplace(key, make_pair(g_inv.G.map.size(), 0));
+    g_inv.G.lst.emplace_back(key);
   }
 }
 
@@ -1734,9 +1736,10 @@ bool added_gridded_parameters_to_netcdf_level_entry(string& grid_entry_key,
           g_grml_data->p.key = "ds" + g_dsid + ":" + dse.key;
           add_gridded_netcdf_parameter(dse, scan_data, time_range,
               parameter_data, grid_data.time_range_entry.num_steps);
-          if (g_inv.maps.P.find(g_grml_data->p.key) == g_inv.maps.P.end()) {
-            g_inv.maps.P.emplace(g_grml_data->p.key, make_pair(g_inv.maps.P.
+          if (g_inv.P.map.find(g_grml_data->p.key) == g_inv.P.map.end()) {
+            g_inv.P.map.emplace(g_grml_data->p.key, make_pair(g_inv.P.map.
                 size(), 0));
+            g_inv.P.lst.emplace_back(g_grml_data->p.key);
           }
           b = true;
         }
@@ -1840,9 +1843,10 @@ void update_level_entry(const TimeBounds& time_bounds, const GridData&
           }
         }
         level_write = true;
-        if (g_inv.maps.P.find(g_grml_data->p.key) == g_inv.maps.P.end()) {
-          g_inv.maps.P.emplace(g_grml_data->p.key, make_pair(g_inv.maps.P.
+        if (g_inv.P.map.find(g_grml_data->p.key) == g_inv.P.map.end()) {
+          g_inv.P.map.emplace(g_grml_data->p.key, make_pair(g_inv.P.map.
               size(), 0));
+          g_inv.P.lst.emplace_back(g_grml_data->p.key);
         }
       }
     }
@@ -1922,25 +1926,26 @@ DateTime compute_nc_time(const HDF5::DataArray& times, const TimeData&
 }
 
 void update_inventory(string pkey, string gkey, const GridData& grid_data) {
-  if (g_inv.maps.L.find(g_grml_data->l.key) == g_inv.maps.L.end()) {
-    g_inv.maps.L.emplace(g_grml_data->l.key, make_pair(g_inv.maps.L.size(), 0));
+  if (g_inv.L.map.find(g_grml_data->l.key) == g_inv.L.map.end()) {
+    g_inv.L.map.emplace(g_grml_data->l.key, make_pair(g_inv.L.map.size(), 0));
+    g_inv.L.lst.emplace_back(g_grml_data->l.key);
   }
   for (size_t n = 0; n < grid_data.valid_time.data_array.num_values; ++n) {
     for (const auto& e : g_grml_data->l.entry.parameter_code_table) {
       stringstream inv_line;
       string error;
-      inv_line << "0|0|" << actual_date_time(data_array_value(grid_data.
+      inv_line << "0|1|" << actual_date_time(data_array_value(grid_data.
           valid_time.data_array, n, grid_data.valid_time.ds.get()), *grid_data.
-          time_data, error).to_string("%Y%m%d%H%MM") << "|" << g_inv.maps.U[
-          pkey].first << "|" << g_inv.maps.G[gkey].first << "|" << g_inv.maps.L[
-          g_grml_data->l.key].first << "|" << g_inv.maps.P[e.first].first <<
+          time_data, error).to_string("%Y%m%d%H%MM") << "|" << g_inv.U.map[
+          pkey].first << "|" << g_inv.G.map[gkey].first << "|" << g_inv.L.map[
+          g_grml_data->l.key].first << "|" << g_inv.P.map[e.first].first <<
           "|0";
       g_inv.lines.emplace_back(inv_line.str());
-      ++g_inv.maps.U[pkey].second;
-      ++g_inv.maps.G[gkey].second;
-      ++g_inv.maps.L[g_grml_data->l.key].second;
-      ++g_inv.maps.P[e.first].second;
-++g_inv.maps.R["x"].second;
+      ++g_inv.U.map[pkey].second;
+      ++g_inv.G.map[gkey].second;
+      ++g_inv.L.map[g_grml_data->l.key].second;
+      ++g_inv.P.map[e.first].second;
+++g_inv.R.map["x"].second;
     }
   }
 }
@@ -3935,7 +3940,8 @@ void scan_gridded_hdf5nc4_file(ScanData& scan_data) {
     exit(1);
   }
 if (g_inv.stream.is_open()) {
-g_inv.maps.R.emplace("x", make_pair(0, 0));
+g_inv.R.map.emplace("x", make_pair(0, 0));
+g_inv.R.lst.emplace_back("x");
 }
   if (gatherxml::verbose_operation) {
     cout << "...function scan_gridded_hdf5nc4_file() done." << endl;
@@ -4018,9 +4024,9 @@ void scan_hdf5_file(std::list<string>& filelist, ScanData& scan_data) {
   if (gatherxml::verbose_operation) {
     cout << "Beginning HDF5 file scan..." << endl;
   }
+  gatherxml::markup::ObML::ObservationData obs_data;
   stream_set(ISTREAM_TYPE::_HDF5);
   auto is = sget_hdf5();
-  gatherxml::markup::ObML::ObservationData obs_data;
   for (const auto& file : filelist) {
     if (gatherxml::verbose_operation) {
       cout << "Scanning file: " << file << endl;
@@ -4083,8 +4089,8 @@ void scan_file(ScanData& scan_data) {
   if (gatherxml::verbose_operation) {
     cout << "Beginning file scan..." << endl;
   }
-  work_file.reset(new TempFile);
-  if (!work_file->open(metautils::directives.temp_path)) {
+  g_work_file.reset(new TempFile);
+  if (!g_work_file->open(metautils::directives.temp_path)) {
     log_error2("unable to create a temporary file in " +
         metautils::directives.temp_path, F, g_util_ident);
   }
@@ -4097,11 +4103,11 @@ void scan_file(ScanData& scan_data) {
   string file_format, error;
   std::list<string> filelist;
   if (!metautils::primaryMetadata::prepare_file_for_metadata_scanning(
-      *work_file, *work_dir, &filelist, file_format, error)) {
+      *g_work_file, *work_dir, &filelist, file_format, error)) {
     log_error2(error + "'", F + ": "
         "prepare_file_for_metadata_scanning()", g_util_ident);
   }
-  if (filelist.empty()) filelist.emplace_back(work_file->name());
+  if (filelist.empty()) filelist.emplace_back(g_work_file->name());
   scan_data.tdir.reset(new TempDir);
   if (!scan_data.tdir->create(metautils::directives.temp_path)) {
     log_error2("unable to create a temporary directory in " +
@@ -4181,12 +4187,11 @@ void print_output_location(int write_type) {
   cout << "ML" << endl;
 }
 
-void write_map(string prefix, const unordered_map<string, pair<size_t, size_t>>&
-    map) {
-  for (const auto& e : map) {
-    if (e.second.second > 0) {
-      g_inv.stream << prefix << "<!>" << e.second.first << "<!>" << e.first <<
-          endl;
+void write_map(string prefix, const Inventory::Map& map) {
+  for (const auto& key : map.lst) {
+    auto& p = map.map.at(key);
+    if (p.second > 0) {
+      g_inv.stream << prefix << "<!>" << p.first << "<!>" << key << endl;
     }
   }
 }
@@ -4195,11 +4200,11 @@ void write_inventory() {
   if (!g_inv.stream.is_open()) {
     return;
   }
-  write_map("U", g_inv.maps.U);
-  write_map("G", g_inv.maps.G);
-  write_map("L", g_inv.maps.L);
-  write_map("P", g_inv.maps.P);
-  write_map("R", g_inv.maps.R);
+  write_map("U", g_inv.U);
+  write_map("G", g_inv.G);
+  write_map("L", g_inv.L);
+  write_map("P", g_inv.P);
+  write_map("R", g_inv.R);
   g_inv.stream << "-----" << endl;
   for (const auto& line : g_inv.lines) {
     g_inv.stream << line << endl;
