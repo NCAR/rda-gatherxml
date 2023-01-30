@@ -220,7 +220,11 @@ string gatherxml_utility(string user) {
     }
   }
   if (util.empty()) {
-    log_error2("unable to determine gatherxml utility", F, "gatherxml", user);
+    cerr << "Error: unable to determine gatherxml utility from format (-f) '" <<
+        metautils::args.data_format << "'" << endl;
+    cerr << "    Use \"gathexml --showinfo\" to see a list of supported data "
+        "formats" << endl;
+    exit(1);
   }
   if (sp_a.back()[0] != '/' && !regex_search(sp_a.back(), regex("^https://rda."
       "ucar.edu/"))) {
@@ -247,6 +251,19 @@ string gatherxml_utility(string user) {
   return util.substr(1);
 }
 
+int command_execute(string command) {
+  stringstream oss, ess;
+  mysystem2(command, oss, ess);
+  if (!oss.str().empty()) {
+    cout << oss.str() << endl;
+  }
+  if (!ess.str().empty()) {
+    cerr << ess.str() << endl;
+    return 1;
+  }
+  return 0;
+}
+
 int main(int argc, char **argv) {
   metautils::args.args_string = unixutils::unix_args_string(argc, argv,
       ARG_DELIMITER);
@@ -265,10 +282,11 @@ int main(int argc, char **argv) {
     log_error2("unable to connect to database; error: " + srv.error(), "main()",
         util, u);
   }
-  MySQL::Query q("stat_flag", "dssgrp", "logname = '" + u + "'");
+  MySQL::LocalQuery q("stat_flag", "dssgrp", "logname = '" + u + "'");
   if (q.submit(srv) < 0) {
     log_error2("authorization server error: " + q.error(), "main()", util, u);
   }
+  srv.disconnect();
   MySQL::Row row;
   if (!q.fetch_row(row)) {
     cerr << "Error: not authorized" << endl;
@@ -285,31 +303,29 @@ int main(int argc, char **argv) {
   }
   auto s = whereis_singularity();
   if (s.empty()) {
-    log_error2("unable to find singularity", "main()", util, u);
-  }
-  string b = "/glade/u/home/dattore/conf,/glade/scratch/rdadata,/glade/u/home/"
-      "rdadata,/glade/collections/rda/data,/gpfs/fs1/collections/rda/work/logs/"
-      "md";
-  auto sp = split(metautils::args.args_string, "!");
-  if (sp.size() > 0 && sp.back()[0] == '/') {
+    auto host = unixutils::host_name();
+    if (util == "dsgen" && host.find("rda-web") == 0) {
+      return command_execute("/usr/local/decs/bin/_dsgen " + metautils::args.
+          args_string);
+    } else {
+      log_error2("unable to find singularity", "main()", util, u);
+    }
+  } else {
+    string b = "/glade/u/home/dattore/conf,/glade/scratch/rdadata,/glade/u/"
+        "home/rdadata,/glade/collections/rda/data,/gpfs/fs1/collections/rda/"
+        "work/logs/md";
+    auto sp = split(metautils::args.args_string, "!");
+    if (sp.size() > 0 && sp.back()[0] == '/') {
 
-    // test run must specify full path, so bind that path
-    auto idx = sp.back().rfind("/");
-    b += "," + sp.back().substr(0, idx);
+      // test run must specify full path, so bind that path
+      auto idx = sp.back().rfind("/");
+      b += "," + sp.back().substr(0, idx);
+    }
+    cmd = s + " -s exec -B " + b + " /glade/u/home/rdadata/bin/singularity/"
+        "gatherxml-exec.sif /usr/local/bin/_" + util;
+    if (!metautils::args.args_string.empty()) {
+      cmd += " " + substitute(metautils::args.args_string, "!", " ");
+    }
+    return command_execute(cmd);
   }
-  cmd = s + " -s exec -B " + b + " /glade/u/home/rdadata/bin/singularity/"
-      "gatherxml-exec.sif /usr/local/bin/_" + util;
-  if (!metautils::args.args_string.empty()) {
-    cmd += " " + substitute(metautils::args.args_string, "!", " ");
-  }
-  stringstream oss, ess;
-  mysystem2(cmd, oss, ess);
-  if (!oss.str().empty()) {
-    cout << oss.str() << endl;
-  }
-  if (!ess.str().empty()) {
-    cerr << ess.str() << endl;
-    return 1;
-  }
-  return 0;
 }
