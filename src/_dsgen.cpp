@@ -79,6 +79,7 @@ unordered_map<string, string> wagtail_db{
     { "access_restrict", "dataset_description_datasetdescriptionpage" },
     { "contributors", "dataset_description_datasetdescriptionpage" },
     { "data_formats", "dataset_description_datasetdescriptionpage" },
+    { "data_license", "dataset_description_datasetdescriptionpage" },
     { "data_types", "dataset_description_datasetdescriptionpage" },
     { "levels", "dataset_description_datasetdescriptionpage" },
     { "spatial_coverage", "dataset_description_datasetdescriptionpage" },
@@ -394,6 +395,7 @@ string text_field_from_element(const XMLElement& e) {
     replace_all(s, "<" + e.name() + ">", "");
     replace_all(s, "</" + e.name() + ">", "");
     trim(s);
+/*
     auto i = s.find("<p");
     if (i == string::npos) {
       i = s.find("<P");
@@ -402,6 +404,7 @@ string text_field_from_element(const XMLElement& e) {
       auto i2 = s.find(">", i);
       s.insert(i2, " style=\"margin: 0px; padding: 0px\"");
     }
+*/
   }
   return s;
 }
@@ -413,6 +416,7 @@ void insert_text_field(ofstream& ofs, const XMLElement& e, string
     replace_all(s, "<" + e.name() + ">", "");
     replace_all(s, "</" + e.name() + ">", "");
     trim(s);
+/*
     size_t i = s.find("<p");
     if (i == string::npos) {
       i = s.find("<P");
@@ -421,6 +425,7 @@ void insert_text_field(ofstream& ofs, const XMLElement& e, string
       auto i2 = s.find(">", i);
       s.insert(i2, " style=\"margin: 0px; padding: 0px\"");
     }
+*/
     ofs << "<tr style=\"vertical-align: top\"><td class=\"bold\">" <<
         section_title << ":</td><td>" << s << "</td></tr>" << endl;
   }
@@ -1138,6 +1143,7 @@ void add_access_restrictions(TokenDocument& tdoc) {
   auto a = e.to_string();
   replace_all(a, "<access>", "");
   replace_all(a, "</access>", "");
+/*
   auto idx = a.find("<p");
   if (idx == string::npos) {
     idx = a.find("<P");
@@ -1146,6 +1152,7 @@ void add_access_restrictions(TokenDocument& tdoc) {
     auto idx2 = a.find(">", idx);
     a.insert(idx2, " style=\"margin: 0px; padding: 0px\"");
   }
+*/
   if (!a.empty()) {
     tdoc.add_if("__HAS_ACCESS_RESTRICTIONS__");
     tdoc.add_replacement("__ACCESS_RESTRICTIONS__", a);
@@ -1159,6 +1166,7 @@ void add_usage_restrictions(TokenDocument& tdoc) {
   auto u = e.to_string();
   replace_all(u, "<usage>", "");
   replace_all(u, "</usage>", "");
+/*
   auto idx = u.find("<p");
   if (idx == string::npos) {
     idx = u.find("<P");
@@ -1167,6 +1175,7 @@ void add_usage_restrictions(TokenDocument& tdoc) {
     auto idx2 = u.find(">", idx);
     u.insert(idx2, " style=\"margin: 0px; padding: 0px\"");
   }
+*/
   if (!u.empty()) {
     tdoc.add_if("__HAS_USAGE_RESTRICTIONS__");
     tdoc.add_replacement("__USAGE_RESTRICTIONS__", u);
@@ -1944,6 +1953,40 @@ void add_more_details(TokenDocument& tdoc) {
   }
 }
 
+void add_data_license() {
+  static const string F = this_function_label(__func__);
+  auto id = g_xdoc.element("dsOverview/dataLicense").content();
+  struct stat st;
+  XMLDocument ldoc;
+  if (stat("/usr/local/www/server_root/web/metadata", &st) == 0) {
+    ldoc.open("/usr/local/www/server_root/web/metadata/DataLicenses.xml");
+  } else {
+    auto f = unixutils::remote_web_file("https://rda.ucar.edu/metadata/"
+        "DataLicenses.xml", temp_dir.name());
+    ldoc.open(f);
+  }
+  if (!ldoc) {
+    log_error2("unable to open DataLicenses.xml", F, "dsgen", USER);
+  }
+  auto elist = ldoc.element_list("DataLicenses/License");
+  size_t idx = 0;
+  for (const auto& e : elist) {
+    if (id == e.attribute_value("id")) {
+      update_wagtail("data_license", "{\"title\": \"" + e.element("title").
+          content() + "\", \"href\": \"" + e.element("href").content() + "\", "
+          "\"img_href\": \"" + e.element("img_href").content() + "\"}", F);
+      break;
+    }
+    ++idx;
+  }
+  if (idx == elist.size()) {
+    update_wagtail("data_license", "{\"title\": \"" + elist.front().element(
+        "title").content() + "\", \"href\": \"" + elist.front().element("href").
+        content() + "\", \"img_href\": \"" + elist.front().element("img_href").
+        content() + "\"}", F);
+  }
+}
+
 void generate_description(string type, string tdir_name) {
   static const string F = this_function_label(__func__);
   string dsnum2 = substitute(metautils::args.dsnum, ".", "");
@@ -2006,6 +2049,7 @@ void generate_description(string type, string tdir_name) {
   add_related_datasets(tdoc); // wagtail
   add_more_details(tdoc);
   add_data_citations(tdoc); // wagtail
+  add_data_license();
 
   ofs << tdoc;
   ofs.close();
