@@ -1839,7 +1839,8 @@ void add_data_volume(TokenDocument& tdoc, size_t& swp_cnt) {
     string j;
     for (const auto& r2: q2) {
       auto g = r2[1].empty() ? r2[2] : r2[1];
-      auto v=stof(r2[0]) / 1000000.;
+      replace_all(g, "\"", "\\\\\"");
+      auto v = stof(r2[0]) / 1000000.;
       auto n = 0;
       while (v > 1000. && n < VOLUME_LEN) {
         v /= 1000.;
