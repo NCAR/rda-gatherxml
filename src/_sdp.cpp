@@ -42,33 +42,33 @@ int check_date(std::string date,std::string& db_date,std::string type)
   if (sp.size() > 1) {
 // check the month
     if (sp[1].length() != 2 || sp[1] < "01" || sp[1] > "12") {
-	std::cerr << "Error: bad month in " << type << " date" << std::endl;
-	exit(1);
+      std::cerr << "Error: bad month in " << type << " date" << std::endl;
+      exit(1);
     }
     flag=2;
   }
   else {
     if (type == "start") {
-	db_date+="-01-01";
+      db_date+="-01-01";
     }
     else {
-	db_date+="-12-31";
+      db_date+="-12-31";
     }
   }
   if (sp.size() > 2) {
 // check the day
     sdum=strutils::itos(dateutils::days_in_month(std::stoi(sp[0]),std::stoi(sp[1])));
     if (sp[2].length() != 2 || sp[2] < "01" || sp[2] > sdum) {
-	std::cerr << "Error: bad month in " << type << " date" << std::endl;
-	exit(1);
+      std::cerr << "Error: bad month in " << type << " date" << std::endl;
+      exit(1);
     }
     flag=3;
   }
   else {
     if (type == "start")
-	db_date+="-01";
+      db_date+="-01";
     else
-	db_date+="-"+strutils::itos(dateutils::days_in_month(std::stoi(sp[0]),std::stoi(sp[1])));
+      db_date+="-"+strutils::itos(dateutils::days_in_month(std::stoi(sp[0]),std::stoi(sp[1])));
   }
   return flag;
 }
@@ -90,33 +90,33 @@ int check_time(std::string time,std::string& db_time,std::string type)
   if (sp.size() > 1) {
 // check the minutes
     if (sp[1].length() != 2 || sp[1] < "00" || sp[1] > "59") {
-	std::cerr << "Error: bad minutes in " << type << " time" << std::endl;
-	exit(1);
+      std::cerr << "Error: bad minutes in " << type << " time" << std::endl;
+      exit(1);
     }
     flag=2;
   }
   else {
     if (type == "start") {
-	db_time+=":00:00";
+      db_time+=":00:00";
     }
     else {
-	db_time+=":59:59";
+      db_time+=":59:59";
     }
   }
   if (sp.size() > 2) {
 // check the seconds
     if (sp[2].length() != 2 || sp[2] < "00" || sp[2] > "59") {
-	std::cerr << "Error: bad seconds in " << type << " time" << std::endl;
-	exit(1);
+      std::cerr << "Error: bad seconds in " << type << " time" << std::endl;
+      exit(1);
     }
     flag=3;
   }
   else {
     if (type == "start") {
-	db_time+=":00";
+      db_time+=":00";
     }
     else {
-	db_time+=":59";
+      db_time+=":59";
     }
   }
   return flag;
@@ -151,40 +151,40 @@ int main(int argc,char **argv)
   auto unix_args=strutils::split(metautils::args.args_string,"%");
   for (size_t n=0; n < unix_args.size(); ++n) {
     if (unix_args[n] == "-d") {
-	metautils::args.dsnum=unix_args[++n];
-	if (std::regex_search(metautils::args.dsnum,std::regex("^ds"))) {
-	  metautils::args.dsnum=metautils::args.dsnum.substr(2);
-	}
-	dsnum2=strutils::substitute(metautils::args.dsnum,".","");
+      metautils::args.dsnum=unix_args[++n];
+      if (std::regex_search(metautils::args.dsnum,std::regex("^ds"))) {
+        metautils::args.dsnum=metautils::args.dsnum.substr(2);
+      }
+      dsnum2=strutils::substitute(metautils::args.dsnum,".","");
     }
     else if (unix_args[n] == "-g") {
-	local_args.gindex=unix_args[++n];
+      local_args.gindex=unix_args[++n];
     }
     else if (unix_args[n] == "-bd") {
-	local_args.start_date=unix_args[++n];
-	local_args.start_date_flag=check_date(local_args.start_date,db_start_date,"start");
+      local_args.start_date=unix_args[++n];
+      local_args.start_date_flag=check_date(local_args.start_date,db_start_date,"start");
     }
     else if (unix_args[n] == "-bt") {
-	local_args.start_time=unix_args[++n];
-	local_args.start_time_flag=check_time(local_args.start_time,db_start_time,"start");
+      local_args.start_time=unix_args[++n];
+      local_args.start_time_flag=check_time(local_args.start_time,db_start_time,"start");
     }
     else if (unix_args[n] == "-ed") {
-	local_args.end_date=unix_args[++n];
-	local_args.end_date_flag=check_date(local_args.end_date,db_end_date,"end");
+      local_args.end_date=unix_args[++n];
+      local_args.end_date_flag=check_date(local_args.end_date,db_end_date,"end");
     }
     else if (unix_args[n] == "-et") {
-	local_args.end_time=unix_args[++n];
-	local_args.end_time_flag=check_time(local_args.end_time,db_end_time,"end");
+      local_args.end_time=unix_args[++n];
+      local_args.end_time_flag=check_time(local_args.end_time,db_end_time,"end");
     }
     else if (unix_args[n] == "-tz") {
-	local_args.tz=unix_args[++n];
-	if (!std::regex_search(local_args.tz,std::regex("^[+-]")) || !strutils::is_numeric(local_args.tz.substr(1))) {
-	  std::cerr << "Error: bad time zone specification" << std::endl;
-	  exit(1);
-	}
+      local_args.tz=unix_args[++n];
+      if (!std::regex_search(local_args.tz,std::regex("^[+-]")) || !strutils::is_numeric(local_args.tz.substr(1))) {
+        std::cerr << "Error: bad time zone specification" << std::endl;
+        exit(1);
+      }
     }
     else {
-	std::cerr << "Warning: flag " << unix_args[n] << " is not a valid flag" << std::endl;
+      std::cerr << "Warning: flag " << unix_args[n] << " is not a valid flag" << std::endl;
     }
   }
   if (metautils::args.dsnum.empty()) {
@@ -230,8 +230,8 @@ int main(int argc,char **argv)
   auto found_cmd_db=false;
   for (const auto& db : db_names) {
     if (table_exists(server,db+".ds"+dsnum2+"_primaries")) {
-	found_cmd_db=true;
-	break;
+      found_cmd_db=true;
+      break;
     }
   }
   if (found_cmd_db) {
@@ -282,58 +282,58 @@ int main(int argc,char **argv)
   while (!ifs.eof()) {
     std::string sline=line;
     if (std::regex_search(sline,std::regex("^  <timeStamp"))) {
-	ofs << "  <timeStamp value=\"" << dateutils::current_date_time().to_string("%Y-%m-%d %HH:%MM:%SS %Z") << "\" />" << std::endl;
+      ofs << "  <timeStamp value=\"" << dateutils::current_date_time().to_string("%Y-%m-%d %HH:%MM:%SS %Z") << "\" />" << std::endl;
     }
     else if (std::regex_search(sline,std::regex("^    <temporal")) && (std::regex_search(sline,std::regex("groupID=\""+group_ID+"\"")) || (group_ID == "Entire Dataset" && !std::regex_search(sline,std::regex("groupID"))))) {
-	std::string new_line="    <temporal";
-	if (!local_args.start_date.empty()) {
-	  new_line+=" start=\""+local_args.start_date;
-	  if (!local_args.start_time.empty()) {
-	    new_line+=" "+local_args.start_time;
-	    if (!local_args.tz.empty()) {
-		new_line+=" "+local_args.tz;
-	    }
-	    else {
-		new_line+=" +0000";
-	    }
-	  }
-	  new_line+="\"";
-	}
-	else {
-	  auto idx=sline.find("start=");
-	  auto parts=strutils::split(sline.substr(idx));
-	  new_line+=" "+parts.front();
-	}
-	auto idx=sline.find("end=");
-	if (!local_args.end_date.empty()) {
-	  new_line+=" end=\""+local_args.end_date;
-	  if (!local_args.end_time.empty()) {
-	    new_line+=" "+local_args.end_time;
-	    if (!local_args.tz.empty()) {
-		new_line+=" "+local_args.tz;
-	    }
-	    else {
-		new_line+=" +0000";
-	    }
-	  }
-	  new_line+="\"";
-	}
-	else {
-	  auto parts=strutils::split(sline.substr(idx));
-	  new_line+=" "+parts.front();
-	}
-	auto group_ID=sline.substr(idx+5);
-	if ( (idx=group_ID.find("\"")) != std::string::npos) {
-	  group_ID=group_ID.substr(idx);
-	}
-	auto group_parts=strutils::split(group_ID);
-	for (size_t n=1; n < group_parts.size(); ++n) {
-	  new_line+=" "+group_parts[n];
-	}
-	ofs << new_line << std::endl;
+      std::string new_line="    <temporal";
+      if (!local_args.start_date.empty()) {
+        new_line+=" start=\""+local_args.start_date;
+        if (!local_args.start_time.empty()) {
+          new_line+=" "+local_args.start_time;
+          if (!local_args.tz.empty()) {
+            new_line+=" "+local_args.tz;
+          }
+          else {
+            new_line+=" +0000";
+          }
+        }
+        new_line+="\"";
+      }
+      else {
+        auto idx=sline.find("start=");
+        auto parts=strutils::split(sline.substr(idx));
+        new_line+=" "+parts.front();
+      }
+      auto idx=sline.find("end=");
+      if (!local_args.end_date.empty()) {
+        new_line+=" end=\""+local_args.end_date;
+        if (!local_args.end_time.empty()) {
+          new_line+=" "+local_args.end_time;
+          if (!local_args.tz.empty()) {
+            new_line+=" "+local_args.tz;
+          }
+          else {
+            new_line+=" +0000";
+          }
+        }
+        new_line+="\"";
+      }
+      else {
+        auto parts=strutils::split(sline.substr(idx));
+        new_line+=" "+parts.front();
+      }
+      auto group_ID=sline.substr(idx+5);
+      if ( (idx=group_ID.find("\"")) != std::string::npos) {
+        group_ID=group_ID.substr(idx);
+      }
+      auto group_parts=strutils::split(group_ID);
+      for (size_t n=1; n < group_parts.size(); ++n) {
+        new_line+=" "+group_parts[n];
+      }
+      ofs << new_line << std::endl;
     }
     else {
-	ofs << line << std::endl;
+      ofs << line << std::endl;
     }
     ifs.getline(line,32768);
   }
@@ -360,43 +360,43 @@ int main(int argc,char **argv)
   std::string update_string;
   if (!db_start_date.empty()) {
     if (!update_string.empty()) {
-	update_string+=", ";
+      update_string+=", ";
     }
     update_string+="date_start = '"+db_start_date+"'";
   }
   if (!db_start_time.empty()) {
     if (!update_string.empty()) {
-	update_string+=", ";
+      update_string+=", ";
     }
     update_string+="time_start = '"+db_start_time+"'";
   }
   if ( (local_args.start_date_flag+local_args.start_time_flag) > 0) {
     if (!update_string.empty()) {
-	update_string+=", ";
+      update_string+=", ";
     }
     update_string+="start_flag = "+strutils::itos(local_args.start_date_flag+local_args.start_time_flag);
   }
   if (!db_end_date.empty()) {
     if (!update_string.empty()) {
-	update_string+=", ";
+      update_string+=", ";
     }
     update_string+="date_end = '"+db_end_date+"'";
   }
   if (!db_end_time.empty()) {
     if (!update_string.empty()) {
-	update_string+=", ";
+      update_string+=", ";
     }
     update_string+="time_end = '"+db_end_time+"'";
   }
   if ( (local_args.end_date_flag+local_args.end_time_flag) > 0) {
     if (!update_string.empty()) {
-	update_string+=", ";
+      update_string+=", ";
     }
     update_string+="end_flag = "+strutils::itos(local_args.end_date_flag+local_args.end_time_flag);
   }
   if (!local_args.tz.empty()) {
     if (!update_string.empty()) {
-	update_string+=", ";
+      update_string+=", ";
     }
     update_string+="time_zone = '"+local_args.tz+"'";
   }
