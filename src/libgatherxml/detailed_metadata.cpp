@@ -1004,14 +1004,14 @@ void generate_gridded_product_detail(MySQL::Server& mysrv, const DBData& dbdata,
       ofs << "<tr class=\"bg" << cidx << "\" valign=\"top\"><td>";
       if (q.num_rows() > 1) {
         ofs << "<a title=\"Parameters and Vertical Levels\" href=\"javascript:"
-            "void(0)\" onClick=\"popModalWindowWithURL('/cgi-bin/transform?"
-            "dsnum=" << metautils::args.dsnum << "&view=varlev&formatCode=" <<
-            fp.second << "&ftype=" << strutils::to_lower(file_type);
+            "void(0)\" onClick=\"popModalWindowWithGetUrl(950, 600, '/cgi-bin/"
+            "transform?dsnum=" << metautils::args.dsnum << "&view=varlev&"
+            "formatCode=" << fp.second << "&ftype=" << strutils::to_lower(
+            file_type);
         if (!group_index.empty()) {
           ofs << "&gindex=" << group_index;
         }
-        ofs << "&tcode=" << ps.code << "', 950, 600)\">" << ps.description <<
-            "</a>";
+        ofs << "&tcode=" << ps.code << "')\">" << ps.description << "</a>";
       } else {
         ofs << ps.description;
       }
@@ -1288,16 +1288,17 @@ void generate_detailed_grid_summary(string file_type, string group_index,
       ofs_p << "<tr class=\"bg" << cidx << "\" valign=\"top\"><td>";
       if (q.num_rows() > 1) {
         ofs_p << "<a title=\"Products and Coverages\" href=\"javascript:void("
-            "0)\" onClick=\"popModalWindowWithURL('/cgi-bin/transform?dsnum=" <<
-            metautils::args.dsnum << "&view=prodcov&formatCode=" << fp.second <<
-            "&ftype=" << strutils::to_lower(file_type);
+            "0)\" onClick=\"popModalWindowWithGetUrl(950, 600, '/cgi-bin/"
+            "transform?dsnum=" << metautils::args.dsnum << "&view=prodcov&"
+            "formatCode=" << fp.second << "&ftype=" << strutils::to_lower(
+            file_type);
         if (!group_index.empty()) {
           ofs_p << "&gindex=" << group_index;
         }
         for (const auto& e : pdmap[k].parameter_codes) {
           ofs_p << "&pcode=" << e;
         }
-        ofs_p << "', 950, 600)\">" << kk << "</a>";
+        ofs_p << "')\">" << kk << "</a>";
       } else {
         ofs_p << kk;
       }
@@ -1420,16 +1421,16 @@ void generate_detailed_grid_summary(string file_type, string group_index,
           "valign=\"bottom\"><td>";
       if (q.num_rows() > 1) {
         ofs_l << "<a title=\"Products and Coverages\" href=\"javascript:void("
-            "0)\" onClick=\"popModalWindowWithURL('/cgi-bin/transform?dsnum=" <<
-            metautils::args.dsnum << "&view=prodcov&formatCode=" << fp.second <<
-            "&ftype=" << strutils::to_lower(file_type);
+            "0)\" onClick=\"popModalWindowWithGetUrl('/cgi-bin/transform?dsnum="
+            << metautils::args.dsnum << "&view=prodcov&formatCode=" << fp.second
+            << "&ftype=" << strutils::to_lower(file_type);
         if (!group_index.empty()) {
           ofs_l << "&gindex=" << group_index;
         }
         for (auto& e : clmap[key].map_list) {
           ofs_l << "&map=" << e;
         }
-        ofs_l << "', 950, 600)\">" << key << "</a>";
+        ofs_l << "')\">" << key << "</a>";
       } else {
         ofs_l << key;
       }
