@@ -29,6 +29,7 @@ using std::get;
 using std::list;
 using std::make_pair;
 using std::make_tuple;
+using std::map;
 using std::move;
 using std::ofstream;
 using std::pair;
@@ -48,7 +49,10 @@ using std::vector;
 using strutils::itos;
 using strutils::replace_all;
 using strutils::split;
+using strutils::strand;
 using strutils::substitute;
+using strutils::to_capital;
+using strutils::to_lower;
 using unixutils::mysystem2;
 
 namespace gatherxml {
@@ -482,12 +486,12 @@ void generate_level_cross_reference(string format, string title, string
     ofs << "</style>" << endl;
     auto n = 0;
     if (lv.size() > 0) {
-      ofs << "<p>The following " << lv.size() << " " << strutils::to_capital(
-          format) << " levels are included in this dataset:<center><table "
-          "class=\"insert\" cellspacing=\"1\" cellpadding=\"5\" border=\"0\">"
-          "<tr class=\"bg2\" valign=\"bottom\"><th align=\"center\">Code</th>"
-          "<th align=\"left\">Description</th><th align=\"center\">Units</th>"
-          "</tr>" << endl;
+      ofs << "<p>The following " << lv.size() << " " << to_capital(format) <<
+          " levels are included in this dataset:<center><table class="
+          "\"insert\" cellspacing=\"1\" cellpadding=\"5\" border=\"0\"><tr "
+          "class=\"bg2\" valign=\"bottom\"><th align=\"center\">Code</th><th "
+          "align=\"left\">Description</th><th align=\"center\">Units</th></tr>"
+          << endl;
       sort(lv.begin(), lv.end(), compare_levels);
       for (const auto& e : lv) {
         auto sp = split(e, "<!>");
@@ -499,10 +503,10 @@ void generate_level_cross_reference(string format, string title, string
       ofs << "</table></center></p>" << endl;
     }
     if (yv.size() > 0) {
-      ofs << "<p>The following " << yv.size() << " " << strutils::to_capital(
-          format) << " layers are included in this dataset:<center><table "
-          "class=\"insert\" cellspacing=\"1\" cellpadding=\"5\" border=\"0\">"
-          "<tr class=\"bg2\" valign=\"bottom\"><th align=\"center\">Code<br />"
+      ofs << "<p>The following " << yv.size() << " " << to_capital(format) <<
+          " layers are included in this dataset:<center><table class="
+          "\"insert\" cellspacing=\"1\" cellpadding=\"5\" border=\"0\"><tr "
+          "class=\"bg2\" valign=\"bottom\"><th align=\"center\">Code<br />"
           "(Bottom)</th><th align=\"center\">Code<br />(Top)</th><th align="
           "\"left\">Description</th><th align=\"center\">Units<br />(Bottom)"
           "</th><th align=\"center\">Units<br />(Top)</th></tr>" << endl;
@@ -589,7 +593,7 @@ void add_to_formats(XMLDocument& xdoc, string database, string primaries_table,
     if (!v.empty()) {
       formats += "<a target=\"_format\" href=\"" + v + "\">";
     }
-    formats += strutils::to_capital(substitute(r[0], "proprietary_",
+    formats += to_capital(substitute(r[0], "proprietary_",
         "Dataset-specific "));
     if (!v.empty()) {
       formats += "</a>";
@@ -928,8 +932,8 @@ void generate_gridded_product_detail(MySQL::Server& mysrv, const DBData& dbdata,
           replace_all(f, "proprietary", "dataset-specific");
           ofs << "<span class=\"paneltext\">Go to <a href=\"javascript:void(0)"
               "\" onClick=\"javascript:scrollTo('" << e.first <<
-              "_anchor')\">" << strutils::to_capital(f) << "</a> Summary</span>"
-              "<br>" << endl;
+              "_anchor')\">" << to_capital(f) << "</a> Summary</span><br>" <<
+              endl;
         }
       }
       ofs << "</td></tr></table>" << endl;
@@ -938,8 +942,8 @@ void generate_gridded_product_detail(MySQL::Server& mysrv, const DBData& dbdata,
     replace_all(f, "proprietary", "dataset-specific");
     ofs << "<table class=\"insert\" width=\"100%\" cellspacing=\"1\" "
         "cellpadding=\"5\" border=\"0\"><tr><th class=\"headerRow\" colspan="
-        "\"2\" align=\"center\">Summary for Grids in " << strutils::to_capital(
-        f) << " Format</th></tr>" << endl;
+        "\"2\" align=\"center\">Summary for Grids in " << to_capital(f) <<
+        " Format</th></tr>" << endl;
     if (group_index.empty()) {
       q.set("select distinct parameter, levelType_codes from " + dbdata.db +
           ".summary where dsid = '" + metautils::args.dsnum + "' and "
@@ -1187,12 +1191,12 @@ void generate_detailed_grid_summary(string file_type, string group_index,
           replace_all(f, "proprietary", "dataset-specific");
           ofs_p << "<span class=\"paneltext\">Go to <a href=\"javascript:void("
               "0)\" onClick=\"javascript:scrollTo('" << e.first <<
-              "_anchor')\">" << strutils::to_capital(f) << "</a> Summary</span>"
-              "<br>" << endl;
+              "_anchor')\">" << to_capital(f) << "</a> Summary</span><br>" <<
+              endl;
           ofs_l << "<span class=\"paneltext\">Go to <a href=\"javascript:void("
               "0)\" onClick=\"javascript:scrollTo('" << e.first <<
-              "_anchor')\">" << strutils::to_capital(f) << "</a> Summary</span>"
-              "<br>" << endl;
+              "_anchor')\">" << to_capital(f) << "</a> Summary</span><br>" <<
+              endl;
         }
       }
       ofs_p << "</td></tr></table>" << endl;
@@ -1479,6 +1483,7 @@ void generate_detailed_grid_summary(string file_type, string group_index,
     ofs_p << "</table>" << endl;
     ofs_l << "</table>" << endl;
   }
+  mysrv.disconnect();
   ofs_p.close();
   ofs_l.close();
   if (pfv.size() > 0) {
@@ -1491,7 +1496,6 @@ void generate_detailed_grid_summary(string file_type, string group_index,
     metautils::log_warning(F + " couldn't sync detail files - rdadata_sync "
         "error(s): '" + e + "'", caller, user);
   }
-  mysrv.disconnect();
   write_grid_html(ofs, pfv.size());
 }
 
@@ -1499,10 +1503,21 @@ void generate_detailed_observation_summary(string file_type, string group_index,
     ofstream& ofs, const vector<pair<string, string>>& format_list, string
     caller, string user) {
   static const string F = this_function_label(__func__);
-  MySQL::Query query;
-  TypeEntry te,te2;
-  xmlutils::DataTypeMapper data_type_mapper(metautils::directives.parameter_map_path);
+  TempDir t;
+  if (!t.create(metautils::directives.temp_path)) {
+    log_error2("unable to create temporary directory", F, caller, user);
+  }
 
+  // create the directory tree in the temp directory
+  stringstream oss, ess;
+  if (mysystem2("/bin/mkdir -p " + t.name() + "/metadata", oss, ess) != 0) {
+    log_error2("unable to create temporary directory tree - '" + ess.str() +
+        "'", F, caller, user);
+  }
+  ofstream ofs_o((t.name() + "/metadata/obs-detail.html").c_str());
+  if (!ofs_o.is_open()) {
+    log_error2("unable to open output for observation detail", F, caller, user);
+  }
   DBData dbdata;
   if (file_type == "Web") {
     dbdata.db = "WObML";
@@ -1513,162 +1528,272 @@ void generate_detailed_observation_summary(string file_type, string group_index,
   MySQL::Server mysrv(metautils::directives.database_server, metautils::
       directives.metadb_username, metautils::directives.metadb_password, "");
   string d2 = substitute(metautils::args.dsnum, ".", "");
-  my::map<TypeEntry> platform_table;
+  xmlutils::DataTypeMapper data_type_mapper(metautils::directives.
+      parameter_map_path);
   for (const auto& fp : format_list) {
-    platform_table.clear();
-    auto data_format=fp.first;
-    ofs << "<br><center><table class=\"insert\" width=\"95%\" cellspacing=\"1\" cellpadding=\"5\" border=\"0\"><tr><th class=\"headerRow\" colspan=\"4\" align=\"center\">Summary for Platform Observations in " << strutils::to_capital(substitute(data_format,"proprietary_","")) << " Format</th></tr>" << endl;
-    auto cindex=0;
-    ofs << "<tr class=\"bg2\" valign=\"top\"><th align=\"left\">Observing Platform</th><th align=\"left\">Observation Type<ul class=\"paneltext\"><li>Data Types</li></ul></th><td align=\"left\"><b>Average Frequency of Data</b><br>(varies by individual platform ID and data type)</td><td align=\"left\"><b>Temporal/Geographical Coverage</b><br>(each dot represents a 3&deg; box containing one or more observations)</td></tr>" << endl;
+    map<string, TypeEntry> platform_table;
+    auto data_format = fp.first;
+    ofs_o << "<br><center><table class=\"insert\" width=\"95%\" cellspacing=\""
+        "1\" cellpadding=\"5\" border=\"0\"><tr><th class=\"headerRow\" "
+        "colspan=\"4\" align=\"center\">Summary for Platform Observations in "
+        << to_capital(substitute(data_format,"proprietary_","")) << " Format"
+        "</th></tr>" << endl;
+    auto cindex = 0;
+    ofs_o << "<tr class=\"bg2\" valign=\"top\"><th align=\"left\">Observing "
+        "Platform</th><th align=\"left\">Observation Type<ul class=\""
+        "paneltext\"><li>Data Types</li></ul></th><td align=\"left\"><b>"
+        "Average Frequency of Data</b><br>(varies by individual platform ID "
+        "and data type)</td><td align=\"left\"><b>Temporal/Geographical "
+        "Coverage</b><br>(each dot represents a 3&deg; box containing one or "
+        "more observations)</td></tr>" << endl;
+    MySQL::Query query;
     if (group_index.empty()) {
-      if (MySQL::table_exists(mysrv,dbdata.db+".ds"+d2+"_dataTypes2")) {
-        query.set("select distinct platformType,obsType,dataType,min(start_date),max(end_date) from "+dbdata.db+".ds"+d2+"_dataTypes2 as d left join "+dbdata.db+".ds"+d2+"_dataTypesList as l on l.code = d.dataType_code left join "+dbdata.db+".ds"+d2+dbdata.table+" as p on p.code = d."+dbdata.ID_type+"ID_code left join "+dbdata.db+".platformTypes as t on t.code = l.platformType_code left join "+dbdata.db+".obsTypes as o on o.code = l.observationType_code where p.format_code = "+fp.second+" group by platformType,obsType,dataType order by platformType,obsType,dataType");
+      if (MySQL::table_exists(mysrv, dbdata.db + ".ds" + d2 + "_dataTypes2")) {
+        query.set("select distinct platformType, obsType, dataType, min("
+            "start_date),max(end_date) from " + dbdata.db + ".ds" + d2 +
+            "_dataTypes2 as d left join " + dbdata.db + ".ds" + d2 +
+            "_dataTypesList as l on l.code = d.dataType_code left join " +
+            dbdata.db + ".ds" + d2 + dbdata.table + " as p on p.code = d." +
+            dbdata.ID_type + "ID_code left join " + dbdata.db +
+            ".platformTypes as t on t.code = l.platformType_code left join " +
+            dbdata.db + ".obsTypes as o on o.code = l.observationType_code "
+            "where p.format_code = " + fp.second + " group by platformType, "
+            "obsType, dataType order by platformType, obsType, dataType");
+      } else {
+        query.set("select distinct platformType, obsType, dataType, min("
+            "start_date), max(end_date) from " + dbdata.db + ".ds" + d2 +
+            "_dataTypes as d left join " + dbdata.db + ".ds" + d2 + dbdata.
+            table + " as p on p.code = d." + dbdata.ID_type + "ID_code left "
+            "join " + dbdata.db + ".platformTypes as t on t.code = d."
+            "platformType_code left join " + dbdata.db + ".obsTypes as o on o."
+            "code = d.observationType_code where p.format_code = " + fp.second +
+            " group by platformType, obsType, dataType order by platformType, "
+            "obsType, dataType");
       }
-      else {
-        query.set("select distinct platformType,obsType,dataType,min(start_date),max(end_date) from "+dbdata.db+".ds"+d2+"_dataTypes as d left join "+dbdata.db+".ds"+d2+dbdata.table+" as p on p.code = d."+dbdata.ID_type+"ID_code left join "+dbdata.db+".platformTypes as t on t.code = d.platformType_code left join "+dbdata.db+".obsTypes as o on o.code = d.observationType_code where p.format_code = "+fp.second+" group by platformType,obsType,dataType order by platformType,obsType,dataType");
-      }
-    }
-    else {
-      if (MySQL::table_exists(mysrv,dbdata.db+".ds"+d2+"_dataTypes2")) {
-        query.set("select distinct platformType,obsType,dataType,min(start_date),max(end_date) from "+dbdata.db+".ds"+d2+dbdata.table+" as p left join dssdb."+dbdata.dtable+" as x on x."+dbdata.dtable+" = p."+dbdata.ID_type+"ID left join "+dbdata.db+".ds"+d2+"_dataTypes2 as d on d."+dbdata.ID_type+"ID_code = p.code left join "+dbdata.db+".ds"+d2+"_dataTypesList as l on l.code = d.dataType_code left join "+dbdata.db+".platformTypes as t on t.code = l.platformType_code left join "+dbdata.db+".obsTypes as o on o.code = l.observationType_code where x.gindex = "+group_index+" and p.format_code = "+fp.second+" group by platformType,obsType,dataType order by platformType,obsType,dataType");
-      }
-      else {
-        query.set("select distinct platformType,obsType,dataType,min(start_date),max(end_date) from "+dbdata.db+".ds"+d2+dbdata.table+" as p left join dssdb."+dbdata.dtable+" as x on x."+dbdata.dtable+" = p."+dbdata.ID_type+"ID left join "+dbdata.db+".ds"+d2+"_dataTypes as d on d."+dbdata.ID_type+"ID_code = p.code left join "+dbdata.db+".platformTypes as t on t.code = d.platformType_code left join "+dbdata.db+".obsTypes as o on o.code = d.observationType_code where x.gindex = "+group_index+" and p.format_code = "+fp.second+" group by platformType,obsType,dataType order by platformType,obsType,dataType");
+    } else {
+      if (MySQL::table_exists(mysrv, dbdata.db + ".ds" + d2 + "_dataTypes2")) {
+        query.set("select distinct platformType, obsType, dataType, min("
+            "start_date), max(end_date) from " + dbdata.db + ".ds" + d2 +
+            dbdata.table + " as p left join dssdb." + dbdata.dtable + " as x "
+            "on x." + dbdata.dtable + " = p." + dbdata.ID_type + "ID left join "
+            + dbdata.db + ".ds" + d2 + "_dataTypes2 as d on d." + dbdata.ID_type
+            + "ID_code = p.code left join " + dbdata.db + ".ds" + d2 +
+            "_dataTypesList as l on l.code = d.dataType_code left join " +
+            dbdata.db + ".platformTypes as t on t.code = l.platformType_code "
+            "left join " + dbdata.db + ".obsTypes as o on o.code = l."
+            "observationType_code where x.gindex = " + group_index + " and p."
+            "format_code = " + fp.second + " group by platformType, obsType, "
+            "dataType order by platformType, obsType, dataType");
+      } else {
+        query.set("select distinct platformType, obsType, dataType, min("
+            "start_date), max(end_date) from " + dbdata.db + ".ds" + d2 +
+            dbdata.table + " as p left join dssdb." + dbdata.dtable + " as x "
+            "on x." + dbdata.dtable + " = p." + dbdata.ID_type + "ID left join "
+            + dbdata.db + ".ds" + d2 + "_dataTypes as d on d." + dbdata.ID_type
+            + "ID_code = p.code left join " + dbdata.db + ".platformTypes as t "
+            "on t.code = d.platformType_code left join " + dbdata.db +
+            ".obsTypes as o on o.code = d.observationType_code where x.gindex "
+            "= " + group_index + " and p.format_code = " + fp.second + " group "
+            "by platformType, obsType, dataType order by platformType, "
+            "obsType, dataType");
       }
     }
     if (query.submit(mysrv) < 0) {
       log_error2("'" + query.error() + "' for '" + query.show() + "'", F,
           caller, user);
     }
+    TypeEntry te, te2;
     for (const auto& res : query) {
-      if (!platform_table.found(res[0],te)) {
-// te is the entry for an individual platform; te.type_table_keys is the list of
-//   corresponding observation types
-        te.key=res[0];
+      auto pt_key = to_lower(res[0]);
+      auto it = platform_table.find(pt_key);
+      if (it == platform_table.end()) {
+
+        // te is the entry for an individual platform; te.type_table_keys is the
+        //   list of corresponding observation types
+        te.key = res[0];
         te.type_table.reset(new my::map<TypeEntry>);
         te.type_table_keys.reset(new list<string>);
-// te2 is the entry for an individual observation type; te2.type_table_keys is
-//   the list of corresponding dataTypes (don't need te2.type_table for
-//   uniqueness because query guarantees each dataType will be unique
-        te2.key=res[1];
-        te2.start=res[3];
-        te2.end=res[4];
+
+        // te2 is the entry for an individual observation type;
+        //   te2.type_table_keys is the list of corresponding dataTypes (don't
+        //   need te2.type_table for uniqueness because query guarantees each
+        //   dataType will be unique
+        te2.key = res[1];
+        te2.start = res[3];
+        te2.end = res[4];
         te2.type_table_keys.reset(new list<string>);
         te2.type_table_keys->emplace_back(res[2]);
-        te2.type_table_keys_2=nullptr;
+        te2.type_table_keys_2 = nullptr;
         te.type_table->insert(te2);
         te.type_table_keys->emplace_back(te2.key);
-        platform_table.insert(te);
-      }
-      else {
-        if (te.type_table->found(res[1],te2)) {
+        platform_table.emplace(pt_key, te);
+      } else {
+        if (it->second.type_table->found(res[1], te2)) {
           if (res[3] < te2.start) {
-            te2.start=res[3];
+            te2.start = res[3];
           }
           if (res[4] > te2.end) {
-            te2.end=res[4];
+            te2.end = res[4];
           }
           te2.type_table_keys->emplace_back(res[2]);
-          te.type_table->replace(te2);
-        }
-        else {
-          te2.key=res[1];
-          te2.start=res[3];
-          te2.end=res[4];
+          it->second.type_table->replace(te2);
+        } else {
+          te2.key = res[1];
+          te2.start = res[3];
+          te2.end = res[4];
           te2.type_table_keys.reset(new list<string>);
           te2.type_table_keys->emplace_back(res[2]);
-          te2.type_table_keys_2=nullptr;
-          te.type_table->insert(te2);
-          te.type_table_keys->emplace_back(te2.key);
+          te2.type_table_keys_2 = nullptr;
+          it->second.type_table->insert(te2);
+          it->second.type_table_keys->emplace_back(te2.key);
         }
-        platform_table.replace(te);
       }
     }
     if (group_index.empty()) {
-      if (field_exists(mysrv,dbdata.db+".ds"+d2+dbdata.table,"min_obs_per")) {
-        query.set("select any_value(l.platformType),any_value(o.obsType),min(f.min_obs_per),max(f.max_obs_per),f.unit from "+dbdata.db+".ds"+d2+dbdata.table+" as p join "+dbdata.db+".ds"+d2+"_frequencies as f on p.code = f."+dbdata.ID_type+"ID_code left join "+dbdata.db+".obsTypes as o on o.code = f.observationType_code left join "+dbdata.db+".platformTypes as l on l.code = f.platformType_code left join WObML.frequency_sort as s on s.keyword = f.unit where p.format_code = "+fp.second+" group by f.observationType_code,f.platformType_code,f.unit,s.idx order by s.idx");
+      if (field_exists(mysrv, dbdata.db + ".ds" + d2 + dbdata.table,
+          "min_obs_per")) {
+        query.set("select any_value(l.platformType), any_value(o.obsType), min("
+            "f.min_obs_per), max(f.max_obs_per), f.unit from " + dbdata.db +
+            ".ds" + d2 + dbdata.table + " as p join " + dbdata.db + ".ds" + d2 +
+            "_frequencies as f on p.code = f." + dbdata.ID_type + "ID_code "
+            "left join " + dbdata.db + ".obsTypes as o on o.code = f."
+            "observationType_code left join " + dbdata.db + ".platformTypes as "
+            "l on l.code = f.platformType_code left join WObML.frequency_sort "
+            "as s on s.keyword = f.unit where p.format_code = " + fp.second +
+            " group by f.observationType_code, f.platformType_code, f.unit, s."
+            "idx order by s.idx");
+      } else {
+        query.set("select any_value(l.platformType), any_value(o.obsType), min("
+            "f.avg_obs_per), max(f.avg_obs_per), f.unit from " + dbdata.db +
+            ".ds" + d2 + dbdata.table + " as p join " + dbdata.db + ".ds" + d2 +
+            "_frequencies as f on p.code = f." + dbdata.ID_type + "ID_code "
+            "left join " + dbdata.db + ".obsTypes as o on o.code = f."
+            "observationType_code left join " + dbdata.db + ".platformTypes as "
+            "l on l.code = f.platformType_code left join WObML.frequency_sort "
+            "as s on s.keyword = f.unit where p.format_code = " + fp.second +
+            " group by f.observationType_code, f.platformType_code, f.unit, s."
+            "idx order by s.idx");
       }
-      else {
-        query.set("select any_value(l.platformType),any_value(o.obsType),min(f.avg_obs_per),max(f.avg_obs_per),f.unit from "+dbdata.db+".ds"+d2+dbdata.table+" as p join "+dbdata.db+".ds"+d2+"_frequencies as f on p.code = f."+dbdata.ID_type+"ID_code left join "+dbdata.db+".obsTypes as o on o.code = f.observationType_code left join "+dbdata.db+".platformTypes as l on l.code = f.platformType_code left join WObML.frequency_sort as s on s.keyword = f.unit where p.format_code = "+fp.second+" group by f.observationType_code,f.platformType_code,f.unit,s.idx order by s.idx");
-      }
-    }
-    else {
-      if (field_exists(mysrv,dbdata.db+".ds"+d2+dbdata.table,"min_obs_per")) {
-        query.set("select any_value(l.platformType),any_value(o.obsType),min(f.min_obs_per),max(f.max_obs_per),f.unit from "+dbdata.db+".ds"+d2+dbdata.table+" as p left join dssdb."+dbdata.dtable+" as x on x."+dbdata.dtable+" = p."+dbdata.ID_type+"ID left join "+dbdata.db+".ds"+d2+"_frequencies as f on p.code = f."+dbdata.ID_type+"ID_code left join "+dbdata.db+".obsTypes as o on o.code = f.observationType_code left join "+dbdata.db+".platformTypes as l on l.code = f.platformType_code left join WObML.frequency_sort as s on s.keyword = f.unit where x.gindex = "+group_index+" and p.format_code = "+fp.second+" group by f.observationType_code,f.platformType_code,f.unit,s.idx order by s.idx");
-      }
-      else {
-        query.set("select any_value(l.platformType),any_value(o.obsType),min(f.avg_obs_per),max(f.avg_obs_per),f.unit from "+dbdata.db+".ds"+d2+dbdata.table+" as p left join dssdb."+dbdata.dtable+" as x on x."+dbdata.dtable+" = p."+dbdata.ID_type+"ID left join "+dbdata.db+".ds"+d2+"_frequencies as f on p.code = f."+dbdata.ID_type+"ID_code left join "+dbdata.db+".obsTypes as o on o.code = f.observationType_code left join "+dbdata.db+".platformTypes as l on l.code = f.platformType_code left join WObML.frequency_sort as s on s.keyword = f.unit where x.gindex = "+group_index+" and p.format_code = "+fp.second+" group by f.observationType_code,f.platformType_code,f.unit,s.idx order by s.idx");
+    } else {
+      if (field_exists(mysrv, dbdata.db + ".ds" + d2 + dbdata.table,
+          "min_obs_per")) {
+        query.set("select any_value(l.platformType), any_value(o.obsType), min("
+            "f.min_obs_per), max(f.max_obs_per), f.unit from " + dbdata.db +
+            ".ds" + d2 + dbdata.table + " as p left join dssdb." + dbdata.
+            dtable + " as x on x." + dbdata.dtable + " = p." + dbdata.ID_type +
+            "ID left join " + dbdata.db + ".ds" + d2 + "_frequencies as f on p."
+            "code = f." + dbdata.ID_type + "ID_code left join " + dbdata.db +
+            ".obsTypes as o on o.code = f.observationType_code left join " +
+            dbdata.db + ".platformTypes as l on l.code = f.platformType_code "
+            "left join WObML.frequency_sort as s on s.keyword = f.unit where x."
+            "gindex = " + group_index + " and p.format_code = " + fp.second +
+            " group by f.observationType_code, f.platformType_code, f.unit, s."
+            "idx order by s.idx");
+      } else {
+        query.set("select any_value(l.platformType), any_value(o.obsType), min("
+            "f.avg_obs_per), max(f.avg_obs_per), f.unit from " + dbdata.db +
+            ".ds" + d2 + dbdata.table + " as p left join dssdb." + dbdata.
+            dtable + " as x on x." + dbdata.dtable + " = p." + dbdata.ID_type +
+            "ID left join " + dbdata.db + ".ds" + d2 + "_frequencies as f on p."
+            "code = f." + dbdata.ID_type + "ID_code left join " + dbdata.db +
+            ".obsTypes as o on o.code = f.observationType_code left join " +
+            dbdata.db + ".platformTypes as l on l.code = f.platformType_code "
+            "left join WObML.frequency_sort as s on s.keyword = f.unit where x."
+            "gindex = " + group_index + " and p.format_code = " + fp.second +
+            " group by f.observationType_code, f.platformType_code, f.unit, s."
+            "idx order by s.idx");
       }
     }
     if (query.submit(mysrv) < 0)
       log_error2("'" + query.error() + "' for '" + query.show() + "'", F,
           caller, user);
     for (const auto& res : query) {
-      if (platform_table.found(res[0],te)) {
-        te.type_table->found(res[1],te2);
+      auto pt_key = to_lower(res[0]);
+      auto it = platform_table.find(pt_key);
+      if (it != platform_table.end()) {
+        it->second.type_table->found(res[1], te2);
         if (te2.type_table_keys_2 == NULL) {
           te2.type_table_keys_2.reset(new list<string>);
         }
         if (res[2] == res[3]) {
-          te2.type_table_keys_2->emplace_back("<nobr>"+res[2]+" per "+res[4]+"</nobr>");
+          te2.type_table_keys_2->emplace_back("<nobr>" + res[2] + " per " + res[
+              4] + "</nobr>");
+        } else {
+          te2.type_table_keys_2->emplace_back("<nobr>" + res[2] + " to " + res[
+              3] + "</nobr> per " + res[4]);
         }
-        else {
-          te2.type_table_keys_2->emplace_back("<nobr>"+res[2]+" to "+res[3]+"</nobr> per "+res[4]);
-        }
-        te.type_table->replace(te2);
-        platform_table.replace(te);
+        it->second.type_table->replace(te2);
       }
     }
-    for (const auto& key : platform_table.keys()) {
+    for (auto& e : platform_table) {
       unordered_set<string> unique_data_types;
-      platform_table.found(key,te);
-      auto n=0;
-      for (const auto& key2 : *te.type_table_keys) {
+      auto n = 0;
+      for (const auto& key2 : *(e.second).type_table_keys) {
         if (n == 0) {
-          ofs << "<tr class=\"bg" << cindex << "\" valign=\"top\"><td rowspan=\"" << te.type_table->size() << "\">" << strutils::to_capital(te.key) << "</td>";
+          ofs_o << "<tr class=\"bg" << cindex << "\" valign=\"top\"><td "
+              "rowspan=\"" << e.second.type_table->size() << "\">" <<
+              to_capital(e.second.key) << "</td>";
+        } else {
+          ofs_o << "<tr class=\"bg" << cindex << "\" valign=\"top\">";
         }
-        else {
-          ofs << "<tr class=\"bg" << cindex << "\" valign=\"top\">";
-        }
-        te2.key=key2;
-        te.type_table->found(te2.key,te2);
-        ofs << "<td>" << strutils::to_capital(te2.key) << "<ul class=\"paneltext\">";
+        te2.key = key2;
+        e.second.type_table->found(te2.key, te2);
+        ofs_o << "<td>" << to_capital(te2.key) << "<ul class=\"paneltext\">";
         for (const auto& key3 : *te2.type_table_keys) {
           auto key = metatranslations::detailed_datatype(data_type_mapper,
               fp.first, key3);
           if (unique_data_types.find(key) == unique_data_types.end()) {
-            ofs << "<li>" << key << "</li>";
+            ofs_o << "<li>" << key << "</li>";
             unique_data_types.insert(key);
           }
         }
-        ofs << "</ul></td><td><ul class=\"paneltext\">";
+        ofs_o << "</ul></td><td><ul class=\"paneltext\">";
         if (te2.type_table_keys_2 != NULL) {
           for (const auto& key3 : *te2.type_table_keys_2) {
-            ofs << "<li>" << key3 << "</li>";
+            ofs_o << "<li>" << key3 << "</li>";
           }
         }
-        ofs << "</ul></td><td align=\"center\">" << dateutils::string_ll_to_date_string(te2.start) << " to " << dateutils::string_ll_to_date_string(te2.end);
-        if (group_index.empty() && unixutils::exists_on_server(metautils::directives.web_server,"/data/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+te2.key+"."+te.key+".kml",metautils::directives.rdadata_home)) {
-          ofs << "&nbsp;<a href=\"/datasets/ds" << metautils::args.dsnum << "/metadata/" << te2.key << "." << te.key << ".kml\"><img src=\"/images/kml.gif\" width=\"36\" height=\"14\" hspace=\"3\" border=\"0\" title=\"See stations plotted in Google Earth\"></a>";
+        ofs_o << "</ul></td><td align=\"center\">" << dateutils::
+            string_ll_to_date_string(te2.start) << " to " << dateutils::
+            string_ll_to_date_string(te2.end);
+        if (group_index.empty() && unixutils::exists_on_server(metautils::
+            directives.web_server, "/data/web/datasets/ds" + metautils::args.
+            dsnum + "/metadata/" + te2.key + "." + e.second.key + ".kml",
+            metautils::directives.rdadata_home)) {
+          ofs_o << "&nbsp;<a href=\"/datasets/ds" << metautils::args.dsnum <<
+              "/metadata/" << te2.key << "." << e.second.key << ".kml\"><img "
+              "src=\"/images/kml.gif\" width=\"36\" height=\"14\" hspace=\"3\" "
+              "border=\"0\" title=\"See stations plotted in Google Earth\">"
+              "</a>";
         }
-        ofs << "<br><img src=\"/datasets/ds" << metautils::args.dsnum << "/metadata/spatial_coverage." << substitute(data_format," ","_") << "_" << dbdata.ID_type;
+        ofs_o << "<br><img src=\"/datasets/ds" << metautils::args.dsnum <<
+            "/metadata/spatial_coverage." << substitute(data_format," ","_") <<
+            "_" << dbdata.ID_type;
         if (!group_index.empty()) {
-          ofs << "_gindex_" << group_index;
+          ofs_o << "_gindex_" << group_index;
         }
-        ofs << "_" << key2 << "." << key << ".gif?" << strutils::strand(5) << "\"></td></tr>" << endl;
+        ofs_o << "_" << key2 << "." << e.second.key << ".gif?" << strand(5) <<
+            "\"></td></tr>" << endl;
         te2.type_table_keys->clear();
         te2.type_table_keys.reset();
         ++n;
       }
-      te.type_table->clear();
-      te.type_table.reset();
-      te.type_table_keys->clear();
-      te.type_table_keys.reset();
-      cindex=1-cindex;
+      e.second.type_table->clear();
+      e.second.type_table.reset();
+      e.second.type_table_keys->clear();
+      e.second.type_table_keys.reset();
+      cindex = 1 - cindex;
     }
-    ofs << "</table></center>" << endl;
+    ofs_o << "</table></center>" << endl;
   }
   mysrv.disconnect();
+  ofs_o.close();
+  string e;
+  if (unixutils::rdadata_sync(t.name(), "metadata/", "/data/web/datasets/ds" +
+      metautils::args.dsnum, metautils::directives.rdadata_home, e) < 0) {
+    metautils::log_warning(F + " couldn't sync detail files - rdadata_sync "
+        "error(s): '" + e + "'", caller, user);
+  }
 }
 
 void generate_detailed_fix_summary(string file_type, string group_index,
@@ -1689,7 +1814,7 @@ void generate_detailed_fix_summary(string file_type, string group_index,
     platform_table.clear();
     auto format=fp.first;
     replace_all(format,"proprietary_","");
-    ofs << "<br><center><table class=\"insert\" width=\"95%\" cellspacing=\"1\" cellpadding=\"5\" border=\"0\"><tr><th class=\"headerRow\" colspan=\"3\" align=\"center\">Summary for Cyclone Fixes in " << strutils::to_capital(format) << " Format</th></tr>" << endl;
+    ofs << "<br><center><table class=\"insert\" width=\"95%\" cellspacing=\"1\" cellpadding=\"5\" border=\"0\"><tr><th class=\"headerRow\" colspan=\"3\" align=\"center\">Summary for Cyclone Fixes in " << to_capital(format) << " Format</th></tr>" << endl;
     auto cindex=0;
     ofs << "<tr class=\"bg2\" valign=\"top\"><th align=\"left\">Cyclone Classification</th><td align=\"left\"><b>Average Frequency of Data</b><br>(may vary by individual cyclone ID)</td><td align=\"left\"><b>Temporal/Geographical Coverage</b><br>(each dot represents a 3&deg; box containing one or more fixes)</td></tr>" << endl;
     MySQL::Query query;
@@ -1744,7 +1869,7 @@ void generate_detailed_fix_summary(string file_type, string group_index,
     for (const auto& key : platform_table.keys()) {
       TypeEntry te;
       platform_table.found(key,te);
-      ofs << "<tr class=\"bg" << cindex << "\" valign=\"top\"><td>" << strutils::to_capital(te.key) << "</td><td><ul class=\"paneltext\">";
+      ofs << "<tr class=\"bg" << cindex << "\" valign=\"top\"><td>" << to_capital(te.key) << "</td><td><ul class=\"paneltext\">";
       for (auto& key2 : *te.type_table_keys) {
         ofs << "<li>" << key2 << "</li>";
       }
@@ -1752,7 +1877,7 @@ void generate_detailed_fix_summary(string file_type, string group_index,
       if (!group_index.empty()) {
         ofs << "_gindex_" << group_index;
       }
-      ofs << "_" << te.key << ".gif?" << strutils::strand(5) << "\"></td></tr>" << endl;
+      ofs << "_" << te.key << ".gif?" << strand(5) << "\"></td></tr>" << endl;
       te.type_table_keys->clear();
       te.type_table_keys.reset();
       cindex=1-cindex;
@@ -1833,7 +1958,7 @@ void generate_detailed_metadata_view(string caller, string user) {
         } else if (data_type == "platform_observation") {
           dtyps+="Platform Observations";
         } else {
-          dtyps+=strutils::to_capital(data_type);
+          dtyps+=to_capital(data_type);
         }
         dtyps+="</li>";
       }
@@ -1841,7 +1966,7 @@ void generate_detailed_metadata_view(string caller, string user) {
       for (auto element : elist) {
         auto format=element.content();
         replace_all(format,"proprietary_","");
-        fmts+="<li>"+strutils::to_capital(format)+"</li>";
+        fmts+="<li>"+to_capital(format)+"</li>";
       }
     }
 // create the metadata directory tree in the temp directory
