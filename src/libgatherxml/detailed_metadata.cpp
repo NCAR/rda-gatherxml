@@ -1483,13 +1483,13 @@ void generate_detailed_grid_summary(string file_type, string group_index,
     ofs_p << "</table>" << endl;
     ofs_l << "</table>" << endl;
   }
-  mysrv.disconnect();
   ofs_p.close();
   ofs_l.close();
   if (pfv.size() > 0) {
     generate_gridded_product_detail(mysrv, dbdata, file_type, group_index,
         format_list, t, caller, user);
   }
+  mysrv.disconnect();
   string e;
   if (unixutils::rdadata_sync(t.name(), "metadata/", "/data/web/datasets/ds" +
       metautils::args.dsnum, metautils::directives.rdadata_home, e) < 0) {
