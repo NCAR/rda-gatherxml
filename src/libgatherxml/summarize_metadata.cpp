@@ -1452,9 +1452,15 @@ void create_file_list_cache(string file_type, string caller, string user, string
   auto d2 = substitute(metautils::args.dsnum, ".", "");
   MySQL::Server mysrv(metautils::directives.database_server, metautils::
       directives.metadb_username, metautils::directives.metadb_password, "");
-  static unordered_map<string, string> gmap;
-  if (gmap.empty()) {
-    fill_gindex_map(mysrv, gmap, caller, user);
+  static Mutex g_mutex;
+  static unique_ptr<unordered_map<string, string>> gmap;
+  if (gmap == nullptr && !g_mutex.is_locked()) {
+    g_mutex.lock();
+    gmap.reset(new unordered_map<string, string>);
+    fill_gindex_map(mysrv, *gmap, caller, user);
+    g_mutex.unlock();
+  } else if (g_mutex.is_locked()) {
+    while (g_mutex.is_locked()) { }
   }
   unordered_map<string, FileEntry> grmlmap, obmlmap, fixmlmap;
   MySQL::LocalQuery oq, sq;
@@ -1466,13 +1472,13 @@ void create_file_list_cache(string file_type, string caller, string user, string
         return;
       }
       if (file_type == "Web" && tindex.empty()) {
-        grml_file_data(file_type, gmap, grmlmap, caller, user);
+        grml_file_data(file_type, *gmap, grmlmap, caller, user);
       }
       b = true;
     }
     if (table_exists(mysrv, "WObML.ds" + d2 + "_webfiles2")) {
       if (file_type == "Web" && tindex.empty()) {
-        obml_file_data(file_type, gmap, obmlmap, caller, user);
+        obml_file_data(file_type, *gmap, obmlmap, caller, user);
       }
       if (file_type == "Web") {
         oq.set("select min(start_date), max(end_date) from WObML.ds" + d2 +
@@ -1496,7 +1502,7 @@ void create_file_list_cache(string file_type, string caller, string user, string
     }
     if (table_exists(mysrv, "WFixML.ds" + d2 + "_webfiles2")) {
       if (tindex.empty()) {
-        fixml_file_data(file_type, gmap, fixmlmap, caller, user);
+        fixml_file_data(file_type, *gmap, fixmlmap, caller, user);
       }
     }
   }
