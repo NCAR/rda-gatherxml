@@ -524,9 +524,10 @@ void generate_level_cross_reference(string format, string title, string
     ofs.close();
     string e;
     if (unixutils::rdadata_sync(t.name(), "metadata/", "/data/web/datasets/ds" +
-        metautils::args.dsnum, metautils::directives.rdadata_home, e) < 0)
+        metautils::args.dsnum, metautils::directives.rdadata_home, e) < 0) {
       metautils::log_warning(F + " couldn't sync '" + html_file + "' - "
           "rdadata_sync error(s): '" + e + "'", caller, user);
+    }
   } else {
 
     // remove the level table if it exists and there are no levels for this
