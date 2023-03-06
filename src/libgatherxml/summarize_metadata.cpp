@@ -915,28 +915,35 @@ void create_non_cmd_file_list_cache(string file_type, unordered_set<string>&
   mysrv.disconnect();
 }
 
-void fill_gindex_map(MySQL::Server& server, unordered_map<string, string>&
-     gindex_map, string caller, string user) {
+void fill_gindex_map(MySQL::Server& server, Mutex& g_mutex, unique_ptr<
+     unordered_map<string, string>>& gindex_map, string caller, string user) {
   static const string F = this_function_label(__func__);
-  MySQL::Query q("select gindex, grpid from dssdb.dsgroup where dsid = 'ds" +
-      metautils::args.dsnum + "'");
+  if (gindex_map == nullptr && !g_mutex.is_locked()) {
+    g_mutex.lock();
+    MySQL::Query q("select gindex, grpid from dssdb.dsgroup where dsid = 'ds" +
+        metautils::args.dsnum + "'");
 #ifdef DUMP_QUERIES
-  {
-  Timer tm;
-  tm.start();
+    {
+    Timer tm;
+    tm.start();
 #endif
-  if (q.submit(server) < 0) {
-    log_error2("'" + q.error() + "' while trying to get groups data", F, caller,
-        user);
-  }
+    if (q.submit(server) < 0) {
+      log_error2("'" + q.error() + "' while trying to get groups data", F,
+          caller, user);
+    }
 #ifdef DUMP_QUERIES
-  tm.stop();
-  cerr << "Elapsed time: " << tm.elapsed_time() << " " << F << ": " << q.show()
-      << endl;
-  }
+    tm.stop();
+    cerr << "Elapsed time: " << tm.elapsed_time() << " " << F << ": " << q.show()
+        << endl;
+    }
 #endif
-  for (const auto& r : q) {
-    gindex_map.emplace(r[0], r[1]);
+    gindex_map.reset(new unordered_map<string, string>);
+    for (const auto& r : q) {
+      gindex_map->emplace(r[0], r[1]);
+    }
+    g_mutex.unlock();
+  } else if (g_mutex.is_locked()) {
+    while (g_mutex.is_locked()) { }
   }
 }
 
@@ -1454,14 +1461,7 @@ void create_file_list_cache(string file_type, string caller, string user, string
       directives.metadb_username, metautils::directives.metadb_password, "");
   static Mutex g_mutex;
   static unique_ptr<unordered_map<string, string>> gmap;
-  if (gmap == nullptr && !g_mutex.is_locked()) {
-    g_mutex.lock();
-    gmap.reset(new unordered_map<string, string>);
-    fill_gindex_map(mysrv, *gmap, caller, user);
-    g_mutex.unlock();
-  } else if (g_mutex.is_locked()) {
-    while (g_mutex.is_locked()) { }
-  }
+  fill_gindex_map(mysrv, g_mutex, gmap, caller, user);
   unordered_map<string, FileEntry> grmlmap, obmlmap, fixmlmap;
   MySQL::LocalQuery oq, sq;
   auto b = false;
