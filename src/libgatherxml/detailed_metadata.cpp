@@ -652,7 +652,7 @@ string parameter_query(MySQL::Server& mysrv, const DBData& dbdata, string
     }
   } else {
     if (format_query_result_size > 1) {
-      return "select a.parameter, a.levelType_codes,min(a.start_date),max(a."
+      return "select a.parameter, a.levelType_codes, min(a.start_date), max(a."
           "end_date) from " + dbdata.db + ".ds" + d2 + "_agrids as a left join "
           + dbdata.db + ".ds" + d2 + dbdata.table + " as p on p.code = a." +
           dbdata.ID_type + "ID_code where p.format_code = " + format_code +
