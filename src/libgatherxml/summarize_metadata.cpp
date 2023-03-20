@@ -1238,14 +1238,14 @@ void write_grml_parameters(string file_type, string tindex, ofstream& ofs,
   if (parameter_data.empty() && !pd_mutex.is_locked()) {
     pd_mutex.lock();
     MySQL::LocalQuery qs("parameter, start_date, end_date, " + idtyp +
-        "ID_code", db + ".ds" + d2 + "_agrids");
+        "ID_code", db + ".ds" + d2 + "_agrids2");
 #ifdef DUMP_QUERIES
     {
     Timer tm;
     tm.start();
 #endif
     if (qs.submit(mysrv) < 0) {
-      log_error2("'" + qs.error() + "' while trying to get agrids data", F,
+      log_error2("'" + qs.error() + "' while trying to get agrids2 data", F,
           caller, user);
     }
 #ifdef DUMP_QUERIES

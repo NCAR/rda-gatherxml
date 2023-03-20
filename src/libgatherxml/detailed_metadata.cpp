@@ -617,17 +617,17 @@ string parameter_query(MySQL::Server& mysrv, const DBData& dbdata, string
             "a.end_date) from " + dbdata.db + ".ds" + d2 + dbdata.table + " as "
             "p left join dssdb." + dbdata.dtable + " as x on (x." + dbdata.
             dtable + " = p." + dbdata.ID_type + "ID and x.type = p.type and x."
-            "dsid = p.dsid) left join " + dbdata.db + ".ds" + d2 + "_agrids as "
-            "a on a." + dbdata.ID_type + "ID_code = p.code where p.format_code "
-            "= " + format_code + " and !isnull(x." + dbdata.dtable + ") and x."
-            "gindex = " + group_index + " group by a.parameter, a."
+            "dsid = p.dsid) left join " + dbdata.db + ".ds" + d2 + "_agrids2 "
+            "as a on a." + dbdata.ID_type + "ID_code = p.code where p."
+            "format_code = " + format_code + " and !isnull(x." + dbdata.dtable +
+            ") and x.gindex = " + group_index + " group by a.parameter, a."
             "levelType_codes";
       }
       return "select a.parameter, a.levelType_codes, min(a.start_date), max(a."
           "end_date) from " + dbdata.db + ".ds" + d2 + dbdata.table + " as p "
           "left join dssdb." + dbdata.dtable + " as x on x." + dbdata.dtable +
           " = p." + dbdata.ID_type + "ID left join " + dbdata.db + ".ds" + d2 +
-          "_agrids as a on a." + dbdata.ID_type + "ID_code = p.code where p."
+          "_agrids2 as a on a." + dbdata.ID_type + "ID_code = p.code where p."
           "format_code = " + format_code + " and !isnull(x." + dbdata.dtable +
           ") and x.gindex = " + group_index + " group by a.parameter, a."
           "levelType_codes";
@@ -637,29 +637,29 @@ string parameter_query(MySQL::Server& mysrv, const DBData& dbdata, string
             "a.end_date) from " + dbdata.db + ".ds" + d2 + dbdata.table + " as "
             "p left join dssdb." + dbdata.dtable + " as x on (x." + dbdata.
             dtable + " = p." + dbdata.ID_type + "ID and x.type = p.type and x."
-            "dsid = p.dsid) left join " + dbdata.db + ".ds" + d2 + "_agrids as "
-            "a on a." + dbdata.ID_type + "ID_code = p.code where !isnull(x." +
-            dbdata.dtable + ") and x.gindex = " + group_index + " group by a."
+            "dsid = p.dsid) left join " + dbdata.db + ".ds" + d2 + "_agrids2 "
+            "as a on a." + dbdata.ID_type + "ID_code = p.code where !isnull(x."
+            + dbdata.dtable + ") and x.gindex = " + group_index + " group by a."
             "parameter, a.levelType_codes";
       }
       return "select a.parameter, a.levelType_codes, min(a.start_date), max(a."
           "end_date) from " + dbdata.db + ".ds" + d2 + dbdata.table + " as p "
           "left join dssdb." + dbdata.dtable + " as x on x." + dbdata.dtable +
           " = p." + dbdata.ID_type + "ID left join " + dbdata.db + ".ds" + d2 +
-          "_agrids as a on a." + dbdata.ID_type + "ID_code = p.code where "
+          "_agrids2 as a on a." + dbdata.ID_type + "ID_code = p.code where "
           "!isnull(x." + dbdata.dtable + ") and x.gindex = " + group_index +
           " group by a.parameter, a.levelType_codes";
     }
   } else {
     if (format_query_result_size > 1) {
       return "select a.parameter, a.levelType_codes, min(a.start_date), max(a."
-          "end_date) from " + dbdata.db + ".ds" + d2 + "_agrids as a left join "
-          + dbdata.db + ".ds" + d2 + dbdata.table + " as p on p.code = a." +
-          dbdata.ID_type + "ID_code where p.format_code = " + format_code +
-          " group by a.parameter, a.levelType_codes";
+          "end_date) from " + dbdata.db + ".ds" + d2 + "_agrids2 as a left "
+          "join " + dbdata.db + ".ds" + d2 + dbdata.table + " as p on p.code = "
+          "a." + dbdata.ID_type + "ID_code where p.format_code = " + format_code
+          + " group by a.parameter, a.levelType_codes";
     }
     return "select parameter, levelType_codes, min(start_date), max(end_date) "
-        "from " + dbdata.db + ".ds" + d2 + "_agrids group by parameter, "
+        "from " + dbdata.db + ".ds" + d2 + "_agrids2 group by parameter, "
         "levelType_codes";
   }
 }
@@ -870,13 +870,14 @@ void generate_gridded_product_detail(MySQL::Server& mysrv, const DBData& dbdata,
       if (format_list.size() > 1) {
         qs.set("select a.timeRange_codes, a.gridDefinition_codes, min(a."
             "start_date), max(a.end_date) from " + dbdata.db + ".ds" + d2 +
-            "_agrids as a left join " + dbdata.db + ".ds" + d2 + dbdata.table +
+            "_agrids2 as a left join " + dbdata.db + ".ds" + d2 + dbdata.table +
             " as p on p.code = a." + dbdata.ID_type + "ID_code where p."
             "format_code = " + fp.second + " group by a.timeRange_codes, a."
             "gridDefinition_codes");
       } else {
         qs.set("select timeRange_codes, gridDefinition_codes, min(start_date), "
-            "max(end_date) from " + dbdata.db + ".ds" + d2 + "_agrids group by "            "timeRange_codes, gridDefinition_codes");
+            "max(end_date) from " + dbdata.db + ".ds" + d2 + "_agrids2 group "
+            "by timeRange_codes, gridDefinition_codes");
       }
     }
 #ifdef DUMP_QUERIES

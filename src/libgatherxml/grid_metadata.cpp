@@ -60,7 +60,7 @@ void summarize_grid_levels(string database, string caller, string user) {
   MySQL::Server srv(metautils::directives.database_server, metautils::
       directives.metadb_username, metautils::directives.metadb_password, "");
   MySQL::LocalQuery q("select distinct p.format_code, g.levelType_codes from " +
-      database + ".ds" + d + "_agrids as g left join " + database + ".ds" + d +
+      database + ".ds" + d + "_agrids2 as g left join " + database + ".ds" + d +
       t + " as p on p.code = g." + i + "_code where !isnull(p.format_code)");
 #ifdef DUMP_QUERIES
   {
@@ -186,7 +186,7 @@ void summarize_grids(string database, string caller, string user, string
   } else {
     s = "select " + i + "_code, timeRange_codes, gridDefinition_codes, "
         "parameter, levelType_codes, start_date, end_date from " + database +
-        ".ds" + d + "_agrids";
+        ".ds" + d + "_agrids2";
   }
   MySQL::Query sq(s);
 #ifdef DUMP_QUERIES
@@ -385,13 +385,13 @@ void summarize_grid_resolutions(string caller, string user, string
   }
   if (!file_id_code.empty()) {
     q.set("select distinct gridDefinition_codes from WGrML.ds" + substitute(
-        metautils::args.dsnum, ".", "") + "_agrids where webID_code = " +
+        metautils::args.dsnum, ".", "") + "_agrids2 where webID_code = " +
         file_id_code);
   } else {
     srv._delete("search.grid_resolutions", "dsid = '" + metautils::args.dsnum +
         "'");
     q.set("select distinct gridDefinition_codes from WGrML.ds" + substitute(
-        metautils::args.dsnum, ".", "") + "_agrids");
+        metautils::args.dsnum, ".", "") + "_agrids2");
   }
 #ifdef DUMP_QUERIES
   {
@@ -564,6 +564,7 @@ void aggregate_grids(string database, string caller, string user, string
             log_error2("bitmap for grid definitions is too long", F, caller,
                 user);
           }
+/*
           if (srv.insert(database + ".ds" + d + "_agrids", fileID_code + ", '" +
               sql_ready(trb) + "', '" + sql_ready(gdb) + "', '" + lkey + "', " +
               d1 + ", " + d2) < 0) {
@@ -571,6 +572,7 @@ void aggregate_grids(string database, string caller, string user, string
                 ", '" + trb + "', '" + gdb + "', '" + lkey + "', " + d1 + ", " +
                 d2 + "'", F, caller, user);
           }
+*/
           stringstream ss;
           ss.str("");
           ss << fileID_code << ", " << trv.front() << ", " << trv.back() <<
@@ -669,6 +671,7 @@ void aggregate_grids(string database, string caller, string user, string
       if (gdb.length() > 255) {
         log_error2("bitmap for grid definitions is too long", F, caller, user);
       }
+/*
       if (!fileID_code.empty() && srv.insert(database + ".ds" + d + "_agrids",
           fileID_code + ", '" + sql_ready(trb) + "', '" + sql_ready(gdb) +
           "', '" + lkey + "', " + d1 + ", " + d2) < 0) {
@@ -676,6 +679,7 @@ void aggregate_grids(string database, string caller, string user, string
             ", '" + trb + "', '" + gdb + "', '" + lkey + "', " + d1 + ", " + d2,
             F, caller, user);
       }
+*/
       stringstream ss;
       ss.str("");
       ss << fileID_code << ", " << trv.front() << ", " << trv.back() << ", '";
