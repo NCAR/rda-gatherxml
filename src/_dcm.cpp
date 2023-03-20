@@ -133,7 +133,7 @@ void clear_tables_by_file_id(std::string db,std::string file_ID_code,bool is_ver
 
 void clear_grid_cache(MySQL::Server& server,std::string db)
 {
-  MySQL::LocalQuery query("select parameter,levelType_codes,min(start_date),max(end_date) from "+db+".ds"+dsnum2+"_agrids group by parameter,levelType_codes");
+  MySQL::LocalQuery query("select parameter,levelType_codes,min(start_date),max(end_date) from "+db+".ds"+dsnum2+"_agrids2 group by parameter,levelType_codes");
   if (query.submit(server) < 0) {
     metautils::log_error("clear_grid_cache() returned error: "+query.error()+" while trying to rebuild grid cache","dcm",USER);
   }
@@ -245,7 +245,9 @@ bool remove_from(std::string database,std::string table_ext,std::string file_fie
             xml_parent=unixutils::remote_web_file("https://rda.ucar.edu/datasets/ds"+metautils::args.dsnum+"/metadata/"+md_directory+"/"+md_file+".gz",tempdir_name());
             struct stat buf;
             if (stat(xml_parent.c_str(),&buf) == 0) {
-              system(("gunzip "+xml_parent).c_str());
+              if (system(("gunzip "+xml_parent).c_str()) != 0) {
+                metautils::log_error("remove_from() could not unzip '" + xml_parent + "'","dcm",USER);
+              }
               strutils::chop(xml_parent,3);
             }
           }
