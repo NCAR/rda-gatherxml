@@ -182,7 +182,7 @@ void summarize_grids(string database, string caller, string user, string
   if (!fileID_code.empty()) {
     s = "select " + i + "_code, timeRange_code, gridDefinition_code, "
         "parameter, levelType_codes, start_date, end_date from " + database +
-        ".ds" + d + "_grids where " + i + "_code = " + fileID_code;
+        ".ds" + d + "_grids2 where " + i + "_code = " + fileID_code;
   } else {
     s = "select " + i + "_code, timeRange_codes, gridDefinition_codes, "
         "parameter, levelType_codes, start_date, end_date from " + database +
@@ -489,13 +489,13 @@ void aggregate_grids(string database, string caller, string user, string
   MySQL::LocalQuery q;
   if (database == "WGrML") {
     if (!fileID_code.empty()) {
-      srv._delete("WGrML.ds" + d + "_agrids", "webID_code = " + fileID_code);
+//      srv._delete("WGrML.ds" + d + "_agrids", "webID_code = " + fileID_code);
       srv._delete("WGrML.ds" + d + "_agrids2", "webID_code = " + fileID_code);
       srv._delete("WGrML.ds" + d + "_grid_definitions", "webID_code = " +
           fileID_code);
       q.set("select timeRange_code, gridDefinition_code, parameter, "
           "levelType_codes, min(start_date), max(end_date) from WGrML.ds" + d +
-          "_grids where webID_code = " + fileID_code + " group by "
+          "_grids2 where webID_code = " + fileID_code + " group by "
           "timeRange_code, gridDefinition_code, parameter, levelType_codes "
           "order by parameter, levelType_codes, timeRange_code");
     } else {
@@ -686,7 +686,7 @@ void aggregate_grids(string database, string caller, string user, string
       if (trv.size() <= 2) {
         ss << "!" << trv.front();
         if (trv.size() == 2) {
-          ss << ", " << trv.back();
+          ss << "," << trv.back();
         }
       } else {
         ss << sql_ready(trb);
@@ -695,7 +695,7 @@ void aggregate_grids(string database, string caller, string user, string
       if (gdv.size() <= 2) {
         ss << "!" << gdv.front();
         if (gdv.size() == 2) {
-          ss << ", " << gdv.back();
+          ss << "," << gdv.back();
         }
       } else {
         ss << sql_ready(gdb);
