@@ -580,7 +580,7 @@ void aggregate_grids(string database, string caller, string user, string
           if (trv.size() <= 2) {
             ss << "!" << trv.front();
             if (trv.size() == 2) {
-              ss << ", " << trv.back();
+              ss << "," << trv.back();
             }
           } else {
             ss << sql_ready(trb);
@@ -589,7 +589,7 @@ void aggregate_grids(string database, string caller, string user, string
           if (gdv.size() <= 2) {
             ss << "!" << gdv.front();
             if (gdv.size() == 2) {
-              ss << ", " << gdv.back();
+              ss << "," << gdv.back();
             }
           } else {
             ss << sql_ready(gdb);
