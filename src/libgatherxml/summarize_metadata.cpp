@@ -457,8 +457,8 @@ unordered_set<string> summarize_frequencies_from_wgrml_by_data_file(MySQL::
 
   // get all of the time ranges for the given file ID
   MySQL::LocalQuery qt("select timeRange_code, min(start_date), max(end_date), "
-      "sum(min_nsteps), sum(max_nsteps) from WGrML.ds" + ds + "_grids where "
-      "webID_code = " + file_id_code + " group by timeRange_code, parameter");
+      "sum(nsteps) from WGrML.ds" + ds + "_grids2 where webID_code = " +
+      file_id_code + " group by timeRange_code, parameter");
 #ifdef DUMP_QUERIES
   {
   Timer tm;
@@ -500,7 +500,7 @@ unordered_set<string> summarize_frequencies_from_wgrml_by_data_file(MySQL::
   size_t cnt = 0;
   string smin = "30001231235959", smax = "10000101000000";
   for (const auto& r : qt) {
-    if (r[3] != "1" || r[4] != "1") {
+    if (r[3] != "1") {
       auto t = map[r[0]];
       string k, f;
       tie(k, f) = gridded_frequency_data(t);
@@ -542,18 +542,7 @@ unordered_set<string> summarize_frequencies_from_wgrml_by_data_file(MySQL::
         size_t n;
         double d;
         string u;
-        if (r[3] != r[4]) {
-          n = stoi(r[3]);
-          grids_per(n, d1, d2, d, u);
-          if (d > 0.) {
-            if (u != "singletimestep") {
-              k = searchutils::time_resolution_keyword("irregular", lround(d),
-                  u, "");
-              f = "irregular<!>" + itos(lround(d)) + "<!>" + u;
-            }
-          }
-        }
-        n = stoi(r[4]);
+        n = stoi(r[3]);
         grids_per(n, d1, d2, d, u);
         if (d > 0.) {
           if (u != "singletimestep") {
