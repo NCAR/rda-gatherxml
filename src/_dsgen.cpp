@@ -111,6 +111,20 @@ void update_wagtail(string column, string insert_value, string caller) {
   }
 }
 
+void sync_dataset_files(string tdir_name) {
+  string p = "/data/web";
+  if (g_dataset_type == "W") {
+    p += "/internal";
+  }
+  p += "/datasets/ds" + metautils::args.dsnum;
+  string e;
+  if (unixutils::rdadata_sync(tdir_name, ".", p, metautils::directives.
+      rdadata_home, e) < 0) {
+    metautils::log_error2("couldn't sync dataset files - rdadata_sync "
+        "error(s): '" + e + "'", "main()", "dsgen", USER);
+  }
+}
+
 void generate_index(string tdir_name) {
   static const string F = this_function_label(__func__);
   ofstream ofs;
@@ -439,11 +453,13 @@ void add_abstract(TokenDocument& tdoc) {
       "dsOverview/summary")), F);
 }
 
-void exit_if_dead_dataset(TokenDocument& tdoc, std::ofstream& ofs) {
+void exit_if_dead_dataset(TokenDocument& tdoc, string tdir_name, std::ofstream&
+    ofs) {
   if (g_dataset_type == "D") {
     tdoc.add_if("__IS_DEAD_DATASET__");
     ofs << tdoc;
     ofs.close();
+    sync_dataset_files(tdir_name);
     exit(0);
   }
 }
@@ -2012,7 +2028,7 @@ void generate_description(string type, string tdir_name) {
   }
   update_wagtail("dstype", g_dataset_type, F);
   add_abstract(tdoc); //wagtail
-  exit_if_dead_dataset(tdoc, ofs);
+  exit_if_dead_dataset(tdoc, tdir_name, ofs);
 
 /*
   if (g_dataset_type == "I") {
@@ -2121,15 +2137,5 @@ int main(int argc, char **argv) {
     }
   }
   server.disconnect();
-  string p = "/data/web";
-  if (g_dataset_type == "W") {
-    p += "/internal";
-  }
-  p += "/datasets/ds" + metautils::args.dsnum;
-  string e;
-  if (unixutils::rdadata_sync(d.name(), ".", p, metautils::directives.
-      rdadata_home, e) < 0) {
-    metautils::log_error2("couldn't sync dataset files - rdadata_sync "
-        "error(s): '" + e + "'", "main()", "dsgen", USER);
-  }
+  sync_dataset_files(d.name());
 }
