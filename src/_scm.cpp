@@ -400,11 +400,6 @@ void create_grml_tables(MarkupParameters *markup_parameters) {
     log_error2("error: '" + markup_parameters->server.error() + "' while "
         "creating table " + tb_base + "_levels", F, "scm", USER);
   }
-  if (markup_parameters->server.command("create table " + tb_base + "_grids "
-      "like " + markup_parameters->database + ".template_grids", r) < 0) {
-    log_error2("error: '" + markup_parameters->server.error() + "' while "
-        "creating table " + tb_base + "_grids", F, "scm", USER);
-  }
   if (markup_parameters->server.command("create table " + tb_base + "_grids2 "
       "like " + markup_parameters->database + ".template_grids2", r) < 0) {
     log_error2("error: '" + markup_parameters->server.error() + "' while "
@@ -572,11 +567,8 @@ void insert_filename(MarkupParameters *markup_parameters) {
 
 void clear_grml_tables(MarkupParameters *markup_parameters) {
   markup_parameters->server._delete(markup_parameters->database + ".ds" +
-      local_args.dsnum2 + "_grids", markup_parameters->file_type + "ID_code = "
-      + markup_parameters->file_map[markup_parameters->filename]);
-  markup_parameters->server._delete(markup_parameters->database + ".ds" +
-      local_args.dsnum2 + "_grids2", markup_parameters->file_type + "ID_code = "
-      + markup_parameters->file_map[markup_parameters->filename]);
+      local_args.dsnum2 + "_grids2", "file_code = " + markup_parameters->
+      file_map[markup_parameters->filename]);
   markup_parameters->server._delete(markup_parameters->database + ".ds" +
       local_args.dsnum2 + "_processes", markup_parameters->file_type +
       "ID_code = " + markup_parameters->file_map[markup_parameters->filename]);
@@ -877,7 +869,7 @@ void process_grml_markup(void *markup_parameters) {
         }
       }
     }
-    for (auto& e : pdmap) {
+    for (auto& e : pdmap2) {
       sort(e.second->level_code_list.begin(), e.second->level_code_list.end(),
       [](const size_t& left, const size_t& right) -> bool {
         if (left <= right) {
@@ -888,44 +880,17 @@ void process_grml_markup(void *markup_parameters) {
       string s;
       bitmap::compress_values(e.second->level_code_list, s);
       auto sp = split(e.first, "<!>");
-      if (gp->server.insert(gp->database + ".ds" + local_args.dsnum2 + "_grids",
-          gp->file_type + "ID_code, timeRange_code, gridDefinition_code, "
-          "parameter, levelType_codes, start_date, end_date, min_nsteps, "
-          "max_nsteps", gp->file_map[gp->filename] + ", " + tr_map[tr] + ", " +
+      auto tbl = gp->database + ".ds" + local_args.dsnum2 + "_grids2";
+      auto cols = "file_code, timeRange_code, gridDefinition_code, "
+          "parameter, levelType_codes, start_date, end_date, nsteps";
+      auto inserts = gp->file_map[gp->filename] + ", " + tr_map[tr] + ", " +
           gd_map[gdef] + ", '" + sp[0] + "', '" + s + "', " + sp[1] + ", " + sp[
-          2] + ", " + itos(e.second->min_nsteps) + ", " + itos(e.second->
-          max_nsteps), "") < 0) {
-        log_error2("error: '" + gp->server.error() + " while inserting into " +
-            gp->database + ".ds" + local_args.dsnum2 + "_grids", F, "scm",
-            USER);
+          2] + ", " + sp[3];
+      if (gp->server.insert(tbl, cols, inserts, "") < 0) {
+        log_error2("error: '" + gp->server.error() + " while inserting '" +
+            inserts + "' into '" + tbl + "'", F, "scm", USER);
       }
       e.second.reset();
-    }
-    if (table_exists(gp->server, gp->database + ".ds" + local_args.dsnum2 +
-        "_grids2")) {
-      for (auto& e : pdmap2) {
-        sort(e.second->level_code_list.begin(), e.second->level_code_list.end(),
-        [](const size_t& left, const size_t& right) -> bool {
-          if (left <= right) {
-            return true;
-          }
-          return false;
-        });
-        string s;
-        bitmap::compress_values(e.second->level_code_list, s);
-        auto sp = split(e.first, "<!>");
-        if (gp->server.insert(gp->database + ".ds" + local_args.dsnum2 +
-            "_grids2", gp->file_type + "ID_code, timeRange_code, "
-            "gridDefinition_code, parameter, levelType_codes, start_date, "
-            "end_date, nsteps", gp->file_map[gp->filename] + ", " + tr_map[tr] +
-            ", " + gd_map[gdef] + ", '" + sp[0] + "', '" + s + "', " + sp[1] +
-            ", " + sp[2] + ", " + sp[3], "") < 0) {
-          log_error2("error: '" + gp->server.error() + " while inserting into "
-              + gp->database + ".ds" + local_args.dsnum2 + "_grids2", F, "scm",
-              USER);
-        }
-        e.second.reset();
-      }
     }
   }
   replace_all(mndt, "-", "");
@@ -944,15 +909,6 @@ void process_grml_markup(void *markup_parameters) {
        gp->file_map[gp->filename]) < 0) {
     log_error2("error: '" + gp->server.error() + " while updating " + tb_nam, F,
         "scm", USER);
-  }
-  if (!table_exists(gp->server, gp->database + ".ds" + local_args.dsnum2 +
-      "_agrids")) {
-    string r;
-    if (gp->server.command("create table " + gp->database + ".ds" + local_args.
-        dsnum2 + "_agrids like " + gp->database + ".template_agrids", r) < 0) {
-      log_error2("error: '" + gp->server.error() + " while creating table " +
-          gp->database + ".ds" + local_args.dsnum2 + "_agrids", F, "scm", USER);
-    }
   }
   if (!table_exists(gp->server, gp->database + ".ds" + local_args.dsnum2 +
       "_agrids2")) {
