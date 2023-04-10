@@ -679,22 +679,21 @@ string time_range_query(MySQL::Server& mysrv, const DBData& dbdata, string
         dbdata.db + ".ds" + d2 + dbdata.table + " as p left join dssdb." +
         dbdata.dtable + " as x on (x." + dbdata.dtable + " = p." + dbdata.
         ID_type + "ID and x.type = p.type and x.dsid = p.dsid) left join " +
-        dbdata.db + ".ds" + d2 + "_grids as g on g." + dbdata.ID_type +
-        "ID_code = p.code left join " + dbdata.db + ".timeRanges as t on t."
-        "code = g.timeRange_code left join " + dbdata.db + ".gridDefinitions "
-        "as d on d.code = g.gridDefinition_code where p.format_code = " +
-        format_code + " and !isnull(x." + dbdata.dtable + ") and x.gindex = "
-        + group_index;
+        dbdata.db + ".ds" + d2 + "_grids2 as g on g.file_code = p.code left "
+        "join " + dbdata.db + ".timeRanges as t on t.code = g.timeRange_code "
+        "left join " + dbdata.db + ".gridDefinitions as d on d.code = g."
+        "gridDefinition_code where p.format_code = " + format_code + " and "
+        "!isnull(x." + dbdata.dtable + ") and x.gindex = " + group_index;
   }
   return "select distinct t.timeRange, d.definition, d.defParams from (select "
       "p.code from " + dbdata.db + ".ds" + d2 + dbdata.table + " as p left "
       "join dssdb." + dbdata.dtable + " as x on x." + dbdata.dtable + " = p." +
       dbdata.ID_type + "ID where p.format_code = " + format_code + " and "
       "!isnull(x." + dbdata.dtable + ") and x.gindex = " + group_index + ") as "
-      "p left join " + dbdata.db + ".ds" + d2 + "_grids as g on g." + dbdata.
-      ID_type + "ID_code = p.code left join " + dbdata.db + ".timeRanges as t "
-      "on t.code = g.timeRange_code left join " + dbdata.db +
-      ".gridDefinitions as d on d.code = g.gridDefinition_code";
+      "p left join " + dbdata.db + ".ds" + d2 + "_grids2 as g on g.file_code = "
+      "p.code left join " + dbdata.db + ".timeRanges as t on t.code = g."
+      "timeRange_code left join " + dbdata.db + ".gridDefinitions as d on d."
+      "code = g.gridDefinition_code";
 }
 
 void write_grid_html(ofstream& ofs, size_t num_products) {

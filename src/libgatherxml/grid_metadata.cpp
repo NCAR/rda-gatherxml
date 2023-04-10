@@ -180,9 +180,9 @@ void summarize_grids(string database, string caller, string user, string
   }
   string s;
   if (!fileID_code.empty()) {
-    s = "select " + i + "_code, timeRange_code, gridDefinition_code, "
-        "parameter, levelType_codes, start_date, end_date from " + database +
-        ".ds" + d + "_grids2 where " + i + "_code = " + fileID_code;
+    s = "select file_code, timeRange_code, gridDefinition_code, parameter, "
+        "levelType_codes, start_date, end_date from " + database + ".ds" + d +
+        "_grids2 where file_code = " + fileID_code;
   } else {
     s = "select " + i + "_code, timeRange_codes, gridDefinition_codes, "
         "parameter, levelType_codes, start_date, end_date from " + database +
@@ -495,7 +495,7 @@ void aggregate_grids(string database, string caller, string user, string
           fileID_code);
       q.set("select timeRange_code, gridDefinition_code, parameter, "
           "levelType_codes, min(start_date), max(end_date) from WGrML.ds" + d +
-          "_grids2 where webID_code = " + fileID_code + " group by "
+          "_grids2 where file_code = " + fileID_code + " group by "
           "timeRange_code, gridDefinition_code, parameter, levelType_codes "
           "order by parameter, levelType_codes, timeRange_code");
     } else {

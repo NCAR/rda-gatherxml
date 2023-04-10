@@ -457,7 +457,7 @@ unordered_set<string> summarize_frequencies_from_wgrml_by_data_file(MySQL::
 
   // get all of the time ranges for the given file ID
   MySQL::LocalQuery qt("select timeRange_code, min(start_date), max(end_date), "
-      "sum(nsteps) from WGrML.ds" + ds + "_grids2 where webID_code = " +
+      "sum(nsteps) from WGrML.ds" + ds + "_grids2 where file_code = " +
       file_id_code + " group by timeRange_code, parameter");
 #ifdef DUMP_QUERIES
   {
