@@ -12,17 +12,21 @@
 #include <search.hpp>
 #include <myerror.hpp>
 
+using std::string;
+using std::stringstream;
+using metautils::log_error;
+
 metautils::Directives metautils::directives;
 metautils::Args metautils::args;
 bool gatherxml::verbose_operation;
-extern const std::string USER=getenv("USER");
-std::string myerror="";
-std::string mywarning="";
+extern const string USER=getenv("USER");
+string myerror="";
+string mywarning="";
 
 struct Entry {
   Entry() : key() {}
 
-  std::string key;
+  string key;
 };
 struct LocalArgs {
   LocalArgs() : notify(false),keep_xml(false) {}
@@ -32,15 +36,15 @@ struct LocalArgs {
 struct ThreadStruct {
   ThreadStruct() : strings(),removed_file_index(-1),file_removed(false),tid(0) {}
 
-  std::vector<std::string> strings;
+  std::vector<string> strings;
   int removed_file_index;
   bool file_removed;
   pthread_t tid;
 };
-std::string dsnum2;
-std::vector<std::string> files;
-std::unordered_set<std::string> web_tindex_set,inv_tindex_set;
-std::unordered_set<std::string> web_gindex_set;
+string dsnum2;
+std::vector<string> files;
+std::unordered_set<string> web_tindex_set,inv_tindex_set;
+std::unordered_set<string> web_gindex_set;
 bool removed_from_WGrML,removed_from_WObML,removed_from_SatML,removed_from_WFixML;
 bool create_Web_filelist_cache=false,create_inv_filelist_cache=false;
 
@@ -71,97 +75,99 @@ void parse_args(MySQL::Server& server)
   }
 }
 
-std::string tempdir_name()
+string tempdir_name()
 {
   static TempDir *tdir=nullptr;
   if (tdir == nullptr) {
     tdir=new TempDir;
     if (!tdir->create(metautils::directives.temp_path)) {
-      metautils::log_error("unable to create temporary directory","dcm",USER);
+      log_error("unable to create temporary directory","dcm",USER);
     }
   }
   return tdir->name();
 }
 
-void copy_version_controlled_data(MySQL::Server& server,std::string db,std::string file_ID_code)
+void copy_version_controlled_data(MySQL::Server& server,string db,string file_ID_code)
 {
-  std::string error;
+  string error;
   auto tnames=table_names(server,db,"ds"+dsnum2+"%",error);
   for (auto t : tnames) {
     t=db+"."+t;
     if (field_exists(server,t,"mssID_code")) {
       if (!table_exists(server,"V"+t)) {
         if (server.command("create table V"+t+" like "+t,error) < 0) {
-          metautils::log_error("copy_version_controlled_table() returned error: "+server.error()+" while trying to create V"+t,"dcm",USER);
+          log_error("copy_version_controlled_table() returned error: "+server.error()+" while trying to create V"+t,"dcm",USER);
         }
       }
-      std::string result;
+      string result;
       server.command("insert into V"+t+" select * from "+t+" where mssID_code = "+file_ID_code,result);
     }
   }
 }
 
-void clear_tables_by_file_id(std::string db,std::string file_ID_code,bool is_version_controlled)
+void clear_tables_by_file_id(string db,string file_ID_code,bool is_version_controlled)
 {
-  const std::string THIS_FUNC=__func__;
+  const string THIS_FUNC=__func__;
   MySQL::Server local_server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   if (!local_server) {
-    metautils::log_error(THIS_FUNC+"(): unable to connect to MySQL server while clearing fileID code "+file_ID_code+" from "+db,"dcm",USER);
+    log_error(THIS_FUNC+"(): unable to connect to MySQL server while clearing fileID code "+file_ID_code+" from "+db,"dcm",USER);
   }
   if (is_version_controlled) {
     copy_version_controlled_data(local_server,db,file_ID_code);
   }
-  std::string code_name;
+  string code_name;
   if (db[0] == 'W') {
     code_name="webID_code";
   }
   else {
     code_name="mssID_code";
   }
-  std::string error;
+  string error;
   auto tnames=table_names(local_server,db,"ds"+dsnum2+"%",error);
   for (auto t : tnames) {
     t=db+"."+t;
     if (field_exists(local_server,t,code_name)) {
       if (local_server._delete(t,code_name+" = "+file_ID_code) < 0) {
-        metautils::log_error(THIS_FUNC+"() returned error: "+local_server.error()+" while clearing "+t,"dcm",USER);
+        log_error(THIS_FUNC+"() returned error: "+local_server.error()+" while clearing "+t,"dcm",USER);
       }
     }
   }
   local_server.disconnect();
 }
 
-void clear_grid_cache(MySQL::Server& server,std::string db)
-{
-  MySQL::LocalQuery query("select parameter,levelType_codes,min(start_date),max(end_date) from "+db+".ds"+dsnum2+"_agrids2 group by parameter,levelType_codes");
+void clear_grid_cache(MySQL::Server& server, string db) {
+  MySQL::LocalQuery query("select parameter, level_type_codes, min("
+      "start_date), max(end_date) from " + db + ".ds" + dsnum2 + "_agrids2 "
+      "group by parameter, level_type_codes");
   if (query.submit(server) < 0) {
-    metautils::log_error("clear_grid_cache() returned error: "+query.error()+" while trying to rebuild grid cache","dcm",USER);
+    log_error("clear_grid_cache() returned error: " + query.error() + " while "
+        "trying to rebuild grid cache", "dcm", USER);
   }
-  std::string result;
-  server.command("lock tables "+db+".ds"+dsnum2+"_agrids_cache write",result);
-  if (server._delete(db+".ds"+dsnum2+"_agrids_cache") < 0) {
-    metautils::log_error("clear_grid_cache() returned error: "+server.error()+" while clearing "+db+".ds"+dsnum2+"_agrids_cache","dcm",USER);
+  if (server._delete(db + ".ds" + dsnum2 + "_agrids_cache") < 0) {
+    log_error("clear_grid_cache() returned error: " + server.error() + " while "
+        "clearing " + db + ".ds" + dsnum2 + "_agrids_cache", "dcm", USER);
   }
-  MySQL::Row row;
-  while (query.fetch_row(row)) {
-    if (server.insert(db+".ds"+dsnum2+"_agrids_cache","'"+row[0]+"','"+row[1]+"',"+row[2]+","+row[3]) < 0) {
-      metautils::log_error("clear_grid_cache() returned error: "+server.error()+" while inserting into "+db+".ds"+dsnum2+"_agrids_cache","dcm",USER);
+  for (const auto& row : query) {
+    if (server.insert(db + ".ds" + dsnum2 + "_agrids_cache","'" + row[0] + "','"
+        + row[1] + "'," + row[2] + "," + row[3]) < 0) {
+      log_error("clear_grid_cache() returned error: " + server.error() +
+          " while inserting into " + db + ".ds" + dsnum2 + "_agrids_cache",
+          "dcm", USER);
     }
   }
-  server.command("unlock tables",result);
 }
 
-bool remove_from(std::string database,std::string table_ext,std::string file_field_name,std::string md_directory,std::string& file,std::string file_ext,std::string& file_ID_code,bool& is_version_controlled)
+bool remove_from(string database,string table_ext,string file_field_name,string md_directory,string& file,string file_ext,string& file_ID_code,bool& is_version_controlled)
 {
   is_version_controlled=false;
-  std::string error;
+  string error;
   if (md_directory == "wfmd" && std::regex_search(file,std::regex("^http(s){0,1}://(rda|dss)\\.ucar\\.edu"))) {
     file=metautils::relative_web_filename(file);
   }
   auto file_table=database+".ds"+dsnum2+table_ext;
   MySQL::Server local_server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   if (!local_server) {
-    metautils::log_error("remove_from() unable to connect to MySQL server while removing  "+file,"dcm",USER);
+    log_error("remove_from() unable to connect to MySQL server while removing  "+file,"dcm",USER);
   }
   MySQL::LocalQuery query("code",file_table,file_field_name+" = '"+file+"'");
   if (query.submit(local_server) == 0) {
@@ -173,23 +179,23 @@ bool remove_from(std::string database,std::string table_ext,std::string file_fie
 // check for a primary moved to version-controlled
         query.set("mssid","dssdb.mssfile","dsid = 'ds"+metautils::args.dsnum+"' and mssfile = '"+file+"' and property = 'V'");
         if (query.submit(local_server) < 0) {
-          metautils::log_error("remove_from() returned error: "+local_server.error()+" while trying to check mssfile property for '"+file+"'","dcm",USER);
+          log_error("remove_from() returned error: "+local_server.error()+" while trying to check mssfile property for '"+file+"'","dcm",USER);
         }
         if (query.num_rows() == 1) {
           is_version_controlled=true;
         }
       }
       if (is_version_controlled) {
-        std::string result;
+        string result;
         if (!table_exists(local_server,"V"+file_table)) {
           if (local_server.command("create table V"+file_table+" like "+file_table,error) < 0) {
-            metautils::log_error("remove_from() returned error: "+local_server.error()+" while trying to create V"+file_table,"dcm",USER);
+            log_error("remove_from() returned error: "+local_server.error()+" while trying to create V"+file_table,"dcm",USER);
           }
         }
         local_server.command("insert into V"+file_table+" select * from "+file_table+" where code = "+file_ID_code,result);
       }
       if (local_server._delete(file_table,"code = "+file_ID_code) < 0) {
-        metautils::log_error("remove_from() returned error: "+local_server.error(),"dcm",USER);
+        log_error("remove_from() returned error: "+local_server.error(),"dcm",USER);
       }
       if (database == "WGrML" || database == "WObML") {
         auto tables=MySQL::table_names(local_server,strutils::substitute(database,"W","I"),"ds"+dsnum2+"_inventory_%",error);
@@ -224,12 +230,12 @@ bool remove_from(std::string database,std::string table_ext,std::string file_fie
         std::unique_ptr<TempDir> tdir;
         tdir.reset(new TempDir);
         if (!tdir->create(metautils::directives.temp_path)) {
-          metautils::log_error("remove_from() could not create a temporary directory","dcm",USER);
+          log_error("remove_from() could not create a temporary directory","dcm",USER);
         }
         if (is_version_controlled) {
-          std::stringstream oss,ess;
+          stringstream oss,ess;
           if (unixutils::mysystem2("/bin/mkdir -p "+tdir->name()+"/metadata/"+md_directory+"/v",oss,ess) < 0) {
-            metautils::log_error("remove_from() could not create the temporary directory tree","dcm",USER);
+            log_error("remove_from() could not create the temporary directory tree","dcm",USER);
           }
         }
         short flag=0;
@@ -240,13 +246,13 @@ bool remove_from(std::string database,std::string table_ext,std::string file_fie
           flag=2;
         }
         if (file_ext == ".ObML" && flag > 0) {
-          std::string xml_parent;
+          string xml_parent;
           if (flag == 1) {
             xml_parent=unixutils::remote_web_file("https://rda.ucar.edu/datasets/ds"+metautils::args.dsnum+"/metadata/"+md_directory+"/"+md_file+".gz",tempdir_name());
             struct stat buf;
             if (stat(xml_parent.c_str(),&buf) == 0) {
               if (system(("gunzip "+xml_parent).c_str()) != 0) {
-                metautils::log_error("remove_from() could not unzip '" + xml_parent + "'","dcm",USER);
+                log_error("remove_from() could not unzip '" + xml_parent + "'","dcm",USER);
               }
               strutils::chop(xml_parent,3);
             }
@@ -261,7 +267,7 @@ bool remove_from(std::string database,std::string table_ext,std::string file_fie
               if (is_version_controlled) {
                 auto f=unixutils::remote_web_file("https://rda.ucar.edu/datasets/ds"+metautils::args.dsnum+"/metadata/"+md_directory+"/"+e.attribute_value("ref"),tdir->name()+"/metadata/"+md_directory+"/v");
                 if (f.empty()) {
-                  metautils::log_error("remove_from() could not get remote file https://rda.ucar.edu/datasets/ds"+metautils::args.dsnum+"/metadata/"+md_directory+"/"+e.attribute_value("ref"),"dcm",USER);
+                  log_error("remove_from() could not get remote file https://rda.ucar.edu/datasets/ds"+metautils::args.dsnum+"/metadata/"+md_directory+"/"+e.attribute_value("ref"),"dcm",USER);
                 }
               }
               if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+md_directory+"/"+e.attribute_value("ref"),tdir->name(),metautils::directives.rdadata_home,error) < 0) {
@@ -273,7 +279,7 @@ bool remove_from(std::string database,std::string table_ext,std::string file_fie
               if (is_version_controlled) {
                 auto f=unixutils::remote_web_file("https://rda.ucar.edu/datasets/ds"+metautils::args.dsnum+"/metadata/"+md_directory+"/"+e.attribute_value("ref"),tdir->name()+"/metadata/"+md_directory+"/v");
                 if (f.empty()) {
-                  metautils::log_error("remove_from() could not get remote file https://rda.ucar.edu/datasets/ds"+metautils::args.dsnum+"/metadata/"+md_directory+"/"+e.attribute_value("ref"),"dcm",USER);
+                  log_error("remove_from() could not get remote file https://rda.ucar.edu/datasets/ds"+metautils::args.dsnum+"/metadata/"+md_directory+"/"+e.attribute_value("ref"),"dcm",USER);
                 }
               }
               if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+md_directory+"/"+e.attribute_value("ref"),tdir->name(),metautils::directives.rdadata_home,error) < 0) {
@@ -306,9 +312,9 @@ bool remove_from(std::string database,std::string table_ext,std::string file_fie
         if (is_version_controlled) {
           auto f=unixutils::remote_web_file("https://rda.ucar.edu/datasets/ds"+metautils::args.dsnum+"/metadata/"+md_directory+"/"+md_file,tdir->name()+"/metadata/"+md_directory+"/v");
           if (!f.empty()) {
-            std::string error;
+            string error;
             if (unixutils::rdadata_sync(tdir->name(),"metadata/"+md_directory+"/v/","/data/web/datasets/ds"+metautils::args.dsnum,metautils::directives.rdadata_home,error) < 0) {
-              metautils::log_error("unable to move version-controlled metadata file "+file+"; error: "+error,"dcm",USER);
+              log_error("unable to move version-controlled metadata file "+file+"; error: "+error,"dcm",USER);
             }
           }
         }
@@ -327,7 +333,7 @@ extern "C" void *t_removed(void *ts) {
   ThreadStruct *t=(ThreadStruct *)ts;
   auto file=t->strings[0];
   bool file_removed=false;
-  std::string file_ID_code;
+  string file_ID_code;
   bool is_version_controlled;
   if (std::regex_search(file,std::regex("^/FS/DECS/"))) {
 std::cerr << "Terminating - dcm no longer works on HPSS files" << std::endl;
@@ -391,7 +397,7 @@ exit(1);
   return nullptr;
 }
 
-void generate_graphics(std::string type)
+void generate_graphics(string type)
 {
   if (type == "web") {
     type="gsi";
@@ -399,13 +405,13 @@ void generate_graphics(std::string type)
   else {
     return;
   }
-  std::stringstream oss,ess;
+  stringstream oss,ess;
   unixutils::mysystem2(metautils::directives.local_root+"/bin/"+type+" "+metautils::args.dsnum,oss,ess);
 }
 
 void generate_dataset_home_page()
 {
-  std::stringstream oss,ess;
+  stringstream oss,ess;
   unixutils::mysystem2(metautils::directives.local_root+"/bin/dsgen "+metautils::args.dsnum,oss,ess);
 }
 
@@ -495,8 +501,7 @@ int main(int argc, char **argv) {
   metautils::read_config("dcm", USER);
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   if (!server) {
-    metautils::log_error("unable to connect to MySQL server on startup", "dcm",
-        USER);
+    log_error("unable to connect to MySQL server on startup", "dcm", USER);
   }
   parse_args(server);
 /*
@@ -581,7 +586,7 @@ int main(int argc, char **argv) {
   for (const auto& gindex : web_gindex_set) {
     gatherxml::detailedMetadata::generate_group_detailed_metadata_view(gindex,"Web","dcm",USER);
   }
-  std::stringstream oss,ess;
+  stringstream oss,ess;
   if (removed_from_WGrML) {
     clear_grid_cache(server,"WGrML");
     threads.clear();
