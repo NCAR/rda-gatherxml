@@ -456,9 +456,9 @@ unordered_set<string> summarize_frequencies_from_wgrml_by_data_file(MySQL::
   auto ds = substitute(metautils::args.dsnum, ".", "");
 
   // get all of the time ranges for the given file ID
-  MySQL::LocalQuery qt("select timeRange_code, min(start_date), max(end_date), "
-      "sum(nsteps) from WGrML.ds" + ds + "_grids2 where file_code = " +
-      file_id_code + " group by timeRange_code, parameter");
+  MySQL::LocalQuery qt("select time_range_code, min(start_date), max("
+      "end_date), sum(nsteps) from WGrML.ds" + ds + "_grids2 where file_code = "
+      + file_id_code + " group by time_range_code, parameter");
 #ifdef DUMP_QUERIES
   {
   Timer tm;
@@ -1226,8 +1226,8 @@ void write_grml_parameters(string file_type, string tindex, ofstream& ofs,
   static vector<tuple<string, string, string, string>> parameter_data;
   if (parameter_data.empty() && !pd_mutex.is_locked()) {
     pd_mutex.lock();
-    MySQL::LocalQuery qs("parameter, start_date, end_date, " + idtyp +
-        "ID_code", db + ".ds" + d2 + "_agrids2");
+    MySQL::LocalQuery qs("parameter, start_date, end_date, file_code", db +
+        ".ds" + d2 + "_agrids2");
 #ifdef DUMP_QUERIES
     {
     Timer tm;
