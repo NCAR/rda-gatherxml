@@ -573,9 +573,8 @@ void clear_grml_tables(MarkupParameters *markup_parameters) {
       local_args.dsnum2 + "_processes", markup_parameters->file_type +
       "ID_code = " + markup_parameters->file_map[markup_parameters->filename]);
   markup_parameters->server._delete(markup_parameters->database + ".ds" +
-      local_args.dsnum2 + "_ensembles", markup_parameters->file_type
-      + "ID_code = " + markup_parameters->file_map[markup_parameters->
-      filename]);
+      local_args.dsnum2 + "_ensembles", "file_code = " + markup_parameters->
+      file_map[markup_parameters->filename]);
 }
 
 void clear_obml_tables(MarkupParameters *markup_parameters) {
@@ -881,8 +880,8 @@ void process_grml_markup(void *markup_parameters) {
       bitmap::compress_values(e.second->level_code_list, s);
       auto sp = split(e.first, "<!>");
       auto tbl = gp->database + ".ds" + local_args.dsnum2 + "_grids2";
-      auto cols = "file_code, timeRange_code, gridDefinition_code, "
-          "parameter, levelType_codes, start_date, end_date, nsteps";
+      auto cols = "file_code, time_range_code, grid_definition_code, "
+          "parameter, level_type_codes, start_date, end_date, nsteps";
       auto inserts = gp->file_map[gp->filename] + ", " + tr_map[tr] + ", " +
           gd_map[gdef] + ", '" + sp[0] + "', '" + s + "', " + sp[1] + ", " + sp[
           2] + ", " + sp[3];

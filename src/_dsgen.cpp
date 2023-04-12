@@ -1552,7 +1552,7 @@ void add_spatial_coverage(TokenDocument& tdoc, string dsnum2, const vector<
           qgc.set("select gridDefinition_codes, webID_code from WGrML.ds" +
               dsnum2 + "_grid_definitions");
         } else {
-          qgc.set("select distinct gridDefinition_codes from WGrML.ds" + dsnum2
+          qgc.set("select distinct grid_definition_codes from WGrML.ds" + dsnum2
               + "_agrids2");
         }
         if (qgc.submit(server) < 0) {
