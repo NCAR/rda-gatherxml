@@ -87,11 +87,6 @@ void summarize_grid_levels(string database, string caller, string user) {
     }
   }
   string e;
-  if (srv.command("lock table " + database + ".ds" + d + "_levels write", e) 
-      < 0) {
-    log_error2(srv.error() + " while locking table " + database + ".ds" + d +
-        "_levels", F, caller, user);
-  }
   srv._delete(database + ".ds" + d + "_levels");
   for (const auto& e : uset) {
     if (srv.insert(database + ".ds" + d + "_levels", e) < 0) {
@@ -99,9 +94,6 @@ void summarize_grid_levels(string database, string caller, string user) {
           ".ds" + d + "_levels", F, caller,
           user);
     }
-  }
-  if (srv.command("unlock tables", e) < 0) {
-    log_error2(srv.error() + " while unlocking tables", F, caller, user);
   }
   srv.disconnect();
 }
@@ -488,7 +480,7 @@ void aggregate_grids(string database, string caller, string user, string
   if (database == "WGrML") {
     if (!fileID_code.empty()) {
       srv._delete("WGrML.ds" + d + "_agrids2", "file_code = " + fileID_code);
-      srv._delete("WGrML.ds" + d + "_grid_definitions", "webID_code = " +
+      srv._delete("WGrML.ds" + d + "_grid_definitions", "file_code = " +
           fileID_code);
       q.set("select time_range_code, grid_definition_code, parameter, "
           "level_type_codes, min(start_date), max(end_date) from WGrML.ds" + d +
