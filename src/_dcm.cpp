@@ -13,6 +13,8 @@
 #include <myerror.hpp>
 
 using metautils::log_error;
+using metautils::log_error2;
+using miscutils::this_function_label;
 using std::cout;
 using std::endl;
 using std::string;
@@ -96,48 +98,46 @@ string tempdir_name() {
   return tdir->name();
 }
 
-void copy_version_controlled_data(MySQL::Server& server,string db,string file_ID_code)
-{
+void copy_version_controlled_data(MySQL::Server& server, string db, string
+    file_ID_code) {
   string error;
-  auto tnames=table_names(server,db,"ds"+g_dsnum2+"%",error);
+  auto tnames = table_names(server, db, "ds" + g_dsnum2 + "%", error);
   for (auto t : tnames) {
-    t=db+"."+t;
-    if (field_exists(server,t,"mssID_code")) {
-      if (!table_exists(server,"V"+t)) {
-        if (server.command("create table V"+t+" like "+t,error) < 0) {
-          log_error("copy_version_controlled_table() returned error: "+server.error()+" while trying to create V"+t,"dcm",USER);
+    t = db + "." + t;
+    if (field_exists(server, t, "file_code")) {
+      if (!table_exists(server, "V" + t)) {
+        if (server.command("create table V" + t + " like " + t, error) < 0) {
+          log_error2("error: '" + server.error() + "' while trying to create V"
+              + t, "copy_version_controlled_data()", "dcm", USER);
         }
       }
-      string result;
-      server.command("insert into V"+t+" select * from "+t+" where mssID_code = "+file_ID_code,result);
+      string res;
+      server.command("insert into V" + t + " select * from " + t + " where "
+          "file_code = " + file_ID_code, res);
     }
   }
 }
 
-void clear_tables_by_file_id(string db,string file_ID_code,bool is_version_controlled)
-{
-  const string THIS_FUNC=__func__;
-  MySQL::Server local_server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
+void clear_tables_by_file_id(string db, string file_ID_code, bool
+    is_version_controlled) {
+  static const string F = this_function_label(__func__);
+  MySQL::Server local_server(metautils::directives.database_server, metautils::
+      directives.metadb_username, metautils::directives.metadb_password, "");
   if (!local_server) {
-    log_error(THIS_FUNC+"(): unable to connect to MySQL server while clearing fileID code "+file_ID_code+" from "+db,"dcm",USER);
+    log_error2("unable to connect to MySQL server while clearing fileID code " +
+        file_ID_code + " from " + db, F, "dcm", USER);
   }
   if (is_version_controlled) {
-    copy_version_controlled_data(local_server,db,file_ID_code);
-  }
-  string code_name;
-  if (db[0] == 'W') {
-    code_name="webID_code";
-  }
-  else {
-    code_name="mssID_code";
+    copy_version_controlled_data(local_server, db, file_ID_code);
   }
   string error;
-  auto tnames=table_names(local_server,db,"ds"+g_dsnum2+"%",error);
+  auto tnames=table_names(local_server, db, "ds" + g_dsnum2 + "%", error);
   for (auto t : tnames) {
-    t=db+"."+t;
-    if (field_exists(local_server,t,code_name)) {
-      if (local_server._delete(t,code_name+" = "+file_ID_code) < 0) {
-        log_error(THIS_FUNC+"() returned error: "+local_server.error()+" while clearing "+t,"dcm",USER);
+    t = db + "." + t;
+    if (field_exists(local_server, t, "file_code")) {
+      if (local_server._delete(t, "file_code = " + file_ID_code) < 0) {
+        log_error2("error: '" + local_server.error() + "' while clearing " + t,
+            F, "dcm", USER);
       }
     }
   }
@@ -145,23 +145,23 @@ void clear_tables_by_file_id(string db,string file_ID_code,bool is_version_contr
 }
 
 void clear_grid_cache(MySQL::Server& server, string db) {
+  static const string F = this_function_label(__func__);
   MySQL::LocalQuery query("select parameter, level_type_codes, min("
       "start_date), max(end_date) from " + db + ".ds" + g_dsnum2 + "_agrids2 "
       "group by parameter, level_type_codes");
   if (query.submit(server) < 0) {
-    log_error("clear_grid_cache() returned error: " + query.error() + " while "
-        "trying to rebuild grid cache", "dcm", USER);
+    log_error2("error: '" + query.error() + "' while trying to rebuild grid "
+        "cache", F, "dcm", USER);
   }
   if (server._delete(db + ".ds" + g_dsnum2 + "_agrids_cache") < 0) {
-    log_error("clear_grid_cache() returned error: " + server.error() + " while "
-        "clearing " + db + ".ds" + g_dsnum2 + "_agrids_cache", "dcm", USER);
+    log_error2("error: '" + server.error() + "' while clearing " + db + ".ds" +
+        g_dsnum2 + "_agrids_cache", F, "dcm", USER);
   }
   for (const auto& row : query) {
-    if (server.insert(db + ".ds" + g_dsnum2 + "_agrids_cache","'" + row[0] + "','"
-        + row[1] + "'," + row[2] + "," + row[3]) < 0) {
-      log_error("clear_grid_cache() returned error: " + server.error() +
-          " while inserting into " + db + ".ds" + g_dsnum2 + "_agrids_cache",
-          "dcm", USER);
+    if (server.insert(db + ".ds" + g_dsnum2 + "_agrids_cache","'" + row[0] +
+        "','" + row[1] + "'," + row[2] + "," + row[3]) < 0) {
+      log_error2("error: '" + server.error() + "' while inserting into " + db +
+          ".ds" + g_dsnum2 + "_agrids_cache", F, "dcm", USER);
     }
   }
 }
