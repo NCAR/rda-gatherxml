@@ -12,13 +12,15 @@
 #include <search.hpp>
 #include <myerror.hpp>
 
+using metautils::log_error;
 using std::cout;
 using std::endl;
 using std::string;
 using std::stringstream;
 using std::unordered_set;
 using std::vector;
-using metautils::log_error;
+using strutils::split;
+using strutils::substitute;
 
 metautils::Directives metautils::directives;
 metautils::Args metautils::args;
@@ -57,23 +59,22 @@ bool g_removed_from_wgrml, g_removed_from_wobml, g_removed_from_satml,
     g_removed_from_wfixml;
 bool g_create_web_filelist_cache = false, create_inv_filelist_cache=false;
 
-void parse_args(MySQL::Server& server)
-{
-  auto arg_list=strutils::split(metautils::args.args_string,"%");
-  for (auto arg=arg_list.begin(); arg != arg_list.end(); ++arg) {
+void parse_args(MySQL::Server& server) {
+  auto arg_list = split(metautils::args.args_string, "%");
+  for (auto arg = arg_list.begin(); arg != arg_list.end(); ++arg) {
     if (*arg == "-d") {
       ++arg;
-      metautils::args.dsnum=*arg;
-      if (std::regex_search(metautils::args.dsnum,std::regex("^ds"))) {
-        metautils::args.dsnum=metautils::args.dsnum.substr(2);
+      metautils::args.dsnum = *arg;
+      if (metautils::args.dsnum.find("ds") == 0) {
+        metautils::args.dsnum = metautils::args.dsnum.substr(2);
       }
-      g_dsnum2=strutils::substitute(metautils::args.dsnum,".","");
+      g_dsnum2 = substitute(metautils::args.dsnum, ".", "");
     } else if (*arg == "-G") {
-      metautils::args.update_graphics=false;
+      metautils::args.update_graphics = false;
     } else if (*arg == "-k") {
-      local_args.keep_xml=true;
+      local_args.keep_xml = true;
     } else if (*arg == "-N") {
-      local_args.notify=true;
+      local_args.notify = true;
     } else {
       g_files.emplace_back(*arg);
     }
@@ -84,13 +85,12 @@ void parse_args(MySQL::Server& server)
   }
 }
 
-string tempdir_name()
-{
-  static TempDir *tdir=nullptr;
+string tempdir_name() {
+  static TempDir *tdir = nullptr;
   if (tdir == nullptr) {
-    tdir=new TempDir;
+    tdir = new TempDir;
     if (!tdir->create(metautils::directives.temp_path)) {
-      log_error("unable to create temporary directory","dcm",USER);
+      log_error("unable to create temporary directory", "dcm", USER);
     }
   }
   return tdir->name();
@@ -207,11 +207,11 @@ bool remove_from(string database,string table_ext,string file_field_name,string 
         log_error("remove_from() returned error: "+local_server.error(),"dcm",USER);
       }
       if (database == "WGrML" || database == "WObML") {
-        auto tables=MySQL::table_names(local_server,strutils::substitute(database,"W","I"),"ds"+g_dsnum2+"_inventory_%",error);
+        auto tables=MySQL::table_names(local_server,substitute(database,"W","I"),"ds"+g_dsnum2+"_inventory_%",error);
         for (const auto& table : tables) {
-          local_server._delete(strutils::substitute(database,"W","I")+".`"+table+"`","webID_code = "+file_ID_code);
+          local_server._delete(substitute(database,"W","I")+".`"+table+"`","webID_code = "+file_ID_code);
         }
-        if (local_server._delete(strutils::substitute(database,"W","I")+".ds"+g_dsnum2+"_inventory_summary","webID_code = "+file_ID_code) == 0) {
+        if (local_server._delete(substitute(database,"W","I")+".ds"+g_dsnum2+"_inventory_summary","webID_code = "+file_ID_code) == 0) {
           query.set("select tindex from dssdb.wfile where wfile = '"+file+"'");
           if (query.submit(local_server) == 0 && query.num_rows() == 1) {
             query.fetch_row(row);
