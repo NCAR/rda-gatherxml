@@ -16,40 +16,46 @@ using std::cout;
 using std::endl;
 using std::string;
 using std::stringstream;
+using std::unordered_set;
+using std::vector;
 using metautils::log_error;
 
 metautils::Directives metautils::directives;
 metautils::Args metautils::args;
 bool gatherxml::verbose_operation;
-extern const string USER=getenv("USER");
-string myerror="";
-string mywarning="";
+extern const string USER = getenv("USER");
+string myerror = "";
+string mywarning = "";
 
 struct Entry {
-  Entry() : key() {}
+  Entry() : key() { }
 
   string key;
 };
+
 struct LocalArgs {
-  LocalArgs() : notify(false),keep_xml(false) {}
+  LocalArgs() : notify(false), keep_xml(false) { }
 
-  bool notify,keep_xml;
+  bool notify, keep_xml;
 } local_args;
-struct ThreadStruct {
-  ThreadStruct() : strings(),removed_file_index(-1),file_removed(false),tid(0) {}
 
-  std::vector<string> strings;
+struct ThreadStruct {
+  ThreadStruct() : strings(), removed_file_index(-1), file_removed(false),
+      tid(0) { }
+
+  vector<string> strings;
   int removed_file_index;
   bool file_removed;
   pthread_t tid;
 };
-string dsnum2;
-std::vector<string> files;
-std::unordered_set<string> web_tindex_set,inv_tindex_set;
-std::unordered_set<string> web_gindex_set;
-bool g_removed_from_wgrml, g_removed_from_wobml, removed_from_SatML,
+
+string g_dsnum2;
+vector<string> g_files;
+unordered_set<string> g_web_tindex_set, g_inv_tindex_set;
+unordered_set<string> g_web_gindex_set;
+bool g_removed_from_wgrml, g_removed_from_wobml, g_removed_from_satml,
     g_removed_from_wfixml;
-bool g_create_web_filelist_cache = false,create_inv_filelist_cache=false;
+bool g_create_web_filelist_cache = false, create_inv_filelist_cache=false;
 
 void parse_args(MySQL::Server& server)
 {
@@ -61,7 +67,7 @@ void parse_args(MySQL::Server& server)
       if (std::regex_search(metautils::args.dsnum,std::regex("^ds"))) {
         metautils::args.dsnum=metautils::args.dsnum.substr(2);
       }
-      dsnum2=strutils::substitute(metautils::args.dsnum,".","");
+      g_dsnum2=strutils::substitute(metautils::args.dsnum,".","");
     } else if (*arg == "-G") {
       metautils::args.update_graphics=false;
     } else if (*arg == "-k") {
@@ -69,7 +75,7 @@ void parse_args(MySQL::Server& server)
     } else if (*arg == "-N") {
       local_args.notify=true;
     } else {
-      files.emplace_back(*arg);
+      g_files.emplace_back(*arg);
     }
   }
   if (metautils::args.dsnum.empty()) {
@@ -93,7 +99,7 @@ string tempdir_name()
 void copy_version_controlled_data(MySQL::Server& server,string db,string file_ID_code)
 {
   string error;
-  auto tnames=table_names(server,db,"ds"+dsnum2+"%",error);
+  auto tnames=table_names(server,db,"ds"+g_dsnum2+"%",error);
   for (auto t : tnames) {
     t=db+"."+t;
     if (field_exists(server,t,"mssID_code")) {
@@ -126,7 +132,7 @@ void clear_tables_by_file_id(string db,string file_ID_code,bool is_version_contr
     code_name="mssID_code";
   }
   string error;
-  auto tnames=table_names(local_server,db,"ds"+dsnum2+"%",error);
+  auto tnames=table_names(local_server,db,"ds"+g_dsnum2+"%",error);
   for (auto t : tnames) {
     t=db+"."+t;
     if (field_exists(local_server,t,code_name)) {
@@ -140,21 +146,21 @@ void clear_tables_by_file_id(string db,string file_ID_code,bool is_version_contr
 
 void clear_grid_cache(MySQL::Server& server, string db) {
   MySQL::LocalQuery query("select parameter, level_type_codes, min("
-      "start_date), max(end_date) from " + db + ".ds" + dsnum2 + "_agrids2 "
+      "start_date), max(end_date) from " + db + ".ds" + g_dsnum2 + "_agrids2 "
       "group by parameter, level_type_codes");
   if (query.submit(server) < 0) {
     log_error("clear_grid_cache() returned error: " + query.error() + " while "
         "trying to rebuild grid cache", "dcm", USER);
   }
-  if (server._delete(db + ".ds" + dsnum2 + "_agrids_cache") < 0) {
+  if (server._delete(db + ".ds" + g_dsnum2 + "_agrids_cache") < 0) {
     log_error("clear_grid_cache() returned error: " + server.error() + " while "
-        "clearing " + db + ".ds" + dsnum2 + "_agrids_cache", "dcm", USER);
+        "clearing " + db + ".ds" + g_dsnum2 + "_agrids_cache", "dcm", USER);
   }
   for (const auto& row : query) {
-    if (server.insert(db + ".ds" + dsnum2 + "_agrids_cache","'" + row[0] + "','"
+    if (server.insert(db + ".ds" + g_dsnum2 + "_agrids_cache","'" + row[0] + "','"
         + row[1] + "'," + row[2] + "," + row[3]) < 0) {
       log_error("clear_grid_cache() returned error: " + server.error() +
-          " while inserting into " + db + ".ds" + dsnum2 + "_agrids_cache",
+          " while inserting into " + db + ".ds" + g_dsnum2 + "_agrids_cache",
           "dcm", USER);
     }
   }
@@ -167,7 +173,7 @@ bool remove_from(string database,string table_ext,string file_field_name,string 
   if (md_directory == "wfmd" && std::regex_search(file,std::regex("^http(s){0,1}://(rda|dss)\\.ucar\\.edu"))) {
     file=metautils::relative_web_filename(file);
   }
-  auto file_table=database+".ds"+dsnum2+table_ext;
+  auto file_table=database+".ds"+g_dsnum2+table_ext;
   MySQL::Server local_server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   if (!local_server) {
     log_error("remove_from() unable to connect to MySQL server while removing  "+file,"dcm",USER);
@@ -201,24 +207,24 @@ bool remove_from(string database,string table_ext,string file_field_name,string 
         log_error("remove_from() returned error: "+local_server.error(),"dcm",USER);
       }
       if (database == "WGrML" || database == "WObML") {
-        auto tables=MySQL::table_names(local_server,strutils::substitute(database,"W","I"),"ds"+dsnum2+"_inventory_%",error);
+        auto tables=MySQL::table_names(local_server,strutils::substitute(database,"W","I"),"ds"+g_dsnum2+"_inventory_%",error);
         for (const auto& table : tables) {
           local_server._delete(strutils::substitute(database,"W","I")+".`"+table+"`","webID_code = "+file_ID_code);
         }
-        if (local_server._delete(strutils::substitute(database,"W","I")+".ds"+dsnum2+"_inventory_summary","webID_code = "+file_ID_code) == 0) {
+        if (local_server._delete(strutils::substitute(database,"W","I")+".ds"+g_dsnum2+"_inventory_summary","webID_code = "+file_ID_code) == 0) {
           query.set("select tindex from dssdb.wfile where wfile = '"+file+"'");
           if (query.submit(local_server) == 0 && query.num_rows() == 1) {
             query.fetch_row(row);
             if (!row[0].empty() && row[0] != "0") {
-              inv_tindex_set.emplace(row[0]);
+              g_inv_tindex_set.emplace(row[0]);
             }
           }
           create_inv_filelist_cache=true;
         }
       }
       if (database == "WObML") {
-        local_server._delete("I"+database.substr(1)+".ds"+dsnum2+"_dataTypes","webID_code = "+file_ID_code);
-        auto tables=MySQL::table_names(local_server,"I"+database.substr(1),"ds"+dsnum2+"_timeSeries_times_%",error);
+        local_server._delete("I"+database.substr(1)+".ds"+g_dsnum2+"_dataTypes","webID_code = "+file_ID_code);
+        auto tables=MySQL::table_names(local_server,"I"+database.substr(1),"ds"+g_dsnum2+"_timeSeries_times_%",error);
         for (const auto& table : tables) {
           local_server._delete("I"+database.substr(1)+"."+table,"webID_code = "+file_ID_code);
         }
@@ -364,14 +370,14 @@ extern "C" void *t_removed(void *ts) {
   MySQL::LocalQuery query("gindex", "wfile", "wfile = '" + file+"'");
   MySQL::Row row;
   if (query.submit(server_d) == 0 && query.fetch_row(row)) {
-    web_gindex_set.emplace(row[0]);
+    g_web_gindex_set.emplace(row[0]);
   }
   if (file_removed) {
     query.set("tindex", "wfile", "wfile = '" + file + "'");
     if (query.submit(server_d) == 0 && query.num_rows() == 1) {
       query.fetch_row(row);
       if (!row[0].empty() && row[0] != "0") {
-        web_tindex_set.emplace(row[0]);
+        g_web_tindex_set.emplace(row[0]);
       }
     }
     g_create_web_filelist_cache = true;
@@ -504,22 +510,22 @@ int main(int argc, char **argv) {
 */
   g_removed_from_wgrml=false;
   g_removed_from_wobml=false;
-  removed_from_SatML=false;
+  g_removed_from_satml=false;
   g_removed_from_wfixml=false;
   const size_t MAX_NUM_THREADS=6;
-  std::vector<ThreadStruct> threads(MAX_NUM_THREADS);
-  std::vector<pthread_t> tid_list;
-  for (size_t n=0; n < files.size(); ++n) {
+  vector<ThreadStruct> threads(MAX_NUM_THREADS);
+  vector<pthread_t> tid_list;
+  for (size_t n=0; n < g_files.size(); ++n) {
     if (tid_list.size() < MAX_NUM_THREADS) {
       threads[tid_list.size()].strings.clear();
-      threads[tid_list.size()].strings.emplace_back(files[n]);
+      threads[tid_list.size()].strings.emplace_back(g_files[n]);
       threads[tid_list.size()].removed_file_index=n;
       threads[tid_list.size()].file_removed=false;
       pthread_create(&threads[tid_list.size()].tid,nullptr,t_removed,&threads[tid_list.size()]);
       pthread_detach(threads[tid_list.size()].tid);
       tid_list.emplace_back(threads[tid_list.size()].tid);
       if (gatherxml::verbose_operation) {
-        std::cout << "thread created for removal of " << files[n] << " ..." << std::endl;
+        std::cout << "thread created for removal of " << g_files[n] << " ..." << std::endl;
       }
     }
     else {
@@ -531,9 +537,9 @@ int main(int argc, char **argv) {
         for (size_t m=0; m < MAX_NUM_THREADS; ++m) {
           if (pthread_kill(tid_list[m],0) != 0) {
             if (threads[m].file_removed) {
-              files[threads[m].removed_file_index].clear();
+              g_files[threads[m].removed_file_index].clear();
               if (gatherxml::verbose_operation) {
-                std::cout << "File " << files[threads[m].removed_file_index] << "/" << files.size() << " cleared." << std::endl;
+                std::cout << "File " << g_files[threads[m].removed_file_index] << "/" << g_files.size() << " cleared." << std::endl;
               }
             }
             free_tid_idx=m;
@@ -545,14 +551,14 @@ int main(int argc, char **argv) {
         }
       }
       threads[free_tid_idx].strings.clear();
-      threads[free_tid_idx].strings.emplace_back(files[n]);
+      threads[free_tid_idx].strings.emplace_back(g_files[n]);
       threads[free_tid_idx].removed_file_index=n;
       threads[free_tid_idx].file_removed=false;
       pthread_create(&threads[free_tid_idx].tid,nullptr,t_removed,&threads[free_tid_idx]);
       pthread_detach(threads[free_tid_idx].tid);
       tid_list[free_tid_idx]=threads[free_tid_idx].tid;
       if (gatherxml::verbose_operation) {
-        std::cout << "available thread slot at " << free_tid_idx << " found, thread created for removal of " << files[n] << " ..." << std::endl;
+        std::cout << "available thread slot at " << free_tid_idx << " found, thread created for removal of " << g_files[n] << " ..." << std::endl;
       }
     }
   }
@@ -563,9 +569,9 @@ int main(int argc, char **argv) {
       if (tid_list[n] < 0xffffffffffffffff) {
         if (pthread_kill(tid_list[n],0) != 0) {
           if (threads[n].file_removed) {
-            files[threads[n].removed_file_index].clear();
+            g_files[threads[n].removed_file_index].clear();
             if (gatherxml::verbose_operation) {
-              std::cout << "File " << files[threads[n].removed_file_index] << "/" << files.size() << " cleared." << std::endl;
+              std::cout << "File " << g_files[threads[n].removed_file_index] << "/" << g_files.size() << " cleared." << std::endl;
             }
           }
           tid_list[n]=0xffffffffffffffff;
@@ -576,7 +582,7 @@ int main(int argc, char **argv) {
       }
     }
   }
-  for (const auto& gindex : web_gindex_set) {
+  for (const auto& gindex : g_web_gindex_set) {
     gatherxml::detailedMetadata::generate_group_detailed_metadata_view(gindex,"Web","dcm",USER);
   }
   stringstream oss,ess;
@@ -617,7 +623,7 @@ int main(int argc, char **argv) {
     }
     generate_dataset_home_page();
   }
-  if (removed_from_SatML) {
+  if (g_removed_from_satml) {
     if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" -rm",oss,ess) < 0)
       std::cerr << ess.str() << std::endl;
   }
@@ -635,23 +641,23 @@ int main(int argc, char **argv) {
   if (g_create_web_filelist_cache) {
     gatherxml::summarizeMetadata::create_file_list_cache("Web","dcm",USER);
   }
-  for (const auto& tindex : web_tindex_set) {
+  for (const auto& tindex : g_web_tindex_set) {
     gatherxml::summarizeMetadata::create_file_list_cache("Web","dcm",USER,tindex);
   }
   if (create_inv_filelist_cache) {
     gatherxml::summarizeMetadata::create_file_list_cache("inv","dcm",USER);
   }
-  for (const auto& tindex : inv_tindex_set) {
+  for (const auto& tindex : g_inv_tindex_set) {
     gatherxml::summarizeMetadata::create_file_list_cache("inv","dcm",USER,tindex);
   }
-  for (auto it=files.begin(); it != files.end(); ++it) {
+  for (auto it=g_files.begin(); it != g_files.end(); ++it) {
     if (it->empty()) {
-      files.erase(it--);
+      g_files.erase(it--);
     }
   }
-  if (files.size() > 0) {
+  if (!g_files.empty()) {
     std::cerr << "Warning: content metadata for the following files was not removed (maybe it never existed?):";
-    for (const auto& file : files) {
+    for (const auto& file : g_files) {
       std::cerr << " " << file;
     }
     std::cerr << std::endl;
@@ -662,7 +668,7 @@ int main(int argc, char **argv) {
     server.update("dataset","version = version+1","dsid = 'ds"+metautils::args.dsnum+"'");
     server.disconnect();
   }
-  if (files.size() == 0 && local_args.notify) {
+  if (g_files.empty() && local_args.notify) {
     std::cout << "dcm has completed successfully" << std::endl;
   }
 }
