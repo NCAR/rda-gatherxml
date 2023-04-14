@@ -417,7 +417,7 @@ extern "C" void *t_removed(void *ts) {
   auto file_removed = false;
   string file_id_code;
   bool is_version_controlled;
-  auto was_removed = remove_from("WGrML", "_webfiles2", "webID", "wfmd", file,
+  auto was_removed = remove_from("WGrML", "_webfiles2", "id", "wfmd", file,
       ".GrML", file_id_code, is_version_controlled);
   if (was_removed) {
     clear_tables_by_file_id("WGrML", file_id_code, is_version_controlled);
@@ -517,11 +517,6 @@ extern "C" void *t_summarize_grid_levels(void *ts) {
 
 extern "C" void *t_summarize_grid_resolutions(void *) {
   gatherxml::summarizeMetadata::summarize_grid_resolutions("dcm", USER, "");
-  return nullptr;
-}
-
-extern "C" void *t_create_file_list_cache(void *) {
-  gatherxml::summarizeMetadata::create_file_list_cache("MSS", "dcm", USER);
   return nullptr;
 }
 
