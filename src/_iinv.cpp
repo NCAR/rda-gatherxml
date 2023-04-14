@@ -338,12 +338,14 @@ void build_wms_capabilities() {
           ofs << "          <Layer>" << endl;
           ofs << "            <Title>" << pmapper.description(dfmt, pcod) <<
               "</Title>" << endl;
+
           q.set("select distinct valid_date from IGrML.`ds" + local_args.
               dsnum2 + "_inventory_" + fcod + "!" + pcod + "` as i left join "
               "WGrML.ds" + local_args.dsnum2 + "_webfiles2 as w on w.code = "
               "i.webID_code where timeRange_code = " + tcod + " and "
               "gridDefinition_code = " + gcod + " and level_code = " +
-              level_code + " and webID = '" + dfil + "' order by valid_date");
+              level_code + " and w.id = '" + dfil + "' order by valid_date");
+
           if (q.submit(server) == 0) {
             for (const auto& r : q) {
               ofs << "            <Layer queryable=\"0\">" << endl;
@@ -415,7 +417,7 @@ void build_wms_capabilities() {
               "WGrML.ds" + local_args.dsnum2 + "_webfiles2 as w on w.code = "
               "i.webID_code where timeRange_code = " + tcod + " and "
               "gridDefinition_code = " + gcod + " and level_code = " + lcod +
-              " and webID = '" + dfil + "' order by valid_date");
+              " and w.id = '" + dfil + "' order by valid_date");
           if (q.submit(server) == 0) {
             for (const auto& r : q) {
               ofs << "            <Layer queryable=\"0\">" << endl;
@@ -477,14 +479,14 @@ void insert_grml_inventory() {
   MySQL::LocalQuery q("select code,format_code,tindex from WGrML.ds" +
       local_args.dsnum2 + "_webfiles2 as w left join dssdb.wfile as x on "
       "(x.dsid = 'ds" + metautils::args.dsnum + "' and x.type = 'D' and "
-      "x.wfile = w.webID) where webID = '" + wid + "'");
+      "x.wfile = w.id) where w.id = '" + wid + "'");
   if (q.submit(server) < 0) {
     log_error2("insert_grml_inventory() returned error: " + q.error() +
         " while looking for code from webfiles", F, "iinv", USER);
   }
   if (q.num_rows() == 0) {
-    log_error2("insert_grml_inventory() did not find " + wid + " in WGrML.ds" +
-        local_args.dsnum2 + "_webfiles2", F, "iinv", USER);
+    log_error2("did not find " + wid + " in WGrML.ds" + local_args.dsnum2 +
+        "_webfiles2", F, "iinv", USER);
   }
   MySQL::Row row;
   q.fetch_row(row);
@@ -507,13 +509,16 @@ void insert_grml_inventory() {
   int nlin = 0, ndup = 0;
   long long tbyts = 0;
   vector<std::pair<string, int>> trv;
-  vector<string> glst, llst, plst, rlst, elst, pclst;
+  vector<string> pclst;
+  unordered_map<string, string> glst, llst, plst, rlst, elst;
   char line[32768];
+  auto hdr_re = regex("<!>");
+  auto inv_re = regex("\\|");
   ifs.getline(line, 32768);
   while (!ifs.eof()) {
     ++nlin;
     string s = line;
-    if (regex_search(s, regex("<!>"))) {
+    if (regex_search(s, hdr_re)) {
       auto sp = split(s, "<!>");
       switch (sp[0][0]) {
         case 'U': {
@@ -698,7 +703,7 @@ void insert_grml_inventory() {
                 "iinv", USER);
           }
           q.fetch_row(row);
-          glst.emplace_back(row[0]);
+          glst.emplace(sp[1], row[0]);
           break;
         }
         case 'L': {
@@ -738,11 +743,11 @@ void insert_grml_inventory() {
                 "'", F, "iinv", USER);
           }
           q.fetch_row(row);
-          llst.emplace_back(row[0]);
+          llst.emplace(sp[1], row[0]);
           break;
         }
         case 'P': {
-          plst.emplace_back(sp[2]);
+          plst.emplace(sp[1], sp[2]);
           auto pcod = fc + "!" + sp[2];
           if (!MySQL::table_exists(server, "IGrML.ds" + local_args.dsnum2 +
               "_inventory_" + pcod)) {
@@ -769,15 +774,15 @@ void insert_grml_inventory() {
           break;
         }
         case 'R': {
-          rlst.emplace_back(sp[2]);
+          rlst.emplace(sp[1], sp[2]);
           break;
         }
         case 'E': {
-          elst.emplace_back(sp[2]);
+          elst.emplace(sp[1], sp[2]);
           break;
         }
       }
-    } else if (regex_search(s, regex("\\|"))) {
+    } else if (regex_search(s, inv_re)) {
       auto sp_i = split(s, "|");
       tbyts += stoll(sp_i[1]);
       auto t = stoi(sp_i[3]);
@@ -805,20 +810,20 @@ void insert_grml_inventory() {
       }
       stringstream iss;
       iss << wic << ", " << sp_i[0] << ", " << sp_i[1] << ", " << sp_i[2] <<
-          ", " << idat << ", " << trv[t].first << ", " << glst[stoi(sp_i[4])] <<
-          ", " << llst[stoi(sp_i[5])] << ", ";
+          ", " << idat << ", " << trv[t].first << ", " << glst[sp_i[4]] << ", "
+          << llst[sp_i[5]] << ", ";
       if (sp_i.size() > 7 && !sp_i[7].empty()) {
-        iss << "'" << rlst[stoi(sp_i[7])] << "',";
+        iss << "'" << rlst[sp_i[7]] << "',";
       } else {
         iss << "'', ";
       }
       if (sp_i.size() > 8 && !sp_i[8].empty()) {
-        iss << "'" << elst[stoi(sp_i[8])] << "'";
+        iss << "'" << elst[sp_i[8]] << "'";
       } else {
         iss << "''";
       }
       iss << ", '" << uflg << "'";
-      auto pcode = fc + "!" + plst[stoi(sp_i[6])];
+      auto pcode = fc + "!" + plst[sp_i[6]];
       if (server.insert("IGrML.`ds" + local_args.dsnum2 + "_inventory_" + pcode
           + "`", "webID_code, byte_offset, byte_length, valid_date, init_date, "
           "timeRange_code, gridDefinition_code, level_code, process, ensemble, "
@@ -831,15 +836,15 @@ void insert_grml_inventory() {
           stringstream dss;
           dss << "webID_code = " << wic << " and valid_date = " << sp_i[2] <<
               " and timeRange_code = " << trv[t].first << " and "
-              "gridDefinition_code = " << glst[stoi(sp_i[4])] << " and "
-              "level_code = " << llst[stoi(sp_i[5])];
+              "gridDefinition_code = " << glst[sp_i[4]] << " and level_code = "
+              << llst[sp_i[5]];
           if (sp_i.size() > 7 && !sp_i[7].empty()) {
-            dss << " and process = '" << rlst[stoi(sp_i[7])] << "'";
+            dss << " and process = '" << rlst[sp_i[7]] << "'";
           } else {
             dss << " and process = ''";
           }
           if (sp_i.size() > 8 && !sp_i[8].empty()) {
-            dss << " and ensemble = '" << elst[stoi(sp_i[8])] << "'";
+            dss << " and ensemble = '" << elst[sp_i[8]] << "'";
           } else {
             dss << " and ensemble = ''";
           }
