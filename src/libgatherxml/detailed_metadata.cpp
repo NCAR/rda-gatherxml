@@ -608,90 +608,28 @@ void add_to_formats(XMLDocument& xdoc, string database, string primaries_table,
 }
 
 string parameter_query(MySQL::Server& mysrv, const DBData& dbdata, string
-    format_code, string group_index, size_t format_query_result_size) {
+    format_code, size_t format_query_result_size) {
   auto d2 = substitute(metautils::args.dsnum, ".", "");
-  if (!group_index.empty()) {
-    if (format_query_result_size > 1) {
-      if (field_exists(mysrv, dbdata.db + ".ds" + d2 + dbdata.table, "dsid")) {
-        return "select a.parameter, a.level_type_codes, min(a.start_date), max("
-            "a.end_date) from " + dbdata.db + ".ds" + d2 + dbdata.table + " as "
-            "p left join dssdb." + dbdata.dtable + " as x on (x." + dbdata.
-            dtable + " = p." + dbdata.id_type + "ID and x.type = p.type and x."
-            "dsid = p.dsid) left join " + dbdata.db + ".ds" + d2 + "_agrids2 "
-            "as a on a.file_code = p.code where p.format_code = " + format_code
-            + " and !isnull(x." + dbdata.dtable + ") and x.gindex = " +
-            group_index + " group by a.parameter, a.level_type_codes";
-      }
-      return "select a.parameter, a.level_type_codes, min(a.start_date), max(a."
-          "end_date) from " + dbdata.db + ".ds" + d2 + dbdata.table + " as p "
-          "left join dssdb." + dbdata.dtable + " as x on x." + dbdata.dtable +
-          " = p." + dbdata.id_type + "ID left join " + dbdata.db + ".ds" + d2 +
-          "_agrids2 as a on a.file_code = p.code where p.format_code = " +
-          format_code + " and !isnull(x." + dbdata.dtable + ") and x.gindex = "
-          + group_index + " group by a.parameter, a.level_type_codes";
-    } else {
-      if (field_exists(mysrv, dbdata.db + ".ds" + d2 + dbdata.table, "dsid")) {
-        return "select a.parameter, a.level_type_codes, min(a.start_date), max("
-            "a.end_date) from " + dbdata.db + ".ds" + d2 + dbdata.table + " as "
-            "p left join dssdb." + dbdata.dtable + " as x on (x." + dbdata.
-            dtable + " = p." + dbdata.id_type + "ID and x.type = p.type and x."
-            "dsid = p.dsid) left join " + dbdata.db + ".ds" + d2 + "_agrids2 "
-            "as a on a.file_code = p.code where !isnull(x." + dbdata.dtable +
-            ") and x.gindex = " + group_index + " group by a.parameter, a."
-            "level_type_codes";
-      }
-      return "select a.parameter, a.level_type_codes, min(a.start_date), max(a."
-          "end_date) from " + dbdata.db + ".ds" + d2 + dbdata.table + " as p "
-          "left join dssdb." + dbdata.dtable + " as x on x." + dbdata.dtable +
-          " = p." + dbdata.id_type + "ID left join " + dbdata.db + ".ds" + d2 +
-          "_agrids2 as a on a.file_code = p.code where !isnull(x." + dbdata.
-          dtable + ") and x.gindex = " + group_index + " group by a.parameter, "
-          "a.level_type_codes";
-    }
-  } else {
-    if (format_query_result_size > 1) {
-      return "select a.parameter, a.level_type_codes, min(a.start_date), max(a."
-          "end_date) from " + dbdata.db + ".ds" + d2 + "_agrids2 as a left "
-          "join " + dbdata.db + ".ds" + d2 + dbdata.table + " as p on p.code = "
-          "a.file_code where p.format_code = " + format_code + " group by a."
-          "parameter, a.level_type_codes";
-    }
-    return "select parameter, level_type_codes, min(start_date), max(end_date) "
-        "from " + dbdata.db + ".ds" + d2 + "_agrids2 group by parameter, "
-        "level_type_codes";
+  if (format_query_result_size > 1) {
+    return "select a.parameter, a.level_type_codes, min(a.start_date), max(a."
+        "end_date) from " + dbdata.db + ".ds" + d2 + "_agrids2 as a left join "
+        + dbdata.db + ".ds" + d2 + dbdata.table + " as p on p.code = a."
+        "file_code where p.format_code = " + format_code + " group by a."
+        "parameter, a.level_type_codes";
   }
+  return "select parameter, level_type_codes, min(start_date), max(end_date) "
+      "from " + dbdata.db + ".ds" + d2 + "_agrids2 group by parameter, "
+      "level_type_codes";
 }
 
 string time_range_query(MySQL::Server& mysrv, const DBData& dbdata, string
-    format_code, string group_index) {
+    format_code) {
   auto d2 = substitute(metautils::args.dsnum, ".", "");
-  if (group_index.empty()) {
-    return "select distinct t.timeRange, d.definition, d.defParams from " +
-        dbdata.db + ".summary as s left join " + dbdata.db + ".timeRanges as t "
-        "on t.code = s.timeRange_code left join " + dbdata.db +
-        ".gridDefinitions as d on d.code = s.gridDefinition_code where s.dsid "
-        "= '" + metautils::args.dsnum + "' and format_code = " + format_code;
-  }
-  if (field_exists(mysrv, dbdata.db + ".ds" + d2 + dbdata.table, "dsid")) {
-    return "select distinct t.timeRange, d.definition, d.defParams from " +
-        dbdata.db + ".ds" + d2 + dbdata.table + " as p left join dssdb." +
-        dbdata.dtable + " as x on (x." + dbdata.dtable + " = p." + dbdata.
-        id_type + "ID and x.type = p.type and x.dsid = p.dsid) left join " +
-        dbdata.db + ".ds" + d2 + "_grids2 as g on g.file_code = p.code left "
-        "join " + dbdata.db + ".timeRanges as t on t.code = g.time_range_code "
-        "left join " + dbdata.db + ".gridDefinitions as d on d.code = g."
-        "grid_definition_code where p.format_code = " + format_code + " and "
-        "!isnull(x." + dbdata.dtable + ") and x.gindex = " + group_index;
-  }
-  return "select distinct t.timeRange, d.definition, d.defParams from (select "
-      "p.code from " + dbdata.db + ".ds" + d2 + dbdata.table + " as p left "
-      "join dssdb." + dbdata.dtable + " as x on x." + dbdata.dtable + " = p." +
-      dbdata.id_type + "ID where p.format_code = " + format_code + " and "
-      "!isnull(x." + dbdata.dtable + ") and x.gindex = " + group_index + ") as "
-      "p left join " + dbdata.db + ".ds" + d2 + "_grids2 as g on g.file_code = "
-      "p.code left join " + dbdata.db + ".timeRanges as t on t.code = g."
-      "time_range_code left join " + dbdata.db + ".gridDefinitions as d on d."
-      "code = g.grid_definition_code";
+  return "select distinct t.timeRange, d.definition, d.defParams from " +
+      dbdata.db + ".summary as s left join " + dbdata.db + ".timeRanges as t "
+      "on t.code = s.timeRange_code left join " + dbdata.db +
+      ".gridDefinitions as d on d.code = s.gridDefinition_code where s.dsid = "
+      "'" + metautils::args.dsnum + "' and format_code = " + format_code;
 }
 
 void write_grid_html(ofstream& ofs, size_t num_products) {
@@ -811,8 +749,8 @@ void write_grid_html(ofstream& ofs, size_t num_products) {
 }
 
 void generate_gridded_product_detail(MySQL::Server& mysrv, const DBData& dbdata,
-    string file_type, string group_index, const vector<pair<string, string>>&
-    format_list, TempDir& tdir, string caller, string user) {
+    string file_type, const vector<pair<string, string>>& format_list, TempDir&
+    tdir, string caller, string user) {
   static const string F = this_function_label(__func__);
   MySQL::LocalQuery q;
   q.set("timeRange, code", dbdata.db + ".timeRanges");
@@ -860,21 +798,17 @@ void generate_gridded_product_detail(MySQL::Server& mysrv, const DBData& dbdata,
   }
   for (const auto& fp : format_list) {
     MySQL::Query qs;
-    if (!group_index.empty()) {
-      qs.set("");
+    auto d2 = substitute(metautils::args.dsnum, ".", "");
+    if (format_list.size() > 1) {
+      qs.set("select a.time_range_codes, a.grid_definition_codes, min(a."
+          "start_date), max(a.end_date) from " + dbdata.db + ".ds" + d2 +
+          "_agrids2 as a left join " + dbdata.db + ".ds" + d2 + dbdata.table +
+          " as p on p.code = a.file_code where p.format_code = " + fp.second +
+          " group by a.time_range_codes, a.grid_definition_codes");
     } else {
-      auto d2 = substitute(metautils::args.dsnum, ".", "");
-      if (format_list.size() > 1) {
-        qs.set("select a.time_range_codes, a.grid_definition_codes, min(a."
-            "start_date), max(a.end_date) from " + dbdata.db + ".ds" + d2 +
-            "_agrids2 as a left join " + dbdata.db + ".ds" + d2 + dbdata.table +
-            " as p on p.code = a.file_code where p.format_code = " + fp.second +
-            " group by a.time_range_codes, a.grid_definition_codes");
-      } else {
-        qs.set("select time_range_codes, grid_definition_codes, min("
-            "start_date), max(end_date) from " + dbdata.db + ".ds" + d2 +
-            "_agrids2 group by time_range_codes, grid_definition_codes");
-      }
+      qs.set("select time_range_codes, grid_definition_codes, min(start_date), "
+          "max(end_date) from " + dbdata.db + ".ds" + d2 + "_agrids2 group by "
+          "time_range_codes, grid_definition_codes");
     }
 #ifdef DUMP_QUERIES
     {
@@ -942,13 +876,9 @@ void generate_gridded_product_detail(MySQL::Server& mysrv, const DBData& dbdata,
         "cellpadding=\"5\" border=\"0\"><tr><th class=\"headerRow\" colspan="
         "\"2\" align=\"center\">Summary for Grids in " << to_capital(f) <<
         " Format</th></tr>" << endl;
-    if (group_index.empty()) {
-      q.set("select distinct parameter, levelType_codes from " + dbdata.db +
-          ".summary where dsid = '" + metautils::args.dsnum + "' and "
-          "format_code = " + fp.second);
-    } else {
-      q.set("");
-    }
+    q.set("select distinct parameter, levelType_codes from " + dbdata.db +
+        ".summary where dsid = '" + metautils::args.dsnum + "' and format_code "
+        "= " + fp.second);
 #ifdef DUMP_QUERIES
     {
     Timer tm;
@@ -1010,9 +940,6 @@ void generate_gridded_product_detail(MySQL::Server& mysrv, const DBData& dbdata,
             "transform?dsnum=" << metautils::args.dsnum << "&view=varlev&"
             "formatCode=" << fp.second << "&ftype=" << strutils::to_lower(
             file_type);
-        if (!group_index.empty()) {
-          ofs << "&gindex=" << group_index;
-        }
         ofs << "&tcode=" << ps.code << "')\">" << ps.description << "</a>";
       } else {
         ofs << ps.description;
@@ -1049,9 +976,8 @@ void generate_gridded_product_detail(MySQL::Server& mysrv, const DBData& dbdata,
   ofs.close();
 }
 
-void generate_detailed_grid_summary(string file_type, string group_index,
-    ofstream& ofs, const vector<pair<string, string>>& format_list, string
-    caller, string user) {
+void generate_detailed_grid_summary(string file_type, ofstream& ofs, const
+    vector<pair<string, string>>& format_list, string caller, string user) {
   static const string F = this_function_label(__func__);
   TempDir t;
   if (!t.create(metautils::directives.temp_path)) {
@@ -1091,8 +1017,7 @@ void generate_detailed_grid_summary(string file_type, string group_index,
       directives.metadb_username, metautils::directives.metadb_password, "");
   MySQL::LocalQuery q;
   for (const auto& fp : format_list) {
-    q.set(parameter_query(mysrv, dbdata, fp.second, group_index, format_list.
-        size()));
+    q.set(parameter_query(mysrv, dbdata, fp.second, format_list.size()));
 #ifdef DUMP_QUERIES
     {
     Timer tm;
@@ -1214,8 +1139,7 @@ void generate_detailed_grid_summary(string file_type, string group_index,
         "cellpadding=\"5\" border=\"0\"><tr><th class=\"headerRow\" colspan=\""
         << ncols << "\" align=\"center\">Summary for Grids in " << strutils::
         to_capital(f) << " Format</th></tr>" << endl;
-    MySQL::LocalQuery q(time_range_query(mysrv, dbdata, fp.second,
-        group_index));
+    MySQL::LocalQuery q(time_range_query(mysrv, dbdata, fp.second));
 #ifdef DUMP_QUERIES
     {
     Timer tm;
@@ -1294,9 +1218,6 @@ void generate_detailed_grid_summary(string file_type, string group_index,
             "transform?dsnum=" << metautils::args.dsnum << "&view=prodcov&"
             "formatCode=" << fp.second << "&ftype=" << strutils::to_lower(
             file_type);
-        if (!group_index.empty()) {
-          ofs_p << "&gindex=" << group_index;
-        }
         for (const auto& e : pdmap[k].parameter_codes) {
           ofs_p << "&pcode=" << e;
         }
@@ -1426,9 +1347,6 @@ void generate_detailed_grid_summary(string file_type, string group_index,
             "0)\" onClick=\"popModalWindowWithGetUrl('/cgi-bin/transform?dsnum="
             << metautils::args.dsnum << "&view=prodcov&formatCode=" << fp.second
             << "&ftype=" << strutils::to_lower(file_type);
-        if (!group_index.empty()) {
-          ofs_l << "&gindex=" << group_index;
-        }
         for (auto& e : clmap[key].map_list) {
           ofs_l << "&map=" << e;
         }
@@ -1484,8 +1402,8 @@ void generate_detailed_grid_summary(string file_type, string group_index,
   ofs_p.close();
   ofs_l.close();
   if (pfv.size() > 0) {
-    generate_gridded_product_detail(mysrv, dbdata, file_type, group_index,
-        format_list, t, caller, user);
+    generate_gridded_product_detail(mysrv, dbdata, file_type, format_list, t,
+        caller, user);
   }
   mysrv.disconnect();
   string e;
@@ -1497,9 +1415,9 @@ void generate_detailed_grid_summary(string file_type, string group_index,
   write_grid_html(ofs, pfv.size());
 }
 
-void generate_detailed_observation_summary(string file_type, string group_index,
-    ofstream& ofs, const vector<pair<string, string>>& format_list, string
-    caller, string user) {
+void generate_detailed_observation_summary(string file_type, ofstream& ofs,
+    const vector<pair<string, string>>& format_list, string caller, string
+    user) {
   static const string F = this_function_label(__func__);
   TempDir t;
   if (!t.create(metautils::directives.temp_path)) {
@@ -1545,56 +1463,27 @@ void generate_detailed_observation_summary(string file_type, string group_index,
         "Coverage</b><br>(each dot represents a 3&deg; box containing one or "
         "more observations)</td></tr>" << endl;
     MySQL::Query query;
-    if (group_index.empty()) {
-      if (MySQL::table_exists(mysrv, dbdata.db + ".ds" + d2 + "_dataTypes2")) {
-        query.set("select distinct platformType, obsType, dataType, min("
-            "start_date),max(end_date) from " + dbdata.db + ".ds" + d2 +
-            "_dataTypes2 as d left join " + dbdata.db + ".ds" + d2 +
-            "_dataTypesList as l on l.code = d.dataType_code left join " +
-            dbdata.db + ".ds" + d2 + dbdata.table + " as p on p.code = d." +
-            dbdata.id_type + "ID_code left join " + dbdata.db +
-            ".platformTypes as t on t.code = l.platformType_code left join " +
-            dbdata.db + ".obsTypes as o on o.code = l.observationType_code "
-            "where p.format_code = " + fp.second + " group by platformType, "
-            "obsType, dataType order by platformType, obsType, dataType");
-      } else {
-        query.set("select distinct platformType, obsType, dataType, min("
-            "start_date), max(end_date) from " + dbdata.db + ".ds" + d2 +
-            "_dataTypes as d left join " + dbdata.db + ".ds" + d2 + dbdata.
-            table + " as p on p.code = d." + dbdata.id_type + "ID_code left "
-            "join " + dbdata.db + ".platformTypes as t on t.code = d."
-            "platformType_code left join " + dbdata.db + ".obsTypes as o on o."
-            "code = d.observationType_code where p.format_code = " + fp.second +
-            " group by platformType, obsType, dataType order by platformType, "
-            "obsType, dataType");
-      }
+    if (MySQL::table_exists(mysrv, dbdata.db + ".ds" + d2 + "_dataTypes2")) {
+      query.set("select distinct platformType, obsType, dataType, min("
+          "start_date),max(end_date) from " + dbdata.db + ".ds" + d2 +
+          "_dataTypes2 as d left join " + dbdata.db + ".ds" + d2 +
+          "_dataTypesList as l on l.code = d.dataType_code left join " + dbdata.
+          db + ".ds" + d2 + dbdata.table + " as p on p.code = d." + dbdata.
+          id_type + "ID_code left join " + dbdata.db + ".platformTypes as t on "
+          "t.code = l.platformType_code left join " + dbdata.db + ".obsTypes "
+          "as o on o.code = l.observationType_code where p.format_code = " + fp.
+          second + " group by platformType, obsType, dataType order by "
+          "platformType, obsType, dataType");
     } else {
-      if (MySQL::table_exists(mysrv, dbdata.db + ".ds" + d2 + "_dataTypes2")) {
-        query.set("select distinct platformType, obsType, dataType, min("
-            "start_date), max(end_date) from " + dbdata.db + ".ds" + d2 +
-            dbdata.table + " as p left join dssdb." + dbdata.dtable + " as x "
-            "on x." + dbdata.dtable + " = p." + dbdata.id_type + "ID left join "
-            + dbdata.db + ".ds" + d2 + "_dataTypes2 as d on d." + dbdata.id_type
-            + "ID_code = p.code left join " + dbdata.db + ".ds" + d2 +
-            "_dataTypesList as l on l.code = d.dataType_code left join " +
-            dbdata.db + ".platformTypes as t on t.code = l.platformType_code "
-            "left join " + dbdata.db + ".obsTypes as o on o.code = l."
-            "observationType_code where x.gindex = " + group_index + " and p."
-            "format_code = " + fp.second + " group by platformType, obsType, "
-            "dataType order by platformType, obsType, dataType");
-      } else {
-        query.set("select distinct platformType, obsType, dataType, min("
-            "start_date), max(end_date) from " + dbdata.db + ".ds" + d2 +
-            dbdata.table + " as p left join dssdb." + dbdata.dtable + " as x "
-            "on x." + dbdata.dtable + " = p." + dbdata.id_type + "ID left join "
-            + dbdata.db + ".ds" + d2 + "_dataTypes as d on d." + dbdata.id_type
-            + "ID_code = p.code left join " + dbdata.db + ".platformTypes as t "
-            "on t.code = d.platformType_code left join " + dbdata.db +
-            ".obsTypes as o on o.code = d.observationType_code where x.gindex "
-            "= " + group_index + " and p.format_code = " + fp.second + " group "
-            "by platformType, obsType, dataType order by platformType, "
-            "obsType, dataType");
-      }
+      query.set("select distinct platformType, obsType, dataType, min("
+          "start_date), max(end_date) from " + dbdata.db + ".ds" + d2 +
+          "_dataTypes as d left join " + dbdata.db + ".ds" + d2 + dbdata.table +
+          " as p on p.code = d." + dbdata.id_type + "ID_code left join " +
+          dbdata.db + ".platformTypes as t on t.code = d.platformType_code "
+          "left join " + dbdata.db + ".obsTypes as o on o.code = d."
+          "observationType_code where p.format_code = " + fp.second + " group "
+          "by platformType, obsType, dataType order by platformType, obsType, "
+          "dataType");
     }
     if (query.submit(mysrv) < 0) {
       log_error2("'" + query.error() + "' for '" + query.show() + "'", F,
@@ -1647,60 +1536,29 @@ void generate_detailed_observation_summary(string file_type, string group_index,
         }
       }
     }
-    if (group_index.empty()) {
-      if (field_exists(mysrv, dbdata.db + ".ds" + d2 + dbdata.table,
-          "min_obs_per")) {
-        query.set("select any_value(l.platformType), any_value(o.obsType), min("
-            "f.min_obs_per), max(f.max_obs_per), f.unit from " + dbdata.db +
-            ".ds" + d2 + dbdata.table + " as p join " + dbdata.db + ".ds" + d2 +
-            "_frequencies as f on p.code = f." + dbdata.id_type + "ID_code "
-            "left join " + dbdata.db + ".obsTypes as o on o.code = f."
-            "observationType_code left join " + dbdata.db + ".platformTypes as "
-            "l on l.code = f.platformType_code left join WObML.frequency_sort "
-            "as s on s.keyword = f.unit where p.format_code = " + fp.second +
-            " group by f.observationType_code, f.platformType_code, f.unit, s."
-            "idx order by s.idx");
-      } else {
-        query.set("select any_value(l.platformType), any_value(o.obsType), min("
-            "f.avg_obs_per), max(f.avg_obs_per), f.unit from " + dbdata.db +
-            ".ds" + d2 + dbdata.table + " as p join " + dbdata.db + ".ds" + d2 +
-            "_frequencies as f on p.code = f." + dbdata.id_type + "ID_code "
-            "left join " + dbdata.db + ".obsTypes as o on o.code = f."
-            "observationType_code left join " + dbdata.db + ".platformTypes as "
-            "l on l.code = f.platformType_code left join WObML.frequency_sort "
-            "as s on s.keyword = f.unit where p.format_code = " + fp.second +
-            " group by f.observationType_code, f.platformType_code, f.unit, s."
-            "idx order by s.idx");
-      }
+    if (field_exists(mysrv, dbdata.db + ".ds" + d2 + dbdata.table,
+        "min_obs_per")) {
+      query.set("select any_value(l.platformType), any_value(o.obsType), min("
+          "f.min_obs_per), max(f.max_obs_per), f.unit from " + dbdata.db + ".ds"
+          + d2 + dbdata.table + " as p join " + dbdata.db + ".ds" + d2 +
+          "_frequencies as f on p.code = f." + dbdata.id_type + "ID_code left "
+          "join " + dbdata.db + ".obsTypes as o on o.code = f."
+          "observationType_code left join " + dbdata.db + ".platformTypes as l "
+          "on l.code = f.platformType_code left join WObML.frequency_sort as s "
+          "on s.keyword = f.unit where p.format_code = " + fp.second + " group "
+          "by f.observationType_code, f.platformType_code, f.unit, s.idx order "
+          "by s.idx");
     } else {
-      if (field_exists(mysrv, dbdata.db + ".ds" + d2 + dbdata.table,
-          "min_obs_per")) {
-        query.set("select any_value(l.platformType), any_value(o.obsType), min("
-            "f.min_obs_per), max(f.max_obs_per), f.unit from " + dbdata.db +
-            ".ds" + d2 + dbdata.table + " as p left join dssdb." + dbdata.
-            dtable + " as x on x." + dbdata.dtable + " = p." + dbdata.id_type +
-            "ID left join " + dbdata.db + ".ds" + d2 + "_frequencies as f on p."
-            "code = f." + dbdata.id_type + "ID_code left join " + dbdata.db +
-            ".obsTypes as o on o.code = f.observationType_code left join " +
-            dbdata.db + ".platformTypes as l on l.code = f.platformType_code "
-            "left join WObML.frequency_sort as s on s.keyword = f.unit where x."
-            "gindex = " + group_index + " and p.format_code = " + fp.second +
-            " group by f.observationType_code, f.platformType_code, f.unit, s."
-            "idx order by s.idx");
-      } else {
-        query.set("select any_value(l.platformType), any_value(o.obsType), min("
-            "f.avg_obs_per), max(f.avg_obs_per), f.unit from " + dbdata.db +
-            ".ds" + d2 + dbdata.table + " as p left join dssdb." + dbdata.
-            dtable + " as x on x." + dbdata.dtable + " = p." + dbdata.id_type +
-            "ID left join " + dbdata.db + ".ds" + d2 + "_frequencies as f on p."
-            "code = f." + dbdata.id_type + "ID_code left join " + dbdata.db +
-            ".obsTypes as o on o.code = f.observationType_code left join " +
-            dbdata.db + ".platformTypes as l on l.code = f.platformType_code "
-            "left join WObML.frequency_sort as s on s.keyword = f.unit where x."
-            "gindex = " + group_index + " and p.format_code = " + fp.second +
-            " group by f.observationType_code, f.platformType_code, f.unit, s."
-            "idx order by s.idx");
-      }
+      query.set("select any_value(l.platformType), any_value(o.obsType), min("
+          "f.avg_obs_per), max(f.avg_obs_per), f.unit from " + dbdata.db + ".ds"
+          + d2 + dbdata.table + " as p join " + dbdata.db + ".ds" + d2 +
+          "_frequencies as f on p.code = f." + dbdata.id_type + "ID_code left "
+          "join " + dbdata.db + ".obsTypes as o on o.code = f."
+          "observationType_code left join " + dbdata.db + ".platformTypes as l "
+          "on l.code = f.platformType_code left join WObML.frequency_sort as s "
+          "on s.keyword = f.unit where p.format_code = " + fp.second + " group "
+          "by f.observationType_code, f.platformType_code, f.unit, s.idx order "
+          "by s.idx");
     }
     if (query.submit(mysrv) < 0)
       log_error2("'" + query.error() + "' for '" + query.show() + "'", F,
@@ -1754,10 +1612,10 @@ void generate_detailed_observation_summary(string file_type, string group_index,
         ofs_o << "</ul></td><td align=\"center\">" << dateutils::
             string_ll_to_date_string(te2.start) << " to " << dateutils::
             string_ll_to_date_string(te2.end);
-        if (group_index.empty() && unixutils::exists_on_server(metautils::
-            directives.web_server, "/data/web/datasets/ds" + metautils::args.
-            dsnum + "/metadata/" + te2.key + "." + e.second.key + ".kml",
-            metautils::directives.rdadata_home)) {
+        if (unixutils::exists_on_server(metautils::directives.web_server,
+            "/data/web/datasets/ds" + metautils::args.dsnum + "/metadata/" +
+            te2.key + "." + e.second.key + ".kml", metautils::directives.
+            rdadata_home)) {
           ofs_o << "&nbsp;<a href=\"/datasets/ds" << metautils::args.dsnum <<
               "/metadata/" << te2.key << "." << e.second.key << ".kml\"><img "
               "src=\"/images/kml.gif\" width=\"36\" height=\"14\" hspace=\"3\" "
@@ -1767,9 +1625,6 @@ void generate_detailed_observation_summary(string file_type, string group_index,
         ofs_o << "<br><img src=\"/datasets/ds" << metautils::args.dsnum <<
             "/metadata/spatial_coverage." << substitute(data_format," ","_") <<
             "_" << dbdata.id_type;
-        if (!group_index.empty()) {
-          ofs_o << "_gindex_" << group_index;
-        }
         ofs_o << "_" << key2 << "." << e.second.key << ".gif?" << strand(5) <<
             "\"></td></tr>" << endl;
         te2.type_table_keys->clear();
@@ -1794,9 +1649,8 @@ void generate_detailed_observation_summary(string file_type, string group_index,
   }
 }
 
-void generate_detailed_fix_summary(string file_type, string group_index,
-    ofstream& ofs, const vector<pair<string, string>>& format_list, string
-    caller, string user) {
+void generate_detailed_fix_summary(string file_type, ofstream& ofs, const
+    vector<pair<string, string>>& format_list, string caller, string user) {
   static const string F = this_function_label(__func__);
   DBData dbdata;
   if (file_type == "Web") {
@@ -1816,10 +1670,7 @@ void generate_detailed_fix_summary(string file_type, string group_index,
     auto cindex=0;
     ofs << "<tr class=\"bg2\" valign=\"top\"><th align=\"left\">Cyclone Classification</th><td align=\"left\"><b>Average Frequency of Data</b><br>(may vary by individual cyclone ID)</td><td align=\"left\"><b>Temporal/Geographical Coverage</b><br>(each dot represents a 3&deg; box containing one or more fixes)</td></tr>" << endl;
     MySQL::Query query;
-    if (group_index.empty())
-      query.set("select distinct classification,min(l.start_date),max(l.end_date) from "+dbdata.db+".ds"+d2+"_locations as l left join "+dbdata.db+".ds"+d2+dbdata.table+" as p on p.code = l."+dbdata.id_type+"ID_code left join "+dbdata.db+".classifications as c on c.code = l.classification_code where p.format_code = "+fp.second+" group by classification order by classification");
-    else
-      query.set("select distinct classification,min(l.start_date),max(l.end_date) from "+dbdata.db+".ds"+d2+dbdata.table+" as p left join dssdb."+dbdata.dtable+" as x on x."+dbdata.dtable+" = p."+dbdata.id_type+"ID left join "+dbdata.db+".ds"+d2+"_locations as l on l."+dbdata.id_type+"ID_code = p.code left join "+dbdata.db+".classifications as c on c.code = l.classification_code where x.gindex = "+group_index+" and p.format_code = "+fp.second+" group by classification order by classification");
+    query.set("select distinct classification,min(l.start_date),max(l.end_date) from "+dbdata.db+".ds"+d2+"_locations as l left join "+dbdata.db+".ds"+d2+dbdata.table+" as p on p.code = l."+dbdata.id_type+"ID_code left join "+dbdata.db+".classifications as c on c.code = l.classification_code where p.format_code = "+fp.second+" group by classification order by classification");
     if (query.submit(server) < 0) {
       log_error2("'" + query.error() + "' for '" + query.show() + "'", F,
           caller, user);
@@ -1843,12 +1694,7 @@ void generate_detailed_fix_summary(string file_type, string group_index,
         platform_table.replace(te);
       }
     }
-    if (group_index.empty()) {
-      query.set("select any_value(c.classification),min(f.min_obs_per),max(f.max_obs_per),f.unit from "+dbdata.db+".ds"+d2+dbdata.table+" as p left join "+dbdata.db+".ds"+d2+"_frequencies as f on p.code = f."+dbdata.id_type+"ID_code left join "+dbdata.db+".classifications as c on c.code = f.classification_code left join WObML.frequency_sort as s on s.keyword = f.unit where p.format_code = "+fp.second+" group by f.classification_code,f.unit,s.idx order by s.idx");
-    }
-    else {
-      query.set("select any_value(c.classification),min(f.min_obs_per),max(f.max_obs_per),f.unit from "+dbdata.db+".ds"+d2+dbdata.table+" as p left join dssdb."+dbdata.dtable+" as x on x."+dbdata.dtable+" = p."+dbdata.id_type+"ID left join "+dbdata.db+".ds"+d2+"_frequencies as f on p.code = f."+dbdata.id_type+"ID_code left join "+dbdata.db+".classifications as c on c.code = f.classification_code left join WObML.frequency_sort as s on s.keyword = f.unit where x.gindex = "+group_index+" and  p.format_code = "+fp.second+" group by f.classification_code,f.unit,s.idx order by s.idx");
-    }
+    query.set("select any_value(c.classification),min(f.min_obs_per),max(f.max_obs_per),f.unit from "+dbdata.db+".ds"+d2+dbdata.table+" as p left join "+dbdata.db+".ds"+d2+"_frequencies as f on p.code = f."+dbdata.id_type+"ID_code left join "+dbdata.db+".classifications as c on c.code = f.classification_code left join WObML.frequency_sort as s on s.keyword = f.unit where p.format_code = "+fp.second+" group by f.classification_code,f.unit,s.idx order by s.idx");
     if (query.submit(server) < 0) {
       log_error2("'" + query.error() + "' for '" + query.show() + "'", F,
           caller, user);
@@ -1872,9 +1718,6 @@ void generate_detailed_fix_summary(string file_type, string group_index,
         ofs << "<li>" << key2 << "</li>";
       }
       ofs << "</ul></td><td align=\"center\">" << dateutils::string_ll_to_date_string(te.start) << " to " << dateutils::string_ll_to_date_string(te.end) << "<br><img src=\"/datasets/ds" << metautils::args.dsnum << "/metadata/spatial_coverage." << dbdata.id_type;
-      if (!group_index.empty()) {
-        ofs << "_gindex_" << group_index;
-      }
       ofs << "_" << te.key << ".gif?" << strand(5) << "\"></td></tr>" << endl;
       te.type_table_keys->clear();
       te.type_table_keys.reset();
@@ -1913,8 +1756,8 @@ void generate_detailed_metadata_view(string caller, string user) {
 
   // svec contains the database, the data type description, and a function
   //  that generates an appropriate summary
-  vector<tuple<string, string, void(*)(string, string, ofstream&, const vector<
-      pair<string, string>>&, string, string)>> svec{
+  vector<tuple<string, string, void(*)(string, ofstream&, const vector<pair<
+      string, string>>&, string, string)>> svec{
     make_tuple("WGrML", "Grids", generate_detailed_grid_summary),
     make_tuple("WObML", "Platform Observations",
     generate_detailed_observation_summary),
@@ -2086,9 +1929,9 @@ void generate_detailed_metadata_view(string caller, string user) {
     }
     ofs << "</table></center>" << endl;
     for (size_t n = 0; n < svec.size(); ++n) {
-      if (vv[n].size() > 0) {
+      if (!vv[n].empty()) {
         auto& generate_summary = get<2>(svec[n]);
-        generate_summary("Web", "", ofs, vv[n], caller, user);
+        generate_summary("Web", ofs, vv[n], caller, user);
       }
     }
     ofs.close();
