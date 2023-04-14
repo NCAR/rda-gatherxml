@@ -31,29 +31,22 @@ std::list<std::string> file_list;
 void fill_files_with_metadata(std::string filename = "")
 {
   const size_t NUM_DATABASES=7;
-  const char *dbs[NUM_DATABASES]={"GrML","WGrML","ObML","WObML","SatML","FixML","WFixML"};
+  static const std::vector<std::string> dbs{ "WGrML", "WObML", "SatML", "WFixML" };
   MySQL::LocalQuery query;
   MySQL::Row row;
-  std::string IDType,listType,meta_link;
+  std::string meta_link;
   Entry e;
 
   for (size_t n=0; n < NUM_DATABASES; ++n) {
     if (dbs[n][0] == 'W') {
-	IDType="web";
-	listType="_webfiles2";
 	meta_link.assign(&dbs[n][1],2);
     }
-    else {
-	IDType="mss";
-	listType="_primaries2";
-	meta_link.assign(&dbs[n][0],2);
-    }
-    if (table_exists(server_m,std::string(dbs[n])+".ds"+dsnum2+listType)) {
+    if (table_exists(server_m,std::string(dbs[n])+".ds"+dsnum2+"_webfiles2")) {
 	if (!filename.empty()) {
-	  query.set("select "+IDType+"ID from "+dbs[n]+".ds"+dsnum2+listType+" where "+IDType+"ID = '"+filename+"'");
+	  query.set("select id from "+dbs[n]+".ds"+dsnum2+"_webfiles2"+" where id = '"+filename+"'");
 	}
 	else {
-	  query.set("select "+IDType+"ID from "+dbs[n]+".ds"+dsnum2+listType);
+	  query.set("select id from "+dbs[n]+".ds"+dsnum2+"_webfiles2");
 	}
 	if (query.submit(server_m) < 0) {
 	  metautils::log_error("error '"+query.error()+"' while trying to get "+dbs[n]+" filelist","sml",user);
