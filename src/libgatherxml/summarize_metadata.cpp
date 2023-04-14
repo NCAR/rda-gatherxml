@@ -89,13 +89,18 @@ void cmd_dates(string database, size_t date_left_padding, vector<CMDDateRange>&
     myerror = "Error: unable to connect to metadata server";
     exit(1);
   }
-  string s = database + ".ds" + substitute(metautils::args.dsnum, ".", "") +
+  string tbl = database + ".ds" + substitute(metautils::args.dsnum, ".", "") +
       "_webfiles2";
-  if (table_exists(mysrv, s)) {
-    MySQL::LocalQuery q("select min(w.start_date), max(w.end_date), wf.gindex "
-        "from " + s + " as w left join dssdb.wfile as wf on wf.wfile = w.webID "
-        "where wf.dsid = 'ds" + metautils::args.dsnum + "' and wf.type = 'D' "
-        "and wf.status = 'P' and w.start_date > 0 group by wf.gindex");
+  if (table_exists(mysrv, tbl)) {
+
+// patch until all "webfiles2" tables are migrated from webID -> id
+MySQL::LocalQuery q;
+if (field_exists(mysrv, tbl, "id")) {
+q.set("select min(w.start_date), max(w.end_date), wf.gindex from " + tbl + " as w left join dssdb.wfile as wf on wf.wfile = w.id where wf.dsid = 'ds" + metautils::args.dsnum + "' and wf.type = 'D' and wf.status = 'P' and w.start_date > 0 group by wf.gindex");
+} else {
+q.set("select min(w.start_date), max(w.end_date), wf.gindex from " + tbl + " as w left join dssdb.wfile as wf on wf.wfile = w.webID where wf.dsid = 'ds" + metautils::args.dsnum + "' and wf.type = 'D' and wf.status = 'P' and w.start_date > 0 group by wf.gindex");
+}
+
 #ifdef DUMP_QUERIES
     {
     Timer tm;
@@ -116,8 +121,8 @@ void cmd_dates(string database, size_t date_left_padding, vector<CMDDateRange>&
     if (q.num_rows() < 2 && (!b || row[2] == "0")) {
       auto i = itos(date_left_padding);
       q.set("select lpad(start_date, " + i + ", '0'), lpad(end_date, " + i +
-          ", '0'), 0 from " + s + " where start_date != 0 order by start_date, "
-          "end_date");
+          ", '0'), 0 from " + tbl + " where start_date != 0 order by "
+          "start_date, end_date");
 #ifdef DUMP_QUERIES
       {
       Timer tm;
@@ -455,7 +460,7 @@ unordered_set<string> summarize_frequencies_from_wgrml_by_data_file(MySQL::
   unordered_set<string> sfreq; // return value
   auto ds = substitute(metautils::args.dsnum, ".", "");
 
-  // get all of the time ranges for the given file ID
+  // get all of the time ranges for the given file id
   MySQL::LocalQuery qt("select time_range_code, min(start_date), max("
       "end_date), sum(nsteps) from WGrML.ds" + ds + "_grids2 where file_code = "
       + file_id_code + " group by time_range_code, parameter");
@@ -617,7 +622,7 @@ unordered_set<string> summarize_frequencies_from_wgrml_by_data_file(MySQL::
           "_frequencies", F, caller, user);
     }
   } else {
-    server._delete("WGrML.ds" + ds + "_frequencies", "webID_code = " +
+    server._delete("WGrML.ds" + ds + "_frequencies", "file_code = " +
         file_id_code);
   }
   if (fset.size() > 0) {
@@ -652,12 +657,12 @@ unordered_set<string> summarize_frequencies_from_wgrml(MySQL::Server& server,
     string file_id_code, string caller, string user) {
   if (file_id_code.empty()) {
 
-    // no file ID provided, summarize for full dataset
+    // no file id provided, summarize for full dataset
     return move(summarize_frequencies_from_wgrml_by_dataset(server, caller,
         user));
   } else {
 
-    // adding information from a given file ID
+    // adding information from a given file id
     return move(summarize_frequencies_from_wgrml_by_data_file(server,
         file_id_code, caller, user));
   }
@@ -1016,10 +1021,14 @@ void grml_file_data(string file_type, unordered_map<string, string>&
     fill_data_formats_table(mysrv, "WGrML", m, caller, user);
   }
   MySQL::Query q;
-  q.set("select webID, format_code, num_grids, start_date, end_date, gindex, "
-      "file_format, data_size from WGrML.ds" + d + "_webfiles2 as w left join "
-      "dssdb.wfile as d on d.wfile = w.webID where d.dsid = 'ds" + metautils::
-      args.dsnum + "' and d.type = 'D' and d.status = 'P' and num_grids > 0");
+
+// patch until all webfiles2 tables have migrated webID -> id
+if (MySQL::field_exists(mysrv, "WGrML.ds" + d + "_webfiles2", "id")) {
+q.set("select id, format_code, num_grids, start_date, end_date, gindex, file_format, data_size from WGrML.ds" + d + "_webfiles2 as w left join dssdb.wfile as d on d.wfile = w.id where d.dsid = 'ds" + metautils::args.dsnum + "' and d.type = 'D' and d.status = 'P' and num_grids > 0");
+} else {
+q.set("select webID, format_code, num_grids, start_date, end_date, gindex, file_format, data_size from WGrML.ds" + d + "_webfiles2 as w left join dssdb.wfile as d on d.wfile = w.webID where d.dsid = 'ds" + metautils::args.dsnum + "' and d.type = 'D' and d.status = 'P' and num_grids > 0");
+}
+
 #ifdef DUMP_QUERIES
   {
   Timer tm;
@@ -1125,6 +1134,9 @@ void write_grml_parameters(string file_type, string tindex, ofstream& ofs,
     string caller, string user, string& min, string& max, string&
     init_date_selection) {
   static const string F = this_function_label(__func__);
+  if (file_type != "Web" && file_type != "inv") {
+    log_error2("unsupported file type '" + file_type + "'", F, caller, user);
+  }
   string d2 = substitute(metautils::args.dsnum, ".", "");
   MySQL::Server mysrv(metautils::directives.database_server, metautils::
       directives.metadb_username, metautils::directives.metadb_password, "");
@@ -1132,17 +1144,9 @@ void write_grml_parameters(string file_type, string tindex, ofstream& ofs,
     log_error2("'" + mysrv.error() + "' while trying to connect", F, caller,
         user);
   }
-  string db, dssfil, mfil, wc, idtyp;
-  if (file_type == "Web" || file_type == "inv") {
-    db = "WGrML";
-    dssfil = "wfile";
-    mfil = "_webfiles2";
-    wc = "type = 'D' and status = 'P'";
-    idtyp = "web";
-  }
   static unordered_map<string, string> dfmap;
   if (dfmap.empty()) {
-    fill_data_formats_table(mysrv, db, dfmap, caller, user);
+    fill_data_formats_table(mysrv, "WGrML", dfmap, caller, user);
   }
   static unordered_set<string> invs;
   static string idsel = "";
@@ -1174,19 +1178,20 @@ void write_grml_parameters(string file_type, string tindex, ofstream& ofs,
   init_date_selection = idsel;
   static unordered_map<string, unordered_map<string, string>> ffmap;
   static unordered_map<string, unordered_set<string>> rdafs;
-  auto fkey = idtyp + db + d2 + mfil + tindex;
+  auto fkey = d2 + ":" + tindex;
   if (ffmap[fkey].empty()) {
     if (!tindex.empty()) {
-      MySQL::LocalQuery q(dssfil, "dssdb." + dssfil, "dsid = 'ds" + metautils::
-          args.dsnum + "' and tindex = " + tindex + " and " + wc);
+      MySQL::LocalQuery q("wfile", "dssdb.wfile", "dsid = 'ds" + metautils::
+          args.dsnum + "' and tindex = " + tindex + " and " + "type = 'D' and "
+          "status = 'P'");
 #ifdef DUMP_QUERIES
       {
       Timer tm;
       tm.start();
 #endif
       if (q.submit(mysrv) < 0) {
-        log_error2("'" + q.error() + "' while trying to get RDA files from dssdb."
-            + dssfil, F, caller, user);
+        log_error2("'" + q.error() + "' while trying to get RDA files from "
+            "dssdb.wfile", F, caller, user);
       }
 #ifdef DUMP_QUERIES
       tm.stop();
@@ -1198,8 +1203,15 @@ void write_grml_parameters(string file_type, string tindex, ofstream& ofs,
         rdafs[tindex].emplace(r[0]);
       }
     }
-    MySQL::LocalQuery q("code, " + idtyp + "ID, format_code", db + ".ds" + d2 +
-        mfil);
+
+// patch until all webfiles2 tables have migrated webID -> id
+MySQL::LocalQuery q;
+if (MySQL::field_exists(mysrv, "WGrML.ds" + d2 + "_webfiles2", "id")) {
+q.set("code, id, format_code", "WGrML.ds" + d2 + "_webfiles2");
+} else {
+q.set("code, webID, format_code", "WGrML.ds" + d2 + "_webfiles2");
+}
+
 #ifdef DUMP_QUERIES
     {
     Timer tm;
@@ -1207,7 +1219,7 @@ void write_grml_parameters(string file_type, string tindex, ofstream& ofs,
 #endif
     if (q.submit(mysrv) < 0) {
       log_error2("'" + q.error() + "' while trying to get metadata files from "
-          + db + ".ds" + d2 + mfil, F, caller, user);
+          + "WGrML" + ".ds" + d2 + "_webfiles2", F, caller, user);
     }
 #ifdef DUMP_QUERIES
     tm.stop();
@@ -1226,8 +1238,8 @@ void write_grml_parameters(string file_type, string tindex, ofstream& ofs,
   static vector<tuple<string, string, string, string>> parameter_data;
   if (parameter_data.empty() && !pd_mutex.is_locked()) {
     pd_mutex.lock();
-    MySQL::LocalQuery qs("parameter, start_date, end_date, file_code", db +
-        ".ds" + d2 + "_agrids2");
+    MySQL::LocalQuery qs("parameter, start_date, end_date, file_code", "WGrML."
+        "ds" + d2 + "_agrids2");
 #ifdef DUMP_QUERIES
     {
     Timer tm;
@@ -1311,135 +1323,6 @@ void write_grml_parameters(string file_type, string tindex, ofstream& ofs,
     ofs << p.second.id << "<!>" << p.first << "<!>" << p.second.short_name <<
         endl;
   }
-}
-
-void write_groups(string& file_type, string db, ofstream& ofs, string& caller,
-    string& user) {
-  static const string F = this_function_label(__func__);
-  MySQL::Server mysrv(metautils::directives.database_server, metautils::
-      directives.metadb_username, metautils::directives.metadb_password, "");
-  if (!mysrv) {
-    log_error2("'" + mysrv.error() + "' while trying to connect", F, caller,
-        user);
-  }
-  static MySQL::LocalQuery g_query;
-  if (!g_query) {
-    g_query.set("select gindex, title, grpid from dssdb.dsgroup where dsid = "
-        "'ds" + metautils::args.dsnum + "'");
-#ifdef DUMP_QUERIES
-    {
-    Timer tm;
-    tm.start();
-#endif
-    if (g_query.submit(mysrv) < 0) {
-      log_error2("'" + g_query.error() + "' while trying to get list of groups",
-          F, caller, user);
-    }
-#ifdef DUMP_QUERIES
-    tm.stop();
-    cerr << "Elapsed time: " << tm.elapsed_time() << " " << F << ": " <<
-        g_query.show() << endl;
-    }
-#endif
-  }
-  unordered_map<string, pair<string, string>> gmap;
-  static unordered_map<string, unordered_set<string>> fset;
-  if (g_query.num_rows() > 1) {
-    string idtyp, mfil, dssfil, wc;
-    if (file_type == "Web" || file_type == "inv") {
-      db = "W" + db;
-      idtyp = "web";
-      mfil = "_webfiles2";
-      dssfil = "wfile";
-      wc = "type = 'D' and status = 'P'";
-    }
-    for (const auto& row : g_query) {
-      if (row[2].empty()) {
-        gmap.emplace(row[0], make_pair(row[1], row[0]));
-      } else {
-        gmap.emplace(row[0], make_pair(row[1], row[2]));
-      }
-    }
-    static auto d2 = substitute(metautils::args.dsnum, ".", "");
-    auto fset_key = idtyp + db + d2 + mfil;
-    if (fset.find(fset_key) == fset.end()) {
-      fset.emplace(fset_key, unordered_set<string>());
-      MySQL::LocalQuery q("select " + idtyp + "ID from " + db + ".ds" + d2 +
-          mfil);
-#ifdef DUMP_QUERIES
-      {
-      Timer tm;
-      tm.start();
-#endif
-      if (q.submit(mysrv) < 0) {
-        log_error2("'" + q.error() + "' while trying to get webfiles", F,
-            caller, user);
-      }
-#ifdef DUMP_QUERIES
-      tm.stop();
-      cerr << "Elapsed time: " << tm.elapsed_time() << " " << F << ": " << q.
-          show() << endl;
-      }
-#endif
-      for (const auto& r : q) {
-        fset[fset_key].emplace(r[0]);
-      }
-    }
-    static unordered_map<string, MySQL::LocalQuery> dssdb_file_cache;
-    if (!dssdb_file_cache[dssfil]) {
-      dssdb_file_cache[dssfil].set("select " + dssfil + ", gindex from dssdb." +
-          dssfil + " where dsid = 'ds" + metautils::args.dsnum + "' and " + wc);
-#ifdef DUMP_QUERIES
-      {
-      Timer tm;
-      tm.start();
-#endif
-      if (dssdb_file_cache[dssfil].submit(mysrv) < 0) {
-        log_error2("'" +  dssdb_file_cache[dssfil].error() +  "' while trying "
-            "to get " + dssfil + ", gindex list", F, caller, user);
-      }
-#ifdef DUMP_QUERIES
-      tm.stop();
-      cerr << "Elapsed time: " << tm.elapsed_time() << " " << F << ": " <<
-          dssdb_file_cache[dssfil].show() << endl;
-      }
-#endif
-    }
-    unordered_set<string> gset;
-    vector<string> v;
-    v.resize(dssdb_file_cache[dssfil].num_rows());
-    auto n = 0;
-    for (const auto& row : dssdb_file_cache[dssfil]) {
-      if (fset[fset_key].find(row[0]) != fset[fset_key].end()) {
-        if (gset.find(row[1]) == gset.end()) {
-          if (gmap.find(row[1]) != gmap.end()) {
-            v[n] = row[1];
-            ++n;
-            gset.emplace(row[1]);
-          }
-        }
-      }
-    }
-    v.resize(n);
-    sort(v.begin(), v.end(),
-    [](const string& left, const string& right) -> bool {
-      if (left.length() < right.length()) {
-        return true;
-      } else if (left.length() > right.length()) {
-        return false;
-      } else {
-        if (left <= right) {
-          return true;
-        }
-        return false;
-      }
-    });
-    for (size_t n = 0; n < v.size(); ++n) {
-      ofs << v[n] << "<!>" << gmap[v[n]].first << "<!>" << gmap[v[n]].second <<
-          endl;
-    }
-  }
-  mysrv.disconnect();
 }
 
 void create_file_list_cache(string file_type, string caller, string user, string
@@ -1539,11 +1422,6 @@ void create_file_list_cache(string file_type, string caller, string user, string
         ofs << " " << s;
       }
       ofs << endl;
-/*
-      if (tindex.empty()) {
-        write_groups(file_type, "GrML", ofs, caller, user);
-      }
-*/
       ofs.close();
       if (max == "0") {
         string e;
