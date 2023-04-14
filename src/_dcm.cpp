@@ -17,12 +17,22 @@ using metautils::log_error2;
 using miscutils::this_function_label;
 using std::cout;
 using std::endl;
+using std::regex;
+using std::regex_search;
 using std::string;
 using std::stringstream;
+using std::unique_ptr;
 using std::unordered_set;
 using std::vector;
+using strutils::chop;
+using strutils::replace_all;
 using strutils::split;
 using strutils::substitute;
+using unixutils::exists_on_server;
+using unixutils::mysystem2;
+using unixutils::rdadata_sync;
+using unixutils::rdadata_unsync;
+using unixutils::remote_web_file;
 
 metautils::Directives metautils::directives;
 metautils::Args metautils::args;
@@ -158,177 +168,243 @@ void clear_grid_cache(MySQL::Server& server, string db) {
         g_dsnum2 + "_agrids_cache", F, "dcm", USER);
   }
   for (const auto& row : query) {
-    if (server.insert(db + ".ds" + g_dsnum2 + "_agrids_cache","'" + row[0] +
-        "','" + row[1] + "'," + row[2] + "," + row[3]) < 0) {
+    if (server.insert(db + ".ds" + g_dsnum2 + "_agrids_cache", "'" + row[0] +
+        "', '" + row[1] + "', " + row[2] + ", " + row[3]) < 0) {
       log_error2("error: '" + server.error() + "' while inserting into " + db +
           ".ds" + g_dsnum2 + "_agrids_cache", F, "dcm", USER);
     }
   }
 }
 
-bool remove_from(string database,string table_ext,string file_field_name,string md_directory,string& file,string file_ext,string& file_ID_code,bool& is_version_controlled)
-{
-  is_version_controlled=false;
+bool remove_from(string database, string table_ext, string file_field_name,
+    string md_directory, string& file, string file_ext, string& file_id_code,
+    bool& is_version_controlled) {
+  static const string F = this_function_label(__func__);
+  is_version_controlled = false;
   string error;
-  if (md_directory == "wfmd" && std::regex_search(file,std::regex("^http(s){0,1}://(rda|dss)\\.ucar\\.edu"))) {
-    file=metautils::relative_web_filename(file);
+  if (md_directory == "wfmd" && regex_search(file, regex("^http(s){0,1}://"
+      "(rda|dss)\\.ucar\\.edu"))) {
+    file = metautils::relative_web_filename(file);
   }
-  auto file_table=database+".ds"+g_dsnum2+table_ext;
-  MySQL::Server local_server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
+  auto file_table = database + ".ds" + g_dsnum2 + table_ext;
+  MySQL::Server local_server(metautils::directives.database_server, metautils::
+      directives.metadb_username, metautils::directives.metadb_password, "");
   if (!local_server) {
-    log_error("remove_from() unable to connect to MySQL server while removing  "+file,"dcm",USER);
+    log_error2("unable to connect to MySQL server while removing  " + file, F,
+        "dcm", USER);
   }
-  MySQL::LocalQuery query("code",file_table,file_field_name+" = '"+file+"'");
+  MySQL::LocalQuery query("code", file_table, file_field_name + " = '" + file +
+      "'");
   if (query.submit(local_server) == 0) {
     if (query.num_rows() == 1) {
       MySQL::Row row;
       query.fetch_row(row);
-      file_ID_code=row[0];
-      if (md_directory == "fmd") {
-// check for a primary moved to version-controlled
-        query.set("mssid","dssdb.mssfile","dsid = 'ds"+metautils::args.dsnum+"' and mssfile = '"+file+"' and property = 'V'");
-        if (query.submit(local_server) < 0) {
-          log_error("remove_from() returned error: "+local_server.error()+" while trying to check mssfile property for '"+file+"'","dcm",USER);
-        }
-        if (query.num_rows() == 1) {
-          is_version_controlled=true;
-        }
+      file_id_code = row[0];
+
+      // check for a file moved to the saved area
+      query.set("sid", "dssdb.file", "dsid = 'ds" + metautils::args.dsnum +
+          "' and sfile = '" + file + "'");
+      if (query.submit(local_server) < 0) {
+        log_error2("error: '" + local_server.error() + "' while trying to "
+            "check sfile for '" + file + "'", F, "dcm", USER);
+      }
+      if (query.num_rows() == 1) {
+        is_version_controlled = true;
       }
       if (is_version_controlled) {
-        string result;
-        if (!table_exists(local_server,"V"+file_table)) {
-          if (local_server.command("create table V"+file_table+" like "+file_table,error) < 0) {
-            log_error("remove_from() returned error: "+local_server.error()+" while trying to create V"+file_table,"dcm",USER);
+        string res;
+        if (!table_exists(local_server, "V" + file_table)) {
+          if (local_server.command("create table V" + file_table + " like " +
+              file_table, error) < 0) {
+            log_error2("error: '" + local_server.error() + "' while trying to "
+                "create V" + file_table, F, "dcm", USER);
           }
         }
-        local_server.command("insert into V"+file_table+" select * from "+file_table+" where code = "+file_ID_code,result);
+        local_server.command("insert into V" + file_table + " select * from " +
+            file_table + " where code = " + file_id_code, res);
       }
-      if (local_server._delete(file_table,"code = "+file_ID_code) < 0) {
-        log_error("remove_from() returned error: "+local_server.error(),"dcm",USER);
+      if (local_server._delete(file_table, "code = " + file_id_code) < 0) {
+        log_error2("error: '" + local_server.error() + "'", F, "dcm", USER);
       }
       if (database == "WGrML" || database == "WObML") {
-        auto tables=MySQL::table_names(local_server,substitute(database,"W","I"),"ds"+g_dsnum2+"_inventory_%",error);
+        auto tables = MySQL::table_names(local_server, substitute(database, "W",
+            "I"), "ds" + g_dsnum2 + "_inventory_%", error);
         for (const auto& table : tables) {
-          local_server._delete(substitute(database,"W","I")+".`"+table+"`","webID_code = "+file_ID_code);
+          local_server._delete(substitute(database, "W", "I") + ".`" + table +
+              "`", "file_code = " + file_id_code);
         }
-        if (local_server._delete(substitute(database,"W","I")+".ds"+g_dsnum2+"_inventory_summary","webID_code = "+file_ID_code) == 0) {
-          query.set("select tindex from dssdb.wfile where wfile = '"+file+"'");
+        if (local_server._delete(substitute(database, "W", "I") + ".ds" +
+            g_dsnum2 + "_inventory_summary", "webID_code = " + file_id_code) ==
+            0) {
+          query.set("select tindex from dssdb.wfile where wfile = '" + file +
+              "'");
           if (query.submit(local_server) == 0 && query.num_rows() == 1) {
             query.fetch_row(row);
             if (!row[0].empty() && row[0] != "0") {
               g_inv_tindex_set.emplace(row[0]);
             }
           }
-          create_inv_filelist_cache=true;
+          create_inv_filelist_cache = true;
         }
       }
       if (database == "WObML") {
-        local_server._delete("I"+database.substr(1)+".ds"+g_dsnum2+"_dataTypes","webID_code = "+file_ID_code);
-        auto tables=MySQL::table_names(local_server,"I"+database.substr(1),"ds"+g_dsnum2+"_timeSeries_times_%",error);
+        local_server._delete("I" + database.substr(1) + ".ds" + g_dsnum2 +
+            "_dataTypes", "file_code = " + file_id_code);
+        auto tables = MySQL::table_names(local_server, "I" + database.substr(1),
+            "ds" + g_dsnum2 + "_timeSeries_times_%", error);
         for (const auto& table : tables) {
-          local_server._delete("I"+database.substr(1)+"."+table,"webID_code = "+file_ID_code);
+          local_server._delete("I" + database.substr(1) + "." + table,
+              "file_code = " + file_id_code);
         }
       }
-      auto md_file=file;
-      if (md_directory == "fmd") {
-        strutils::replace_all(md_file,"/FS/DECS/","");
-      }
-      strutils::replace_all(md_file,"/","%");
-      md_file+=file_ext;
+      auto md_file = file;
+      replace_all(md_file, "/", "%");
+      md_file += file_ext;
       if (!local_args.keep_xml) {
-        std::unique_ptr<TempDir> tdir;
+        unique_ptr<TempDir> tdir;
         tdir.reset(new TempDir);
         if (!tdir->create(metautils::directives.temp_path)) {
-          log_error("remove_from() could not create a temporary directory","dcm",USER);
+          log_error2("could not create a temporary directory", F, "dcm", USER);
         }
         if (is_version_controlled) {
-          stringstream oss,ess;
-          if (unixutils::mysystem2("/bin/mkdir -p "+tdir->name()+"/metadata/"+md_directory+"/v",oss,ess) < 0) {
-            log_error("remove_from() could not create the temporary directory tree","dcm",USER);
+          stringstream oss, ess;
+          if (mysystem2("/bin/mkdir -p " + tdir->name() + "/metadata/" +
+               md_directory + "/v", oss, ess) < 0) {
+            log_error("could not create the temporary directory tree", F, "dcm",
+                USER);
           }
         }
-        short flag=0;
-        if (unixutils::exists_on_server(metautils::directives.web_server,"/data/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+md_directory+"/"+md_file+".gz",metautils::directives.rdadata_home)) {
-          flag=1;
-        }
-        else if (unixutils::exists_on_server(metautils::directives.web_server,"/data/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+md_directory+"/"+md_file,metautils::directives.rdadata_home)) {
-          flag=2;
+        short flag = 0;
+        if (exists_on_server(metautils::directives.web_server, "/data/web/"
+            "datasets/ds" + metautils::args.dsnum + "/metadata/" + md_directory
+            + "/" + md_file + ".gz", metautils::directives.rdadata_home)) {
+          flag = 1;
+        } else if (exists_on_server(metautils::directives.web_server, "/data/"
+            "web/datasets/ds" + metautils::args.dsnum + "/metadata/" +
+            md_directory + "/" + md_file, metautils::directives.rdadata_home)) {
+          flag = 2;
         }
         if (file_ext == ".ObML" && flag > 0) {
           string xml_parent;
           if (flag == 1) {
-            xml_parent=unixutils::remote_web_file("https://rda.ucar.edu/datasets/ds"+metautils::args.dsnum+"/metadata/"+md_directory+"/"+md_file+".gz",tempdir_name());
+            xml_parent = remote_web_file("https://rda.ucar.edu/datasets/ds" +
+                metautils::args.dsnum + "/metadata/" + md_directory + "/" +
+                md_file + ".gz", tempdir_name());
             struct stat buf;
-            if (stat(xml_parent.c_str(),&buf) == 0) {
-              if (system(("gunzip "+xml_parent).c_str()) != 0) {
-                log_error("remove_from() could not unzip '" + xml_parent + "'","dcm",USER);
+            if (stat(xml_parent.c_str(), &buf) == 0) {
+              if (system(("gunzip " + xml_parent).c_str()) != 0) {
+                log_error2("could not unzip '" + xml_parent + "'", F, "dcm",
+                    USER);
               }
-              strutils::chop(xml_parent,3);
+              chop(xml_parent, 3);
             }
-          }
-          else if (flag == 2) {
-            xml_parent=unixutils::remote_web_file("https://rda.ucar.edu/datasets/ds"+metautils::args.dsnum+"/metadata/"+md_directory+"/"+md_file,tempdir_name());
+          } else if (flag == 2) {
+            xml_parent = remote_web_file("https://rda.ucar.edu/datasets/ds" +
+                metautils::args.dsnum + "/metadata/" + md_directory + "/" +
+                md_file, tempdir_name());
           }
           XMLDocument xdoc;
           if (xdoc.open(xml_parent)) {
-            auto elist=xdoc.element_list("ObML/observationType/platform/IDs");
+            auto elist = xdoc.element_list("ObML/observationType/platform/IDs");
             for (const auto& e : elist) {
               if (is_version_controlled) {
-                auto f=unixutils::remote_web_file("https://rda.ucar.edu/datasets/ds"+metautils::args.dsnum+"/metadata/"+md_directory+"/"+e.attribute_value("ref"),tdir->name()+"/metadata/"+md_directory+"/v");
+                auto f = remote_web_file("https://rda.ucar.edu/datasets/ds" +
+                    metautils::args.dsnum + "/metadata/" + md_directory + "/" +
+                    e.attribute_value("ref"), tdir->name() + "/metadata/" +
+                    md_directory + "/v");
                 if (f.empty()) {
-                  log_error("remove_from() could not get remote file https://rda.ucar.edu/datasets/ds"+metautils::args.dsnum+"/metadata/"+md_directory+"/"+e.attribute_value("ref"),"dcm",USER);
+                  log_error2("could not get remote file https://rda.ucar.edu/"
+                      "datasets/ds" + metautils::args.dsnum + "/metadata/" +
+                      md_directory + "/" + e.attribute_value("ref"), F, "dcm",
+                      USER);
                 }
               }
-              if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+md_directory+"/"+e.attribute_value("ref"),tdir->name(),metautils::directives.rdadata_home,error) < 0) {
-                metautils::log_warning("unable to unsync "+e.attribute_value("ref"),"dcm",USER);
+              if (rdadata_unsync("/__HOST__/web/datasets/ds" + metautils::
+                  args.dsnum + "/metadata/" + md_directory + "/" + e.
+                  attribute_value("ref"), tdir->name(), metautils::directives.
+                  rdadata_home, error) < 0) {
+                metautils::log_warning("unable to unsync " + e.attribute_value(
+                    "ref"), "dcm", USER);
               }
             }
-            elist=xdoc.element_list("ObML/observationType/platform/locations");
+            elist = xdoc.element_list("ObML/observationType/platform/"
+                "locations");
             for (const auto& e : elist) {
               if (is_version_controlled) {
-                auto f=unixutils::remote_web_file("https://rda.ucar.edu/datasets/ds"+metautils::args.dsnum+"/metadata/"+md_directory+"/"+e.attribute_value("ref"),tdir->name()+"/metadata/"+md_directory+"/v");
+                auto f = remote_web_file("https://rda.ucar.edu/datasets/ds" +
+                    metautils::args.dsnum + "/metadata/" + md_directory + "/" +
+                    e.attribute_value("ref"), tdir->name() + "/metadata/" +
+                    md_directory + "/v");
                 if (f.empty()) {
-                  log_error("remove_from() could not get remote file https://rda.ucar.edu/datasets/ds"+metautils::args.dsnum+"/metadata/"+md_directory+"/"+e.attribute_value("ref"),"dcm",USER);
+                  log_error2("could not get remote file https://rda.ucar.edu/"
+                      "datasets/ds" + metautils::args.dsnum + "/metadata/" +
+                      md_directory + "/" + e.attribute_value("ref"), F, "dcm",
+                      USER);
                 }
               }
-              if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+md_directory+"/"+e.attribute_value("ref"),tdir->name(),metautils::directives.rdadata_home,error) < 0) {
-                metautils::log_warning("unable to unsync "+e.attribute_value("ref"),"dcm",USER);
+              if (rdadata_unsync("/__HOST__/web/datasets/ds" + metautils::
+                  args.dsnum + "/metadata/" + md_directory + "/" + e.
+                  attribute_value("ref"), tdir->name(), metautils::directives.
+                  rdadata_home, error) < 0) {
+                metautils::log_warning("unable to unsync " + e.attribute_value(
+                    "ref"), "dcm", USER);
               }
             }
             xdoc.close();
           }
         }
         if (md_directory == "wfmd") {
-          if (unixutils::exists_on_server(metautils::directives.web_server,"/data/web/datasets/ds"+metautils::args.dsnum+"/metadata/inv/"+md_file+"_inv.gz",metautils::directives.rdadata_home)) {
-            if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/inv/"+md_file+"_inv.gz",tdir->name(),metautils::directives.rdadata_home,error) < 0) {
-              metautils::log_warning("unable to unsync "+md_file+"_inv","dcm",USER);
+          if (exists_on_server(metautils::directives.web_server, "/data/web/"
+              "datasets/ds" + metautils::args.dsnum + "/metadata/inv/" +
+              md_file + "_inv.gz", metautils::directives.rdadata_home)) {
+            if (rdadata_unsync("/__HOST__/web/datasets/ds" + metautils::args.
+                dsnum + "/metadata/inv/" + md_file + "_inv.gz", tdir->name(),
+                metautils::directives.rdadata_home, error) < 0) {
+              metautils::log_warning("unable to unsync " + md_file + "_inv",
+                  "dcm", USER);
+            }
+          } else if (exists_on_server(metautils::directives.web_server, "/data/"
+              "web/datasets/ds" + metautils::args.dsnum + "/metadata/inv/" +
+              md_file + "_inv", metautils::directives.rdadata_home)) {
+            if (rdadata_unsync("/__HOST__/web/datasets/ds" + metautils::args.
+                dsnum + "/metadata/inv/" + md_file + "_inv", tdir->name(),
+                metautils::directives.rdadata_home, error) < 0) {
+              metautils::log_warning("unable to unsync " + md_file + "_inv",
+                  "dcm", USER);
             }
           }
-          else if (unixutils::exists_on_server(metautils::directives.web_server,"/data/web/datasets/ds"+metautils::args.dsnum+"/metadata/inv/"+md_file+"_inv",metautils::directives.rdadata_home)) {
-            if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/inv/"+md_file+"_inv",tdir->name(),metautils::directives.rdadata_home,error) < 0) {
-              metautils::log_warning("unable to unsync "+md_file+"_inv","dcm",USER);
-            }
-          }
-          if (unixutils::exists_on_server(metautils::directives.web_server,"/data/web/datasets/ds"+metautils::args.dsnum+"/metadata/wms/"+md_file+".gz",metautils::directives.rdadata_home)) {
-            if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/wms/"+md_file+".gz",tdir->name(),metautils::directives.rdadata_home,error) < 0) {
-              metautils::log_warning("unable to unsync wms file "+md_file,"dcm",USER);
+          if (exists_on_server(metautils::directives.web_server, "/data/web/"
+              "datasets/ds" + metautils::args.dsnum + "/metadata/wms/" + md_file
+              + ".gz", metautils::directives.rdadata_home)) {
+            if (rdadata_unsync("/__HOST__/web/datasets/ds" + metautils::args.
+                dsnum + "/metadata/wms/" + md_file + ".gz", tdir->name(),
+                metautils::directives.rdadata_home, error) < 0) {
+              metautils::log_warning("unable to unsync wms file " + md_file,
+                  "dcm", USER);
             }
           }
         }
         if (flag == 1) {
-          md_file+=".gz";
+          md_file += ".gz";
         }
         if (is_version_controlled) {
-          auto f=unixutils::remote_web_file("https://rda.ucar.edu/datasets/ds"+metautils::args.dsnum+"/metadata/"+md_directory+"/"+md_file,tdir->name()+"/metadata/"+md_directory+"/v");
+          auto f = remote_web_file("https://rda.ucar.edu/datasets/ds" +
+              metautils::args.dsnum + "/metadata/" + md_directory + "/" +
+              md_file, tdir->name() + "/metadata/" + md_directory + "/v");
           if (!f.empty()) {
             string error;
-            if (unixutils::rdadata_sync(tdir->name(),"metadata/"+md_directory+"/v/","/data/web/datasets/ds"+metautils::args.dsnum,metautils::directives.rdadata_home,error) < 0) {
-              log_error("unable to move version-controlled metadata file "+file+"; error: "+error,"dcm",USER);
+            if (rdadata_sync(tdir->name(), "metadata/" + md_directory + "/v/",
+                "/data/web/datasets/ds" + metautils::args.dsnum, metautils::
+                directives.rdadata_home, error) < 0) {
+              log_error2("unable to move version-controlled metadata file " +
+                  file + "; error: " + error, F, "dcm", USER);
             }
           }
         }
-        if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds"+metautils::args.dsnum+"/metadata/"+md_directory+"/"+md_file,tdir->name(),metautils::directives.rdadata_home,error) < 0) {
-          metautils::log_warning("unable to unsync "+md_file,"dcm",USER);
+        if (rdadata_unsync("/__HOST__/web/datasets/ds" + metautils::args.dsnum +
+            "/metadata/" + md_directory + "/" + md_file, tdir->name(),
+            metautils::directives.rdadata_home, error) < 0) {
+          metautils::log_warning("unable to unsync " + md_file, "dcm", USER);
         }
       }
       return true;
@@ -405,13 +481,13 @@ void generate_graphics(string type)
     return;
   }
   stringstream oss,ess;
-  unixutils::mysystem2(metautils::directives.local_root+"/bin/"+type+" "+metautils::args.dsnum,oss,ess);
+  mysystem2(metautils::directives.local_root+"/bin/"+type+" "+metautils::args.dsnum,oss,ess);
 }
 
 void generate_dataset_home_page()
 {
   stringstream oss,ess;
-  unixutils::mysystem2(metautils::directives.local_root+"/bin/dsgen "+metautils::args.dsnum,oss,ess);
+  mysystem2(metautils::directives.local_root+"/bin/dsgen "+metautils::args.dsnum,oss,ess);
 }
 
 extern "C" void *t_index_variables(void *)
@@ -604,10 +680,10 @@ int main(int argc, char **argv) {
     for (const auto& t : threads) {
       pthread_join(t.tid,nullptr);
     }
-    if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" -rw",oss,ess) < 0) {
+    if (mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" -rw",oss,ess) < 0) {
       std::cerr << ess.str() << std::endl;
     }
-    if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" -ri",oss,ess) < 0) {
+    if (mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" -ri",oss,ess) < 0) {
       std::cerr << ess.str() << std::endl;
     }
     generate_dataset_home_page();
@@ -615,7 +691,7 @@ int main(int argc, char **argv) {
   if (g_removed_from_wobml) {
     gatherxml::summarizeMetadata::summarize_frequencies("dcm",USER);
     gatherxml::summarizeMetadata::summarize_obs_data("dcm",USER);
-    if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" -rw",oss,ess) < 0) {
+    if (mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" -rw",oss,ess) < 0) {
       std::cerr << ess.str() << std::endl;
     }
     if (metautils::args.update_graphics) {
@@ -624,13 +700,13 @@ int main(int argc, char **argv) {
     generate_dataset_home_page();
   }
   if (g_removed_from_satml) {
-    if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" -rm",oss,ess) < 0)
+    if (mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" -rm",oss,ess) < 0)
       std::cerr << ess.str() << std::endl;
   }
   if (g_removed_from_wfixml) {
     gatherxml::summarizeMetadata::summarize_frequencies("dcm",USER);
     gatherxml::summarizeMetadata::summarize_fix_data("dcm",USER);
-    if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" -rw",oss,ess) < 0) {
+    if (mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" -rw",oss,ess) < 0) {
       std::cerr << ess.str() << std::endl;
     }
     if (metautils::args.update_graphics) {
