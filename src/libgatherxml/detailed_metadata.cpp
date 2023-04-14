@@ -103,9 +103,9 @@ struct ParameterData {
 };
 
 struct DBData {
-  DBData() : db(), table(), dtable(), ID_type() { }
+  DBData() : db(), table(), dtable(), id_type() { }
 
-  string db, table, dtable, ID_type;
+  string db, table, dtable, id_type;
 };
 
 struct TypeEntry {
@@ -616,7 +616,7 @@ string parameter_query(MySQL::Server& mysrv, const DBData& dbdata, string
         return "select a.parameter, a.level_type_codes, min(a.start_date), max("
             "a.end_date) from " + dbdata.db + ".ds" + d2 + dbdata.table + " as "
             "p left join dssdb." + dbdata.dtable + " as x on (x." + dbdata.
-            dtable + " = p." + dbdata.ID_type + "ID and x.type = p.type and x."
+            dtable + " = p." + dbdata.id_type + "ID and x.type = p.type and x."
             "dsid = p.dsid) left join " + dbdata.db + ".ds" + d2 + "_agrids2 "
             "as a on a.file_code = p.code where p.format_code = " + format_code
             + " and !isnull(x." + dbdata.dtable + ") and x.gindex = " +
@@ -625,7 +625,7 @@ string parameter_query(MySQL::Server& mysrv, const DBData& dbdata, string
       return "select a.parameter, a.level_type_codes, min(a.start_date), max(a."
           "end_date) from " + dbdata.db + ".ds" + d2 + dbdata.table + " as p "
           "left join dssdb." + dbdata.dtable + " as x on x." + dbdata.dtable +
-          " = p." + dbdata.ID_type + "ID left join " + dbdata.db + ".ds" + d2 +
+          " = p." + dbdata.id_type + "ID left join " + dbdata.db + ".ds" + d2 +
           "_agrids2 as a on a.file_code = p.code where p.format_code = " +
           format_code + " and !isnull(x." + dbdata.dtable + ") and x.gindex = "
           + group_index + " group by a.parameter, a.level_type_codes";
@@ -634,7 +634,7 @@ string parameter_query(MySQL::Server& mysrv, const DBData& dbdata, string
         return "select a.parameter, a.level_type_codes, min(a.start_date), max("
             "a.end_date) from " + dbdata.db + ".ds" + d2 + dbdata.table + " as "
             "p left join dssdb." + dbdata.dtable + " as x on (x." + dbdata.
-            dtable + " = p." + dbdata.ID_type + "ID and x.type = p.type and x."
+            dtable + " = p." + dbdata.id_type + "ID and x.type = p.type and x."
             "dsid = p.dsid) left join " + dbdata.db + ".ds" + d2 + "_agrids2 "
             "as a on a.file_code = p.code where !isnull(x." + dbdata.dtable +
             ") and x.gindex = " + group_index + " group by a.parameter, a."
@@ -643,7 +643,7 @@ string parameter_query(MySQL::Server& mysrv, const DBData& dbdata, string
       return "select a.parameter, a.level_type_codes, min(a.start_date), max(a."
           "end_date) from " + dbdata.db + ".ds" + d2 + dbdata.table + " as p "
           "left join dssdb." + dbdata.dtable + " as x on x." + dbdata.dtable +
-          " = p." + dbdata.ID_type + "ID left join " + dbdata.db + ".ds" + d2 +
+          " = p." + dbdata.id_type + "ID left join " + dbdata.db + ".ds" + d2 +
           "_agrids2 as a on a.file_code = p.code where !isnull(x." + dbdata.
           dtable + ") and x.gindex = " + group_index + " group by a.parameter, "
           "a.level_type_codes";
@@ -676,7 +676,7 @@ string time_range_query(MySQL::Server& mysrv, const DBData& dbdata, string
     return "select distinct t.timeRange, d.definition, d.defParams from " +
         dbdata.db + ".ds" + d2 + dbdata.table + " as p left join dssdb." +
         dbdata.dtable + " as x on (x." + dbdata.dtable + " = p." + dbdata.
-        ID_type + "ID and x.type = p.type and x.dsid = p.dsid) left join " +
+        id_type + "ID and x.type = p.type and x.dsid = p.dsid) left join " +
         dbdata.db + ".ds" + d2 + "_grids2 as g on g.file_code = p.code left "
         "join " + dbdata.db + ".timeRanges as t on t.code = g.time_range_code "
         "left join " + dbdata.db + ".gridDefinitions as d on d.code = g."
@@ -686,7 +686,7 @@ string time_range_query(MySQL::Server& mysrv, const DBData& dbdata, string
   return "select distinct t.timeRange, d.definition, d.defParams from (select "
       "p.code from " + dbdata.db + ".ds" + d2 + dbdata.table + " as p left "
       "join dssdb." + dbdata.dtable + " as x on x." + dbdata.dtable + " = p." +
-      dbdata.ID_type + "ID where p.format_code = " + format_code + " and "
+      dbdata.id_type + "ID where p.format_code = " + format_code + " and "
       "!isnull(x." + dbdata.dtable + ") and x.gindex = " + group_index + ") as "
       "p left join " + dbdata.db + ".ds" + d2 + "_grids2 as g on g.file_code = "
       "p.code left join " + dbdata.db + ".timeRanges as t on t.code = g."
@@ -1077,7 +1077,7 @@ void generate_detailed_grid_summary(string file_type, string group_index,
     dbdata.db = "WGrML";
     dbdata.table = "_webfiles2";
     dbdata.dtable = "wfile";
-    dbdata.ID_type = "web";
+    dbdata.id_type = "web";
   }
   auto d2 = substitute(metautils::args.dsnum, ".", "");
   xmlutils::ParameterMapper pmap(metautils::directives.parameter_map_path);
@@ -1521,7 +1521,7 @@ void generate_detailed_observation_summary(string file_type, string group_index,
     dbdata.db = "WObML";
     dbdata.table = "_webfiles2";
     dbdata.dtable = "wfile";
-    dbdata.ID_type = "web";
+    dbdata.id_type = "web";
   }
   MySQL::Server mysrv(metautils::directives.database_server, metautils::
       directives.metadb_username, metautils::directives.metadb_password, "");
@@ -1552,7 +1552,7 @@ void generate_detailed_observation_summary(string file_type, string group_index,
             "_dataTypes2 as d left join " + dbdata.db + ".ds" + d2 +
             "_dataTypesList as l on l.code = d.dataType_code left join " +
             dbdata.db + ".ds" + d2 + dbdata.table + " as p on p.code = d." +
-            dbdata.ID_type + "ID_code left join " + dbdata.db +
+            dbdata.id_type + "ID_code left join " + dbdata.db +
             ".platformTypes as t on t.code = l.platformType_code left join " +
             dbdata.db + ".obsTypes as o on o.code = l.observationType_code "
             "where p.format_code = " + fp.second + " group by platformType, "
@@ -1561,7 +1561,7 @@ void generate_detailed_observation_summary(string file_type, string group_index,
         query.set("select distinct platformType, obsType, dataType, min("
             "start_date), max(end_date) from " + dbdata.db + ".ds" + d2 +
             "_dataTypes as d left join " + dbdata.db + ".ds" + d2 + dbdata.
-            table + " as p on p.code = d." + dbdata.ID_type + "ID_code left "
+            table + " as p on p.code = d." + dbdata.id_type + "ID_code left "
             "join " + dbdata.db + ".platformTypes as t on t.code = d."
             "platformType_code left join " + dbdata.db + ".obsTypes as o on o."
             "code = d.observationType_code where p.format_code = " + fp.second +
@@ -1573,8 +1573,8 @@ void generate_detailed_observation_summary(string file_type, string group_index,
         query.set("select distinct platformType, obsType, dataType, min("
             "start_date), max(end_date) from " + dbdata.db + ".ds" + d2 +
             dbdata.table + " as p left join dssdb." + dbdata.dtable + " as x "
-            "on x." + dbdata.dtable + " = p." + dbdata.ID_type + "ID left join "
-            + dbdata.db + ".ds" + d2 + "_dataTypes2 as d on d." + dbdata.ID_type
+            "on x." + dbdata.dtable + " = p." + dbdata.id_type + "ID left join "
+            + dbdata.db + ".ds" + d2 + "_dataTypes2 as d on d." + dbdata.id_type
             + "ID_code = p.code left join " + dbdata.db + ".ds" + d2 +
             "_dataTypesList as l on l.code = d.dataType_code left join " +
             dbdata.db + ".platformTypes as t on t.code = l.platformType_code "
@@ -1586,8 +1586,8 @@ void generate_detailed_observation_summary(string file_type, string group_index,
         query.set("select distinct platformType, obsType, dataType, min("
             "start_date), max(end_date) from " + dbdata.db + ".ds" + d2 +
             dbdata.table + " as p left join dssdb." + dbdata.dtable + " as x "
-            "on x." + dbdata.dtable + " = p." + dbdata.ID_type + "ID left join "
-            + dbdata.db + ".ds" + d2 + "_dataTypes as d on d." + dbdata.ID_type
+            "on x." + dbdata.dtable + " = p." + dbdata.id_type + "ID left join "
+            + dbdata.db + ".ds" + d2 + "_dataTypes as d on d." + dbdata.id_type
             + "ID_code = p.code left join " + dbdata.db + ".platformTypes as t "
             "on t.code = d.platformType_code left join " + dbdata.db +
             ".obsTypes as o on o.code = d.observationType_code where x.gindex "
@@ -1653,7 +1653,7 @@ void generate_detailed_observation_summary(string file_type, string group_index,
         query.set("select any_value(l.platformType), any_value(o.obsType), min("
             "f.min_obs_per), max(f.max_obs_per), f.unit from " + dbdata.db +
             ".ds" + d2 + dbdata.table + " as p join " + dbdata.db + ".ds" + d2 +
-            "_frequencies as f on p.code = f." + dbdata.ID_type + "ID_code "
+            "_frequencies as f on p.code = f." + dbdata.id_type + "ID_code "
             "left join " + dbdata.db + ".obsTypes as o on o.code = f."
             "observationType_code left join " + dbdata.db + ".platformTypes as "
             "l on l.code = f.platformType_code left join WObML.frequency_sort "
@@ -1664,7 +1664,7 @@ void generate_detailed_observation_summary(string file_type, string group_index,
         query.set("select any_value(l.platformType), any_value(o.obsType), min("
             "f.avg_obs_per), max(f.avg_obs_per), f.unit from " + dbdata.db +
             ".ds" + d2 + dbdata.table + " as p join " + dbdata.db + ".ds" + d2 +
-            "_frequencies as f on p.code = f." + dbdata.ID_type + "ID_code "
+            "_frequencies as f on p.code = f." + dbdata.id_type + "ID_code "
             "left join " + dbdata.db + ".obsTypes as o on o.code = f."
             "observationType_code left join " + dbdata.db + ".platformTypes as "
             "l on l.code = f.platformType_code left join WObML.frequency_sort "
@@ -1678,9 +1678,9 @@ void generate_detailed_observation_summary(string file_type, string group_index,
         query.set("select any_value(l.platformType), any_value(o.obsType), min("
             "f.min_obs_per), max(f.max_obs_per), f.unit from " + dbdata.db +
             ".ds" + d2 + dbdata.table + " as p left join dssdb." + dbdata.
-            dtable + " as x on x." + dbdata.dtable + " = p." + dbdata.ID_type +
+            dtable + " as x on x." + dbdata.dtable + " = p." + dbdata.id_type +
             "ID left join " + dbdata.db + ".ds" + d2 + "_frequencies as f on p."
-            "code = f." + dbdata.ID_type + "ID_code left join " + dbdata.db +
+            "code = f." + dbdata.id_type + "ID_code left join " + dbdata.db +
             ".obsTypes as o on o.code = f.observationType_code left join " +
             dbdata.db + ".platformTypes as l on l.code = f.platformType_code "
             "left join WObML.frequency_sort as s on s.keyword = f.unit where x."
@@ -1691,9 +1691,9 @@ void generate_detailed_observation_summary(string file_type, string group_index,
         query.set("select any_value(l.platformType), any_value(o.obsType), min("
             "f.avg_obs_per), max(f.avg_obs_per), f.unit from " + dbdata.db +
             ".ds" + d2 + dbdata.table + " as p left join dssdb." + dbdata.
-            dtable + " as x on x." + dbdata.dtable + " = p." + dbdata.ID_type +
+            dtable + " as x on x." + dbdata.dtable + " = p." + dbdata.id_type +
             "ID left join " + dbdata.db + ".ds" + d2 + "_frequencies as f on p."
-            "code = f." + dbdata.ID_type + "ID_code left join " + dbdata.db +
+            "code = f." + dbdata.id_type + "ID_code left join " + dbdata.db +
             ".obsTypes as o on o.code = f.observationType_code left join " +
             dbdata.db + ".platformTypes as l on l.code = f.platformType_code "
             "left join WObML.frequency_sort as s on s.keyword = f.unit where x."
@@ -1766,7 +1766,7 @@ void generate_detailed_observation_summary(string file_type, string group_index,
         }
         ofs_o << "<br><img src=\"/datasets/ds" << metautils::args.dsnum <<
             "/metadata/spatial_coverage." << substitute(data_format," ","_") <<
-            "_" << dbdata.ID_type;
+            "_" << dbdata.id_type;
         if (!group_index.empty()) {
           ofs_o << "_gindex_" << group_index;
         }
@@ -1803,7 +1803,7 @@ void generate_detailed_fix_summary(string file_type, string group_index,
     dbdata.db = "WFixML";
     dbdata.table = "_webfiles2";
     dbdata.dtable = "wfile";
-    dbdata.ID_type = "web";
+    dbdata.id_type = "web";
   }
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   string d2 = substitute(metautils::args.dsnum, ".", "");
@@ -1817,9 +1817,9 @@ void generate_detailed_fix_summary(string file_type, string group_index,
     ofs << "<tr class=\"bg2\" valign=\"top\"><th align=\"left\">Cyclone Classification</th><td align=\"left\"><b>Average Frequency of Data</b><br>(may vary by individual cyclone ID)</td><td align=\"left\"><b>Temporal/Geographical Coverage</b><br>(each dot represents a 3&deg; box containing one or more fixes)</td></tr>" << endl;
     MySQL::Query query;
     if (group_index.empty())
-      query.set("select distinct classification,min(l.start_date),max(l.end_date) from "+dbdata.db+".ds"+d2+"_locations as l left join "+dbdata.db+".ds"+d2+dbdata.table+" as p on p.code = l."+dbdata.ID_type+"ID_code left join "+dbdata.db+".classifications as c on c.code = l.classification_code where p.format_code = "+fp.second+" group by classification order by classification");
+      query.set("select distinct classification,min(l.start_date),max(l.end_date) from "+dbdata.db+".ds"+d2+"_locations as l left join "+dbdata.db+".ds"+d2+dbdata.table+" as p on p.code = l."+dbdata.id_type+"ID_code left join "+dbdata.db+".classifications as c on c.code = l.classification_code where p.format_code = "+fp.second+" group by classification order by classification");
     else
-      query.set("select distinct classification,min(l.start_date),max(l.end_date) from "+dbdata.db+".ds"+d2+dbdata.table+" as p left join dssdb."+dbdata.dtable+" as x on x."+dbdata.dtable+" = p."+dbdata.ID_type+"ID left join "+dbdata.db+".ds"+d2+"_locations as l on l."+dbdata.ID_type+"ID_code = p.code left join "+dbdata.db+".classifications as c on c.code = l.classification_code where x.gindex = "+group_index+" and p.format_code = "+fp.second+" group by classification order by classification");
+      query.set("select distinct classification,min(l.start_date),max(l.end_date) from "+dbdata.db+".ds"+d2+dbdata.table+" as p left join dssdb."+dbdata.dtable+" as x on x."+dbdata.dtable+" = p."+dbdata.id_type+"ID left join "+dbdata.db+".ds"+d2+"_locations as l on l."+dbdata.id_type+"ID_code = p.code left join "+dbdata.db+".classifications as c on c.code = l.classification_code where x.gindex = "+group_index+" and p.format_code = "+fp.second+" group by classification order by classification");
     if (query.submit(server) < 0) {
       log_error2("'" + query.error() + "' for '" + query.show() + "'", F,
           caller, user);
@@ -1844,10 +1844,10 @@ void generate_detailed_fix_summary(string file_type, string group_index,
       }
     }
     if (group_index.empty()) {
-      query.set("select any_value(c.classification),min(f.min_obs_per),max(f.max_obs_per),f.unit from "+dbdata.db+".ds"+d2+dbdata.table+" as p left join "+dbdata.db+".ds"+d2+"_frequencies as f on p.code = f."+dbdata.ID_type+"ID_code left join "+dbdata.db+".classifications as c on c.code = f.classification_code left join WObML.frequency_sort as s on s.keyword = f.unit where p.format_code = "+fp.second+" group by f.classification_code,f.unit,s.idx order by s.idx");
+      query.set("select any_value(c.classification),min(f.min_obs_per),max(f.max_obs_per),f.unit from "+dbdata.db+".ds"+d2+dbdata.table+" as p left join "+dbdata.db+".ds"+d2+"_frequencies as f on p.code = f."+dbdata.id_type+"ID_code left join "+dbdata.db+".classifications as c on c.code = f.classification_code left join WObML.frequency_sort as s on s.keyword = f.unit where p.format_code = "+fp.second+" group by f.classification_code,f.unit,s.idx order by s.idx");
     }
     else {
-      query.set("select any_value(c.classification),min(f.min_obs_per),max(f.max_obs_per),f.unit from "+dbdata.db+".ds"+d2+dbdata.table+" as p left join dssdb."+dbdata.dtable+" as x on x."+dbdata.dtable+" = p."+dbdata.ID_type+"ID left join "+dbdata.db+".ds"+d2+"_frequencies as f on p.code = f."+dbdata.ID_type+"ID_code left join "+dbdata.db+".classifications as c on c.code = f.classification_code left join WObML.frequency_sort as s on s.keyword = f.unit where x.gindex = "+group_index+" and  p.format_code = "+fp.second+" group by f.classification_code,f.unit,s.idx order by s.idx");
+      query.set("select any_value(c.classification),min(f.min_obs_per),max(f.max_obs_per),f.unit from "+dbdata.db+".ds"+d2+dbdata.table+" as p left join dssdb."+dbdata.dtable+" as x on x."+dbdata.dtable+" = p."+dbdata.id_type+"ID left join "+dbdata.db+".ds"+d2+"_frequencies as f on p.code = f."+dbdata.id_type+"ID_code left join "+dbdata.db+".classifications as c on c.code = f.classification_code left join WObML.frequency_sort as s on s.keyword = f.unit where x.gindex = "+group_index+" and  p.format_code = "+fp.second+" group by f.classification_code,f.unit,s.idx order by s.idx");
     }
     if (query.submit(server) < 0) {
       log_error2("'" + query.error() + "' for '" + query.show() + "'", F,
@@ -1871,7 +1871,7 @@ void generate_detailed_fix_summary(string file_type, string group_index,
       for (auto& key2 : *te.type_table_keys) {
         ofs << "<li>" << key2 << "</li>";
       }
-      ofs << "</ul></td><td align=\"center\">" << dateutils::string_ll_to_date_string(te.start) << " to " << dateutils::string_ll_to_date_string(te.end) << "<br><img src=\"/datasets/ds" << metautils::args.dsnum << "/metadata/spatial_coverage." << dbdata.ID_type;
+      ofs << "</ul></td><td align=\"center\">" << dateutils::string_ll_to_date_string(te.start) << " to " << dateutils::string_ll_to_date_string(te.end) << "<br><img src=\"/datasets/ds" << metautils::args.dsnum << "/metadata/spatial_coverage." << dbdata.id_type;
       if (!group_index.empty()) {
         ofs << "_gindex_" << group_index;
       }
@@ -2121,118 +2121,21 @@ void generate_group_detailed_metadata_view(string group_index,string file_type,s
   if (!group_index.empty() || group_index == "0") {
     return;
   }
-while (group_index != "0") {
-if (server_d.update("dsgroup","meta_link = 'X'","dsid = 'ds"+metautils::args.dsnum+"' and gindex = "+group_index) < 0) {
-metautils::log_warning("generate_group_detailed_metadata_view() returned warning: "+server_d.error()+" while trying to update dssdb.dsgroup",caller,user);
-}
-query.set("pindex","dsgroup","gindex = "+group_index);
-if (query.submit(server_d) < 0) {
-metautils::log_error("generate_group_detailed_metadata_view(): "+query.error(),caller,user);
-}
-MySQL::Row row;
-if (query.fetch_row(row)) {
-group_index=row[0];
-}
-else
-group_index="0";
-}
-/*
-  if (file_type == "Web") {
-    query.set("title,wnote","dsgroup","dsid = 'ds"+dsnum+"' and gindex = "+group_index);
-    if (table_exists(server_m,"WGrML.ds"+dsnum2+"_webfiles2")) {
-      if (field_exists(server_m,"WGrML.ds"+dsnum2+"_webfiles2","dsid")) {
-        grml_query.set("select distinct f.format,f.code from WGrML.formats as f left join WGrML.ds"+dsnum2+"_webfiles2 as w on f.code = w.format_code left join dssdb.wfile as x on (x.wfile = w.webID and x.type = w.type and x.dsid = w.dsid) where !isnull(w.format_code) and x.gindex = "+group_index);
-      }
-      else {
-        grml_query.set("select distinct f.format,f.code from WGrML.formats as f left join WGrML.ds"+dsnum2+"_webfiles2 as w on f.code = w.format_code left join dssdb.wfile as x on x.wfile = w.webID where !isnull(w.format_code) and x.gindex = "+group_index);
-      }
-      if (grml_query.submit(server_m) < 0) {
-        metautils::log_error("generate_group_detailed_metadata_view(): "+grml_query.error(),caller,user,args);
-      }
+  while (group_index != "0") {
+    if (server_d.update("dsgroup","meta_link = 'X'","dsid = 'ds"+metautils::args.dsnum+"' and gindex = "+group_index) < 0) {
+      metautils::log_warning("generate_group_detailed_metadata_view() returned warning: "+server_d.error()+" while trying to update dssdb.dsgroup",caller,user);
     }
-    if (table_exists(server_m,"WObML.ds"+dsnum2+"_webfiles2")) {
-      if (field_exists(server_m,"WObML.ds"+dsnum2+"_webfiles2","dsid")) {
-        obml_query.set("select distinct f.format,f.code from WObML.formats as f left join WObML.ds"+dsnum2+"_webfiles2 as w on f.code = w.format_code left join dssdb.wfile as x on (x.wfile = w.webID and x.type = w.type and x.dsid = w.dsid) where !isnull(w.format_code) and x.gindex = "+group_index);
-      }
-      else {
-        obml_query.set("select distinct f.format,f.code from WObML.formats as f left join WObML.ds"+dsnum2+"_webfiles2 as w on f.code = w.format_code left join dssdb.wfile as x on x.wfile = w.webID where !isnull(w.format_code) and x.gindex = "+group_index);
-      }
-      if (obml_query.submit(server_m) < 0) {
-        metautils::log_error("generate_group_detailed_metadata_view(): "+obml_query.error(),caller,user,args);
-      }
+    query.set("pindex","dsgroup","gindex = "+group_index);
+    if (query.submit(server_d) < 0) {
+      metautils::log_error("generate_group_detailed_metadata_view(): "+query.error(),caller,user);
     }
-    if (table_exists(server_m,"WFixML.ds"+dsnum2+"_webfiles2")) {
-      if (field_exists(server_m,"WObML.ds"+dsnum2+"_webfiles2","dsid")) {
-        fixml_query.set("select distinct f.format,f.code from WFixML.formats as f left join WFixML.ds"+dsnum2+"_webfiles2 as w on f.code = w.format_code left join dssdb.wfile as x on (x.wfile = w.webID and x.type = w.type and x.dsid = w.dsid) where !isnull(w.format_code) and x.gindex = "+group_index);
-      }
-      else {
-        fixml_query.set("select distinct f.format,f.code from WFixML.formats as f left join WFixML.ds"+dsnum2+"_webfiles2 as w on f.code = w.format_code left join dssdb.wfile as x on x.wfile = w.webID where !isnull(w.format_code) and x.gindex = "+group_index);
-      }
-      if (fixml_query.submit(server_m) < 0) {
-        metautils::log_error("generate_group_detailed_metadata_view(): "+fixml_query.error(),caller,user,args);
-      }
+    MySQL::Row row;
+    if (query.fetch_row(row)) {
+      group_index=row[0];
+    } else {
+      group_index="0";
     }
   }
-  if (query.submit(server_d) < 0)
-    metautils::log_error("generate_group_detailed_metadata_view(): "+query.error(),caller,user,args);
-  if (!query.fetch_row(row)) {
-    metautils::log_error("generate_group_detailed_metadata_view(): no entry in RDADB for group index "+group_index,caller,user,args);
-  }
-  gtitle=row[0];
-  gsummary=row[1];
-  ofs.open(tfile->name().toChar());
-  ofs << "<html>" << endl;
-  ofs << "<head>" << endl;
-  ofs << "<link rel=\"stylesheet\" type=\"text/css\" href=\"/css/transform.css\">" << endl;
-  ofs << "</head>" << endl;
-  ofs << "<body>" << endl;
-  ofs << "<br><center><big>" << gtitle << "</big></center>" << endl;
-  if (!gsummary.empty())
-    ofs << "<center><table><tr><td align=\"left\">" << gsummary << "</td></tr></table></center>" << endl;
-  if (grml_query.num_rows() > 0) {
-    generate_detailed_grid_summary(dsnum,grml_query,file_type,group_index,ofs,formatList,caller,user,args);
-    foundDetail=true;
-  }
-  if (obml_query.num_rows() > 0) {
-    generate_detailed_observation_summary(dsnum,obml_query,file_type,group_index,ofs,formatList,caller,user,args);
-    foundDetail=true;
-  }
-  if (fixml_query.num_rows() > 0) {
-    generate_detailed_fix_summary(dsnum,fixml_query,file_type,group_index,ofs,formatList,caller,user,args);
-    foundDetail=true;
-  }
-  ofs << "</body></html>" << endl;
-  ofs.close();
-  if (foundDetail) {
-    if (hostSync(tfile->name(),"/__HOST__/web/datasets/ds"+dsnum+"/metadata/"+file_type.toLower()+"_detailed_gindex_"+group_index+".html",error) < 0)
-      metautils::log_warning("generate_detailed_metadata_view() couldn't sync '"+file_type.toLower()+"_detailed_gindex_"+group_index+".html' - hostSync error(s): '"+error+"'",caller,user,argsString);
-  } 
-  if (foundDetail) {
-    if (file_type == "MSS") {
-      if (server_d.update("dsgroup","meta_link = if (meta_link = 'W' or meta_link = 'B','B','M')","dsid = 'ds"+dsnum+"' and gindex = "+group_index) < 0)
-        metautils::log_warning("generate_group_detailed_metadata_view() returned warning: "+server_d.error(),caller,user,args);
-    }
-    else if (file_type == "Web") {
-      if (server_d.update("dsgroup","meta_link = if (meta_link = 'M' or meta_link = 'B','B','W')","dsid = 'ds"+dsnum+"' and gindex = "+group_index) < 0)
-        metautils::log_warning("generate_group_detailed_metadata_view() returned warning: "+server_d.error(),caller,user,args);
-      while (group_index != "0") {
-        query.set("pindex","dsgroup","gindex = "+group_index);
-        if (query.submit(server_d) < 0)
-          metautils::log_error("generate_group_detailed_metadata_view(): "+query.error(),caller,user,args);
-        if (query.fetch_row(row)) {
-          group_index=row[0];
-        }
-        else {
-          group_index="0";
-        }
-        if (group_index != "0") {
-          if (server_d.update("dsgroup","meta_link = 'X'","dsid = 'ds"+dsnum+"' and gindex = "+group_index) < 0)
-            metautils::log_warning("generate_group_detailed_metadata_view() returned warning: "+server_d.error(),caller,user,args);
-        }
-      }
-    }
-  }
-*/
   server_m.disconnect();
   server_d.disconnect();
 }
