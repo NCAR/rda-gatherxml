@@ -12,9 +12,9 @@
 #include <search.hpp>
 #include <myerror.hpp>
 
-using metautils::log_error;
 using metautils::log_error2;
 using miscutils::this_function_label;
+using std::cerr;
 using std::cout;
 using std::endl;
 using std::regex;
@@ -69,7 +69,7 @@ unordered_set<string> g_web_tindex_set, g_inv_tindex_set;
 unordered_set<string> g_web_gindex_set;
 bool g_removed_from_wgrml, g_removed_from_wobml, g_removed_from_satml,
     g_removed_from_wfixml;
-bool g_create_web_filelist_cache = false, create_inv_filelist_cache=false;
+bool g_create_web_filelist_cache = false, create_inv_filelist_cache = false;
 
 void parse_args(MySQL::Server& server) {
   auto arg_list = split(metautils::args.args_string, "%");
@@ -92,7 +92,7 @@ void parse_args(MySQL::Server& server) {
     }
   }
   if (metautils::args.dsnum.empty()) {
-    std::cerr << "Error: no dataset specified" << std::endl;
+    cerr << "Error: no dataset specified" << endl;
     exit(1);
   }
 }
@@ -102,14 +102,15 @@ string tempdir_name() {
   if (tdir == nullptr) {
     tdir = new TempDir;
     if (!tdir->create(metautils::directives.temp_path)) {
-      log_error("unable to create temporary directory", "dcm", USER);
+      log_error2("unable to create temporary directory", "tempdir_name()",
+          "dcm", USER);
     }
   }
   return tdir->name();
 }
 
 void copy_version_controlled_data(MySQL::Server& server, string db, string
-    file_ID_code) {
+    file_id_code) {
   string error;
   auto tnames = table_names(server, db, "ds" + g_dsnum2 + "%", error);
   for (auto t : tnames) {
@@ -123,29 +124,29 @@ void copy_version_controlled_data(MySQL::Server& server, string db, string
       }
       string res;
       server.command("insert into V" + t + " select * from " + t + " where "
-          "file_code = " + file_ID_code, res);
+          "file_code = " + file_id_code, res);
     }
   }
 }
 
-void clear_tables_by_file_id(string db, string file_ID_code, bool
+void clear_tables_by_file_id(string db, string file_id_code, bool
     is_version_controlled) {
   static const string F = this_function_label(__func__);
   MySQL::Server local_server(metautils::directives.database_server, metautils::
       directives.metadb_username, metautils::directives.metadb_password, "");
   if (!local_server) {
-    log_error2("unable to connect to MySQL server while clearing fileID code " +
-        file_ID_code + " from " + db, F, "dcm", USER);
+    log_error2("unable to connect to MySQL server while clearing file code " +
+        file_id_code + " from " + db, F, "dcm", USER);
   }
   if (is_version_controlled) {
-    copy_version_controlled_data(local_server, db, file_ID_code);
+    copy_version_controlled_data(local_server, db, file_id_code);
   }
   string error;
-  auto tnames=table_names(local_server, db, "ds" + g_dsnum2 + "%", error);
+  auto tnames = table_names(local_server, db, "ds" + g_dsnum2 + "%", error);
   for (auto t : tnames) {
     t = db + "." + t;
     if (field_exists(local_server, t, "file_code")) {
-      if (local_server._delete(t, "file_code = " + file_ID_code) < 0) {
+      if (local_server._delete(t, "file_code = " + file_id_code) < 0) {
         log_error2("error: '" + local_server.error() + "' while clearing " + t,
             F, "dcm", USER);
       }
@@ -182,10 +183,6 @@ bool remove_from(string database, string table_ext, string file_field_name,
   static const string F = this_function_label(__func__);
   is_version_controlled = false;
   string error;
-  if (md_directory == "wfmd" && regex_search(file, regex("^http(s){0,1}://"
-      "(rda|dss)\\.ucar\\.edu"))) {
-    file = metautils::relative_web_filename(file);
-  }
   auto file_table = database + ".ds" + g_dsnum2 + table_ext;
   MySQL::Server local_server(metautils::directives.database_server, metautils::
       directives.metadb_username, metautils::directives.metadb_password, "");
@@ -270,8 +267,8 @@ bool remove_from(string database, string table_ext, string file_field_name,
           stringstream oss, ess;
           if (mysystem2("/bin/mkdir -p " + tdir->name() + "/metadata/" +
                md_directory + "/v", oss, ess) < 0) {
-            log_error("could not create the temporary directory tree", F, "dcm",
-                USER);
+            log_error2("could not create the temporary directory tree", F,
+                "dcm", USER);
           }
         }
         short flag = 0;
@@ -443,7 +440,7 @@ extern "C" void *t_removed(void *ts) {
   }
   MySQL::Server server_d(metautils::directives.database_server, metautils::
       directives.rdadb_username, metautils::directives.rdadb_password, "");
-  MySQL::LocalQuery query("gindex", "wfile", "wfile = '" + file+"'");
+  MySQL::LocalQuery query("gindex", "wfile", "wfile = '" + file + "'");
   MySQL::Row row;
   if (query.submit(server_d) == 0 && query.fetch_row(row)) {
     g_web_gindex_set.emplace(row[0]);
@@ -472,153 +469,136 @@ extern "C" void *t_removed(void *ts) {
   return nullptr;
 }
 
-void generate_graphics(string type)
-{
-  if (type == "web") {
-    type="gsi";
-  }
-  else {
-    return;
-  }
-  stringstream oss,ess;
-  mysystem2(metautils::directives.local_root+"/bin/"+type+" "+metautils::args.dsnum,oss,ess);
+void generate_graphics() {
+  stringstream oss, ess;
+  mysystem2(metautils::directives.local_root + "/bin/gsi " + metautils::args.
+      dsnum, oss, ess);
 }
 
-void generate_dataset_home_page()
-{
-  stringstream oss,ess;
-  mysystem2(metautils::directives.local_root+"/bin/dsgen "+metautils::args.dsnum,oss,ess);
+void generate_dataset_home_page() {
+  stringstream oss, ess;
+  mysystem2(metautils::directives.local_root + "/bin/dsgen " + metautils::args.
+      dsnum, oss, ess);
 }
 
-extern "C" void *t_index_variables(void *)
-{
-  MySQL::Server srv(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
-  searchutils::index_variables(srv,metautils::args.dsnum);
+extern "C" void *t_index_variables(void *) {
+  MySQL::Server srv(metautils::directives.database_server, metautils::
+      directives.metadb_username, metautils::directives.metadb_password, "");
+  searchutils::index_variables(srv, metautils::args.dsnum);
   srv.disconnect();
   return nullptr;
 }
 
-extern "C" void *t_summarize_frequencies(void *ts)
-{
-  ThreadStruct *t=(ThreadStruct *)ts;
-
-  gatherxml::summarizeMetadata::summarize_frequencies(t->strings[0],"dcm",USER);
+extern "C" void *t_summarize_frequencies(void *ts) {
+  ThreadStruct *t = (ThreadStruct *)ts;
+  gatherxml::summarizeMetadata::summarize_frequencies(t->strings[0], "dcm",
+      USER);
   return nullptr;
 }
 
-extern "C" void *t_summarize_grids(void *ts)
-{
-  ThreadStruct *t=(ThreadStruct *)ts;
-
-  gatherxml::summarizeMetadata::summarize_grids(t->strings[0],"dcm",USER);
+extern "C" void *t_summarize_grids(void *ts) {
+  ThreadStruct *t = (ThreadStruct *)ts;
+  gatherxml::summarizeMetadata::summarize_grids(t->strings[0], "dcm", USER);
   return nullptr;
 }
 
-extern "C" void *t_aggregate_grids(void *ts)
-{
-  ThreadStruct *t=(ThreadStruct *)ts;
-
-  gatherxml::summarizeMetadata::aggregate_grids(t->strings[0],"dcm",USER);
+extern "C" void *t_aggregate_grids(void *ts) {
+  ThreadStruct *t = (ThreadStruct *)ts;
+  gatherxml::summarizeMetadata::aggregate_grids(t->strings[0], "dcm", USER);
   return nullptr;
 }
 
-extern "C" void *t_summarize_grid_levels(void *ts)
-{
-  ThreadStruct *t=(ThreadStruct *)ts;
-
-  gatherxml::summarizeMetadata::summarize_grid_levels(t->strings[0],"dcm",USER);
+extern "C" void *t_summarize_grid_levels(void *ts) {
+  ThreadStruct *t = (ThreadStruct *)ts;
+  gatherxml::summarizeMetadata::summarize_grid_levels(t->strings[0], "dcm",
+      USER);
   return nullptr;
 }
 
-extern "C" void *t_summarize_grid_resolutions(void *)
-{
-  gatherxml::summarizeMetadata::summarize_grid_resolutions("dcm",USER,"");
+extern "C" void *t_summarize_grid_resolutions(void *) {
+  gatherxml::summarizeMetadata::summarize_grid_resolutions("dcm", USER, "");
   return nullptr;
 }
 
-extern "C" void *t_create_file_list_cache(void *)
-{
-  gatherxml::summarizeMetadata::create_file_list_cache("MSS","dcm",USER);
+extern "C" void *t_create_file_list_cache(void *) {
+  gatherxml::summarizeMetadata::create_file_list_cache("MSS", "dcm", USER);
   return nullptr;
 }
 
-extern "C" void *t_generate_detailed_metadata_view(void *)
-{
-  gatherxml::detailedMetadata::generate_detailed_metadata_view("dcm",USER);
+extern "C" void *t_generate_detailed_metadata_view(void *) {
+  gatherxml::detailedMetadata::generate_detailed_metadata_view("dcm", USER);
   return nullptr;
 }
 
 int main(int argc, char **argv) {
   if (argc < 4) {
-    std::cerr << "usage: dcm -d <nnn.n> [options...] files..." << std::endl;
-    std::cerr << std::endl;
-    std::cerr << "purpose:" << std::endl;
-    std::cerr << "dcm deletes content metadata from the RDADB for the specified files." << std::endl;
-    std::cerr << std::endl;
-    std::cerr << "required:" << std::endl;
-    std::cerr << "-d <nnn.n>  nnn.n is the dataset number to which the data file(s) belong" << std::endl;
-    std::cerr << std::endl;
-    std::cerr << "options:" << std::endl;
-    std::cerr << "-g/-G       generate (default)/don't generate graphics for ObML files" << std::endl;
-    std::cerr << "-N          notify with a message when dcm completes" << std::endl;
-    std::cerr << std::endl;
-    std::cerr << "NOTES:" << std::endl;
-    std::cerr << "  1) each file in <files...> must begin with \"https://rda.ucar.edu\", or be" << std::endl;
-    std::cerr << "       specified as for the -WF option of \"dsarch\"" << std::endl;
-    std::cerr << "  2) for files that support individual members, you can either specify the" << std::endl;
-    std::cerr << "       name of the parent file and metadata for all members will be deleted," << std::endl;
-    std::cerr << "       or you can specify the name of an individual member as" << std::endl;
-    std::cerr << "       \"parent..m..member\" and the metadata for just that member will be" << std::endl;
-    std::cerr << "       deleted" << std::endl;
+    cerr << "usage: dcm -d <nnn.n> [options...] files..." << endl;
+    cerr << endl;
+    cerr << "purpose:" << endl;
+    cerr << "dcm deletes content metadata from the RDADB for the specified "
+        "files." << endl;
+    cerr << endl;
+    cerr << "required:" << endl;
+    cerr << "-d <nnn.n>  nnn.n is the dataset number to which the data file(s) "
+        "belong" << endl;
+    cerr << endl;
+    cerr << "options:" << endl;
+    cerr << "-g/-G       generate (default)/don't generate graphics for ObML "
+        "files" << endl;
+    cerr << "-N          notify with a message when dcm completes" << endl;
+    cerr << endl;
+    cerr << "NOTES:" << endl;
+    cerr << "  1) each file in <files...> must be specified as for the -WF "
+        "option of \"dsarch\"" << endl;
     exit(1);
   }
   metautils::args.args_string = unixutils::unix_args_string(argc, argv, '%');
   metautils::read_config("dcm", USER);
-  MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
+  MySQL::Server server(metautils::directives.database_server, metautils::
+      directives.metadb_username, metautils::directives.metadb_password, "");
   if (!server) {
-    log_error("unable to connect to MySQL server on startup", "dcm", USER);
+    log_error2("unable to connect to MySQL server on startup", "main()", "dcm",
+        USER);
   }
   parse_args(server);
-/*
-  if (metautils::args.dsnum == "999.9") {
-    exit(0);
-  }
-*/
-  g_removed_from_wgrml=false;
-  g_removed_from_wobml=false;
-  g_removed_from_satml=false;
-  g_removed_from_wfixml=false;
-  const size_t MAX_NUM_THREADS=6;
+  g_removed_from_wgrml = false;
+  g_removed_from_wobml = false;
+  g_removed_from_satml = false;
+  g_removed_from_wfixml = false;
+  const size_t MAX_NUM_THREADS = 6;
   vector<ThreadStruct> threads(MAX_NUM_THREADS);
   vector<pthread_t> tid_list;
-  for (size_t n=0; n < g_files.size(); ++n) {
+  for (size_t n = 0; n < g_files.size(); ++n) {
     if (tid_list.size() < MAX_NUM_THREADS) {
       threads[tid_list.size()].strings.clear();
       threads[tid_list.size()].strings.emplace_back(g_files[n]);
-      threads[tid_list.size()].removed_file_index=n;
-      threads[tid_list.size()].file_removed=false;
-      pthread_create(&threads[tid_list.size()].tid,nullptr,t_removed,&threads[tid_list.size()]);
+      threads[tid_list.size()].removed_file_index = n;
+      threads[tid_list.size()].file_removed = false;
+      pthread_create(&threads[tid_list.size()].tid, nullptr, t_removed,
+          &threads[tid_list.size()]);
       pthread_detach(threads[tid_list.size()].tid);
       tid_list.emplace_back(threads[tid_list.size()].tid);
       if (gatherxml::verbose_operation) {
-        std::cout << "thread created for removal of " << g_files[n] << " ..." << std::endl;
+        cout << "thread created for removal of " << g_files[n] << " ..." <<
+            endl;
       }
-    }
-    else {
+    } else {
       if (gatherxml::verbose_operation) {
-        std::cout << "... at maximum thread capacity, waiting for an available slot ..." << std::endl;
+        cout << "... at maximum thread capacity, waiting for an available slot "
+            "..." << endl;
       }
-      size_t free_tid_idx=0xffffffffffffffff;
+      size_t free_tid_idx = 0xffffffffffffffff;
       while (1) {
-        for (size_t m=0; m < MAX_NUM_THREADS; ++m) {
-          if (pthread_kill(tid_list[m],0) != 0) {
+        for (size_t m = 0; m < MAX_NUM_THREADS; ++m) {
+          if (pthread_kill(tid_list[m], 0) != 0) {
             if (threads[m].file_removed) {
               g_files[threads[m].removed_file_index].clear();
               if (gatherxml::verbose_operation) {
-                std::cout << "File " << g_files[threads[m].removed_file_index] << "/" << g_files.size() << " cleared." << std::endl;
+                cout << "File " << g_files[threads[m].removed_file_index] << "/"
+                    << g_files.size() << " cleared." << endl;
               }
             }
-            free_tid_idx=m;
+            free_tid_idx = m;
             break;
           }
         }
@@ -628,123 +608,140 @@ int main(int argc, char **argv) {
       }
       threads[free_tid_idx].strings.clear();
       threads[free_tid_idx].strings.emplace_back(g_files[n]);
-      threads[free_tid_idx].removed_file_index=n;
-      threads[free_tid_idx].file_removed=false;
-      pthread_create(&threads[free_tid_idx].tid,nullptr,t_removed,&threads[free_tid_idx]);
+      threads[free_tid_idx].removed_file_index = n;
+      threads[free_tid_idx].file_removed = false;
+      pthread_create(&threads[free_tid_idx].tid, nullptr, t_removed,
+          &threads[free_tid_idx]);
       pthread_detach(threads[free_tid_idx].tid);
-      tid_list[free_tid_idx]=threads[free_tid_idx].tid;
+      tid_list[free_tid_idx] = threads[free_tid_idx].tid;
       if (gatherxml::verbose_operation) {
-        std::cout << "available thread slot at " << free_tid_idx << " found, thread created for removal of " << g_files[n] << " ..." << std::endl;
+        cout << "available thread slot at " << free_tid_idx << " found, thread "
+            "created for removal of " << g_files[n] << " ..." << endl;
       }
     }
   }
-  auto found_thread=true;
+  auto found_thread = true;
   while (found_thread) {
-    found_thread=false;
-    for (size_t n=0; n < tid_list.size(); ++n) {
+    found_thread = false;
+    for (size_t n = 0; n < tid_list.size(); ++n) {
       if (tid_list[n] < 0xffffffffffffffff) {
-        if (pthread_kill(tid_list[n],0) != 0) {
+        if (pthread_kill(tid_list[n], 0) != 0) {
           if (threads[n].file_removed) {
             g_files[threads[n].removed_file_index].clear();
             if (gatherxml::verbose_operation) {
-              std::cout << "File " << g_files[threads[n].removed_file_index] << "/" << g_files.size() << " cleared." << std::endl;
+              cout << "File " << g_files[threads[n].removed_file_index] << "/"
+                  << g_files.size() << " cleared." << endl;
             }
           }
-          tid_list[n]=0xffffffffffffffff;
-        }
-        else {
-          found_thread=true;
+          tid_list[n] = 0xffffffffffffffff;
+        } else {
+          found_thread = true;
         }
       }
     }
   }
   for (const auto& gindex : g_web_gindex_set) {
-    gatherxml::detailedMetadata::generate_group_detailed_metadata_view(gindex,"Web","dcm",USER);
+    gatherxml::detailedMetadata::generate_group_detailed_metadata_view(gindex,
+        "Web", "dcm", USER);
   }
-  stringstream oss,ess;
+  stringstream oss, ess;
   if (g_removed_from_wgrml) {
-    clear_grid_cache(server,"WGrML");
+    clear_grid_cache(server, "WGrML");
     threads.clear();
     threads.resize(7);
-    pthread_create(&threads[0].tid,nullptr,t_index_variables,nullptr);
+    pthread_create(&threads[0].tid, nullptr, t_index_variables, nullptr);
     threads[1].strings.emplace_back("WGrML");
-    pthread_create(&threads[1].tid,nullptr,t_summarize_frequencies,&threads[1]);
+    pthread_create(&threads[1].tid, nullptr, t_summarize_frequencies,
+        &threads[1]);
     threads[2].strings.emplace_back("WGrML");
-    pthread_create(&threads[2].tid,nullptr,t_summarize_grids,&threads[2]);
+    pthread_create(&threads[2].tid, nullptr, t_summarize_grids, &threads[2]);
     threads[3].strings.emplace_back("WGrML");
-    pthread_create(&threads[3].tid,nullptr,t_aggregate_grids,&threads[3]);
+    pthread_create(&threads[3].tid, nullptr, t_aggregate_grids, &threads[3]);
     threads[4].strings.emplace_back("WGrML");
-    pthread_create(&threads[4].tid,nullptr,t_summarize_grid_levels,&threads[4]);
-    pthread_create(&threads[5].tid,nullptr,t_summarize_grid_resolutions,nullptr);
-    pthread_create(&threads[6].tid,nullptr,t_generate_detailed_metadata_view,nullptr);
+    pthread_create(&threads[4].tid, nullptr, t_summarize_grid_levels,
+        &threads[4]);
+    pthread_create(&threads[5].tid, nullptr, t_summarize_grid_resolutions,
+        nullptr);
+    pthread_create(&threads[6].tid, nullptr, t_generate_detailed_metadata_view,
+        nullptr);
     for (const auto& t : threads) {
-      pthread_join(t.tid,nullptr);
+      pthread_join(t.tid, nullptr);
     }
-    if (mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" -rw",oss,ess) < 0) {
-      std::cerr << ess.str() << std::endl;
+    if (mysystem2(metautils::directives.local_root + "/bin/scm -d " +
+        metautils::args.dsnum + " -rw", oss, ess) < 0) {
+      cerr << ess.str() << endl;
     }
-    if (mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" -ri",oss,ess) < 0) {
-      std::cerr << ess.str() << std::endl;
+    if (mysystem2(metautils::directives.local_root + "/bin/scm -d " +
+         metautils::args.dsnum + " -ri", oss, ess) < 0) {
+      cerr << ess.str() << endl;
     }
     generate_dataset_home_page();
   }
   if (g_removed_from_wobml) {
-    gatherxml::summarizeMetadata::summarize_frequencies("dcm",USER);
-    gatherxml::summarizeMetadata::summarize_obs_data("dcm",USER);
-    if (mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" -rw",oss,ess) < 0) {
-      std::cerr << ess.str() << std::endl;
+    gatherxml::summarizeMetadata::summarize_frequencies("dcm", USER);
+    gatherxml::summarizeMetadata::summarize_obs_data("dcm",  USER);
+    if (mysystem2(metautils::directives.local_root + "/bin/scm -d " +
+        metautils::args.dsnum + " -rw", oss, ess) < 0) {
+      cerr << ess.str() << endl;
     }
     if (metautils::args.update_graphics) {
-      generate_graphics("web");
+      generate_graphics();
     }
     generate_dataset_home_page();
   }
   if (g_removed_from_satml) {
-    if (mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" -rm",oss,ess) < 0)
-      std::cerr << ess.str() << std::endl;
+    if (mysystem2(metautils::directives.local_root + "/bin/scm -d " +
+        metautils::args.dsnum + " -rm", oss, ess) < 0)
+      cerr << ess.str() << endl;
   }
   if (g_removed_from_wfixml) {
-    gatherxml::summarizeMetadata::summarize_frequencies("dcm",USER);
-    gatherxml::summarizeMetadata::summarize_fix_data("dcm",USER);
-    if (mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" -rw",oss,ess) < 0) {
-      std::cerr << ess.str() << std::endl;
+    gatherxml::summarizeMetadata::summarize_frequencies("dcm", USER);
+    gatherxml::summarizeMetadata::summarize_fix_data("dcm", USER);
+    if (mysystem2(metautils::directives.local_root + "/bin/scm -d " +
+        metautils::args.dsnum + " -rw", oss, ess) < 0) {
+      cerr << ess.str() << endl;
     }
     if (metautils::args.update_graphics) {
-      generate_graphics("web");
+      generate_graphics();
     }
     generate_dataset_home_page();
   }
   if (g_create_web_filelist_cache) {
-    gatherxml::summarizeMetadata::create_file_list_cache("Web","dcm",USER);
+    gatherxml::summarizeMetadata::create_file_list_cache("Web", "dcm", USER);
   }
   for (const auto& tindex : g_web_tindex_set) {
-    gatherxml::summarizeMetadata::create_file_list_cache("Web","dcm",USER,tindex);
+    gatherxml::summarizeMetadata::create_file_list_cache("Web", "dcm", USER,
+        tindex);
   }
   if (create_inv_filelist_cache) {
-    gatherxml::summarizeMetadata::create_file_list_cache("inv","dcm",USER);
+    gatherxml::summarizeMetadata::create_file_list_cache("inv", "dcm", USER);
   }
   for (const auto& tindex : g_inv_tindex_set) {
-    gatherxml::summarizeMetadata::create_file_list_cache("inv","dcm",USER,tindex);
+    gatherxml::summarizeMetadata::create_file_list_cache("inv", "dcm", USER,
+        tindex);
   }
-  for (auto it=g_files.begin(); it != g_files.end(); ++it) {
+  for (auto it = g_files.begin(); it != g_files.end(); ++it) {
     if (it->empty()) {
       g_files.erase(it--);
     }
   }
   if (!g_files.empty()) {
-    std::cerr << "Warning: content metadata for the following files was not removed (maybe it never existed?):";
+    cerr << "Warning: content metadata for the following files was not "
+        "removed (maybe it never existed?):";
     for (const auto& file : g_files) {
-      std::cerr << " " << file;
+      cerr << " " << file;
     }
-    std::cerr << std::endl;
+    cerr << endl;
   }
   server.disconnect();
-  server.connect(metautils::directives.database_server,metautils::directives.rdadb_username,metautils::directives.rdadb_password,"");
+  server.connect(metautils::directives.database_server, metautils::directives.
+      rdadb_username, metautils::directives.rdadb_password, "");
   if (server) {
-    server.update("dataset","version = version+1","dsid = 'ds"+metautils::args.dsnum+"'");
+    server.update("dataset", "version = version + 1", "dsid = 'ds" +
+        metautils::args.dsnum + "'");
     server.disconnect();
   }
   if (g_files.empty() && local_args.notify) {
-    std::cout << "dcm has completed successfully" << std::endl;
+    cout << "dcm has completed successfully" << endl;
   }
 }
