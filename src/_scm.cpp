@@ -532,13 +532,20 @@ void insert_filename(MarkupParameters *markup_parameters) {
   const static string F = this_function_label(__func__);
   if (markup_parameters->file_map.find(markup_parameters->filename) ==
       markup_parameters->file_map.end()) {
-    auto tb_nam = markup_parameters->database + ".ds" + local_args.dsnum2 + "_"
-        + markup_parameters->file_type + "files2";
+    auto tb_nam = markup_parameters->database + ".ds" + local_args.dsnum2 +
+        "_webfiles2";
     if (!table_exists(markup_parameters->server, tb_nam)) {
       create_tables(markup_parameters);
     }
-    auto c = table_code(markup_parameters->server, tb_nam, markup_parameters->
-        file_type + "ID = '" + markup_parameters->filename + "'", false);
+
+// patch until all "webfiles2" tables have migrated webID -> id
+string c;
+if (MySQL::field_exists(markup_parameters->server, tb_nam, "id")) {
+c = table_code(markup_parameters->server, tb_nam, "id = '" + markup_parameters->filename + "'", false);
+} else {
+c = table_code(markup_parameters->server, tb_nam, markup_parameters->file_type + "ID = '" + markup_parameters->filename + "'", false);
+}
+
     if (c.empty()) {
       if (markup_parameters->server.insert(tb_nam, markup_parameters->file_type
           + "ID, format_code, num_" + markup_parameters->data_type + ", "
@@ -570,8 +577,8 @@ void clear_grml_tables(MarkupParameters *markup_parameters) {
       local_args.dsnum2 + "_grids2", "file_code = " + markup_parameters->
       file_map[markup_parameters->filename]);
   markup_parameters->server._delete(markup_parameters->database + ".ds" +
-      local_args.dsnum2 + "_processes", markup_parameters->file_type +
-      "ID_code = " + markup_parameters->file_map[markup_parameters->filename]);
+      local_args.dsnum2 + "_processes", "file_code = " + markup_parameters->
+      file_map[markup_parameters->filename]);
   markup_parameters->server._delete(markup_parameters->database + ".ds" +
       local_args.dsnum2 + "_ensembles", "file_code = " + markup_parameters->
       file_map[markup_parameters->filename]);
