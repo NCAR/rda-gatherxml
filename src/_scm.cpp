@@ -547,16 +547,30 @@ c = table_code(markup_parameters->server, tb_nam, markup_parameters->file_type +
 }
 
     if (c.empty()) {
-      if (markup_parameters->server.insert(tb_nam, markup_parameters->file_type
-          + "ID, format_code, num_" + markup_parameters->data_type + ", "
-          "start_date, end_date, uflag", "'" + markup_parameters->filename +
-          "', " + markup_parameters->format_map[markup_parameters->format] +
-          ", 0, 0, 0, '" + strand(5) + "'", "") < 0) {
+
+// patch until all "webfiles2" tables have migrated webID -> id
+string cols;
+if (MySQL::field_exists(markup_parameters->server, tb_nam, "id")) {
+cols = "id, format_code, num_" + markup_parameters->data_type + ", " "start_date, end_date, uflag";
+} else {
+cols = markup_parameters->file_type + "ID, format_code, num_" + markup_parameters->data_type + ", " "start_date, end_date, uflag";
+}
+
+      if (markup_parameters->server.insert(tb_nam, cols, "'" +
+          markup_parameters->filename + "', " + markup_parameters->format_map[
+          markup_parameters->format] + ", 0, 0, 0, '" + strand(5) + "'", "") <
+          0) {
         log_error2("error: '" + markup_parameters->server.error() + " while "
             "inserting into " + tb_nam, F, "scm", USER);
       }
-      c = table_code(markup_parameters->server, tb_nam, markup_parameters->
-          file_type + "ID = '" + markup_parameters->filename + "'", false);
+
+// patch until all "webfiles2" tables have migrated webID -> id
+if (MySQL::field_exists(markup_parameters->server, tb_nam, "id")) {
+c = table_code(markup_parameters->server, tb_nam, "id = '" + markup_parameters->filename + "'", false);
+} else {
+c = table_code(markup_parameters->server, tb_nam, markup_parameters->file_type + "ID = '" + markup_parameters->filename + "'", false);
+}
+
       if (c.empty()) {
         log_error2("error: unable to retrieve code from '" + tb_nam + "' for "
             "value '" + markup_parameters->filename + "'", F, "scm", USER);
