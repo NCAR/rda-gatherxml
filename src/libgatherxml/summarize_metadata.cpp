@@ -480,14 +480,14 @@ unordered_set<string> summarize_frequencies_from_wgrml_by_data_file(MySQL::
 #endif
 
   // create a map of time range codes and their descriptions
-  MySQL::LocalQuery qc("code, timeRange", "WGrML.timeRanges");
+  MySQL::LocalQuery qc("code, time_range", "WGrML.time_ranges");
 #ifdef DUMP_QUERIES
   {
   Timer tm;
   tm.start();
 #endif
   if (qc.submit(server) < 0) {
-    log_error2("'" + qc.error() + "' while querying WGrML.timeRanges", F,
+    log_error2("'" + qc.error() + "' while querying WGrML.time_ranges", F,
         caller, user);
   }
 #ifdef DUMP_QUERIES

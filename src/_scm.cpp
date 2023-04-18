@@ -712,8 +712,8 @@ void process_grml_markup(void *markup_parameters) {
       }
     }
     if (tr_map.find(tr) == tr_map.end()) {
-      auto c = table_code(gp->server, gp->database + ".timeRanges",
-          "timeRange = '" + tr + "'");
+      auto c = table_code(gp->server, gp->database + ".time_ranges",
+          "time_range = '" + tr + "'");
       if (c.empty()) {
         log_error2("unable to get time range code", F, "scm", USER);
       }

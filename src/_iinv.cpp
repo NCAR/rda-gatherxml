@@ -297,7 +297,7 @@ void build_wms_capabilities() {
       ofs << "#ENDREPEAT __CRS__" << gcnt << "__" << endl;
       last = gcod;
     }
-    q.set("code", "WGrML.timeRanges", "timeRange = '" + g.attribute_value(
+    q.set("code", "WGrML.time_ranges", "time_range = '" + g.attribute_value(
         "timeRange") + "'");
     string tcod;
     if (q.submit(server) == 0 && q.fetch_row(row)) {
@@ -536,7 +536,7 @@ void insert_grml_inventory() {
             metautils::log_warning("insert_grml_inventory() does not recognize "
                 "product '" + sp[2] + "'", "iinv", USER);
           }
-          q.set("code", "WGrML.timeRanges", "timeRange = '" + sp[2] + "'");
+          q.set("code", "WGrML.time_ranges", "time_range = '" + sp[2] + "'");
           if (q.submit(server) < 0) {
             log_error2("insert_grml_inventory() returned error: " + q.error() +
                 " while trying to get timeRange code", F, "iinv", USER);
