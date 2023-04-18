@@ -354,7 +354,7 @@ void summarize_grid_resolutions(string caller, string user, string
   static const string F = string(__func__) + "()";
   MySQL::Server srv(metautils::directives.database_server, metautils::
       directives.metadb_username, metautils::directives.metadb_password, "");
-  MySQL::LocalQuery q("code, definition, defParams", "WGrML.gridDefinitions");
+  MySQL::LocalQuery q("code, definition, def_params", "WGrML.grid_definitions");
 #ifdef DUMP_QUERIES
   {
   Timer tm;

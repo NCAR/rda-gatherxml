@@ -625,10 +625,10 @@ string parameter_query(MySQL::Server& mysrv, const DBData& dbdata, string
 string time_range_query(MySQL::Server& mysrv, const DBData& dbdata, string
     format_code) {
   auto d2 = substitute(metautils::args.dsnum, ".", "");
-  return "select distinct t.timeRange, d.definition, d.defParams from " +
+  return "select distinct t.timeRange, d.definition, d.def_params from " +
       dbdata.db + ".summary as s left join " + dbdata.db + ".timeRanges as t "
       "on t.code = s.timeRange_code left join " + dbdata.db +
-      ".gridDefinitions as d on d.code = s.gridDefinition_code where s.dsid = "
+      ".grid_definitions as d on d.code = s.gridDefinition_code where s.dsid = "
       "'" + metautils::args.dsnum + "' and format_code = " + format_code;
 }
 
@@ -772,7 +772,7 @@ void generate_gridded_product_detail(MySQL::Server& mysrv, const DBData& dbdata,
   for (const auto& r : q) {
     trmap.emplace(stoi(r[1]), r[0]);
   }
-  q.set("definition, defParams, code", dbdata.db + ".gridDefinitions");
+  q.set("definition, def_params, code", dbdata.db + ".grid_definitions");
 #ifdef DUMP_QUERIES
   {
   Timer tm;
