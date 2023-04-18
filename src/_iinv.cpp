@@ -539,10 +539,10 @@ void insert_grml_inventory() {
           q.set("code", "WGrML.time_ranges", "time_range = '" + sp[2] + "'");
           if (q.submit(server) < 0) {
             log_error2("insert_grml_inventory() returned error: " + q.error() +
-                " while trying to get timeRange code", F, "iinv", USER);
+                " while trying to get time_range code", F, "iinv", USER);
           }
           if (q.num_rows() == 0) {
-            log_error2("no timeRange code for '" + sp[2] + "'", F, "iinv",
+            log_error2("no time_range code for '" + sp[2] + "'", F, "iinv",
                 USER);
           }
           q.fetch_row(row);
