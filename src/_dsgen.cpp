@@ -1539,7 +1539,7 @@ void add_spatial_coverage(TokenDocument& tdoc, string dsnum2, const vector<
     s = "select wfile, tindex from dssdb.wfile where dsid = 'ds" + metautils::
         args.dsnum + "' and type = 'D' and " "status = 'P'";
     fill_map(rfils, s);
-    s = "select code, webID from WGrML.ds" + dsnum2 + "_webfiles2";
+    s = "select code, id from WGrML.ds" + dsnum2 + "_webfiles2";
     fill_map(mfils, s);
   }
   unordered_map<string, shared_ptr<unordered_set<string>>> udefs;
@@ -1549,7 +1549,7 @@ void add_spatial_coverage(TokenDocument& tdoc, string dsnum2, const vector<
       if (dt == "grid") {
         MySQL::LocalQuery qgc;
         if (grouped_periods) {
-          qgc.set("select gridDefinition_codes, webID_code from WGrML.ds" +
+          qgc.set("select grid_definition_codes, file_code from WGrML.ds" +
               dsnum2 + "_grid_definitions");
         } else {
           qgc.set("select distinct grid_definition_codes from WGrML.ds" + dsnum2
@@ -1565,8 +1565,8 @@ void add_spatial_coverage(TokenDocument& tdoc, string dsnum2, const vector<
           for (const auto& v : b) {
             string k;
             if (gdefs.find(v) == gdefs.end()) {
-              MySQL::LocalQuery qgd("definition, defParams", "WGrML"
-                  ".gridDefinitions", "code = " + itos(v));
+              MySQL::LocalQuery qgd("definition, def_params", "WGrML"
+                  ".grid_definitions", "code = " + itos(v));
               if (qgd.submit(server) < 0) {
                 log_error2("query: " + qgd.show() + " returned error: " + qgd.
                     error(), F, "dsgen", USER);

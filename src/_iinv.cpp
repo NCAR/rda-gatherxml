@@ -251,8 +251,8 @@ void build_wms_capabilities() {
   string last = "-1";
   for (const auto& g : glst) {
     auto p = grid_definition_parameters(g);
-    q.set("code", "WGrML.gridDefinitions", "definition = '" + g.attribute_value(
-        "definition") + "' and defParams = '" + p + "'");
+    q.set("code", "WGrML.grid_definitions", "definition = '" + g.
+        attribute_value("definition") + "' and def_params = '" + p + "'");
     string gcod;
     if (q.submit(server) == 0 && q.fetch_row(row)) {
       gcod = row[0];
@@ -692,11 +692,11 @@ void insert_grml_inventory() {
                   "type " + sp_g[0], F, "iinv", USER);
             }
           }
-          q.set("code", "WGrML.gridDefinitions", "definition = '" + d + "' and "
-              "defParams = '" + dp + "'");
+          q.set("code", "WGrML.grid_definitions", "definition = '" + d +
+              "' and def_params = '" + dp + "'");
           if (q.submit(server) < 0) {
             log_error2("insert_grml_inventory() returned error: " + q.error() +
-                " while trying to get gridDefinition code", F, "iinv", USER);
+                " while trying to get grid_definition code", F, "iinv", USER);
           }
           if (q.num_rows() == 0) {
             log_error2("no gridDefinition code for '" + d + ", " + dp + "'", F,
