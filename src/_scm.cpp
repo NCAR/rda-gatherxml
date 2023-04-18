@@ -722,8 +722,8 @@ void process_grml_markup(void *markup_parameters) {
     auto gdef = def + ":" + defp;
     if (gd_map.find(gdef) == gd_map.end()) {
       MySQL::LocalQuery q;
-      auto c = table_code(gp->server, gp->database + ".gridDefinitions",
-          "definition = '" + def + "' AND defParams = '" + defp + "'");
+      auto c = table_code(gp->server, gp->database + ".grid_definitions",
+          "definition = '" + def + "' AND def_params = '" + defp + "'");
       if (c.empty()) {
         log_error2("unable to get grid definition code", F, "scm", USER);
       }
