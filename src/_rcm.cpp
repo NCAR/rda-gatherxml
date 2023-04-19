@@ -322,7 +322,7 @@ bool renamed_cmd() {
   if (regex_search(g_old_name, regex(
       "^http(s){0,1}://(rda|dss)\\.ucar\\.edu/"))) {
     ftbl = "_webfiles2";
-    col = "webID";
+    col = "id";
     dcol = "wfile";
     if (!g_old_web_home.empty()) {
       oname = substitute(g_old_name, "http://rda.ucar.edu", "");
@@ -400,7 +400,7 @@ bool renamed_cmd() {
                 g_new_dsnum + " -f " + substitute(nname, "/", "%") +
                 ".GrML_inv", oss, ess);
             server.update("WGrML.ds" + substitute(g_new_dsnum, ".", "") +
-                "_webfiles2", "inv = 'Y'", "webID = '" + nname + "'");
+                "_webfiles2", "inv = 'Y'", "id = '" + nname + "'");
           }
         }
         auto d = db;

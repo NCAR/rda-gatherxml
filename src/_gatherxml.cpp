@@ -73,12 +73,12 @@ void inventory_all() {
   string ds = substitute(metautils::args.dsnum, ".", "");
   MySQL::LocalQuery q;
   if (MySQL::table_exists(srv, "IGrML.ds" + ds + "_inventory_summary")) {
-    q.set("select w.webID, f.format from WGrML.ds" + ds + "_webfiles2 as w "
+    q.set("select w.id, f.format from WGrML.ds" + ds + "_webfiles2 as w "
         "left join IGrML.ds" + ds + "_inventory_summary as i on i.webID_code = "
         "w.code left join WGrML.formats as f on f.code = w.format_code where "
         "isnull(i.webID_code) or isnull(inv)");
   } else if (MySQL::table_exists(srv, "WGrML.ds" + ds + "_webfiles2")) {
-    q.set("select w.webID, f.format from WGrML.ds" + ds + "_webfiles2 as w "
+    q.set("select w.id, f.format from WGrML.ds" + ds + "_webfiles2 as w "
         "left join WGrML.formats as f on f.code = w.format_code");
   } else if (MySQL::table_exists(srv, "IObML.ds" + ds + "_inventory_summary")) {
     q.set("select w.webID, f.format from WObML.ds" + ds + "_webfiles2 as w "
