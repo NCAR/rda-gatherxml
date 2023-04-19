@@ -484,7 +484,8 @@ void generate_dataset_home_page() {
 extern "C" void *t_index_variables(void *) {
   MySQL::Server srv(metautils::directives.database_server, metautils::
       directives.metadb_username, metautils::directives.metadb_password, "");
-  searchutils::index_variables(srv, metautils::args.dsnum);
+  string e;
+  searchutils::indexed_variables(srv, metautils::args.dsnum, e);
   srv.disconnect();
   return nullptr;
 }
