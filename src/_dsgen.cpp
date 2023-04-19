@@ -1299,8 +1299,8 @@ void add_grouped_variables(TokenDocument& tdoc, size_t& swp_cnt) {
 void add_variables(TokenDocument& tdoc, size_t& swp_cnt) {
   static const string F = this_function_label(__func__);
   MySQL::LocalQuery q("select substring_index(path, ' > ', -1) as var from "
-      "search.variables_new as v left join search.GCMD_sciencekeywords as g on "
-      "g.uuid = v.keyword where v.vocabulary = 'GCMD' and v.dsid = '" +
+      "search.variables as v left join search.GCMD_sciencekeywords as g on g."
+      "uuid = v.keyword where v.vocabulary = 'GCMD' and v.dsid = '" +
       metautils::args.dsnum + "' order by var");
   if (q.submit(server) < 0) {
     log_error2("query: " + q.show() + " returned error: " + q.error(), F,
