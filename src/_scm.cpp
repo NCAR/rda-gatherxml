@@ -25,6 +25,7 @@
 #include <myerror.hpp>
 
 using MySQL::table_exists;
+using dateutils::string_date_to_ll_string;
 using metautils::log_error2;
 using metautils::log_warning;
 using miscutils::this_function_label;
@@ -109,7 +110,7 @@ void parse_args(const char arg_delimiter) {
       }
     } else if (args[n] == "-d") {
       metautils::args.dsnum = args[++n];
-      if (regex_search(metautils::args.dsnum, regex("^ds"))) {
+      if (metautils::args.dsnum.find("ds") == 0) {
         metautils::args.dsnum = metautils::args.dsnum.substr(2);
       }
       local_args.dsnum2 = strutils::substitute(metautils::args.dsnum, ".", "");
@@ -222,10 +223,9 @@ string table_code(MySQL::Server& srv, string table_name, string
       log_error2(srv.error(), F, "scm", USER);
     }
     if (srv.insert(table_name, cols, vals, "") < 0) {
-      auto e = srv.error();
-      if (!regex_search(e, regex("^Duplicate entry"))) {
-        log_error2("server error: '" + e + "' while inserting (" + cols + ") "
-            "values(" + vals + ") into " + table_name, F, "scm", USER);
+      if (srv.error().find("Duplicate entry") != 0) {
+        log_error2("server error: '" + srv.error() + "' while inserting (" +
+            cols + ") values(" + vals + ") into " + table_name, F, "scm", USER);
       }
     }
     if (srv.command("unlock tables", r) < 0) {
@@ -677,7 +677,7 @@ void process_grml_markup(void *markup_parameters) {
   static xmlutils::ParameterMapper PMAP(metautils::directives.
       parameter_map_path);
   unordered_map<string, string> tr_map, gd_map, lev_map;
-  unordered_map<string, shared_ptr<ParameterData>> pdmap, pdmap2;
+  unordered_map<string, shared_ptr<ParameterData>> pdmap;
   unordered_set<string> p_set;
   string mndt = "3000-12-31 23:59 +0000";
   string mxdt = "0001-01-01 00:00 +0000";
@@ -686,7 +686,7 @@ void process_grml_markup(void *markup_parameters) {
   for (const auto& g : gp->xdoc.element_list("GrML/" + gp->element)) {
     auto tr = g.attribute_value("timeRange");
     auto prod = to_lower(tr);
-    if (strutils::contains(prod, "forecast")) {
+    if (prod.find("forecast") != string::npos) {
       prod = prod.substr(0, prod.find("forecast") + 8);
       auto sp = split(prod);
       if (sp.size() > 2) {
@@ -734,7 +734,6 @@ void process_grml_markup(void *markup_parameters) {
       nens = 1;
     }
     pdmap.clear();
-    pdmap2.clear();
     for (const auto& ge : g.element_addresses()) {
       auto enam = ge.p->name();
       if (enam == "process") {
@@ -755,7 +754,7 @@ void process_grml_markup(void *markup_parameters) {
             "_processes", gp->file_map[gp->filename] + ", " + tr_map[tr] + ", "
             + gd_map[gdef] + ", '" + ge.p->attribute_value("value") + "'") <
             0) {
-          if (!strutils::contains(gp->server.error(), "Duplicate entry")) {
+          if (gp->server.error().find("Duplicate entry") == string::npos) {
             log_error2("error: '" + gp->server.error() + "' while inserting "
                 "into " + gp->database + ".ds" + local_args.dsnum2 +
                 "_processes", F, "scm", USER);
@@ -784,7 +783,7 @@ void process_grml_markup(void *markup_parameters) {
             "_ensembles", gp->file_map[gp->filename] + ", " + tr_map[tr] + ", "
             + gd_map[gdef] + ", '" + ge.p->attribute_value("type") + "', '" +
             ge.p->attribute_value("ID") + "', " + v) < 0) {
-          if (!strutils::contains(gp->server.error(), "Duplicate entry")) {
+          if (gp->server.error().find("Duplicate entry") == string::npos) {
             log_error2("error: '" + gp->server.error() + "' while inserting "
                 "into " + gp->database + ".ds" + local_args.dsnum2 +
                 "_ensembles", F, "scm", USER);
@@ -809,7 +808,7 @@ void process_grml_markup(void *markup_parameters) {
         }
         if (gp->server.insert(gp->database + ".ds" + local_args.dsnum2 +
             "_levels", gp->format_map[gp->format] + ", " + lev_map[ltyp]) < 0) {
-          if (!strutils::contains(gp->server.error(), "Duplicate entry")) {
+          if (gp->server.error().find("Duplicate entry") == string::npos) {
             log_error2("error: '" + gp->server.error() + "' while inserting "
                 "into " + gp->database + ".ds" + local_args.dsnum2 + "_levels",
                 F, "scm", USER);
@@ -840,9 +839,9 @@ void process_grml_markup(void *markup_parameters) {
           if (p_set.find(p) == p_set.end()) {
             auto d = PMAP.description(gp->format, p);
             replace_all(d, "'", "\\'");
-            if (gp->server.insert("search.variables", "'" + d + "', 'CMDMAP', '"
-                + metautils::args.dsnum + "'") < 0) {
-              if (!strutils::contains(gp->server.error(), "Duplicate entry")) {
+            if (gp->server.insert("search.variables", "'" + d + "', 'CMDMAP', "
+                "'" + metautils::args.dsnum + "'") < 0) {
+              if (gp->server.error().find("Duplicate entry") == string::npos) {
                 log_error2("error: '" + gp->server.error() + "' while "
                 "inserting into search.variables", F, "scm", USER);
               }
@@ -851,45 +850,27 @@ void process_grml_markup(void *markup_parameters) {
             }
             p_set.emplace(p);
           }
-          auto sv = e.p->attribute_value("start").substr(0, 16);
-          replace_all(sv, "-", "");
-          replace_all(sv, " ", "");
-          replace_all(sv, ":", "");
-          auto ev = e.p->attribute_value("end").substr(0, 16);
-          replace_all(ev, "-", "");
-          replace_all(ev, " ", "");
-          replace_all(ev, ":", "");
-          if (strutils::contains(p, "@")) {
+          auto sv = string_date_to_ll_string(e.p->attribute_value("start").
+              substr(0, 16));
+          auto ev = string_date_to_ll_string(e.p->attribute_value("end").
+              substr(0, 16));
+          if (p.find("@") != string::npos) {
             p = p.substr(0, p.find("@"));
           }
-          p += "<!>" + sv + "<!>" + ev;
+          p += "<!>" + sv + "<!>" + ev + "<!>" + itos(nsteps);
           auto i = stoi(lev_map[ltyp]);
           if (pdmap.find(p) == pdmap.end()) {
             pdmap.emplace(p, shared_ptr<ParameterData>(new ParameterData));
           }
-          if (nsteps < pdmap[p]->min_nsteps) {
-            pdmap[p]->min_nsteps = nsteps;
-          }
-          if (nsteps > pdmap[p]->max_nsteps) {
-            pdmap[p]->max_nsteps = nsteps;
-          }
-          if (pdmap[p]->level_codes.find(i) == pdmap[p]->level_codes.end()) {
+          if (pdmap[p]->level_codes.find(i) == pdmap[p]->level_codes.
+              end()) {
             pdmap[p]->level_codes.emplace(i);
             pdmap[p]->level_code_list.emplace_back(i);
-          }
-          p += "<!>" + itos(nsteps);
-          if (pdmap2.find(p) == pdmap2.end()) {
-            pdmap2.emplace(p, shared_ptr<ParameterData>(new ParameterData));
-          }
-          if (pdmap2[p]->level_codes.find(i) == pdmap2[p]->level_codes.
-              end()) {
-            pdmap2[p]->level_codes.emplace(i);
-            pdmap2[p]->level_code_list.emplace_back(i);
           }
         }
       }
     }
-    for (auto& e : pdmap2) {
+    for (auto& e : pdmap) {
       sort(e.second->level_code_list.begin(), e.second->level_code_list.end(),
       [](const size_t& left, const size_t& right) -> bool {
         if (left <= right) {
@@ -913,13 +894,9 @@ void process_grml_markup(void *markup_parameters) {
       e.second.reset();
     }
   }
-  replace_all(mndt, "-", "");
-  replace_all(mndt, " ", "");
-  replace_all(mndt, ":", "");
+  mndt = string_date_to_ll_string(mndt);
   replace_all(mndt, "+0000", "");
-  replace_all(mxdt, "-", "");
-  replace_all(mxdt, " ", "");
-  replace_all(mxdt, ":", "");
+  mxdt = string_date_to_ll_string(mxdt);
   replace_all(mxdt, "+0000", "");
   auto s = "num_grids = " + itos(cnt) + ", start_date = " + mndt + ", end_date "
       "= " + mxdt;
@@ -1092,7 +1069,7 @@ void *thread_summarize_IDs(void *args) {
           a[3] + ", " + a[4] + ", " + a[2] + ", " + nobs + ", " + dt1.to_string(
           "%Y%m%d%H%MM%SS") + ", " + dt2.to_string("%Y%m%d%H%MM%SS") + ", " +
           tz, "") < 0) {
-        if (!regex_search(srv.error(), regex("Duplicate entry"))) {
+        if (srv.error().find("Duplicate entry") == string::npos) {
           log_error2("'" + srv.error() + "' while inserting '" + ID_code + ", "
               + a[3] + ", " + a[4] + ", " + a[2] + ", " + nobs + ", " + dt1.
               to_string("%Y%m%d%H%MM%SS") + ", " + dt2.to_string(
@@ -1198,7 +1175,7 @@ void *thread_summarize_IDs(void *args) {
       ", " + itos(obs_count) + ", '" + u + "', '" + a[7] + "') on duplicate "
       "key update avg_obs_per = values(avg_obs_per), total_obs = values("
       "total_obs), uflag = values(uflag)", r) < 0) {
-    if (!regex_search(srv.error(), regex("Duplicate entry"))) {
+    if (srv.error().find("Duplicate entry") == string::npos) {
       log_error2("'" + srv.error() + "' while trying to insert into " + a[5] +
           ".ds" + local_args.dsnum2 + "_frequencies (" + a[2] + ", " + a[3] +
           ", " + a[4] + ", " + i + ", " + itos(obs_count) + ", '" + u + "')", F,
@@ -1284,7 +1261,7 @@ void *thread_summarize_file_ID_locations(void *args) {
       s += ", " + a[5] + ", " + a[6] + ", " + e.attribute_value("row") + ", '" +
           lb + "'";
       if (srv.insert(a[7] + ".ds" + local_args.dsnum2 + "_locations", s) < 0) {
-        if (!regex_search(srv.error(), regex("Duplicate entry"))) {
+        if (srv.error().find("Duplicate entry") == string::npos) {
           log_error2("'" + srv.error() + "' while trying to insert into " + a[7]
               + ".ds" + local_args.dsnum2 + "_locations (" + s + ") into " + a[
               7] + ".ds" + local_args.dsnum2 + "_locations", F, "scm", USER);
@@ -1476,7 +1453,7 @@ void process_obml_markup(void *markup_parameters) {
 /*
         if (op->server.insert(op->database+".ds"+local_args.dsnum2+"_dataTypes",s) < 0) {
           error=op->server.error();
-          if (!strutils::contains(error,"Duplicate entry")) {
+          if (error.find("Duplicate entry") == string::npos) {
             metautils::log_error("summarize_obml() returned error: "+error+" while trying to insert '"+s+"' into "+op->database+".ds"+local_args.dsnum2+"_dataTypes","scm",user,args.args_string);
           }
         }
@@ -1618,20 +1595,16 @@ void process_satml_markup(void *markup_parameters) {
     if (sp->server.insert(sp->database + ".ds" + local_args.dsnum2 +
         "_products", sp->file_map[sp->filename] + ", '" + ptyp + "', " + itos(
         n), "update num_products = value(num_products)") < 0) {
-      if (!strutils::contains(sp->server.error(), "Duplicate entry")) {
+      if (sp->server.error().find("Duplicate entry") == string::npos) {
         log_error2("error: '" + sp->server.error() + "' while inserting into " +
             sp->database + ".ds" + local_args.dsnum2 + "_products", F, "scm",
             USER);
       }
     }
   }
-  replace_all(mndt, " ", "");
-  replace_all(mndt, "-", "");
-  replace_all(mndt, ":", "");
+  mndt = string_date_to_ll_string(mndt);
   replace_all(mndt, "+0000", "");
-  replace_all(mxdt, " ", "");
-  replace_all(mxdt, "-", "");
-  replace_all(mxdt, ":", "");
+  mxdt = string_date_to_ll_string(mxdt);
   replace_all(mxdt, "+0000", "");
   auto s = "num_products = " + itos(cnt) + ", start_date = " + mndt + ", "
       "end_date = " + mxdt;
@@ -1691,10 +1664,7 @@ void process_fixml_markup(void *markup_parameters) {
             "scm", USER);
       }
       auto e = _class.element("start");
-      auto v = e.attribute_value("dateTime");
-      replace_all(v, " ", "");
-      replace_all(v, "-", "");
-      replace_all(v, ":", "");
+      auto v = string_date_to_ll_string(e.attribute_value("dateTime"));
       v = v.substr(0, v.length() - 5);
       if (v < mndt) {
         mndt = v;
@@ -1707,10 +1677,7 @@ void process_fixml_markup(void *markup_parameters) {
       }
       auto dt1 = DateTime(stoll(v));
       e = _class.element("end");
-      v = e.attribute_value("dateTime");
-      replace_all(v, " ", "");
-      replace_all(v, "-", "");
-      replace_all(v, ":", "");
+      v = string_date_to_ll_string(e.attribute_value("dateTime"));
       v = v.substr(0, v.length() - 5);
       if (v > mxdt) {
         mxdt = v;
@@ -1803,18 +1770,12 @@ void update_fixml_database(FixMLParameters& fixml_parameters) {
     args.emplace_back(fixml_parameters.file_map[fixml_parameters.filename]);
     args.emplace_back(fixml_parameters.stg_map[e.first]);
     args.emplace_back("");
-    auto s = e.second.first;
-    replace_all(s, "-", "");
-    replace_all(s, ":", "");
-    replace_all(s, " ", "");
+    auto s = string_date_to_ll_string(e.second.first);
     if (s.length() > 12) {
       s = s.substr(0, 12);
     }
     args.emplace_back(s);
-    s = e.second.second;
-    replace_all(s, "-", "");
-    replace_all(s, ":", "");
-    replace_all(s, " ", "");
+    s = string_date_to_ll_string(e.second.second);
     if (s.length() > 12) {
       s = s.substr(0, 12);
     }
@@ -1844,8 +1805,8 @@ void update_fixml_database(FixMLParameters& fixml_parameters) {
           first, sp[0], "");
       if (fixml_parameters.server.insert("search.time_resolutions", "'" + s +
           "', 'GCMD', '" + metautils::args.dsnum + "', 'WFixML'") < 0) {
-        if (!regex_search(fixml_parameters.server.error(), regex("Duplicate "
-            "entry"))) {
+        if (fixml_parameters.server.error().find("Duplicate entry") == string::
+            npos) {
           log_error2("error: '" + fixml_parameters.server.error() + "' while "
               "trying to insert into search.time_resolutions ''" + s + "', "
               "'GCMD', '" + metautils::args.dsnum + "', 'WFixML''", F, "scm",
@@ -1856,8 +1817,8 @@ void update_fixml_database(FixMLParameters& fixml_parameters) {
           0], "");
       if (fixml_parameters.server.insert("search.time_resolutions", "'" + s +
           "', 'GCMD', '" + metautils::args.dsnum + "', 'WFixML'") < 0) {
-        if (!regex_search(fixml_parameters.server.error(), regex("Duplicate "
-            "entry")))
+        if (fixml_parameters.server.error().find("Duplicate entry") == string::
+            npos)
           log_error2("error: '" + fixml_parameters.server.error() + "' while "
               "trying to insert into search.time_resolutions ''" + s + "', "
               "'GCMD', '" + metautils::args.dsnum + "', 'WFixML''", F, "scm",
@@ -1940,13 +1901,12 @@ void summarize_markup(string markup_type, unordered_map<string, vector<
     mp->server._delete("search.data_types", "dsid = '" + metautils::args.dsnum +
         "' and vocabulary = 'dssmm'");
     string err;
-    auto r = regex("Duplicate entry");
     if (t == "GrML") {
       auto gp = reinterpret_cast<GrMLParameters *>(mp);
       for (const auto& p : gp->prod_set) {
         if (gp->server.insert("search.data_types", "'grid', '" + p + "', '" +
             gp->database + "', '" + metautils::args.dsnum + "'") < 0) {
-          if (!regex_search(gp->server.error(), r)) {
+          if (gp->server.error().find("Duplicate entry") == string::npos) {
             err = gp->server.error();
             break;
           }
@@ -1968,7 +1928,7 @@ void summarize_markup(string markup_type, unordered_map<string, vector<
         err = mp->server.error();
       }
     }
-    if (!err.empty() && !regex_search(err, r)) {
+    if (!err.empty() && err.find("Duplicate entry") == string::npos) {
       log_error2("'"  + err  + "' while inserting into search.data_types", F,
           "scm", USER);
     }
@@ -2020,8 +1980,8 @@ void *thread_summarize_fix_data(void *) {
 void *thread_index_variables(void *) {
   MySQL::Server srv(metautils::directives.database_server, metautils::
       directives.metadb_username, metautils::directives.metadb_password, "");
-  auto e = searchutils::index_variables(srv, metautils::args.dsnum);
-  if (!e.empty()) {
+  string e;
+  if (!searchutils::indexed_variables(srv, metautils::args.dsnum, e)) {
     log_error2(e, "thread_index_variables()", "scm", USER);
   }
   srv.disconnect();
@@ -2031,8 +1991,8 @@ void *thread_index_variables(void *) {
 void *thread_index_locations(void *) {
   MySQL::Server srv(metautils::directives.database_server, metautils::
       directives.metadb_username, metautils::directives.metadb_password, "");
-  auto e = searchutils::index_locations(srv, metautils::args.dsnum);
-  if (!e.empty()) {
+  string e;
+  if (!searchutils::indexed_locations(srv, metautils::args.dsnum, e)) {
     log_error2(e, "thread_index_locations()", "scm", USER);
   }
   srv.disconnect();
