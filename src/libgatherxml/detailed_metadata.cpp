@@ -422,7 +422,7 @@ void generate_level_cross_reference(string format, string title, string
   fill_level_code_map("WGrML", lcmap);
   MySQL::Server mysrv(metautils::directives.database_server, metautils::
       directives.metadb_username, metautils::directives.metadb_password, "");
-  MySQL::LocalQuery q("select distinct levelType_codes from WGrML.summary as s "
+  MySQL::LocalQuery q("select distinct level_type_codes from WGrML.summary as s "
       "left join WGrML.formats as f on f.code = s.format_code where s.dsid = '"
       + metautils::args.dsnum + "' and f.format = '" + format + "'");
 #ifdef DUMP_QUERIES
@@ -627,8 +627,8 @@ string time_range_query(MySQL::Server& mysrv, const DBData& dbdata, string
   auto d2 = substitute(metautils::args.dsnum, ".", "");
   return "select distinct t.time_range, d.definition, d.def_params from " +
       dbdata.db + ".summary as s left join " + dbdata.db + ".time_ranges as t "
-      "on t.code = s.timeRange_code left join " + dbdata.db +
-      ".grid_definitions as d on d.code = s.gridDefinition_code where s.dsid = "
+      "on t.code = s.time_range_code left join " + dbdata.db +
+      ".grid_definitions as d on d.code = s.grid_definition_code where s.dsid = "
       "'" + metautils::args.dsnum + "' and format_code = " + format_code;
 }
 
@@ -876,7 +876,7 @@ void generate_gridded_product_detail(MySQL::Server& mysrv, const DBData& dbdata,
         "cellpadding=\"5\" border=\"0\"><tr><th class=\"headerRow\" colspan="
         "\"2\" align=\"center\">Summary for Grids in " << to_capital(f) <<
         " Format</th></tr>" << endl;
-    q.set("select distinct parameter, levelType_codes from " + dbdata.db +
+    q.set("select distinct parameter, level_type_codes from " + dbdata.db +
         ".summary where dsid = '" + metautils::args.dsnum + "' and format_code "
         "= " + fp.second);
 #ifdef DUMP_QUERIES

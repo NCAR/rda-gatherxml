@@ -286,9 +286,9 @@ void summarize_grids(string database, string caller, string user, string
         gse.key + ", '" + b + "', " + d1 + ", " + d2) < 0) {
       if (regex_search(srv.error(), regex("Duplicate entry"))) {
         auto sp = split(gse.key, ",");
-        q.set("levelType_codes", database + ".summary", "dsid = '" + metautils::
-            args.dsnum + "' and format_code = " + sp[0] + " and timeRange_code "
-            "= " + sp[1] + " and gridDefinition_code = " + sp[2] + " and "
+        q.set("level_type_codes", database + ".summary", "dsid = '" + metautils::
+            args.dsnum + "' and format_code = " + sp[0] + " and time_range_code "
+            "= " + sp[1] + " and grid_definition_code = " + sp[2] + " and "
             "parameter = " + sp[3]);
 #ifdef DUMP_QUERIES
         {
@@ -323,7 +323,7 @@ void summarize_grids(string database, string caller, string user, string
         compress_values(v, b);
         if (srv.insert(database + ".summary", "'" + metautils::args.dsnum +
             "', " + gse.key + ", '" + b + "', " + d1 + ", " + d2, "update "
-            "levelType_codes = '" + b + "', start_date = if (" + d1 + " < "
+            "level_type_codes = '" + b + "', start_date = if (" + d1 + " < "
             "start_date, " + d1 + ", start_date), end_date = if (" + d2 + " > "
             "end_date, " + d2 + ", end_date)") < 0) {
           log_error2(srv.error() + " while trying to insert ('" + metautils::
@@ -489,11 +489,11 @@ void aggregate_grids(string database, string caller, string user, string
           "order by parameter, level_type_codes, time_range_code");
     } else {
       srv._delete("WGrML.ds" + d + "_agrids_cache");
-      q.set("select timeRange_code, gridDefinition_code, parameter, "
-          "levelType_codes, min(start_date), max(end_date) from WGrML.summary "
+      q.set("select time_range_code, grid_definition_code, parameter, "
+          "level_type_codes, min(start_date), max(end_date) from WGrML.summary "
           "where dsid = '" + metautils::args.dsnum + "' group by "
-          "timeRange_code, gridDefinition_code, parameter, levelType_codes "
-          "order by parameter, levelType_codes, timeRange_code");
+          "time_range_code, grid_definition_code, parameter, level_type_codes "
+          "order by parameter, level_type_codes, time_range_code");
     }
   } else {
     q.set("");
