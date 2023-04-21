@@ -380,8 +380,8 @@ int main(int argc, char **argv) {
   stringstream oss, ess;
 
   // get the name of the production web server
-  if (mysystem2("/bin/tcsh -c \"curl -s --data 'authKey=qGNlKijgo9DJ7MN&cmd="
-      "identify' https://rda.ucar.edu/cgi-bin/remoteRDAServerUtils\"", oss, ess)
+  if (mysystem2("/usr/bin/curl -s --data 'authKey=qGNlKijgo9DJ7MN&cmd="
+      "identify' https://rda.ucar.edu/cgi-bin/remoteRDAServerUtils", oss, ess)
       != 0 || oss.str().find("Identify:") != 0) {
     log_error("unable to identify web server - error: '" + ess.str() + "'",
         "sdp", G_USER);
@@ -392,18 +392,20 @@ int main(int argc, char **argv) {
   sp = split(host, ".");
 
   // copy the new dataset overview to the production web server
-  if (mysystem2("/bin/tcsh -c \"" + sp.front() + "-sync " + sync_dir->name() +
-      "/dsOverview.xml /" + sp.front() + "/web/ds" + metautils::args.dsnum +
-      ".xml." + cvs_key + "\"", oss, ess) != 0) {
+  if (mysystem2("/bin/sh -c \"rsync -rptgD -e __INNER_QUOTE__ssh -i " +
+      metautils::directives.rdadata_home + "/.ssh/" + sp.front() +
+      "-sync_rdadata_rsa -l rdadata__INNER_QUOTE__ " + sync_dir->name() +
+      "/dsOverview.xml " + sp.front() + ".ucar.edu:/" + sp.front() + "/web/"
+      "ds" + metautils::args.dsnum + ".xml." + cvs_key + "\"", oss, ess) != 0) {
     log_error("unable to web-sync file for CVS - error: '" + ess.str() + "'",
         "sdp", G_USER);
   }
 
   // add the new dataset overview to the CVS version control on the
   //   production web server
-  mysystem2("/bin/tcsh -c \"curl -s --data 'authKey=qGNlKijgo9DJ7MN&cmd=cvssdp&"
+  mysystem2("/usr/bin/curl -s --data 'authKey=qGNlKijgo9DJ7MN&cmd=cvssdp&"
       "dsnum=" + metautils::args.dsnum + "&key=" + cvs_key + "' https://rda."
-      "ucar.edu/cgi-bin/remoteRDAServerUtils\"", oss, ess);
+      "ucar.edu/cgi-bin/remoteRDAServerUtils", oss, ess);
   if (!oss.str().empty()) {
     log_error("cvs error(s): " + oss.str(), "sdp", G_USER);
   }
