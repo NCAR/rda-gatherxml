@@ -304,9 +304,9 @@ int main(int argc, char **argv) {
   auto s = whereis_singularity();
   if (s.empty()) {
     auto host = unixutils::host_name();
-    if (util == "dsgen" && host.find("rda-web") == 0) {
-      return command_execute("/usr/local/decs/bin/_dsgen " + metautils::args.
-          args_string);
+    if (host.find("rda-web") == 0 && (util == "doi" || util == "dsgen")) {
+      return command_execute("/usr/local/decs/bin/_" + util + " " + substitute(
+          metautils::args.args_string, "!", " "));
     } else {
       log_error2("unable to find singularity", "main()", util, u);
     }
