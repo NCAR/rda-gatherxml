@@ -3985,7 +3985,7 @@ void scan_hdf5nc4_file(ScanData& scan_data, gatherxml::markup::ObML::
           directives.metadb_username, metautils::directives.metadb_password,
           "");
       if (server) {
-        MySQL::LocalQuery query("ObML_platformType", "search.GCMD_platforms",
+        MySQL::LocalQuery query("obml_platform_type", "search.gcmd_platforms",
             "path = '" + platform + "'");
         if (query.submit(server) == 0) {
           MySQL::Row row;
