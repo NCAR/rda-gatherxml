@@ -1772,7 +1772,7 @@ void add_spatial_coverage(TokenDocument& tdoc, string dsnum2, const vector<
 void add_contributors(TokenDocument& tdoc) {
   static const string F = this_function_label(__func__);
   MySQL::LocalQuery q("select g.path from search.contributors_new as c left "
-      "join search.GCMD_providers as g on g.uuid = c.keyword where c.dsid = '" +
+      "join search.gcmd_providers as g on g.uuid = c.keyword where c.dsid = '" +
       metautils::args.dsnum + "' and c.vocabulary = 'GCMD'");
   if (q.submit(server) < 0) {
     log_error2("query: " + q.show() + " returned error: " + q.error(), F,

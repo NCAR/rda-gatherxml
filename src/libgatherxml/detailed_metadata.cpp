@@ -1826,7 +1826,7 @@ void generate_detailed_metadata_view(string caller, string user) {
     ofs << "  include_once(\"MyDBI.inc\");" << endl;
     ofs << "  default_dbinfo(\"\",\"metadata\",\"metadata\");" << endl;
     ofs << "  $title=myget(\"search.datasets\",\"title\",\"dsid = '" << metautils::args.dsnum << "'\");" << endl;
-    ofs << "  $contributors=mymget(\"\",\"\",\"select g.path from search.contributors_new as c left join search.GCMD_providers as g on g.uuid = c.keyword where dsid = '" << metautils::args.dsnum << "' order by disp_order\");" << endl;
+    ofs << "  $contributors=mymget(\"\",\"\",\"select g.path from search.contributors_new as c left join search.gcmd_providers as g on g.uuid = c.keyword where dsid = '" << metautils::args.dsnum << "' order by disp_order\");" << endl;
     ofs << "  $projects=mymget(\"\",\"\",\"select g.path from search.projects_new as p left join search.gcmd_projects as g on g.uuid = p.keyword  where dsid = '" << metautils::args.dsnum << "'\");" << endl;
     ofs << "  $supportedProjects=mymget(\"\",\"\",\"select g.path from search.supportedProjects_new as p left join search.gcmd_projects as g on g.uuid = p.keyword where dsid = '" << metautils::args.dsnum << "'\");" << endl;
     ofs << "?>" << endl;
