@@ -1500,15 +1500,15 @@ void create_file_list_cache(string file_type, string caller, string user, string
 
       // platform types
       if (file_type == "Web") {
-        oq.set("select distinct l.platformType_code, p.platformType from WObML."
-            "ds" + d2 + "_dataTypes2 as d left join WObML.ds" + d2 +
+        oq.set("select distinct l.platformType_code, p.platform_type from "
+            "WObML.ds" + d2 + "_dataTypes2 as d left join WObML.ds" + d2 +
             "_dataTypesList as l on l.code = d.dataType_code left join WObML."
-            "platformTypes as p on p.code = l.platformType_code");
+            "platform_types as p on p.code = l.platformType_code");
       } else if (file_type == "inv") {
-        oq.set("select distinct l.platformType_code, p.platformType from WObML."
-            "ds" + d2 + "_dataTypes2 as d left join WObML.ds" + d2 +
+        oq.set("select distinct l.platformType_code, p.platform_type from "
+            "WObML.ds" + d2 + "_dataTypes2 as d left join WObML.ds" + d2 +
             "_dataTypesList as l on l.code = d.dataType_code left join WObML."
-            "platformTypes as p on p.code = l.platformType_code left join "
+            "platform_types as p on p.code = l.platformType_code left join "
             "(select distinct webID_code from IObML.ds" + d2 + "_dataTypes) as "
             "dt on dt.webID_code = d.webID_code where !isnull(dt.webID_code)");
       }

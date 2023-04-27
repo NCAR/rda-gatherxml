@@ -1464,26 +1464,27 @@ void generate_detailed_observation_summary(string file_type, ofstream& ofs,
         "more observations)</td></tr>" << endl;
     MySQL::Query query;
     if (MySQL::table_exists(mysrv, dbdata.db + ".ds" + d2 + "_dataTypes2")) {
-      query.set("select distinct platformType, obsType, dataType, min("
+      query.set("select distinct t.platform_type, o.obs_type, l.dataType, min("
           "start_date),max(end_date) from " + dbdata.db + ".ds" + d2 +
           "_dataTypes2 as d left join " + dbdata.db + ".ds" + d2 +
           "_dataTypesList as l on l.code = d.dataType_code left join " + dbdata.
           db + ".ds" + d2 + dbdata.table + " as p on p.code = d." + dbdata.
-          id_type + "ID_code left join " + dbdata.db + ".platformTypes as t on "
-          "t.code = l.platformType_code left join " + dbdata.db + ".obsTypes "
-          "as o on o.code = l.observationType_code where p.format_code = " + fp.
-          second + " group by platformType, obsType, dataType order by "
-          "platformType, obsType, dataType");
+          id_type + "ID_code left join " + dbdata.db + ".platform_types as t "
+          "on t.code = l.platformType_code left join " + dbdata.db +
+          ".obs_types as o on o.code = l.observationType_code where p."
+          "format_code = " + fp.second + " group by t.platform_type, o."
+          "obs_type, l.dataType order by t.platform_type, o.obs_type, l."
+          "dataType");
     } else {
-      query.set("select distinct platformType, obsType, dataType, min("
+      query.set("select distinct t.platform_type, o.obs_type, l.dataType, min("
           "start_date), max(end_date) from " + dbdata.db + ".ds" + d2 +
           "_dataTypes as d left join " + dbdata.db + ".ds" + d2 + dbdata.table +
           " as p on p.code = d." + dbdata.id_type + "ID_code left join " +
-          dbdata.db + ".platformTypes as t on t.code = d.platformType_code "
-          "left join " + dbdata.db + ".obsTypes as o on o.code = d."
+          dbdata.db + ".platform_types as t on t.code = d.platformType_code "
+          "left join " + dbdata.db + ".obs_types as o on o.code = d."
           "observationType_code where p.format_code = " + fp.second + " group "
-          "by platformType, obsType, dataType order by platformType, obsType, "
-          "dataType");
+          "by t.platform_type, o.obs_type, l.dataType order by t."
+          "platform_type, o.obs_type, l.dataType");
     }
     if (query.submit(mysrv) < 0) {
       log_error2("'" + query.error() + "' for '" + query.show() + "'", F,
@@ -1538,27 +1539,27 @@ void generate_detailed_observation_summary(string file_type, ofstream& ofs,
     }
     if (field_exists(mysrv, dbdata.db + ".ds" + d2 + dbdata.table,
         "min_obs_per")) {
-      query.set("select any_value(l.platformType), any_value(o.obsType), min("
+      query.set("select any_value(l.platform_type), any_value(o.obs_type), min("
           "f.min_obs_per), max(f.max_obs_per), f.unit from " + dbdata.db + ".ds"
           + d2 + dbdata.table + " as p join " + dbdata.db + ".ds" + d2 +
           "_frequencies as f on p.code = f." + dbdata.id_type + "ID_code left "
-          "join " + dbdata.db + ".obsTypes as o on o.code = f."
-          "observationType_code left join " + dbdata.db + ".platformTypes as l "
-          "on l.code = f.platformType_code left join WObML.frequency_sort as s "
-          "on s.keyword = f.unit where p.format_code = " + fp.second + " group "
-          "by f.observationType_code, f.platformType_code, f.unit, s.idx order "
-          "by s.idx");
+          "join " + dbdata.db + ".obs_types as o on o.code = f."
+          "observationType_code left join " + dbdata.db + ".platform_types as "
+          "l on l.code = f.platformType_code left join WObML.frequency_sort as "
+          "s on s.keyword = f.unit where p.format_code = " + fp.second +
+          " group by f.observationType_code, f.platformType_code, f.unit, s."
+          "idx order by s.idx");
     } else {
-      query.set("select any_value(l.platformType), any_value(o.obsType), min("
+      query.set("select any_value(l.platform_type), any_value(o.obs_type), min("
           "f.avg_obs_per), max(f.avg_obs_per), f.unit from " + dbdata.db + ".ds"
           + d2 + dbdata.table + " as p join " + dbdata.db + ".ds" + d2 +
           "_frequencies as f on p.code = f." + dbdata.id_type + "ID_code left "
-          "join " + dbdata.db + ".obsTypes as o on o.code = f."
-          "observationType_code left join " + dbdata.db + ".platformTypes as l "
-          "on l.code = f.platformType_code left join WObML.frequency_sort as s "
-          "on s.keyword = f.unit where p.format_code = " + fp.second + " group "
-          "by f.observationType_code, f.platformType_code, f.unit, s.idx order "
-          "by s.idx");
+          "join " + dbdata.db + ".obs_types as o on o.code = f."
+          "observationType_code left join " + dbdata.db + ".platform_types as "
+          "l on l.code = f.platformType_code left join WObML.frequency_sort as "
+          "s on s.keyword = f.unit where p.format_code = " + fp.second +
+          " group by f.observationType_code, f.platformType_code, f.unit, s."
+          "idx order by s.idx");
     }
     if (query.submit(mysrv) < 0)
       log_error2("'" + query.error() + "' for '" + query.show() + "'", F,
