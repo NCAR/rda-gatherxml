@@ -203,9 +203,9 @@ void scan_input_file(gatherxml::markup::ObML::ObservationData& obs_data)
   if (!server) {
     metautils::log_error("scan_input_file(): unable to connect to the metadata database","prop2xml",USER);
   }
-  MySQL::LocalQuery query("platformType","ObML.platformTypes","platformType != 'unknown'");
+  MySQL::LocalQuery query("platform_type","ObML.platform_types","platform_type != 'unknown'");
   if (query.submit(server) != 0) {
-    metautils::log_error("scan_input_file(): platformTypes query error '"+query.error()+"'","prop2xml",USER);
+    metautils::log_error("scan_input_file(): platform_types query error '"+query.error()+"'","prop2xml",USER);
   }
   MySQL::Row row;
   while (query.fetch_row(row)) {
@@ -213,9 +213,9 @@ void scan_input_file(gatherxml::markup::ObML::ObservationData& obs_data)
 	platform_types.emplace(row[0]);
     }
   }
-  query.set("IDType","ObML.IDTypes","IDType != 'generic' and IDType != 'unknown'");
+  query.set("id_type","ObML.id_types","id_type != 'generic' and id_type != 'unknown'");
   if (query.submit(server) != 0) {
-    metautils::log_error("scan_input_file(): IDTypes query error '"+query.error()+"'","prop2xml",USER);
+    metautils::log_error("scan_input_file(): id_types query error '"+query.error()+"'","prop2xml",USER);
   }
   while (query.fetch_row(row)) {
     if (!row[0].empty()) {

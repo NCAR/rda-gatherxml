@@ -919,8 +919,8 @@ void process_IDs(string type, MySQL::Server& server, string ID_index, string
   static const string F = this_function_label(__func__);
   auto sp = split(ID_data, "[!]");
   string qs = "select i.code from WObML.ds" + local_args.dsnum2 + "_IDs2 as i "
-      "left join WObML.IDTypes as t on t.code = i.IDType_code where i.ID = '" +
-      sp[1] + "' and t.IDType = '" + sp[0] + "' and i.sw_lat = " +
+      "left join WObML.id_types as t on t.code = i.IDType_code where i.ID = '" +
+      sp[1] + "' and t.id_type = '" + sp[0] + "' and i.sw_lat = " +
       metatranslations::string_coordinate_to_db(sp[2]) + " and i.sw_lon = " +
       metatranslations::string_coordinate_to_db(sp[3]);
   if (sp.size() > 4) {
@@ -1043,19 +1043,19 @@ void insert_obml_netcdf_time_series_inventory(std::ifstream& ifs, MySQL::Server&
           break;
         }
         case 'O': {
-          MySQL::LocalQuery q("code", "WObML.obsTypes", "obsType = '" + sp[2] +
-              "'");
+          MySQL::LocalQuery q("code", "WObML.obs_types", "obs_type = '" + sp[2]
+              + "'");
           MySQL::Row row;
           if (q.submit(server) < 0 || !q.fetch_row(row)) {
             log_error2("insert_obml_netcdf_time_series_inventory() returned "
-                "error: " + q.error() + " while trying to get obsType code for "
-                "'" + sp[2] + "'", F, "iinv", USER);
+                "error: " + q.error() + " while trying to get obs_type code "
+                "for '" + sp[2] + "'", F, "iinv", USER);
           }
           omap.emplace(sp[1], row[0]);
           break;
         }
         case 'P': {
-          MySQL::LocalQuery q("code", "WObML.platformTypes", "platformType = "
+          MySQL::LocalQuery q("code", "WObML.platform_types", "platform_type = "
               "'" + sp[2] + "'");
           MySQL::Row row;
           if (q.submit(server) < 0 || !q.fetch_row(row)) {
@@ -1298,19 +1298,19 @@ void insert_obml_netcdf_point_inventory(std::ifstream& ifs, MySQL::Server&
           break;
         }
         case 'O': {
-          MySQL::LocalQuery q("code", "WObML.obsTypes", "obsType = '" + sp_l[
+          MySQL::LocalQuery q("code", "WObML.obs_types", "obs_type = '" + sp_l[
               2] + "'");
           MySQL::Row row;
           if (q.submit(server) < 0 || !q.fetch_row(row)) {
             log_error2("insert_obml_netcdf_point_inventory() returned error: " +
-                q.error() + " while trying to get obsType code for '" + sp_l[
+                q.error() + " while trying to get obs_type code for '" + sp_l[
                 2] + "'", F, "iinv", USER);
           }
           omap.emplace(sp_l[1], row[0]);
           break;
         }
         case 'P': {
-          MySQL::LocalQuery q("code", "WObML.platformTypes", "platformType = "
+          MySQL::LocalQuery q("code", "WObML.platform_types", "platform_type = "
               "'" + sp_l[2] + "'");
           MySQL::Row row;
           if (q.submit(server) < 0 || !q.fetch_row(row)) {
@@ -1556,24 +1556,24 @@ void insert_generic_point_inventory(std::ifstream& ifs ,MySQL::Server& server,
           break;
         }
         case 'O': {
-          MySQL::LocalQuery q("code", "WObML.obsTypes", "obsType = '" + sp[2] +
-              "'");
+          MySQL::LocalQuery q("code", "WObML.obs_types", "obs_type = '" + sp[2]
+              + "'");
           MySQL::Row row;
           if (q.submit(server) < 0 || !q.fetch_row(row)) {
             log_error2("insert_generic_point_inventory() returned error: " + q.
-                error() + " while trying to get obsType code for '" + sp[2] +
+                error() + " while trying to get obs_type code for '" + sp[2] +
                 "'", F, "iinv", USER);
           }
           omap.emplace(sp[1],row[0]);
           break;
         }
         case 'P': {
-          MySQL::LocalQuery q("code", "WObML.platformTypes", "platformType = "
+          MySQL::LocalQuery q("code", "WObML.platform_types", "platform_type = "
               "'" + sp[2] + "'");
           MySQL::Row row;
           if (q.submit(server) < 0 || !q.fetch_row(row)) {
             log_error2("insert_generic_point_inventory() returned error: " + q.
-                error() + " while trying to get platformType code for '" + sp[
+                error() + " while trying to get platform_type code for '" + sp[
                 2] + "'", F, "iinv", USER);
           }
           pmap.emplace(sp[1], row[0]);

@@ -316,23 +316,23 @@ int main(int argc, char **argv) {
     string t;
     if (g.empty()) {
       q2.set("select distinct l.observationType_code, l.platformType_code, "
-          "o.obsType, pf.platformType, p.format_code, f.format from WObML.ds" +
-          dsid + "_webfiles2 as p left join WObML.ds" + dsid + "_dataTypes2 as "
-          "d on d.webID_code = p.code left join WObML.ds" + dsid +
+          "o.obs_type, pf.platform_type, p.format_code, f.format from WObML.ds"
+          + dsid + "_webfiles2 as p left join WObML.ds" + dsid + "_dataTypes2 "
+          "as d on d.webID_code = p.code left join WObML.ds" + dsid +
           "_dataTypesList as l on l.code = d.dataType_code left join WObML."
-          "obsTypes as o on l.observationType_code = o.code left join WObML."
-          "platformTypes as pf on l.platformType_code = pf.code left join "
+          "obs_types as o on l.observationType_code = o.code left join WObML."
+          "platform_types as pf on l.platformType_code = pf.code left join "
           "WObML.formats as f on f.code = p.format_code");
       t = "search.obs_data";
     } else {
       q2.set("select distinct l.observationType_code, l.platformType_code, "
-          "o.obsType, pf.platformType, p.format_code, f.format from WObML.ds" +
-          dsid + "_webfiles2 as p left join dssdb.wfile as x on x.wfile = p."
+          "o.obs_type, pf.platform_type, p.format_code, f.format from WObML.ds"
+          + dsid + "_webfiles2 as p left join dssdb.wfile as x on x.wfile = p."
           "webID left join WObML.ds" + dsid + "_dataTypes2 as d on "
           "d.webID_code = p.code left join WObML.ds" + dsid + "_dataTypesList "
-          "as l on l.code = d.dataType_code left join WObML.obsTypes as o on "
-          "l.observationType_code = o.code left join WObML.platformTypes as pf "
-          "on l.platformType_code = pf.code left join WObML.formats as f on "
+          "as l on l.code = d.dataType_code left join WObML.obs_types as o on "
+          "l.observationType_code = o.code left join WObML.platform_types as "
+          "pf on l.platformType_code = pf.code left join WObML.formats as f on "
           "f.code = p.format_code where x.gindex = " + g);
       t = "WObML.ds" + dsid + "_locations";
     }

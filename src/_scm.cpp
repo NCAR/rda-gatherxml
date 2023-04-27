@@ -975,7 +975,8 @@ void *thread_summarize_IDs(void *args) {
       auto e = snippet.element("ID");
       auto idtyp = e.attribute_value("type");
       if (id_map.find(idtyp) == id_map.end()) {
-        auto c = table_code(srv, a[5] + ".IDTypes", "IDType = '" + idtyp + "'");
+        auto c = table_code(srv, a[5] + ".id_types", "id_type = '" + idtyp +
+            "'");
         if (c.empty()) {
           log_error2("unable to get id type code", F, "scm", USER);
         }
@@ -1382,8 +1383,8 @@ void process_obml_markup(void *markup_parameters) {
   for (const auto& o : op->xdoc.element_list("ObML/" + op->element)) {
     auto obs = o.attribute_value("value");
     if (obs_map.find(obs) == obs_map.end()) {
-      auto c = table_code(op->server, op->database + ".obsTypes", "obsType = '"
-          + obs + "'");
+      auto c = table_code(op->server, op->database + ".obs_types", "obs_type = "
+          "'" + obs + "'");
       if (c.empty()) {
         log_error2("unable to get observation type code", F, "scm", USER);
       }
@@ -1392,8 +1393,8 @@ void process_obml_markup(void *markup_parameters) {
     for (const auto& platform : o.element_addresses()) {
       auto plat = (platform.p)->attribute_value("type");
       if (plat_map.find(plat) == plat_map.end()) {
-        auto c = table_code(op->server, op->database + ".platformTypes",
-            "platformType = '" + plat + "'");
+        auto c = table_code(op->server, op->database + ".platform_types",
+            "platform_type = '" + plat + "'");
         if (c.empty()) {
           log_error2("unable to get platform code", F, "scm", USER);
         }
