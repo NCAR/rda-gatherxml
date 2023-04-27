@@ -1519,8 +1519,8 @@ void process_obml_markup(void *markup_parameters) {
     }
   }
   op->server._delete(op->database + ".ds" + local_args.dsnum2 + "_frequencies",
-      op->file_type + "ID_code = " + op->file_map[op->filename] + " and uflag "
-      "!= '" + uflag + "'");
+      "file_code = " + op->file_map[op->filename] + " and uflag != '" + uflag +
+      "'");
   auto s = "num_observations = " + itos(cnt) + ", start_date = " + mndt + ", "
       "end_date = " + mxdt;
   auto tb_nam = op->database + ".ds" + local_args.dsnum2 + "_" + op->file_type +

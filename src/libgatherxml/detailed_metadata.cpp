@@ -1542,24 +1542,22 @@ void generate_detailed_observation_summary(string file_type, ofstream& ofs,
       query.set("select any_value(l.platform_type), any_value(o.obs_type), min("
           "f.min_obs_per), max(f.max_obs_per), f.unit from " + dbdata.db + ".ds"
           + d2 + dbdata.table + " as p join " + dbdata.db + ".ds" + d2 +
-          "_frequencies as f on p.code = f." + dbdata.id_type + "ID_code left "
-          "join " + dbdata.db + ".obs_types as o on o.code = f."
-          "observationType_code left join " + dbdata.db + ".platform_types as "
-          "l on l.code = f.platformType_code left join WObML.frequency_sort as "
-          "s on s.keyword = f.unit where p.format_code = " + fp.second +
-          " group by f.observationType_code, f.platformType_code, f.unit, s."
-          "idx order by s.idx");
+          "_frequencies as f on p.code = f.file_code left join " + dbdata.db +
+          ".obs_types as o on o.code = f.observation_type_code left join " +
+          dbdata.db + ".platform_types as l on l.code = f.platform_type_code "
+          "left join WObML.frequency_sort as s on s.keyword = f.unit where p."
+          "format_code = " + fp.second + " group by f.observation_type_code, f."
+          "platform_type_code, f.unit, s.idx order by s.idx");
     } else {
       query.set("select any_value(l.platform_type), any_value(o.obs_type), min("
           "f.avg_obs_per), max(f.avg_obs_per), f.unit from " + dbdata.db + ".ds"
           + d2 + dbdata.table + " as p join " + dbdata.db + ".ds" + d2 +
-          "_frequencies as f on p.code = f." + dbdata.id_type + "ID_code left "
-          "join " + dbdata.db + ".obs_types as o on o.code = f."
-          "observationType_code left join " + dbdata.db + ".platform_types as "
-          "l on l.code = f.platformType_code left join WObML.frequency_sort as "
-          "s on s.keyword = f.unit where p.format_code = " + fp.second +
-          " group by f.observationType_code, f.platformType_code, f.unit, s."
-          "idx order by s.idx");
+          "_frequencies as f on p.code = f.file_code left join " + dbdata.db +
+          ".obs_types as o on o.code = f.observation_type_code left join " +
+          dbdata.db + ".platform_types as l on l.code = f.platform_type_code "
+          "left join WObML.frequency_sort as s on s.keyword = f.unit where p."
+          "format_code = " + fp.second + " group by f.observation_type_code, f."
+          "platform_type_code, f.unit, s.idx order by s.idx");
     }
     if (query.submit(mysrv) < 0)
       log_error2("'" + query.error() + "' for '" + query.show() + "'", F,
