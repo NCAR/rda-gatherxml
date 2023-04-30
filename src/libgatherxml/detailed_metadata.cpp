@@ -102,12 +102,6 @@ struct ParameterData {
   vector<size_t> level_values;
 };
 
-struct DBData {
-  DBData() : db(), table(), dtable(), id_type() { }
-
-  string db, table, dtable, id_type;
-};
-
 struct TypeEntry {
   TypeEntry() : key(),start(),end(),type_table(nullptr),type_table_keys(nullptr),type_table_keys_2(nullptr) {}
 
@@ -213,12 +207,12 @@ bool compare_layers(const string& left, const string& right) {
   return false;
 }
 
-void fill_level_code_map(string db, unordered_map<size_t, tuple<string,
-    string, string>>& level_code_map) {
+void fill_level_code_map(unordered_map<size_t, tuple<string, string, string>>&
+    level_code_map) {
   static const string F = this_function_label(__func__);
   MySQL::Server mysrv(metautils::directives.database_server, metautils::
       directives.metadb_username, metautils::directives.metadb_password, "");
-  MySQL::LocalQuery q("code, map, type, value", db + ".levels");
+  MySQL::LocalQuery q("code, map, type, value", "WGrML.levels");
 #ifdef DUMP_QUERIES
   {
   Timer tm;
@@ -419,7 +413,7 @@ void generate_level_cross_reference(string format, string title, string
      html_file, string caller, string user) {
   static const string F = this_function_label(__func__);
   unordered_map<size_t, tuple<string, string, string>> lcmap;
-  fill_level_code_map("WGrML", lcmap);
+  fill_level_code_map(lcmap);
   MySQL::Server mysrv(metautils::directives.database_server, metautils::
       directives.metadb_username, metautils::directives.metadb_password, "");
   MySQL::LocalQuery q("select distinct level_type_codes from WGrML.summary as s "
@@ -607,29 +601,26 @@ void add_to_formats(XMLDocument& xdoc, string database, string primaries_table,
   }
 }
 
-string parameter_query(MySQL::Server& mysrv, const DBData& dbdata, string
-    format_code, size_t format_query_result_size) {
+string parameter_query(MySQL::Server& mysrv, string format_code, size_t
+    format_query_result_size) {
   auto d2 = substitute(metautils::args.dsnum, ".", "");
   if (format_query_result_size > 1) {
     return "select a.parameter, a.level_type_codes, min(a.start_date), max(a."
-        "end_date) from " + dbdata.db + ".ds" + d2 + "_agrids2 as a left join "
-        + dbdata.db + ".ds" + d2 + dbdata.table + " as p on p.code = a."
-        "file_code where p.format_code = " + format_code + " group by a."
-        "parameter, a.level_type_codes";
+        "end_date) from WGrML.ds" + d2 + "_agrids2 as a left join WGrML.ds" + d2
+        + "_webfiles2 as p on p.code = a.file_code where p.format_code = " +
+        format_code + " group by a.parameter, a.level_type_codes";
   }
   return "select parameter, level_type_codes, min(start_date), max(end_date) "
-      "from " + dbdata.db + ".ds" + d2 + "_agrids2 group by parameter, "
-      "level_type_codes";
+      "from WGrML.ds" + d2 + "_agrids2 group by parameter, level_type_codes";
 }
 
-string time_range_query(MySQL::Server& mysrv, const DBData& dbdata, string
-    format_code) {
+string time_range_query(MySQL::Server& mysrv, string format_code) {
   auto d2 = substitute(metautils::args.dsnum, ".", "");
-  return "select distinct t.time_range, d.definition, d.def_params from " +
-      dbdata.db + ".summary as s left join " + dbdata.db + ".time_ranges as t "
-      "on t.code = s.time_range_code left join " + dbdata.db +
-      ".grid_definitions as d on d.code = s.grid_definition_code where s.dsid = "
-      "'" + metautils::args.dsnum + "' and format_code = " + format_code;
+  return "select distinct t.time_range, d.definition, d.def_params from WGrML."
+      "summary as s left join WGrML.time_ranges as t on t.code = s."
+      "time_range_code left join WGrML.grid_definitions as d on d.code = s."
+      "grid_definition_code where s.dsid = '" + metautils::args.dsnum + "' and "
+      "format_code = " + format_code;
 }
 
 void write_grid_html(ofstream& ofs, size_t num_products) {
@@ -748,12 +739,12 @@ void write_grid_html(ofstream& ofs, size_t num_products) {
       endl;
 }
 
-void generate_gridded_product_detail(MySQL::Server& mysrv, const DBData& dbdata,
-    string file_type, const vector<pair<string, string>>& format_list, TempDir&
-    tdir, string caller, string user) {
+void generate_gridded_product_detail(MySQL::Server& mysrv, string file_type,
+    const vector<pair<string, string>>& format_list, TempDir& tdir, string
+    caller, string user) {
   static const string F = this_function_label(__func__);
   MySQL::LocalQuery q;
-  q.set("time_range, code", dbdata.db + ".time_ranges");
+  q.set("time_range, code", "WGrML.time_ranges");
 #ifdef DUMP_QUERIES
   {
   Timer tm;
@@ -772,7 +763,7 @@ void generate_gridded_product_detail(MySQL::Server& mysrv, const DBData& dbdata,
   for (const auto& r : q) {
     trmap.emplace(stoi(r[1]), r[0]);
   }
-  q.set("definition, def_params, code", dbdata.db + ".grid_definitions");
+  q.set("definition, def_params, code", "WGrML.grid_definitions");
 #ifdef DUMP_QUERIES
   {
   Timer tm;
@@ -801,13 +792,13 @@ void generate_gridded_product_detail(MySQL::Server& mysrv, const DBData& dbdata,
     auto d2 = substitute(metautils::args.dsnum, ".", "");
     if (format_list.size() > 1) {
       qs.set("select a.time_range_codes, a.grid_definition_codes, min(a."
-          "start_date), max(a.end_date) from " + dbdata.db + ".ds" + d2 +
-          "_agrids2 as a left join " + dbdata.db + ".ds" + d2 + dbdata.table +
-          " as p on p.code = a.file_code where p.format_code = " + fp.second +
-          " group by a.time_range_codes, a.grid_definition_codes");
+          "start_date), max(a.end_date) from WGrML.ds" + d2 + "_agrids2 as a "
+          "left join WGrML.ds" + d2 + "_webfiles2 as p on p.code = a.file_code "
+          "where p.format_code = " + fp.second + " group by a."
+          "time_range_codes, a.grid_definition_codes");
     } else {
       qs.set("select time_range_codes, grid_definition_codes, min(start_date), "
-          "max(end_date) from " + dbdata.db + ".ds" + d2 + "_agrids2 group by "
+          "max(end_date) from WGrML.ds" + d2 + "_agrids2 group by "
           "time_range_codes, grid_definition_codes");
     }
 #ifdef DUMP_QUERIES
@@ -876,9 +867,9 @@ void generate_gridded_product_detail(MySQL::Server& mysrv, const DBData& dbdata,
         "cellpadding=\"5\" border=\"0\"><tr><th class=\"headerRow\" colspan="
         "\"2\" align=\"center\">Summary for Grids in " << to_capital(f) <<
         " Format</th></tr>" << endl;
-    q.set("select distinct parameter, level_type_codes from " + dbdata.db +
-        ".summary where dsid = '" + metautils::args.dsnum + "' and format_code "
-        "= " + fp.second);
+    q.set("select distinct parameter, level_type_codes from WGrML.summary "
+        "where dsid = '" + metautils::args.dsnum + "' and format_code = " + fp.
+        second);
 #ifdef DUMP_QUERIES
     {
     Timer tm;
@@ -998,13 +989,6 @@ void generate_detailed_grid_summary(string file_type, ofstream& ofs, const
   if (!ofs_l.is_open()) {
     log_error2("unable to open output for level detail", F, caller, user);
   }
-  DBData dbdata;
-  if (file_type == "Web") {
-    dbdata.db = "WGrML";
-    dbdata.table = "_webfiles2";
-    dbdata.dtable = "wfile";
-    dbdata.id_type = "web";
-  }
   auto d2 = substitute(metautils::args.dsnum, ".", "");
   xmlutils::ParameterMapper pmap(metautils::directives.parameter_map_path);
   xmlutils::LevelMapper lmap(metautils::directives.level_map_path);
@@ -1012,12 +996,12 @@ void generate_detailed_grid_summary(string file_type, ofstream& ofs, const
   unordered_map<string, ParameterData> pdmap;
   unordered_map<size_t, LevelSummary> lsmap;
   unordered_map<size_t, tuple<string, string, string>> lcmap;
-  fill_level_code_map(dbdata.db, lcmap);
+  fill_level_code_map(lcmap);
   MySQL::Server mysrv(metautils::directives.database_server, metautils::
       directives.metadb_username, metautils::directives.metadb_password, "");
   MySQL::LocalQuery q;
   for (const auto& fp : format_list) {
-    q.set(parameter_query(mysrv, dbdata, fp.second, format_list.size()));
+    q.set(parameter_query(mysrv, fp.second, format_list.size()));
 #ifdef DUMP_QUERIES
     {
     Timer tm;
@@ -1139,7 +1123,7 @@ void generate_detailed_grid_summary(string file_type, ofstream& ofs, const
         "cellpadding=\"5\" border=\"0\"><tr><th class=\"headerRow\" colspan=\""
         << ncols << "\" align=\"center\">Summary for Grids in " << strutils::
         to_capital(f) << " Format</th></tr>" << endl;
-    MySQL::LocalQuery q(time_range_query(mysrv, dbdata, fp.second));
+    MySQL::LocalQuery q(time_range_query(mysrv, fp.second));
 #ifdef DUMP_QUERIES
     {
     Timer tm;
@@ -1402,8 +1386,8 @@ void generate_detailed_grid_summary(string file_type, ofstream& ofs, const
   ofs_p.close();
   ofs_l.close();
   if (pfv.size() > 0) {
-    generate_gridded_product_detail(mysrv, dbdata, file_type, format_list, t,
-        caller, user);
+    generate_gridded_product_detail(mysrv, file_type, format_list, t, caller,
+        user);
   }
   mysrv.disconnect();
   string e;
@@ -1434,13 +1418,6 @@ void generate_detailed_observation_summary(string file_type, ofstream& ofs,
   if (!ofs_o.is_open()) {
     log_error2("unable to open output for observation detail", F, caller, user);
   }
-  DBData dbdata;
-  if (file_type == "Web") {
-    dbdata.db = "WObML";
-    dbdata.table = "_webfiles2";
-    dbdata.dtable = "wfile";
-    dbdata.id_type = "web";
-  }
   MySQL::Server mysrv(metautils::directives.database_server, metautils::
       directives.metadb_username, metautils::directives.metadb_password, "");
   string d2 = substitute(metautils::args.dsnum, ".", "");
@@ -1463,25 +1440,22 @@ void generate_detailed_observation_summary(string file_type, ofstream& ofs,
         "Coverage</b><br>(each dot represents a 3&deg; box containing one or "
         "more observations)</td></tr>" << endl;
     MySQL::Query query;
-    if (MySQL::table_exists(mysrv, dbdata.db + ".ds" + d2 + "_dataTypes2")) {
+    if (MySQL::table_exists(mysrv, "WObML.ds" + d2 + "_dataTypes2")) {
       query.set("select distinct t.platform_type, o.obs_type, l.dataType, min("
-          "start_date),max(end_date) from " + dbdata.db + ".ds" + d2 +
-          "_dataTypes2 as d left join " + dbdata.db + ".ds" + d2 +
-          "_dataTypesList as l on l.code = d.dataType_code left join " + dbdata.
-          db + ".ds" + d2 + dbdata.table + " as p on p.code = d." + dbdata.
-          id_type + "ID_code left join " + dbdata.db + ".platform_types as t "
-          "on t.code = l.platformType_code left join " + dbdata.db +
-          ".obs_types as o on o.code = l.observationType_code where p."
-          "format_code = " + fp.second + " group by t.platform_type, o."
-          "obs_type, l.dataType order by t.platform_type, o.obs_type, l."
-          "dataType");
+          "start_date),max(end_date) from WObML.ds" + d2 + "_dataTypes2 as d "
+          "left join WObML.ds" + d2 + "_dataTypesList as l on l.code = d."
+          "dataType_code left join WObML.ds" + d2 + "_webfiles as p on p.code "
+          "= d.webID_code left join WObML.platform_types as t on t.code = l."
+          "platformType_code left join WObML.obs_types as o on o.code = l."
+          "observationType_code where p.format_code = " + fp.second + " group "
+          "by t.platform_type, o.obs_type, l.dataType order by t."
+          "platform_type, o.obs_type, l.dataType");
     } else {
       query.set("select distinct t.platform_type, o.obs_type, l.dataType, min("
-          "start_date), max(end_date) from " + dbdata.db + ".ds" + d2 +
-          "_dataTypes as d left join " + dbdata.db + ".ds" + d2 + dbdata.table +
-          " as p on p.code = d." + dbdata.id_type + "ID_code left join " +
-          dbdata.db + ".platform_types as t on t.code = d.platformType_code "
-          "left join " + dbdata.db + ".obs_types as o on o.code = d."
+          "start_date), max(end_date) from WObML.ds" + d2 + "_dataTypes as d "
+          "left join WObML.ds" + d2 + "_webfiles2 as p on p.code = d."
+          "webID_code left join WObML.platform_types as t on t.code = d."
+          "platformType_code left join WObML.obs_types as o on o.code = d."
           "observationType_code where p.format_code = " + fp.second + " group "
           "by t.platform_type, o.obs_type, l.dataType order by t."
           "platform_type, o.obs_type, l.dataType");
@@ -1537,27 +1511,26 @@ void generate_detailed_observation_summary(string file_type, ofstream& ofs,
         }
       }
     }
-    if (field_exists(mysrv, dbdata.db + ".ds" + d2 + dbdata.table,
-        "min_obs_per")) {
+    if (field_exists(mysrv, "WObML.ds" + d2 + "_webfiles2", "min_obs_per")) {
       query.set("select any_value(l.platform_type), any_value(o.obs_type), min("
-          "f.min_obs_per), max(f.max_obs_per), f.unit from " + dbdata.db + ".ds"
-          + d2 + dbdata.table + " as p join " + dbdata.db + ".ds" + d2 +
-          "_frequencies as f on p.code = f.file_code left join " + dbdata.db +
-          ".obs_types as o on o.code = f.observation_type_code left join " +
-          dbdata.db + ".platform_types as l on l.code = f.platform_type_code "
-          "left join WObML.frequency_sort as s on s.keyword = f.unit where p."
-          "format_code = " + fp.second + " group by f.observation_type_code, f."
-          "platform_type_code, f.unit, s.idx order by s.idx");
+          "f.min_obs_per), max(f.max_obs_per), f.unit from WObML.ds" + d2 +
+          "_webfiles2 as p join WObML.ds" + d2 + "_frequencies as f on p.code "
+          "= f.file_code left join WObML.obs_types as o on o.code = f."
+          "observation_type_code left join WObML.platform_types as l on l.code "
+          "= f.platform_type_code left join WObML.frequency_sort as s on s."
+          "keyword = f.unit where p.format_code = " + fp.second + " group by f."
+          "observation_type_code, f.platform_type_code, f.unit, s.idx order by "
+          "s.idx");
     } else {
       query.set("select any_value(l.platform_type), any_value(o.obs_type), min("
-          "f.avg_obs_per), max(f.avg_obs_per), f.unit from " + dbdata.db + ".ds"
-          + d2 + dbdata.table + " as p join " + dbdata.db + ".ds" + d2 +
-          "_frequencies as f on p.code = f.file_code left join " + dbdata.db +
-          ".obs_types as o on o.code = f.observation_type_code left join " +
-          dbdata.db + ".platform_types as l on l.code = f.platform_type_code "
-          "left join WObML.frequency_sort as s on s.keyword = f.unit where p."
-          "format_code = " + fp.second + " group by f.observation_type_code, f."
-          "platform_type_code, f.unit, s.idx order by s.idx");
+          "f.avg_obs_per), max(f.avg_obs_per), f.unit from WObML.ds" + d2 +
+          "_webfiles2 as p join WObML.ds" + d2 + "_frequencies as f on p.code "
+          "= f.file_code left join WObML.obs_types as o on o.code = f."
+          "observation_type_code left join WObML.platform_types as l on l.code "
+          "= f.platform_type_code left join WObML.frequency_sort as s on s."
+          "keyword = f.unit where p.format_code = " + fp.second + " group by f."
+          "observation_type_code, f.platform_type_code, f.unit, s.idx order by "
+          "s.idx");
     }
     if (query.submit(mysrv) < 0)
       log_error2("'" + query.error() + "' for '" + query.show() + "'", F,
@@ -1623,7 +1596,7 @@ void generate_detailed_observation_summary(string file_type, ofstream& ofs,
         }
         ofs_o << "<br><img src=\"/datasets/ds" << metautils::args.dsnum <<
             "/metadata/spatial_coverage." << substitute(data_format," ","_") <<
-            "_" << dbdata.id_type;
+            "_web";
         ofs_o << "_" << key2 << "." << e.second.key << ".gif?" << strand(5) <<
             "\"></td></tr>" << endl;
         te2.type_table_keys->clear();
@@ -1651,13 +1624,6 @@ void generate_detailed_observation_summary(string file_type, ofstream& ofs,
 void generate_detailed_fix_summary(string file_type, ofstream& ofs, const
     vector<pair<string, string>>& format_list, string caller, string user) {
   static const string F = this_function_label(__func__);
-  DBData dbdata;
-  if (file_type == "Web") {
-    dbdata.db = "WFixML";
-    dbdata.table = "_webfiles2";
-    dbdata.dtable = "wfile";
-    dbdata.id_type = "web";
-  }
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   string d2 = substitute(metautils::args.dsnum, ".", "");
   my::map<TypeEntry> platform_table;
@@ -1669,7 +1635,7 @@ void generate_detailed_fix_summary(string file_type, ofstream& ofs, const
     auto cindex=0;
     ofs << "<tr class=\"bg2\" valign=\"top\"><th align=\"left\">Cyclone Classification</th><td align=\"left\"><b>Average Frequency of Data</b><br>(may vary by individual cyclone ID)</td><td align=\"left\"><b>Temporal/Geographical Coverage</b><br>(each dot represents a 3&deg; box containing one or more fixes)</td></tr>" << endl;
     MySQL::Query query;
-    query.set("select distinct classification,min(l.start_date),max(l.end_date) from "+dbdata.db+".ds"+d2+"_locations as l left join "+dbdata.db+".ds"+d2+dbdata.table+" as p on p.code = l."+dbdata.id_type+"ID_code left join "+dbdata.db+".classifications as c on c.code = l.classification_code where p.format_code = "+fp.second+" group by classification order by classification");
+    query.set("select distinct classification,min(l.start_date),max(l.end_date) from WFixML.ds"+d2+"_locations as l left join WFixML.ds"+d2+"_webfiles2 as p on p.code = l.webID_code left join WFixML.classifications as c on c.code = l.classification_code where p.format_code = "+fp.second+" group by classification order by classification");
     if (query.submit(server) < 0) {
       log_error2("'" + query.error() + "' for '" + query.show() + "'", F,
           caller, user);
@@ -1693,7 +1659,7 @@ void generate_detailed_fix_summary(string file_type, ofstream& ofs, const
         platform_table.replace(te);
       }
     }
-    query.set("select any_value(c.classification),min(f.min_obs_per),max(f.max_obs_per),f.unit from "+dbdata.db+".ds"+d2+dbdata.table+" as p left join "+dbdata.db+".ds"+d2+"_frequencies as f on p.code = f."+dbdata.id_type+"ID_code left join "+dbdata.db+".classifications as c on c.code = f.classification_code left join WObML.frequency_sort as s on s.keyword = f.unit where p.format_code = "+fp.second+" group by f.classification_code,f.unit,s.idx order by s.idx");
+    query.set("select any_value(c.classification),min(f.min_obs_per),max(f.max_obs_per),f.unit from WFixML.ds"+d2+"_webfiles2 as p left join WFixML.ds"+d2+"_frequencies as f on p.code = f.webID_code left join WFixML.classifications as c on c.code = f.classification_code left join WObML.frequency_sort as s on s.keyword = f.unit where p.format_code = "+fp.second+" group by f.classification_code,f.unit,s.idx order by s.idx");
     if (query.submit(server) < 0) {
       log_error2("'" + query.error() + "' for '" + query.show() + "'", F,
           caller, user);
@@ -1716,7 +1682,7 @@ void generate_detailed_fix_summary(string file_type, ofstream& ofs, const
       for (auto& key2 : *te.type_table_keys) {
         ofs << "<li>" << key2 << "</li>";
       }
-      ofs << "</ul></td><td align=\"center\">" << dateutils::string_ll_to_date_string(te.start) << " to " << dateutils::string_ll_to_date_string(te.end) << "<br><img src=\"/datasets/ds" << metautils::args.dsnum << "/metadata/spatial_coverage." << dbdata.id_type;
+      ofs << "</ul></td><td align=\"center\">" << dateutils::string_ll_to_date_string(te.start) << " to " << dateutils::string_ll_to_date_string(te.end) << "<br><img src=\"/datasets/ds" << metautils::args.dsnum << "/metadata/spatial_coverage.web";
       ofs << "_" << te.key << ".gif?" << strand(5) << "\"></td></tr>" << endl;
       te.type_table_keys->clear();
       te.type_table_keys.reset();
@@ -1751,7 +1717,6 @@ void generate_detailed_metadata_view(string caller, string user) {
       directives.metadb_username, metautils::directives.metadb_password, "");
   string fmts, dtyps;
   auto b = false;
-  auto pnam = "webfiles2";
 
   // svec contains the database, the data type description, and a function
   //  that generates an appropriate summary
@@ -1764,12 +1729,12 @@ void generate_detailed_metadata_view(string caller, string user) {
   };
   vector<vector<pair<string, string>>> vv(svec.size());
   for (size_t n = 0; n < svec.size(); ++n) {
-    auto s = get<0>(svec[n]) + ".ds" + substitute(metautils::args.dsnum, ".",
-        "") + "_" + pnam;
-    if (table_exists(mysrv_m, s)) {
+    auto tbl = get<0>(svec[n]) + ".ds" + substitute(metautils::args.dsnum, ".",
+        "") + "_webfiles2";
+    if (table_exists(mysrv_m, tbl)) {
       b = true;
       dtyps += "<li>" + get<1>(svec[n]) + " </li>";
-      add_to_formats(xdoc, get<0>(svec[n]), s, vv[n], fmts, caller, user);
+      add_to_formats(xdoc, get<0>(svec[n]), tbl, vv[n], fmts, caller, user);
     }
   }
   xdoc.close();
