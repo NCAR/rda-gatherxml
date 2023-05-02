@@ -1058,11 +1058,11 @@ void obml_file_data(string file_type, unordered_map<string, string>&
   if (map.empty()) {
     fill_data_formats_table(mysrv, "WObML", map, caller, user);
   }
-  MySQL::Query q("select webID, format_code, num_observations, start_date, "
+  MySQL::Query q("select id, format_code, num_observations, start_date, "
       "end_date, gindex, file_format, data_size from WObML.ds" + substitute(
       metautils::args.dsnum, ".", "") + "_webfiles2 as w left join dssdb."
-      "wfile as d on d.wfile = w.webID where d.dsid = 'ds" + metautils::args.
-      dsnum + "' and d.type = 'D' and d.status = 'P' and num_observations > 0");
+      "wfile as d on d.wfile = w.id where d.dsid = 'ds" + metautils::args.dsnum
+      + "' and d.type = 'D' and d.status = 'P' and num_observations > 0");
 #ifdef DUMP_QUERIES
   {
   Timer tm;
@@ -1624,16 +1624,16 @@ void create_file_list_cache(string file_type, string caller, string user, string
       if (tindex.empty()) {
         if (field_exists(mysrv, "WObML.ds" + d2 + "_webfiles2", "dsid")) {
           oq.set("select distinct g.gindex, g.title, g.grpid from WObML.ds" + d2
-              + "_webfiles2 as p left join dssdb.wfile as w on (w.wfile = p."
-              "webID and w.type = p.type and w.dsid = p.dsid) left join dssdb."
+              + "_webfiles2 as p left join dssdb.wfile as w on (w.wfile = p.id "
+              "and w.type = p.type and w.dsid = p.dsid) left join dssdb."
               "dsgroup as g on (g.dsid = 'ds" + metautils::args.dsnum + "' and "
               "g.gindex = w.gindex) where !isnull(w.wfile) order by g.gindex");
         } else {
           oq.set("select distinct g.gindex, g.title, g.grpid from WObML.ds" + d2
-              + "_webfiles2 as p left join dssdb.wfile as w on w.wfile = p."
-              "webID left join dssdb.dsgroup as g on (g.dsid = 'ds" +
-              metautils::args.dsnum + "' and g.gindex = w.gindex) where "
-              "!isnull(w.wfile) order by g.gindex");
+              + "_webfiles2 as p left join dssdb.wfile as w on w.wfile = p.id "
+              "left join dssdb.dsgroup as g on (g.dsid = 'ds" + metautils::args.
+              dsnum + "' and g.gindex = w.gindex) where !isnull(w.wfile) order "
+              "by g.gindex");
         }
 #ifdef DUMP_QUERIES
         {

@@ -1760,8 +1760,8 @@ void insert_obml_inventory() {
   replace_all(fil, "%", "/");
   MySQL::LocalQuery q("select code, tindex from WObML.ds" + local_args.dsnum2 +
       "_webfiles2 as w left join dssdb.wfile as x on (x.dsid = 'ds" +
-      metautils::args.dsnum + "' and x.type = 'D' and x.wfile = w.webID) where "
-      "webID = '" + fil + "'");
+      metautils::args.dsnum + "' and x.type = 'D' and x.wfile = w.id) where w."
+      "id = '" + fil + "'");
   if (q.submit(srv) < 0) {
     log_error2("insert_obml_inventory() returned error: " + q.error() +
         " while looking for code from webfiles", F, "iinv", USER);

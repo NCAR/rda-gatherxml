@@ -78,16 +78,16 @@ void inventory_all() {
         "w.code left join WGrML.formats as f on f.code = w.format_code where "
         "isnull(i.webID_code) or isnull(inv)");
   } else if (MySQL::table_exists(srv, "WGrML.ds" + ds + "_webfiles2")) {
-    q.set("select w.id, f.format from WGrML.ds" + ds + "_webfiles2 as w "
-        "left join WGrML.formats as f on f.code = w.format_code");
+    q.set("select w.id, f.format from WGrML.ds" + ds + "_webfiles2 as w left "
+        "join WGrML.formats as f on f.code = w.format_code");
   } else if (MySQL::table_exists(srv, "IObML.ds" + ds + "_inventory_summary")) {
-    q.set("select w.webID, f.format from WObML.ds" + ds + "_webfiles2 as w "
+    q.set("select w.id, f.format from WObML.ds" + ds + "_webfiles2 as w "
         "left join IObML.ds" + ds + "_inventory_summary as i on i.webID_code = "
         "w.code left join WObML.formats as f on f.code = w.format_code where "
         "isnull(i.webID_code) or isnull(inv)");
   } else if (MySQL::table_exists(srv, "WObML.ds" + ds + "_webfiles2")) {
-    q.set("select w.webID, f.format from WObML.ds" + ds + "_webfiles2 as w "
-        "left join WObML.formats as f on f.code = w.format_code");
+    q.set("select w.id, f.format from WObML.ds" + ds + "_webfiles2 as w left "
+        "join WObML.formats as f on f.code = w.format_code");
   }
   if (q.submit(srv) < 0) {
     log_error2("'" + q.error() + "'", F, "gatherxml", USER);

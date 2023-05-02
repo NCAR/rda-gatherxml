@@ -424,7 +424,7 @@ extern "C" void *t_removed(void *ts) {
     file_removed = true;
     g_removed_from_wgrml = true;
   }
-  was_removed = remove_from("WObML", "_webfiles2", "webID", "wfmd", file,
+  was_removed = remove_from("WObML", "_webfiles2", "id", "wfmd", file,
       ".ObML", file_id_code, is_version_controlled);
   if (was_removed) {
     clear_tables_by_file_id("WObML", file_id_code, is_version_controlled);

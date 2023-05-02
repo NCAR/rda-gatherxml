@@ -213,9 +213,9 @@ void generate_graphics(MySQL::LocalQuery& query, string type, string table,
       if (type == "obs") {
         tnc[nn].query.set("select distinct box1d_row, box1d_bitmap from WObML."
             "ds" + d2 + "_webfiles2 as p left join dssdb.wfile as x on (x.dsid "
-            "= 'ds" + metautils::args.dsnum + "' and x.wfile = p.webID) left "
-            "join " + table + " as t on t.webID_code = p.code where x.gindex = "
-            + gindex + " and observationType_code = " + row[0] + " and "
+            "= 'ds" + metautils::args.dsnum + "' and x.wfile = p.id) left join "
+            + table + " as t on t.webID_code = p.code where x.gindex = " +
+            gindex + " and observationType_code = " + row[0] + " and "
             "platformType_code = " + row[1] + " and p.format_code = " + row[4] +
             " order by box1d_row");
         tnc[nn].imagetag = substitute(row[5], " ", "_") + "_web_gindex_" +
@@ -328,12 +328,12 @@ int main(int argc, char **argv) {
       q2.set("select distinct l.observationType_code, l.platformType_code, "
           "o.obs_type, pf.platform_type, p.format_code, f.format from WObML.ds"
           + dsid + "_webfiles2 as p left join dssdb.wfile as x on x.wfile = p."
-          "webID left join WObML.ds" + dsid + "_dataTypes2 as d on "
-          "d.webID_code = p.code left join WObML.ds" + dsid + "_dataTypesList "
-          "as l on l.code = d.dataType_code left join WObML.obs_types as o on "
-          "l.observationType_code = o.code left join WObML.platform_types as "
-          "pf on l.platformType_code = pf.code left join WObML.formats as f on "
-          "f.code = p.format_code where x.gindex = " + g);
+          "id left join WObML.ds" + dsid + "_dataTypes2 as d on d.webID_code = "
+          "p.code left join WObML.ds" + dsid + "_dataTypesList as l on l.code "
+          "= d.dataType_code left join WObML.obs_types as o on l."
+          "observationType_code = o.code left join WObML.platform_types as pf "
+          "on l.platformType_code = pf.code left join WObML.formats as f on f."
+          "code = p.format_code where x.gindex = " + g);
       t = "WObML.ds" + dsid + "_locations";
     }
     generate_graphics(q2, "obs", t, g);

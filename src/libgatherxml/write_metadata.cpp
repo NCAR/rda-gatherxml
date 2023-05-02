@@ -50,8 +50,8 @@ void close(string filename, unique_ptr<TempDir>& tdir, std::ofstream& ofs,
   MySQL::Server srv(metautils::directives.database_server, metautils::
       directives.metadb_username, metautils::directives.metadb_password, "");
   srv.update("W" + cmd_type + ".ds" + substitute(metautils::args.dsnum, ".", "")
-      + "_webfiles2", "inv = 'Y'", "webID = '" + substitute(filename, "%", "/")
-      + "'");
+      + "_webfiles2", "inv = 'Y'", "id = '" + substitute(filename, "%", "/") +
+      "'");
   if (metautils::args.inventory_only) {
     metautils::args.filename = filename;
   }
