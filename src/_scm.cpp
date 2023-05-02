@@ -1057,8 +1057,8 @@ void *thread_summarize_IDs(void *args) {
         dt2.set(stoll(v));
       }
       auto nobs = e.attribute_value("numObs");
-      if (srv.insert(a[5] + ".ds" + local_args.dsnum2 + "_IDList2", "ID_code, "
-          "observationType_code, platformType_code, " + a[6] + "ID_code, "
+      if (srv.insert(a[5] + ".ds" + local_args.dsnum2 + "_IDList2", "id_code, "
+          "observation_type_code, platform_type_code, file_code, "
           "num_observations, start_date, end_date, time_zone", ID_code + ", " +
           a[3] + ", " + a[4] + ", " + a[2] + ", " + nobs + ", " + dt1.to_string(
           "%Y%m%d%H%MM%SS") + ", " + dt2.to_string("%Y%m%d%H%MM%SS") + ", " +
@@ -1177,14 +1177,14 @@ void *thread_summarize_IDs(void *args) {
     }
   }
   if (a[5] == "WObML" && srv.command("insert into " + a[5] + ".ds" + local_args.
-      dsnum2 + "_geobounds (select i2.webID_code, min(i.sw_lat), "
-      "min(i.sw_lon), max(i.ne_lat), max(i.ne_lon) from " + a[5] + ".ds" +
-      local_args.dsnum2 + "_IDList2 as i2 left join " + a[5] + ".ds" +
-      local_args.dsnum2 + "_IDs2 as i on i.code = i2.ID_code where i2."
-      "webID_code = " + a[2] + " and i.sw_lat > -990000 and i.sw_lon > "
-      "-1810000 and i.ne_lat < 990000 and i.ne_lon < 1810000) on duplicate key "
-      "update min_lat = values(min_lat),  max_lat = values(max_lat),  min_lon "
-      "= values(min_lon),  max_lon = values(max_lon)", r) < 0) {
+      dsnum2 + "_geobounds (select i2.file_code, min(i.sw_lat), min(i.sw_lon), "
+      "max(i.ne_lat), max(i.ne_lon) from " + a[5] + ".ds" + local_args.dsnum2 +
+      "_IDList2 as i2 left join " + a[5] + ".ds" + local_args.dsnum2 + "_IDs2 "
+      "as i on i.code = i2.id_code where i2.file_code = " + a[2] + " and i."
+      "sw_lat > -990000 and i.sw_lon > -1810000 and i.ne_lat < 990000 and i."
+      "ne_lon < 1810000) on duplicate key update min_lat = values(min_lat), "
+      "max_lat = values(max_lat),  min_lon = values(min_lon),  max_lon = "
+      "values(max_lon)", r) < 0) {
     log_error2("'" + srv.error() + "' while trying to insert into " + a[5] +
         ".ds" + local_args.dsnum2 + "_geobounds for webID_code = " + a[2], F,
         "scm", USER);
