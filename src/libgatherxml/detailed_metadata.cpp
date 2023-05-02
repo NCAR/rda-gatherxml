@@ -1444,7 +1444,7 @@ void generate_detailed_observation_summary(string file_type, ofstream& ofs,
       query.set("select distinct t.platform_type, o.obs_type, l.dataType, min("
           "start_date),max(end_date) from WObML.ds" + d2 + "_dataTypes2 as d "
           "left join WObML.ds" + d2 + "_dataTypesList as l on l.code = d."
-          "dataType_code left join WObML.ds" + d2 + "_webfiles as p on p.code "
+          "dataType_code left join WObML.ds" + d2 + "_webfiles2 as p on p.code "
           "= d.webID_code left join WObML.platform_types as t on t.code = l."
           "platformType_code left join WObML.obs_types as o on o.code = l."
           "observationType_code where p.format_code = " + fp.second + " group "
