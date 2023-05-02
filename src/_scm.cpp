@@ -1012,7 +1012,7 @@ void *thread_summarize_IDs(void *args) {
         ne_lon = "-8388608";
       }
       auto ID_code = table_code(srv, a[5] + ".ds" + local_args.dsnum2 + "_IDs2",
-          "IDType_code = " + id_map[idtyp] + " AND ID = '" + ID + "' AND "
+          "id_type_code = " + id_map[idtyp] + " AND id = '" + ID + "' AND "
           "sw_lat = " + sw_lat + " AND sw_lon = " + sw_lon + " AND ne_lat = " +
           ne_lat + " AND ne_lon = " + ne_lon);
       if (ID_code.empty()) {
