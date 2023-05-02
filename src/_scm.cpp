@@ -1280,8 +1280,8 @@ void *thread_summarize_file_ID_locations(void *args) {
       compress_locations(lset, pmap, v, "scm", USER);
       if (a[7] == "WObML") {
         srv._delete("WObML.ds" + local_args.dsnum2 + "_location_names",
-            "webID_code = " + a[2] + " and observationType_code = " + a[3] +
-            " and platformType_code = " + a[4]);
+            "file_code = " + a[2] + " and observation_type_code = " + a[3] +
+            " and platform_type_code = " + a[4]);
       } else if (a[7] == "WFixML") {
         srv._delete("WFixML.ds" + local_args.dsnum2 + "_location_names",
             "webID_code = " + a[2] + " and classification_code = " + a[3]);
