@@ -387,13 +387,6 @@ void create_grml_tables(MarkupParameters *markup_parameters) {
         "creating table " + tb_base + "_" + markup_parameters->file_type +
         "files2", F, "scm", USER);
   }
-/*
-        if (ftyp == "web") {
-          if (markup_parameters->server.command("alter table "+tb_nam+" add type char(1) not null default 'D' after webID, add dsid varchar(9) not null default 'ds"+metautils::args.dsnum+"' after type, add primary key (webID,type,dsid)",result) < 0) {
-            metautils::log_error(F + " returned error: "+markup_parameters->server.error()+" while modifying "+tb_nam,"scm",USER);
-          }
-        }
-*/
   if (markup_parameters->server.command("create table " + tb_base +
       "_levels like " + markup_parameters->database + ".template_levels", r) <
       0) {
