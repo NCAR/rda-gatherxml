@@ -402,7 +402,7 @@ void create_grml_tables(MarkupParameters *markup_parameters) {
 
 void create_obml_tables(MarkupParameters *markup_parameters) {
   static const string F = this_function_label(__func__);
-  auto tb_base = markup_parameters->database + ".ds" + local_args.dsnum2;
+  auto tb_base = "WObML.ds" + local_args.dsnum2;
   string r;
   if (markup_parameters->server.command("create table " + tb_base + "_" +
       markup_parameters->file_type + "files2 like " + markup_parameters->
@@ -442,15 +442,15 @@ void create_obml_tables(MarkupParameters *markup_parameters) {
     log_error2("error: '" + markup_parameters->server.error() + "' while "
         "creating table " + tb_base + "_frequencies", F, "scm", USER);
   }
-  if (markup_parameters->server.command("create table " + tb_base + "_IDs2 "
-      "like " + markup_parameters->database + ".template_IDs2", r) < 0) {
+  if (markup_parameters->server.command("create table " + tb_base + "_ids "
+      "like " + markup_parameters->database + ".template_ids", r) < 0) {
     log_error2("error: '" + markup_parameters->server.error() + "' while "
-        "creating table " + tb_base + "_IDs2", F, "scm", USER);
+        "creating table " + tb_base + "_ids", F, "scm", USER);
   }
-  if (markup_parameters->server.command("create table " + tb_base + "_IDList2 "
-      "like " + markup_parameters->database + ".template_IDList2", r) < 0) {
+  if (markup_parameters->server.command("create table " + tb_base + "_id_list "
+      "like " + markup_parameters->database + ".template_id_list", r) < 0) {
     log_error2("error: '" + markup_parameters->server.error() + "' while "
-        "creating table " + tb_base + "_IDList2", F, "scm", USER);
+        "creating table " + tb_base + "_id_list", F, "scm", USER);
   }
   if (markup_parameters->server.command("create table " + tb_base +
       "_geobounds like " + markup_parameters->database + ".template_geobounds",
@@ -586,7 +586,7 @@ void clear_grml_tables(MarkupParameters *markup_parameters) {
 
 void clear_obml_tables(MarkupParameters *markup_parameters) {
   markup_parameters->server._delete(markup_parameters->database + ".ds" +
-      local_args.dsnum2 + "_IDList2", "file_code = " + markup_parameters->
+      local_args.dsnum2 + "_id_list", "file_code = " + markup_parameters->
       file_map[markup_parameters->filename]);
   markup_parameters->server._delete(markup_parameters->database + ".ds" +
       local_args.dsnum2 + "_data_types", "file_code = " + markup_parameters->
@@ -1002,7 +1002,7 @@ void *thread_summarize_IDs(void *args) {
       if (ne_lon == "-9990000") {
         ne_lon = "-8388608";
       }
-      auto ID_code = table_code(srv, a[5] + ".ds" + local_args.dsnum2 + "_IDs2",
+      auto ID_code = table_code(srv, a[5] + ".ds" + local_args.dsnum2 + "_ids",
           "id_type_code = " + id_map[idtyp] + " AND id = '" + ID + "' AND "
           "sw_lat = " + sw_lat + " AND sw_lon = " + sw_lon + " AND ne_lat = " +
           ne_lat + " AND ne_lon = " + ne_lon);
@@ -1048,7 +1048,7 @@ void *thread_summarize_IDs(void *args) {
         dt2.set(stoll(v));
       }
       auto nobs = e.attribute_value("numObs");
-      if (srv.insert(a[5] + ".ds" + local_args.dsnum2 + "_IDList2", "id_code, "
+      if (srv.insert(a[5] + ".ds" + local_args.dsnum2 + "_id_list", "id_code, "
           "observation_type_code, platform_type_code, file_code, "
           "num_observations, start_date, end_date, time_zone", ID_code + ", " +
           a[3] + ", " + a[4] + ", " + a[2] + ", " + nobs + ", " + dt1.to_string(
@@ -1059,7 +1059,7 @@ void *thread_summarize_IDs(void *args) {
               + a[3] + ", " + a[4] + ", " + a[2] + ", " + nobs + ", " + dt1.
               to_string("%Y%m%d%H%MM%SS") + ", " + dt2.to_string(
               "%Y%m%d%H%MM%SS") + ", " + tz + "' into " + a[5] + ".ds" +
-              local_args.dsnum2 + "_IDList2", F, "scm", USER);
+              local_args.dsnum2 + "_id_list", F, "scm", USER);
         }
       }
       for (const auto& element : e.element_list("dataType")) {
@@ -1170,7 +1170,7 @@ void *thread_summarize_IDs(void *args) {
   if (a[5] == "WObML" && srv.command("insert into " + a[5] + ".ds" + local_args.
       dsnum2 + "_geobounds (select i2.file_code, min(i.sw_lat), min(i.sw_lon), "
       "max(i.ne_lat), max(i.ne_lon) from " + a[5] + ".ds" + local_args.dsnum2 +
-      "_IDList2 as i2 left join " + a[5] + ".ds" + local_args.dsnum2 + "_IDs2 "
+      "_id_list as i2 left join " + a[5] + ".ds" + local_args.dsnum2 + "_ids "
       "as i on i.code = i2.id_code where i2.file_code = " + a[2] + " and i."
       "sw_lat > -990000 and i.sw_lon > -1810000 and i.ne_lat < 990000 and i."
       "ne_lon < 1810000) on duplicate key update min_lat = values(min_lat), "

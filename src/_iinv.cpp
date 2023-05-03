@@ -918,7 +918,7 @@ void process_IDs(string type, MySQL::Server& server, string ID_index, string
      ID_data, unordered_map<string, string>& id_table) {
   static const string F = this_function_label(__func__);
   auto sp = split(ID_data, "[!]");
-  string qs = "select i.code from WObML.ds" + local_args.dsnum2 + "_IDs2 as i "
+  string qs = "select i.code from WObML.ds" + local_args.dsnum2 + "_ids as i "
       "left join WObML.id_types as t on t.code = i.id_type_code where i.id = "
       "'" + sp[1] + "' and t.id_type = '" + sp[0] + "' and i.sw_lat = " +
       metatranslations::string_coordinate_to_db(sp[2]) + " and i.sw_lon = " +
