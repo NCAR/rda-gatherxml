@@ -254,7 +254,7 @@ bool summarize_obs_data(string caller, string user) {
   for (const auto& r : q) {
     fmap.emplace(r[0], r[1]);
   }
-  q.set("format_code, observationType_code, platformType_code, box1d_row, "
+  q.set("format_code, observation_type_code, platform_type_code, box1d_row, "
       "box1d_bitmap", "search.obs_data", "dsid = '" + metautils::args.dsnum +
       "'");
   if (q.submit(mysrv) < 0) {
