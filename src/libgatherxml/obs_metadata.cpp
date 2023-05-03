@@ -266,10 +266,7 @@ bool summarize_obs_data(string caller, string user) {
     omap.emplace(r[0] + "<!>" + r[1] + "<!>" + r[2] + "<!>" + r[3], r[4]);
   }
   string e;
-  if (mysrv.command("lock tables WObML.ds" + d2 + "_locations write", e) < 0) {
-    log_error2("'" + mysrv.error() + "'", F, caller, user);
-  }
-  q.set("webID_code, observation_type_code, platform_type_code, start_date, "
+  q.set("file_code, observation_type_code, platform_type_code, start_date, "
       "end_date, box1d_row, box1d_bitmap", "WObML.ds" + d2 + "_locations");
   if (q.submit(mysrv) < 0) {
     log_error2("'" + q.error() + "' while querying WObML.ds" + d2 +
@@ -278,9 +275,9 @@ bool summarize_obs_data(string caller, string user) {
   unordered_map<string, tuple<string, string, string>> summary_table;
   for (const auto& r : q) {
     if (fmap.find(r[0]) == fmap.end()) {
-      log_error2("found a webID (" + r[0] + ") in WObML.ds" + d2 + "_locations "
-          "that doesn't exist in WObML.ds" + d2 + "_webfiles2", F, caller,
-          user);
+      log_error2("found a file_code (" + r[0] + ") in WObML.ds" + d2 +
+          "_locations that doesn't exist in WObML.ds" + d2 + "_webfiles2", F,
+          caller, user);
     }
     SummaryEntry se;
     se.key=fmap[r[0]] + "<!>" + r[1] + "<!>" + r[2] + "<!>" + r[5];
@@ -299,9 +296,6 @@ bool summarize_obs_data(string caller, string user) {
       }
     }
   }
-  if (mysrv.command("unlock tables", e) < 0) {
-    log_error2("'" + mysrv.error() + "'", F, caller, user);
-  }
   for (const auto& e : summary_table) {
     if (omap.find(e.first) != omap.end()) {
       if (get<2>(summary_table[e.first]) != omap[e.first]) {
@@ -313,9 +307,6 @@ bool summarize_obs_data(string caller, string user) {
       break;
     }
   }
-  if (mysrv.command("lock tables search.obs_data write", e) < 0) {
-    log_error2("'" + mysrv.error() + "'", F, caller, user);
-  }
   mysrv._delete("search.obs_data", "dsid = '" + metautils::args.dsnum + "'");
   for (const auto& e : summary_table) {
     auto sp = split(e.first, "<!>");
@@ -326,9 +317,6 @@ bool summarize_obs_data(string caller, string user) {
         log_error2("'" + mysrv.error() + "'", F, caller, user);
       }
     }
-  }
-  if (mysrv.command("unlock tables", e) < 0) {
-    log_error2("'" + mysrv.error() + "'", F, caller, user);
   }
   summarize_locations("WObML", e);
   if (!e.empty()) {
