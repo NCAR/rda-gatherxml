@@ -311,13 +311,13 @@ int main(int argc, char **argv) {
     }
   }
   auto dsid = substitute(metautils::args.dsnum, ".", "");
-  if (table_exists(server, "WObML.ds" + dsid + "_dataTypes2")) {
+  if (table_exists(server, "WObML.ds" + dsid + "_data_types")) {
     MySQL::LocalQuery q2;
     string t;
     if (g.empty()) {
       q2.set("select distinct l.observation_type_code, l.platform_type_code, "
           "o.obs_type, pf.platform_type, p.format_code, f.format from WObML.ds"
-          + dsid + "_webfiles2 as p left join WObML.ds" + dsid + "_dataTypes2 "
+          + dsid + "_webfiles2 as p left join WObML.ds" + dsid + "_data_types "
           "as d on d.file_code = p.code left join WObML.ds" + dsid +
           "_data_types_list as l on l.code = d.data_type_code left join WObML."
           "obs_types as o on l.observation_type_code = o.code left join WObML."
@@ -328,7 +328,7 @@ int main(int argc, char **argv) {
       q2.set("select distinct l.observation_type_code, l.platform_type_code, "
           "o.obs_type, pf.platform_type, p.format_code, f.format from WObML.ds"
           + dsid + "_webfiles2 as p left join dssdb.wfile as x on x.wfile = p."
-          "id left join WObML.ds" + dsid + "_dataTypes2 as d on d.file_code = "
+          "id left join WObML.ds" + dsid + "_data_types as d on d.file_code = "
           "p.code left join WObML.ds" + dsid + "_data_types_list as l on l."
           "code = d.data_type_code left join WObML.obs_types as o on l."
           "observation_type_code = o.code left join WObML.platform_types as pf "

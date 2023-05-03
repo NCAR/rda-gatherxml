@@ -1501,12 +1501,12 @@ void create_file_list_cache(string file_type, string caller, string user, string
       // platform types
       if (file_type == "Web") {
         oq.set("select distinct l.platform_type_code, p.platform_type from "
-            "WObML.ds" + d2 + "_dataTypes2 as d left join WObML.ds" + d2 +
+            "WObML.ds" + d2 + "_data_types as d left join WObML.ds" + d2 +
             "_data_types_list as l on l.code = d.data_type_code left join "
             "WObML.platform_types as p on p.code = l.platform_type_code");
       } else if (file_type == "inv") {
         oq.set("select distinct l.platform_type_code, p.platform_type from "
-            "WObML.ds" + d2 + "_dataTypes2 as d left join WObML.ds" + d2 +
+            "WObML.ds" + d2 + "_data_types as d left join WObML.ds" + d2 +
             "_data_types_list as l on l.code = d.data_type_code left join "
             "WObML.platform_types as p on p.code = l.platform_type_code left "
             "join (select distinct webID_code from IObML.ds" + d2 +
@@ -1538,7 +1538,7 @@ void create_file_list_cache(string file_type, string caller, string user, string
       if (file_type == "Web" || file_type == "inv") {
         q.set("select distinct f.format from WObML.ds" + d2 + "_webfiles2 as w "
             "left join WObML.formats as f on f.code = w.format_code");
-        oq.set("select distinct l.data_type from WObML.ds" + d2 + "_dataTypes2 "
+        oq.set("select distinct l.data_type from WObML.ds" + d2 + "_data_types "
             "as d left join WObML.ds" + d2 + "_data_types_list as l on l.code "
             "= d.data_type_code");
       } else {

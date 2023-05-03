@@ -1441,7 +1441,7 @@ void generate_detailed_observation_summary(string file_type, ofstream& ofs,
         "more observations)</td></tr>" << endl;
     MySQL::Query query;
     query.set("select distinct t.platform_type, o.obs_type, l.data_type, min("
-        "start_date),max(end_date) from WObML.ds" + d2 + "_dataTypes2 as d "
+        "start_date),max(end_date) from WObML.ds" + d2 + "_data_types as d "
         "left join WObML.ds" + d2 + "_data_types_list as l on l.code = d."
         "data_type_code left join WObML.ds" + d2 + "_webfiles2 as p on p.code "
         "= d.file_code left join WObML.platform_types as t on t.code = l."

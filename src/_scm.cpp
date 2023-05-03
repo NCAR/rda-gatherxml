@@ -424,18 +424,11 @@ void create_obml_tables(MarkupParameters *markup_parameters) {
     log_error2("error: '" + markup_parameters->server.error() + "' while "
         "creating table " + tb_base + "_location_names", F, "scm", USER);
   }
-/*
-  if (markup_parameters->server.command("create table " + tb_base + "_dataTypes like " + markup_parameters->database +
-      ".template_dataTypes", r) < 0) {
-    log_error2("error: '" + markup_parameters->server.error() + "' while creating table " + tb_base
-        + "_dataTypes", F, "scm", USER);
-  }
-*/
   if (markup_parameters->server.command("create table " + tb_base +
-      "_dataTypes2 like " + markup_parameters->database +
-      ".template_dataTypes2", r) < 0) {
+      "_data_types like " + markup_parameters->database +
+      ".template_data_types", r) < 0) {
     log_error2("error: '" + markup_parameters->server.error() + "' while "
-        "creating table " + tb_base + "_dataTypes2", F, "scm", USER);
+        "creating table " + tb_base + "_data_types", F, "scm", USER);
   }
   if (markup_parameters->server.command("create table " + tb_base +
       "_data_types_list like " + markup_parameters->database +
@@ -596,7 +589,7 @@ void clear_obml_tables(MarkupParameters *markup_parameters) {
       local_args.dsnum2 + "_IDList2", "file_code = " + markup_parameters->
       file_map[markup_parameters->filename]);
   markup_parameters->server._delete(markup_parameters->database + ".ds" +
-      local_args.dsnum2 + "_dataTypes2", "file_code = " + markup_parameters->
+      local_args.dsnum2 + "_data_types", "file_code = " + markup_parameters->
       file_map[markup_parameters->filename]);
   markup_parameters->server._delete(markup_parameters->database + ".ds" +
       local_args.dsnum2 + "_frequencies", markup_parameters->file_type +
@@ -1442,10 +1435,10 @@ void process_obml_markup(void *markup_parameters) {
         } else {
           s += ", 0, 0, NULL, 0, NULL";
         }
-        if (op->server.insert("WObML.ds" + local_args.dsnum2 + "_dataTypes2", s)
+        if (op->server.insert("WObML.ds" + local_args.dsnum2 + "_data_types", s)
             < 0) {
           log_error2("'" + op->server.error() + "' while trying to insert '" + s
-              + "' into WObML.ds" + local_args.dsnum2 + "_dataTypes2", F, "scm",
+              + "' into WObML.ds" + local_args.dsnum2 + "_data_types", F, "scm",
               USER);
         }
       }
