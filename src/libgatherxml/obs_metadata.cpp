@@ -269,7 +269,7 @@ bool summarize_obs_data(string caller, string user) {
   if (mysrv.command("lock tables WObML.ds" + d2 + "_locations write", e) < 0) {
     log_error2("'" + mysrv.error() + "'", F, caller, user);
   }
-  q.set("webID_code, observationType_code, platformType_code, start_date, "
+  q.set("webID_code, observation_type_code, platform_type_code, start_date, "
       "end_date, box1d_row, box1d_bitmap", "WObML.ds" + d2 + "_locations");
   if (q.submit(mysrv) < 0) {
     log_error2("'" + q.error() + "' while querying WObML.ds" + d2 +

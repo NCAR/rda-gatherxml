@@ -198,7 +198,7 @@ void generate_graphics(MySQL::LocalQuery& query, string type, string table,
       if (type == "obs") {
         tnc[nn].query.set("select distinct box1d_row, box1d_bitmap from " +
             table + " where dsid = '" + metautils::args.dsnum + "' and "
-            "observationType_code = " + row[0] + " and platformType_code = " +
+            "observation_type_code = " + row[0] + " and platform_type_code = " +
             row[1] + " and format_code = " + row[4] + " order by box1d_row");
         tnc[nn].imagetag = substitute(row[5], " ", "_") + "_web_" + row[2] + "."
             + row[3];
@@ -215,9 +215,9 @@ void generate_graphics(MySQL::LocalQuery& query, string type, string table,
             "ds" + d2 + "_webfiles2 as p left join dssdb.wfile as x on (x.dsid "
             "= 'ds" + metautils::args.dsnum + "' and x.wfile = p.id) left join "
             + table + " as t on t.webID_code = p.code where x.gindex = " +
-            gindex + " and observationType_code = " + row[0] + " and "
-            "platformType_code = " + row[1] + " and p.format_code = " + row[4] +
-            " order by box1d_row");
+            gindex + " and observation_type_code = " + row[0] + " and "
+            "platform_type_code = " + row[1] + " and p.format_code = " + row[4]
+            + " order by box1d_row");
         tnc[nn].imagetag = substitute(row[5], " ", "_") + "_web_gindex_" +
             gindex + "_" + row[2] + "." + row[3];
       } else if (type == "fix") {
@@ -315,24 +315,24 @@ int main(int argc, char **argv) {
     MySQL::LocalQuery q2;
     string t;
     if (g.empty()) {
-      q2.set("select distinct l.observationType_code, l.platformType_code, "
+      q2.set("select distinct l.observation_type_code, l.platform_type_code, "
           "o.obs_type, pf.platform_type, p.format_code, f.format from WObML.ds"
           + dsid + "_webfiles2 as p left join WObML.ds" + dsid + "_dataTypes2 "
           "as d on d.file_code = p.code left join WObML.ds" + dsid +
-          "_dataTypesList as l on l.code = d.data_type_code left join WObML."
-          "obs_types as o on l.observationType_code = o.code left join WObML."
-          "platform_types as pf on l.platformType_code = pf.code left join "
+          "_data_types_list as l on l.code = d.data_type_code left join WObML."
+          "obs_types as o on l.observation_type_code = o.code left join WObML."
+          "platform_types as pf on l.platform_type_code = pf.code left join "
           "WObML.formats as f on f.code = p.format_code");
       t = "search.obs_data";
     } else {
-      q2.set("select distinct l.observationType_code, l.platformType_code, "
+      q2.set("select distinct l.observation_type_code, l.platform_type_code, "
           "o.obs_type, pf.platform_type, p.format_code, f.format from WObML.ds"
           + dsid + "_webfiles2 as p left join dssdb.wfile as x on x.wfile = p."
           "id left join WObML.ds" + dsid + "_dataTypes2 as d on d.file_code = "
-          "p.code left join WObML.ds" + dsid + "_dataTypesList as l on l.code "
-          "= d.data_type_code left join WObML.obs_types as o on l."
-          "observationType_code = o.code left join WObML.platform_types as pf "
-          "on l.platformType_code = pf.code left join WObML.formats as f on f."
+          "p.code left join WObML.ds" + dsid + "_data_types_list as l on l."
+          "code = d.data_type_code left join WObML.obs_types as o on l."
+          "observation_type_code = o.code left join WObML.platform_types as pf "
+          "on l.platform_type_code = pf.code left join WObML.formats as f on f."
           "code = p.format_code where x.gindex = " + g);
       t = "WObML.ds" + dsid + "_locations";
     }

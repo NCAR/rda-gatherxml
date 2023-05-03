@@ -1157,13 +1157,13 @@ void insert_obml_netcdf_time_series_inventory(std::ifstream& ifs, MySQL::Server&
           auto k = o.first + "|" + p.first + "|" + dve.data->var_name;
           if (dmap.find(k) == dmap.end()) {
             MySQL::LocalQuery q("code", "WObML.ds" + local_args.dsnum2 +
-                "_dataTypesList", "observationType_code = " + o.second + " and "
-                "platformType_code = " + p.second + " and dataType = 'ds" +
-                metautils::args.dsnum + ":" + dve.data->var_name + "'");
+                "_data_types_list", "observation_type_code = " + o.second +
+                " and platform_type_code = " + p.second + " and data_type = 'ds"
+                + metautils::args.dsnum + ":" + dve.data->var_name + "'");
             MySQL::Row row;
             if (q.submit(server) < 0 || !q.fetch_row(row)) {
               log_error2("insert_obml_netcdf_time_series_inventory() returned "
-                  "error: " + q.error() + " while trying to get dataType code "
+                  "error: " + q.error() + " while trying to get data_type code "
                   "for '" + o.second + ", " + p.second  + ", '" + dve.data->
                   var_name + "''", F, "iinv", USER);
             }
@@ -1413,13 +1413,13 @@ void insert_obml_netcdf_point_inventory(std::ifstream& ifs, MySQL::Server&
           auto k = o.first + "|" + p.first + "|" + dve.data->var_name;
           if (dmap.find(k) == dmap.end()) {
             MySQL::LocalQuery q("code", "WObML.ds" + local_args.dsnum2 +
-                "_dataTypesList", "observationType_code = " + o.second + " and "
-                "platformType_code = " + p.second + " and dataType = 'ds" +
-                metautils::args.dsnum + ":" + dve.data->var_name + "'");
+                "_data_types_list", "observation_type_code = " + o.second +
+                " and platform_type_code = " + p.second + " and data_type = 'ds"
+                + metautils::args.dsnum + ":" + dve.data->var_name + "'");
             MySQL::Row row;
             if (q.submit(server) < 0 || !q.fetch_row(row)) {
               log_error2("insert_obml_netcdf_point_inventory() returned "
-                  "error: " + q.error() + " while trying to get dataType code "
+                  "error: " + q.error() + " while trying to get data_type code "
                   "for '" + o.second + ", " + p.second + ", '" + dve.data->
                   var_name + "''", F, "iinv", USER);
             }
@@ -1587,13 +1587,13 @@ void insert_generic_point_inventory(std::ifstream& ifs ,MySQL::Server& server,
           if (sp.size() > 2) {
             auto sp2 = split(sp[2], "[!]");
             MySQL::LocalQuery q("code", "WObML.ds" + local_args.dsnum2 +
-                "_dataTypesList","observationType_code = " + omap[sp2[0]] +
-                " and platformType_code = " + pmap[sp2[1]] + " and dataType = "
-                "'" + sp2[2] + "'");
+                "_data_types_list", "observation_type_code = " + omap[sp2[0]] +
+                " and platform_type_code = " + pmap[sp2[1]] + " and data_type "
+                "= '" + sp2[2] + "'");
             MySQL::Row row;
             if (q.submit(server) < 0 || !q.fetch_row(row)) {
               log_error2("insert_generic_point_inventory() returned error: " +
-                  q.error() + " while trying to get dataType code for '" + sp[
+                  q.error() + " while trying to get data_type code for '" + sp[
                   2] + "'", F, "iinv", USER);
             }
             dmap.emplace(stoi(sp[1]), std::make_tuple(stoi(row[0]), stoi(sp2[3].

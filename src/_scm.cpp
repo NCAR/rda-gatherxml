@@ -438,10 +438,10 @@ void create_obml_tables(MarkupParameters *markup_parameters) {
         "creating table " + tb_base + "_dataTypes2", F, "scm", USER);
   }
   if (markup_parameters->server.command("create table " + tb_base +
-      "_dataTypesList like " + markup_parameters->database +
-      ".template_dataTypesList", r) < 0) {
+      "_data_types_list like " + markup_parameters->database +
+      ".template_data_types_list", r) < 0) {
     log_error2("error: '" + markup_parameters->server.error() + "' while "
-        "creating table " + tb_base + "_dataTypesList", F, "scm", USER);
+        "creating table " + tb_base + "_data_types_list", F, "scm", USER);
   }
   if (markup_parameters->server.command("create table " + tb_base +
       "_frequencies like " + markup_parameters->database +
@@ -603,7 +603,7 @@ void clear_obml_tables(MarkupParameters *markup_parameters) {
       local_args.dsnum2 + "_dataTypes2", markup_parameters->file_type +
       "ID_code = " + markup_parameters->file_map[markup_parameters->filename]);
   markup_parameters->server._delete(markup_parameters->database + ".ds" +
-      local_args.dsnum2 + "_dataTypesList", markup_parameters->file_type +
+      local_args.dsnum2 + "_data_types_list", markup_parameters->file_type +
       "ID_code = " + markup_parameters->file_map[markup_parameters->filename]);
   markup_parameters->server._delete(markup_parameters->database + ".ds" +
       local_args.dsnum2 + "_IDList2", markup_parameters->file_type +
@@ -1186,7 +1186,7 @@ void *thread_summarize_IDs(void *args) {
       "max_lat = values(max_lat),  min_lon = values(min_lon),  max_lon = "
       "values(max_lon)", r) < 0) {
     log_error2("'" + srv.error() + "' while trying to insert into " + a[5] +
-        ".ds" + local_args.dsnum2 + "_geobounds for webID_code = " + a[2], F,
+        ".ds" + local_args.dsnum2 + "_geobounds for file_code = " + a[2], F,
         "scm", USER);
   }
   srv.disconnect();
@@ -1376,8 +1376,8 @@ void process_obml_markup(void *markup_parameters) {
   for (const auto& o : op->xdoc.element_list("ObML/" + op->element)) {
     auto obs = o.attribute_value("value");
     if (obs_map.find(obs) == obs_map.end()) {
-      auto c = table_code(op->server, op->database + ".obs_types", "obs_type = "
-          "'" + obs + "'");
+      auto c = table_code(op->server, "WObML.obs_types", "obs_type = '" + obs +
+          "'");
       if (c.empty()) {
         log_error2("unable to get observation type code", F, "scm", USER);
       }
@@ -1386,8 +1386,8 @@ void process_obml_markup(void *markup_parameters) {
     for (const auto& platform : o.element_addresses()) {
       auto plat = (platform.p)->attribute_value("type");
       if (plat_map.find(plat) == plat_map.end()) {
-        auto c = table_code(op->server, op->database + ".platform_types",
-            "platform_type = '" + plat + "'");
+        auto c = table_code(op->server, "WObML.platform_types", "platform_type "
+            "= '" + plat + "'");
         if (c.empty()) {
           log_error2("unable to get platform code", F, "scm", USER);
         }
@@ -1401,12 +1401,12 @@ void process_obml_markup(void *markup_parameters) {
         dtyp += e.attribute_value("value");
         auto dtyp_k = obs_map[obs] + "|" + plat_map[plat] + "|" + dtyp;
         if (dtyp_map.find(dtyp_k) == dtyp_map.end()) {
-          MySQL::LocalQuery q("code", op->database + ".ds" + local_args.dsnum2 +
-              "_dataTypesList", "observationType_code = " + obs_map[obs] +
-              " and platformType_code = " + plat_map[plat] + " and dataType = '"
-              + dtyp + "'");
+          MySQL::LocalQuery q("code", "WObML.ds" + local_args.dsnum2 +
+              "_data_types_list", "observation_type_code = " + obs_map[obs] +
+              " and platform_type_code = " + plat_map[plat] + " and data_type "
+              "= '" + dtyp + "'");
           if (q.submit(op->server) < 0) {
-            log_error2("'" + q.error() + "' while trying to get dataType code "
+            log_error2("'" + q.error() + "' while trying to get data_type code "
                 "(1) for '" + obs_map[obs] + ", " + plat_map[plat] + ", '" +
                 dtyp + "''", F, "scm", USER);
           }
@@ -1415,17 +1415,17 @@ void process_obml_markup(void *markup_parameters) {
           if (q.fetch_row(r)) {
             c = r[0];
           } else {
-            if (op->server.insert(op->database + ".ds" + local_args.dsnum2 +
-                "_dataTypesList", obs_map[obs] + ", " + plat_map[plat] + ", '"
+            if (op->server.insert("WObML.ds" + local_args.dsnum2 +
+                "_data_types_list", obs_map[obs] + ", " + plat_map[plat] + ", '"
                 + dtyp + "', NULL") < 0) {
               log_error2("'" + op->server.error() + "' while trying to insert '"
                   + obs_map[obs] + ", " + plat_map[plat] + ", '" + dtyp +
-                  "'' into " + op->database + ".ds" + local_args.dsnum2 +
-                  "_dataTypesList", F, "scm", USER);
+                  "'' into WObML.ds" + local_args.dsnum2 + "_data_types_list",
+                  F, "scm", USER);
             }
             auto lid = op->server.last_insert_ID();
             if (lid == 0) {
-              log_error2("'" + q.error() + "' while trying to get dataType "
+              log_error2("'" + q.error() + "' while trying to get data_type "
                   "code (2) for '" + obs_map[obs] + ", " + plat_map[plat] +
                   ", '" + dtyp + "''", F, "scm", USER);
             } else {
@@ -1444,19 +1444,11 @@ void process_obml_markup(void *markup_parameters) {
         } else {
           s += ", 0, 0, NULL, 0, NULL";
         }
-/*
-        if (op->server.insert(op->database+".ds"+local_args.dsnum2+"_dataTypes",s) < 0) {
-          error=op->server.error();
-          if (error.find("Duplicate entry") == string::npos) {
-            metautils::log_error("summarize_obml() returned error: "+error+" while trying to insert '"+s+"' into "+op->database+".ds"+local_args.dsnum2+"_dataTypes","scm",user,args.args_string);
-          }
-        }
-*/
-        if (op->server.insert(op->database + ".ds" + local_args.dsnum2 +
-            "_dataTypes2", s) < 0) {
+        if (op->server.insert("WObML.ds" + local_args.dsnum2 + "_dataTypes2", s)
+            < 0) {
           log_error2("'" + op->server.error() + "' while trying to insert '" + s
-              + "' into " + op->database + ".ds" + local_args.dsnum2 +
-              "_dataTypes2", F, "scm", USER);
+              + "' into WObML.ds" + local_args.dsnum2 + "_dataTypes2", F, "scm",
+              USER);
         }
       }
       cnt += stoi((platform.p)->attribute_value("numObs"));
@@ -1499,7 +1491,7 @@ void process_obml_markup(void *markup_parameters) {
           targs.back().emplace_back(plat_map[plat]);
           targs.back().emplace_back(ts);
           targs.back().emplace_back(te);
-          targs.back().emplace_back(op->database);
+          targs.back().emplace_back("WObML");
           pthread_t t;
           pthread_create(&t, nullptr, thread_summarize_file_ID_locations,
               &targs.back());
@@ -1511,13 +1503,12 @@ void process_obml_markup(void *markup_parameters) {
       }
     }
   }
-  op->server._delete(op->database + ".ds" + local_args.dsnum2 + "_frequencies",
+  op->server._delete("WObML.ds" + local_args.dsnum2 + "_frequencies",
       "file_code = " + op->file_map[op->filename] + " and uflag != '" + uflag +
       "'");
   auto s = "num_observations = " + itos(cnt) + ", start_date = " + mndt + ", "
       "end_date = " + mxdt;
-  auto tb_nam = op->database + ".ds" + local_args.dsnum2 + "_" + op->file_type +
-      "files2";
+  auto tb_nam = "WObML.ds" + local_args.dsnum2 + "_" + op->file_type + "files2";
   if (op->server.update(tb_nam, s + ", uflag = '" + strand(5) + "'", "code = " +
       op->file_map[op->filename]) < 0) {
     log_error2("error: '" + op->server.error() + "' while updating " + tb_nam +
