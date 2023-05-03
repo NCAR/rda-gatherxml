@@ -593,25 +593,23 @@ void clear_grml_tables(MarkupParameters *markup_parameters) {
 
 void clear_obml_tables(MarkupParameters *markup_parameters) {
   markup_parameters->server._delete(markup_parameters->database + ".ds" +
-      local_args.dsnum2 + "_locations", markup_parameters->file_type +
-      "ID_code = " + markup_parameters->file_map[markup_parameters->filename]);
-/*
-  markup_parameters->server._delete(markup_parameters->database + ".ds" + local_args.dsnum2 + "_dataTypes", markup_parameters->file_type
-      + "ID_code = " + markup_parameters->file_map[markup_parameters->filename]);
-*/
+      local_args.dsnum2 + "_IDList2", "file_code = " + markup_parameters->
+      file_map[markup_parameters->filename]);
   markup_parameters->server._delete(markup_parameters->database + ".ds" +
-      local_args.dsnum2 + "_dataTypes2", markup_parameters->file_type +
-      "ID_code = " + markup_parameters->file_map[markup_parameters->filename]);
+      local_args.dsnum2 + "_dataTypes2", "file_code = " + markup_parameters->
+      file_map[markup_parameters->filename]);
   markup_parameters->server._delete(markup_parameters->database + ".ds" +
-      local_args.dsnum2 + "_data_types_list", markup_parameters->file_type +
+      local_args.dsnum2 + "_frequencies", markup_parameters->file_type +
       "ID_code = " + markup_parameters->file_map[markup_parameters->filename]);
   markup_parameters->server._delete(markup_parameters->database + ".ds" +
-      local_args.dsnum2 + "_IDList2", markup_parameters->file_type +
-      "ID_code = " + markup_parameters->file_map[markup_parameters->filename]);
-/*
-  markup_parameters->server._delete(markup_parameters->database + ".ds" + local_args.dsnum2 + "_ID_dataTypes",
-      markup_parameters->file_type + "ID_code = " + file_ID_code);
-*/
+      local_args.dsnum2 + "_geobounds", "file_code = " + markup_parameters->
+      file_map[markup_parameters->filename]);
+  markup_parameters->server._delete(markup_parameters->database + ".ds" +
+      local_args.dsnum2 + "_location_names", "file_code = " +
+      markup_parameters->file_map[markup_parameters->filename]);
+  markup_parameters->server._delete(markup_parameters->database + ".ds" +
+      local_args.dsnum2 + "_locations", "file_code = " + markup_parameters->
+      file_map[markup_parameters->filename]);
 }
 
 void clear_satml_tables(MarkupParameters *markup_parameters) {
