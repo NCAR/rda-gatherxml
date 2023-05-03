@@ -318,8 +318,8 @@ int main(int argc, char **argv) {
       q2.set("select distinct l.observationType_code, l.platformType_code, "
           "o.obs_type, pf.platform_type, p.format_code, f.format from WObML.ds"
           + dsid + "_webfiles2 as p left join WObML.ds" + dsid + "_dataTypes2 "
-          "as d on d.webID_code = p.code left join WObML.ds" + dsid +
-          "_dataTypesList as l on l.code = d.dataType_code left join WObML."
+          "as d on d.file_code = p.code left join WObML.ds" + dsid +
+          "_dataTypesList as l on l.code = d.data_type_code left join WObML."
           "obs_types as o on l.observationType_code = o.code left join WObML."
           "platform_types as pf on l.platformType_code = pf.code left join "
           "WObML.formats as f on f.code = p.format_code");
@@ -328,9 +328,9 @@ int main(int argc, char **argv) {
       q2.set("select distinct l.observationType_code, l.platformType_code, "
           "o.obs_type, pf.platform_type, p.format_code, f.format from WObML.ds"
           + dsid + "_webfiles2 as p left join dssdb.wfile as x on x.wfile = p."
-          "id left join WObML.ds" + dsid + "_dataTypes2 as d on d.webID_code = "
+          "id left join WObML.ds" + dsid + "_dataTypes2 as d on d.file_code = "
           "p.code left join WObML.ds" + dsid + "_dataTypesList as l on l.code "
-          "= d.dataType_code left join WObML.obs_types as o on l."
+          "= d.data_type_code left join WObML.obs_types as o on l."
           "observationType_code = o.code left join WObML.platform_types as pf "
           "on l.platformType_code = pf.code left join WObML.formats as f on f."
           "code = p.format_code where x.gindex = " + g);

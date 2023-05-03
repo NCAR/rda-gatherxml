@@ -1440,26 +1440,15 @@ void generate_detailed_observation_summary(string file_type, ofstream& ofs,
         "Coverage</b><br>(each dot represents a 3&deg; box containing one or "
         "more observations)</td></tr>" << endl;
     MySQL::Query query;
-    if (MySQL::table_exists(mysrv, "WObML.ds" + d2 + "_dataTypes2")) {
-      query.set("select distinct t.platform_type, o.obs_type, l.dataType, min("
-          "start_date),max(end_date) from WObML.ds" + d2 + "_dataTypes2 as d "
-          "left join WObML.ds" + d2 + "_dataTypesList as l on l.code = d."
-          "dataType_code left join WObML.ds" + d2 + "_webfiles2 as p on p.code "
-          "= d.webID_code left join WObML.platform_types as t on t.code = l."
-          "platformType_code left join WObML.obs_types as o on o.code = l."
-          "observationType_code where p.format_code = " + fp.second + " group "
-          "by t.platform_type, o.obs_type, l.dataType order by t."
-          "platform_type, o.obs_type, l.dataType");
-    } else {
-      query.set("select distinct t.platform_type, o.obs_type, l.dataType, min("
-          "start_date), max(end_date) from WObML.ds" + d2 + "_dataTypes as d "
-          "left join WObML.ds" + d2 + "_webfiles2 as p on p.code = d."
-          "webID_code left join WObML.platform_types as t on t.code = d."
-          "platformType_code left join WObML.obs_types as o on o.code = d."
-          "observationType_code where p.format_code = " + fp.second + " group "
-          "by t.platform_type, o.obs_type, l.dataType order by t."
-          "platform_type, o.obs_type, l.dataType");
-    }
+    query.set("select distinct t.platform_type, o.obs_type, l.dataType, min("
+        "start_date),max(end_date) from WObML.ds" + d2 + "_dataTypes2 as d "
+        "left join WObML.ds" + d2 + "_dataTypesList as l on l.code = d."
+        "data_type_code left join WObML.ds" + d2 + "_webfiles2 as p on p.code "
+        "= d.file_code left join WObML.platform_types as t on t.code = l."
+        "platformType_code left join WObML.obs_types as o on o.code = l."
+        "observationType_code where p.format_code = " + fp.second + " group by "
+        "t.platform_type, o.obs_type, l.dataType order by t.platform_type, o."
+        "obs_type, l.dataType");
     if (query.submit(mysrv) < 0) {
       log_error2("'" + query.error() + "' for '" + query.show() + "'", F,
           caller, user);

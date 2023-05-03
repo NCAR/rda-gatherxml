@@ -1502,12 +1502,12 @@ void create_file_list_cache(string file_type, string caller, string user, string
       if (file_type == "Web") {
         oq.set("select distinct l.platformType_code, p.platform_type from "
             "WObML.ds" + d2 + "_dataTypes2 as d left join WObML.ds" + d2 +
-            "_dataTypesList as l on l.code = d.dataType_code left join WObML."
+            "_dataTypesList as l on l.code = d.data_type_code left join WObML."
             "platform_types as p on p.code = l.platformType_code");
       } else if (file_type == "inv") {
         oq.set("select distinct l.platformType_code, p.platform_type from "
             "WObML.ds" + d2 + "_dataTypes2 as d left join WObML.ds" + d2 +
-            "_dataTypesList as l on l.code = d.dataType_code left join WObML."
+            "_dataTypesList as l on l.code = d.data_type_code left join WObML."
             "platform_types as p on p.code = l.platformType_code left join "
             "(select distinct webID_code from IObML.ds" + d2 + "_dataTypes) as "
             "dt on dt.webID_code = d.webID_code where !isnull(dt.webID_code)");
@@ -1539,7 +1539,7 @@ void create_file_list_cache(string file_type, string caller, string user, string
             "left join WObML.formats as f on f.code = w.format_code");
         oq.set("select distinct l.dataType from WObML.ds" + d2 + "_dataTypes2 "
             "as d left join WObML.ds" + d2 + "_dataTypesList as l on l.code = "
-            "d.dataType_code");
+            "d.data_type_code");
       } else {
         q.set("");
         oq.set("");
