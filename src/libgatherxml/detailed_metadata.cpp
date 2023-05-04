@@ -1781,7 +1781,7 @@ void generate_detailed_metadata_view(string caller, string user) {
     ofs << "  $title=myget(\"search.datasets\",\"title\",\"dsid = '" << metautils::args.dsnum << "'\");" << endl;
     ofs << "  $contributors=mymget(\"\",\"\",\"select g.path from search.contributors_new as c left join search.gcmd_providers as g on g.uuid = c.keyword where dsid = '" << metautils::args.dsnum << "' order by disp_order\");" << endl;
     ofs << "  $projects=mymget(\"\",\"\",\"select g.path from search.projects_new as p left join search.gcmd_projects as g on g.uuid = p.keyword  where dsid = '" << metautils::args.dsnum << "'\");" << endl;
-    ofs << "  $supportedProjects=mymget(\"\",\"\",\"select g.path from search.supportedProjects_new as p left join search.gcmd_projects as g on g.uuid = p.keyword where dsid = '" << metautils::args.dsnum << "'\");" << endl;
+    ofs << "  $supportedProjects=mymget(\"\",\"\",\"select g.path from search.supported_projects as p left join search.gcmd_projects as g on g.uuid = p.keyword where dsid = '" << metautils::args.dsnum << "'\");" << endl;
     ofs << "?>" << endl;
     ofs << "<p>The information presented here summarizes the data in the primary (NCAR HPSS) archive of ds"+metautils::args.dsnum+".  Some or all of these data may not be directly accessible from our web server.  If you have questions about data access, please contact the dataset specialist named above.</p>" << endl;
     ofs << "<br>" << endl;
