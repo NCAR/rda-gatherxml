@@ -88,7 +88,8 @@ tuple<string, string, string> bufr_types(string bufr_type, size_t code, const
   static unordered_map<size_t, tuple<string, string, string>> map;
   if (map.find(code) == map.end()) {
     MySQL::LocalQuery q("observation_type, platform_type, id_type", "metautil."
-        "BUFRTypes", "BUFR_type = '" + bufr_type + "' and code = " + itos(code));
+        "bufr_types", "bufr_type = '" + bufr_type + "' and code = " + itos(
+        code));
     if (q.submit(mysrv) < 0 || q.num_rows() > 1) {
       log_error2("'" + q.error() + "' from query '" + q.show() + "'", F,
           "bufr2xml", USER);
