@@ -479,10 +479,10 @@ void create_fixml_tables(MarkupParameters *markup_parameters) {
         "creating table " + tb_base + "_" + markup_parameters->file_type +
         "files2", F, "scm", USER);
   }
-  if (markup_parameters->server.command("create table " + tb_base + "_IDList "
-      "like " + markup_parameters->database + ".template_IDList", r) < 0) {
+  if (markup_parameters->server.command("create table " + tb_base + "_id_list "
+      "like " + markup_parameters->database + ".template_id_list", r) < 0) {
     log_error2("error: '" + markup_parameters->server.error() + "' while "
-        "creating table " + tb_base + "_IDList", F, "scm", USER);
+        "creating table " + tb_base + "_id_list", F, "scm", USER);
   }
   if (markup_parameters->server.command("create table " + tb_base +
       "_locations like " + markup_parameters->database + ".template_locations",
@@ -592,8 +592,8 @@ void clear_obml_tables(MarkupParameters *markup_parameters) {
       local_args.dsnum2 + "_data_types", "file_code = " + markup_parameters->
       file_map[markup_parameters->filename]);
   markup_parameters->server._delete(markup_parameters->database + ".ds" +
-      local_args.dsnum2 + "_frequencies", markup_parameters->file_type +
-      "ID_code = " + markup_parameters->file_map[markup_parameters->filename]);
+      local_args.dsnum2 + "_frequencies", "file_code = " + markup_parameters->
+      file_map[markup_parameters->filename]);
   markup_parameters->server._delete(markup_parameters->database + ".ds" +
       local_args.dsnum2 + "_geobounds", "file_code = " + markup_parameters->
       file_map[markup_parameters->filename]);
@@ -607,20 +607,20 @@ void clear_obml_tables(MarkupParameters *markup_parameters) {
 
 void clear_satml_tables(MarkupParameters *markup_parameters) {
   markup_parameters->server._delete(markup_parameters->database + ".ds" +
-      local_args.dsnum2 + "_products", markup_parameters->file_type + "ID_code "
-      "= " + markup_parameters->file_map[markup_parameters->filename]);
+      local_args.dsnum2 + "_products", "file_code = " + markup_parameters->
+      file_map[markup_parameters->filename]);
 }
 
 void clear_fixml_tables(MarkupParameters *markup_parameters) {
   markup_parameters->server._delete(markup_parameters->database + ".ds" +
-      local_args.dsnum2 + "_locations", markup_parameters->file_type +
-      "ID_code = " + markup_parameters->file_map[markup_parameters->filename]);
+      local_args.dsnum2 + "_locations", "file_code = " + markup_parameters->
+      file_map[markup_parameters->filename]);
   markup_parameters->server._delete(markup_parameters->database + ".ds" +
-      local_args.dsnum2 + "_frequencies", markup_parameters->file_type +
-      "ID_code = " + markup_parameters->file_map[markup_parameters->filename]);
+      local_args.dsnum2 + "_frequencies", "file_code = " + markup_parameters->
+      file_map[markup_parameters->filename]);
   markup_parameters->server._delete(markup_parameters->database + ".ds" +
-      local_args.dsnum2 + "_IDList", markup_parameters->file_type + "ID_code = "
-      + markup_parameters->file_map[markup_parameters->filename]);
+      local_args.dsnum2 + "_id_list", "file_code = " + markup_parameters->
+      file_map[markup_parameters->filename]);
 }
 
 void clear_tables(MarkupParameters *markup_parameters) {
@@ -1104,7 +1104,6 @@ void *thread_summarize_IDs(void *args) {
   if (navgm > 0.) {
     avgm /= navgm;
   }
-//  srv._delete(t->args[5]+".ds"+local_args.dsnum2+"_frequencies",file_ID_type+"ID_code = "+file_ID_code+" and observationType_code = "+t->args[3]+" and platformType_code = "+t->args[4]);
   string u;
   if (lround(avgd) >= 1) {
     avgd /= 24.;
@@ -1275,7 +1274,7 @@ void *thread_summarize_file_ID_locations(void *args) {
             " and platform_type_code = " + a[4]);
       } else if (a[7] == "WFixML") {
         srv._delete("WFixML.ds" + local_args.dsnum2 + "_location_names",
-            "webID_code = " + a[2] + " and classification_code = " + a[3]);
+            "file_code = " + a[2] + " and classification_code = " + a[3]);
       }
       for (const auto& i : v) {
         gatherxml::summarizeMetadata::ParentLocation pl;
@@ -1629,15 +1628,15 @@ void process_fixml_markup(void *markup_parameters) {
         fp->stg_map.emplace(stg, c);
       }
       if (fp->server.insert(fp->database + ".ds" + local_args.dsnum2 +
-          "_IDList", "'" + f.attribute_value("ID") + "', " + fp->stg_map[stg] +
+          "_id_list", "'" + f.attribute_value("ID") + "', " + fp->stg_map[stg] +
           ", " + fp->file_map[fp->filename] + ", " + _class.attribute_value(
           "nfixes"), "update num_fixes = num_fixes + " + _class.attribute_value(
           "nfixes")) < 0) {
         log_error2("error: '" + fp->server.error() + "' while inserting '" +
             f.attribute_value("ID") + "', " + fp->stg_map[stg] + ", " + fp->
             file_map[fp->filename] + ", " + _class.attribute_value("nfixes") +
-            "' into " + fp->database + ".ds" + local_args.dsnum2 + "_IDList", F,
-            "scm", USER);
+            "' into " + fp->database + ".ds" + local_args.dsnum2 + "_id_list",
+            F, "scm", USER);
       }
       auto e = _class.element("start");
       auto v = string_date_to_ll_string(e.attribute_value("dateTime"));
