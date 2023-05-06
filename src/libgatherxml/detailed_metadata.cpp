@@ -1624,7 +1624,7 @@ void generate_detailed_fix_summary(string file_type, ofstream& ofs, const
     auto cindex=0;
     ofs << "<tr class=\"bg2\" valign=\"top\"><th align=\"left\">Cyclone Classification</th><td align=\"left\"><b>Average Frequency of Data</b><br>(may vary by individual cyclone ID)</td><td align=\"left\"><b>Temporal/Geographical Coverage</b><br>(each dot represents a 3&deg; box containing one or more fixes)</td></tr>" << endl;
     MySQL::Query query;
-    query.set("select distinct classification,min(l.start_date),max(l.end_date) from WFixML.ds"+d2+"_locations as l left join WFixML.ds"+d2+"_webfiles2 as p on p.code = l.webID_code left join WFixML.classifications as c on c.code = l.classification_code where p.format_code = "+fp.second+" group by classification order by classification");
+    query.set("select distinct classification,min(l.start_date),max(l.end_date) from WFixML.ds"+d2+"_locations as l left join WFixML.ds"+d2+"_webfiles2 as p on p.code = l.file_code left join WFixML.classifications as c on c.code = l.classification_code where p.format_code = "+fp.second+" group by classification order by classification");
     if (query.submit(server) < 0) {
       log_error2("'" + query.error() + "' for '" + query.show() + "'", F,
           caller, user);
@@ -1648,7 +1648,7 @@ void generate_detailed_fix_summary(string file_type, ofstream& ofs, const
         platform_table.replace(te);
       }
     }
-    query.set("select any_value(c.classification),min(f.min_obs_per),max(f.max_obs_per),f.unit from WFixML.ds"+d2+"_webfiles2 as p left join WFixML.ds"+d2+"_frequencies as f on p.code = f.webID_code left join WFixML.classifications as c on c.code = f.classification_code left join WObML.frequency_sort as s on s.keyword = f.unit where p.format_code = "+fp.second+" group by f.classification_code,f.unit,s.idx order by s.idx");
+    query.set("select any_value(c.classification),min(f.min_obs_per),max(f.max_obs_per),f.unit from WFixML.ds"+d2+"_webfiles2 as p left join WFixML.ds"+d2+"_frequencies as f on p.code = f.file_code left join WFixML.classifications as c on c.code = f.classification_code left join WObML.frequency_sort as s on s.keyword = f.unit where p.format_code = "+fp.second+" group by f.classification_code,f.unit,s.idx order by s.idx");
     if (query.submit(server) < 0) {
       log_error2("'" + query.error() + "' for '" + query.show() + "'", F,
           caller, user);

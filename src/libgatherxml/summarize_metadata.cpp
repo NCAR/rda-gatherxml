@@ -92,15 +92,10 @@ void cmd_dates(string database, size_t date_left_padding, vector<CMDDateRange>&
   string tbl = database + ".ds" + substitute(metautils::args.dsnum, ".", "") +
       "_webfiles2";
   if (table_exists(mysrv, tbl)) {
-
-// patch until all "webfiles2" tables are migrated from webID -> id
-MySQL::LocalQuery q;
-if (field_exists(mysrv, tbl, "id")) {
-q.set("select min(w.start_date), max(w.end_date), wf.gindex from " + tbl + " as w left join dssdb.wfile as wf on wf.wfile = w.id where wf.dsid = 'ds" + metautils::args.dsnum + "' and wf.type = 'D' and wf.status = 'P' and w.start_date > 0 group by wf.gindex");
-} else {
-q.set("select min(w.start_date), max(w.end_date), wf.gindex from " + tbl + " as w left join dssdb.wfile as wf on wf.wfile = w.webID where wf.dsid = 'ds" + metautils::args.dsnum + "' and wf.type = 'D' and wf.status = 'P' and w.start_date > 0 group by wf.gindex");
-}
-
+    MySQL::LocalQuery q("select min(w.start_date), max(w.end_date), wf.gindex "
+        "from " + tbl + " as w left join dssdb.wfile as wf on wf.wfile = w.id "
+        "where wf.dsid = 'ds" + metautils::args.dsnum + "' and wf.type = 'D' "
+        "and wf.status = 'P' and w.start_date > 0 group by wf.gindex");
 #ifdef DUMP_QUERIES
     {
     Timer tm;
@@ -1021,14 +1016,11 @@ void grml_file_data(string file_type, unordered_map<string, string>&
     fill_data_formats_table(mysrv, "WGrML", m, caller, user);
   }
   MySQL::Query q;
-
-// patch until all webfiles2 tables have migrated webID -> id
-if (MySQL::field_exists(mysrv, "WGrML.ds" + d + "_webfiles2", "id")) {
-q.set("select id, format_code, num_grids, start_date, end_date, gindex, file_format, data_size from WGrML.ds" + d + "_webfiles2 as w left join dssdb.wfile as d on d.wfile = w.id where d.dsid = 'ds" + metautils::args.dsnum + "' and d.type = 'D' and d.status = 'P' and num_grids > 0");
-} else {
-q.set("select webID, format_code, num_grids, start_date, end_date, gindex, file_format, data_size from WGrML.ds" + d + "_webfiles2 as w left join dssdb.wfile as d on d.wfile = w.webID where d.dsid = 'ds" + metautils::args.dsnum + "' and d.type = 'D' and d.status = 'P' and num_grids > 0");
-}
-
+    q.set("select id, format_code, num_grids, start_date, end_date, gindex, "
+        "file_format, data_size from WGrML.ds" + d + "_webfiles2 as w left "
+        "join dssdb.wfile as d on d.wfile = w.id where d.dsid = 'ds" +
+        metautils::args.dsnum + "' and d.type = 'D' and d.status = 'P' and "
+        "num_grids > 0");
 #ifdef DUMP_QUERIES
   {
   Timer tm;
@@ -1099,11 +1091,11 @@ void fixml_file_data(string file_type, unordered_map<string, string>&
   if (data_formats.empty()) {
     fill_data_formats_table(mysrv, "WFixML", data_formats, caller, user);
   }
-  MySQL::Query q("select webID, format_code, num_fixes, start_date, end_date, "
+  MySQL::Query q("select id, format_code, num_fixes, start_date, end_date, "
       "gindex, file_format, data_size from WFixML.ds" + substitute(metautils::
       args.dsnum, ".", "") + "_webfiles2 as w left join dssdb.wfile as d on "
-      "d.wfile = w.webID where d.dsid = 'ds" + metautils::args.dsnum + "' and "
-      "d.type = 'D' and d.status = 'P' and num_fixes > 0");
+      "d.wfile = w.id where d.dsid = 'ds" + metautils::args.dsnum + "' and d."
+      "type = 'D' and d.status = 'P' and num_fixes > 0");
 #ifdef DUMP_QUERIES
   {
   Timer tm;
@@ -1203,15 +1195,8 @@ void write_grml_parameters(string file_type, string tindex, ofstream& ofs,
         rdafs[tindex].emplace(r[0]);
       }
     }
-
-// patch until all webfiles2 tables have migrated webID -> id
-MySQL::LocalQuery q;
-if (MySQL::field_exists(mysrv, "WGrML.ds" + d2 + "_webfiles2", "id")) {
-q.set("code, id, format_code", "WGrML.ds" + d2 + "_webfiles2");
-} else {
-q.set("code, webID, format_code", "WGrML.ds" + d2 + "_webfiles2");
-}
-
+    MySQL::LocalQuery q("code, id, format_code", "WGrML.ds" + d2 +
+        "_webfiles2");
 #ifdef DUMP_QUERIES
     {
     Timer tm;
