@@ -214,8 +214,8 @@ void generate_graphics(MySQL::LocalQuery& query, string type, string table,
         tnc[nn].query.set("select distinct box1d_row, box1d_bitmap from WObML."
             "ds" + d2 + "_webfiles2 as p left join dssdb.wfile as x on (x.dsid "
             "= 'ds" + metautils::args.dsnum + "' and x.wfile = p.id) left join "
-            + table + " as t on t.webID_code = p.code where x.gindex = " +
-            gindex + " and observation_type_code = " + row[0] + " and "
+            + table + " as t on t.file_code = p.code where x.gindex = " + gindex
+            + " and observation_type_code = " + row[0] + " and "
             "platform_type_code = " + row[1] + " and p.format_code = " + row[4]
             + " order by box1d_row");
         tnc[nn].imagetag = substitute(row[5], " ", "_") + "_web_gindex_" +
@@ -223,8 +223,8 @@ void generate_graphics(MySQL::LocalQuery& query, string type, string table,
       } else if (type == "fix") {
         tnc[nn].query.set("select box1d_row, box1d_bitmap from WFixML.ds" +
             d2 + "_webfiles2 as p left join dssdb.wfile as x on x.wfile = p."
-            "webID left join " + table + " as t on t.webID_code = p.code where "
-            "x.gindex = " + gindex + " and classification_code = " + row[0] +
+            "id left join " + table + " as t on t.file_code = p.code where x."
+            "gindex = " + gindex + " and classification_code = " + row[0] +
             " and p.format_code = " + row[2] + " order by box1d_row");
         tnc[nn].imagetag = substitute(row[3], " ", "_") + "_web_gindex_" +
             gindex + "_" + row[1];
@@ -344,16 +344,15 @@ int main(int argc, char **argv) {
     if (g.empty()) {
       q2.set("select distinct d.classification_code, c.classification, p."
           "format_code, f.format from WFixML.ds" + dsid + "_webfiles2 as p "
-          "left join WFixML.ds" + dsid + "_locations as d on d.webID_code = "
-          "p.code left join WFixML.classifications as c on d."
-          "classification_code = c.code left join WFixML.formats as f on f."
-          "format = p.format_code");
+          "left join WFixML.ds" + dsid + "_locations as d on d.file_code = p."
+          "code left join WFixML.classifications as c on d.classification_code "
+          "= c.code left join WFixML.formats as f on f.format = p.format_code");
       t = "search.fix_data";
     } else {
       q2.set("select distinct d.classification_code, c.classification, p."
           "format_code, f.format from WFixML.ds" + dsid + "_webfiles2 as p "
-          "left join dssdb.wfile as x on x.wfile = p.webID left join WFixML.ds"
-          + dsid + "_locations as d on d.webID_code = p.code left join WFixML."
+          "left join dssdb.wfile as x on x.wfile = p.id left join WFixML.ds" +
+          dsid + "_locations as d on d.file_code = p.code left join WFixML."
           "classifications as c on d.classification_code = c.code left join "
           "WFixML.formats as f on f.format = p.format_code where x.gindex = " +
           g);
