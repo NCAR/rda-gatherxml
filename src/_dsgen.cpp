@@ -809,8 +809,8 @@ void add_data_formats(TokenDocument& tdoc, vector<string>& formats, bool
 
 void append_book_chapter_to_citation(string& citation, string doi) {
   citation += "\", in ";
-  MySQL::LocalQuery qcw("select pages, ISBN from citation.book_chapter_works "
-      "where DOI = '" + doi + "'");
+  MySQL::LocalQuery qcw("select pages, isbn from citation.book_chapter_works "
+      "where doi = '" + doi + "'");
   MySQL::Row rcw;
   if (qcw.submit(server) != 0 || !qcw.fetch_row(rcw)) {
     citation = "";
