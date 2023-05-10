@@ -893,8 +893,8 @@ void append_proceedings_to_citation(string& citation, string doi, string
 
 void add_data_citations(TokenDocument& tdoc) {
   static const string F = this_function_label(__func__);
-  MySQL::LocalQuery qc("select distinct d.DOI_work from citation"
-      ".data_citations as d left join dssdb.dsvrsn as v on v.doi = d.DOI_data "
+  MySQL::LocalQuery qc("select distinct d.doi_work from citation"
+      ".data_citations as d left join dssdb.dsvrsn as v on v.doi = d.doi_data "
       "where v.dsid = 'ds" + metautils::args.dsnum + "'");
   if (qc.submit(server) < 0) {
     return;
