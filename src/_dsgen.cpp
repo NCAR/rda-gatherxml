@@ -817,7 +817,7 @@ void append_book_chapter_to_citation(string& citation, string doi) {
     return;
   }
   MySQL::LocalQuery qbw("select title, publisher from citation.book_works "
-      "where ISBN = '" + rcw[1] + "'");
+      "where isbn = '" + rcw[1] + "'");
   MySQL::Row rbw;
   if (qbw.submit(server) != 0 || !qbw.fetch_row(rbw)) {
     citation = "";
@@ -853,7 +853,7 @@ void append_book_chapter_to_citation(string& citation, string doi) {
 void append_journal_to_citation(string& citation, string doi) {
   citation += ". ";
   MySQL::LocalQuery q("select pub_name, volume, pages from citation."
-      "journal_works where DOI = '" + doi + "'");
+      "journal_works where doi = '" + doi + "'");
   MySQL::Row row;
   if (q.submit(server) != 0 || !q.fetch_row(row)) {
     citation = "";
@@ -874,7 +874,7 @@ void append_proceedings_to_citation(string& citation, string doi, string
     publisher) {
   citation += ". <em>";
   MySQL::LocalQuery q("select pub_name, pages from citation.proceedings_works "
-      "where DOI = '" + doi + "'");
+      "where doi = '" + doi + "'");
   MySQL::Row row;
   if (q.submit(server) != 0 || !q.fetch_row(row)) {
     citation = "";
@@ -903,7 +903,7 @@ void add_data_citations(TokenDocument& tdoc) {
   for (const auto& rc : qc) {
     auto doi = rc[0];
     MySQL::LocalQuery qw("select title, pub_year, type, publisher from citation"
-        ".works where DOI = '" + doi + "'");
+        ".works where doi = '" + doi + "'");
     MySQL::Row rw;
     if (qw.submit(server) == 0 && qw.fetch_row(rw)) {
       auto ti = htmlutils::unicode_escape_to_html(rw[0]);
