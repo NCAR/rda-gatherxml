@@ -825,7 +825,7 @@ void append_book_chapter_to_citation(string& citation, string doi) {
   }
   citation += htmlutils::unicode_escape_to_html(rbw[0]) + ". Ed. ";
   MySQL::LocalQuery qwa("select first_name, middle_name, last_name from "
-      "citation.works_authors where ID = '" + rcw[1] + "' and ID_type = 'ISBN' "
+      "citation.works_authors where id = '" + rcw[1] + "' and id_type = 'ISBN' "
       "order by sequence");
   if (qwa.submit(server) != 0) {
     citation = "";
@@ -910,7 +910,7 @@ void add_data_citations(TokenDocument& tdoc) {
       auto yr = rw[1];
       auto typ = rw[2];
       MySQL::LocalQuery qwa("select last_name, first_name, middle_name from "
-          "citation.works_authors where ID = '" + doi + "' and ID_type = 'DOI' "
+          "citation.works_authors where id = '" + doi + "' and id_type = 'DOI' "
           "order by sequence");
       if (qwa.submit(server) == 0) {
         string cit;
