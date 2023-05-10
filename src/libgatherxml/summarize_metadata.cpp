@@ -1143,7 +1143,7 @@ void write_grml_parameters(string file_type, string tindex, ofstream& ofs,
   static unordered_set<string> invs;
   static string idsel = "";
   if (file_type == "inv" && invs.empty()) {
-    MySQL::LocalQuery q("webID_code, dupe_vdates", "IGrML.ds" + d2 +
+    MySQL::LocalQuery q("file_code, dupe_vdates", "IGrML.ds" + d2 +
         "_inventory_summary");
 #ifdef DUMP_QUERIES
     {
@@ -1350,8 +1350,8 @@ void create_file_list_cache(string file_type, string caller, string user, string
             "_inventory_summary")) {
           oq.set("select min(start_date), max(end_date) from WObML.ds" + d2
               + "_webfiles2 as w left join IObML.ds" + d2 +
-              "_inventory_summary as i on i.webID_code = w.code where !isnull("
-              "i.webID_code) and start_date > 0");
+              "_inventory_summary as i on i.file_code = w.code where i."
+              "file_code is not null and start_date > 0");
         } else {
           return;
         }

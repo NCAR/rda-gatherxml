@@ -231,7 +231,7 @@ bool remove_from(string database, string table_ext, string file_field_name,
               "`", "file_code = " + file_id_code);
         }
         if (local_server._delete(substitute(database, "W", "I") + ".ds" +
-            g_dsnum2 + "_inventory_summary", "webID_code = " + file_id_code) ==
+            g_dsnum2 + "_inventory_summary", "file_code = " + file_id_code) ==
             0) {
           query.set("select tindex from dssdb.wfile where wfile = '" + file +
               "'");
