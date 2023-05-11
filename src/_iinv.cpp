@@ -684,8 +684,11 @@ struct InventoryData {
 void process_grml_product_entry(MySQL::Server& server, string product,
     InventoryData& inv_data) {
   static const string F = this_function_label(__func__);
-  auto i = 0;
-  if (regex_search(product, regex("-hour Forecast$"))) {
+  int i;
+  if (product == "Analysis" || regex_search(product, regex("^0-hour")) ||
+      product == "Monthly Mean") {
+    i = 0;
+  } else if (regex_search(product, regex("-hour Forecast$"))) {
     i = stoi(product.substr(0, product.find("-")));
   } else if (regex_search(product, regex("to initial\\+"))) {
     auto hr = product.substr(product.find("to initial+") + 11);
