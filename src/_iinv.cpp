@@ -22,8 +22,12 @@ using metautils::log_error2;
 using miscutils::this_function_label;
 using std::cerr;
 using std::cout;
+using std::deque;
 using std::endl;
 using std::list;
+using std::make_pair;
+using std::make_tuple;
+using std::pair;
 using std::regex;
 using std::regex_search;
 using std::shared_ptr;
@@ -32,9 +36,11 @@ using std::stoi;
 using std::stoll;
 using std::string;
 using std::stringstream;
+using std::tuple;
 using std::unordered_map;
 using std::unordered_set;
 using std::vector;
+using strutils::append;
 using strutils::chop;
 using strutils::ftos;
 using strutils::itos;
@@ -43,6 +49,7 @@ using strutils::replace_all;
 using strutils::split;
 using strutils::strand;
 using strutils::substitute;
+using strutils::trim;
 using unixutils::mysystem2;
 
 metautils::Directives metautils::directives;
@@ -453,6 +460,560 @@ void build_wms_capabilities() {
   delete tdir;
 }
 
+void rename_indexes(MySQL::Server& server, string table) {
+  static const string F = this_function_label(__func__);
+  string res;
+  if (server.command("show index from " + table, res) < 0) {
+    log_error2("unable to show indexes for table '" + table + "'", F, "iinv",
+        USER);
+  }
+  vector<string> indexes;
+  unordered_map<string, vector<string>> index_map;
+  auto sp = split(res, "\n");
+  for (const auto& p : sp) {
+    auto sp2 = split(p, "|");
+    auto index_name = sp2[3];
+    trim(index_name);
+    if (index_name.find("dsnnnn_inventory_") == 0) {
+      auto column = sp2[5];
+      trim(column);
+      if (index_map.find(index_name) == index_map.end()) {
+        indexes.emplace_back(index_name);
+        index_map.emplace(index_name, vector<string>{ column });
+      } else {
+        index_map[index_name].emplace_back(column);
+      }
+    }
+  }
+  auto index_prefix = table.substr(table.find(".") + 1);
+  for (const auto& e : indexes) {
+    auto index_name = e;
+    replace_all(index_name, "dsnnnn_inventory_p", index_prefix);
+    string column_list;
+    for (const auto& c : index_map[e]) {
+      append(column_list, c, ", ");
+    }
+    if (server.command("alter table " + table + " add index " + index_name + "("
+        + column_list + ")", res) < 0) {
+      log_error2("unable to create index '" + index_name + "' in table '" +
+          table + "', error: '" + server.error() + "'", F, "iinv", USER);
+    }
+    if (server.command("alter table " + table + " drop index " + e, res) < 0) {
+      log_error2("unable to drop index '" + e + "' from table '" + table + "', "
+          "error: '" + server.error() + "'", F, "iinv", USER);
+    }
+  }
+}
+
+tuple<string, string> process_grml_lat_lon_grid_definition(deque<string>&
+    def_parts) {
+  string d, dp; // return values
+  if (stoi(def_parts[0]) == static_cast<int>(Grid::Type::latitudeLongitude)) {
+    d = "latLon";
+  } else if (stoi(def_parts[0]) == static_cast<int>(Grid::Type::
+      gaussianLatitudeLongitude)) {
+    d = "gaussLatLon";
+  }
+  if (def_parts[0].back() == 'C') {
+    d += "Cell";
+  }
+  dp = def_parts[1] + ":" + def_parts[2] + ":";
+  if (def_parts[3][0] == '-') {
+    dp += def_parts[3].substr(1) + "S:";
+  } else {
+    dp += def_parts[3] + "N:";
+  }
+  if (def_parts[4][0] == '-') {
+    dp += def_parts[4].substr(1) + "W:";
+  } else {
+    dp += def_parts[4] + "E:";
+  }
+  if (def_parts[5][0] == '-') {
+    dp += def_parts[5].substr(1) + "S:";
+  } else {
+    dp += def_parts[5] + "N:";
+  }
+  if (def_parts[6][0] == '-') {
+    dp += def_parts[6].substr(1) + "W:";
+  } else {
+    dp += def_parts[6] + "E:";
+  }
+  dp += def_parts[7] + ":" + def_parts[8];
+  return make_tuple(d, dp);
+}
+
+tuple<string, string> process_grml_polar_stereographic_grid_definition(deque<
+    string>& def_parts) {
+  string dp = def_parts[1] + ":" + def_parts[2] + ":";
+  if (def_parts[3][0] == '-') {
+    dp += def_parts[3].substr(1) + "S:";
+  } else {
+    dp += def_parts[3] + "N:";
+  }
+  if (def_parts[4][0] == '-') {
+    dp += def_parts[4].substr(1) + "W:";
+  } else {
+    dp += def_parts[4] + "E:";
+  }
+  if (def_parts[5][0] == '-') {
+    dp += def_parts[5].substr(1) + "S:";
+  } else {
+    dp += def_parts[5] + "N:";
+  }
+  if (def_parts[6][0] == '-') {
+    dp += def_parts[6].substr(1) + "W:";
+  } else {
+    dp += def_parts[6] + "E:";
+  }
+  dp += def_parts[9] + ":" + def_parts[7] + ":" + def_parts[8];
+  return make_tuple("polarStereographic", dp);
+}
+
+tuple<string, string> process_grml_mercator_grid_definition(deque<string>&
+    def_parts) {
+  string dp = def_parts[1] + ":" + def_parts[2] + ":";
+  if (def_parts[3][0] == '-') {
+    dp += def_parts[3].substr(1) + "S:";
+  } else {
+    dp += def_parts[3] + "N:";
+  }
+  if (def_parts[4][0] == '-') {
+    dp += def_parts[4].substr(1) + "W:";
+  } else {
+    dp += def_parts[4] + "E:";
+  }
+  if (def_parts[5][0] == '-') {
+    dp += def_parts[5].substr(1) + "S:";
+  } else {
+    dp += def_parts[5] + "N:";
+  }
+  if (def_parts[6][0] == '-') {
+    dp += def_parts[6].substr(1) + "W:";
+  } else {
+    dp += def_parts[6] + "E:";
+  }
+  dp += def_parts[7] + ":" + def_parts[8] + ":";
+  if (def_parts[9][0] == '-') {
+    dp += def_parts[9].substr(1) + "S";
+  } else {
+    dp += def_parts[9] + "N";
+  }
+  return make_tuple("mercator", dp);
+}
+
+tuple<string, string> process_grml_lambert_conformal_grid_definition(deque<
+    string>& def_parts) {
+  string dp = def_parts[1] + ":" + def_parts[2] + ":";
+  if (def_parts[3][0] == '-') {
+    dp += def_parts[3].substr(1) + "S:";
+  } else {
+    dp += def_parts[3] + "N:";
+  }
+  if (def_parts[4][0] == '-') {
+    dp += def_parts[4].substr(1) + "W:";
+  } else {
+    dp += def_parts[4] + "E:";
+  }
+  if (def_parts[5][0] == '-') {
+    dp += def_parts[5].substr(1) + "S:";
+  } else {
+    dp += def_parts[5] + "N:";
+  }
+  if (def_parts[6][0] == '-') {
+    dp += def_parts[6].substr(1) + "W:";
+  } else {
+    dp += def_parts[6] + "E:";
+  }
+  dp += def_parts[9] + ":" + def_parts[7] + ":" + def_parts[8] + ":";
+  if (def_parts[10][0] == '-') {
+    dp += def_parts[10].substr(1) + "S:";
+  } else {
+    dp += def_parts[10] + "N:";
+  }
+  if (def_parts[11][0] == '-') {
+    dp += def_parts[11].substr(1) + "S";
+  } else {
+    dp += def_parts[11] + "N";
+  }
+  return make_tuple("lambertConformal", dp);
+}
+
+tuple<string, string> process_grml_grid_definition(deque<string>& def_parts) {
+  static const string F = this_function_label(__func__);
+  switch (stoi(def_parts[0])) {
+    case static_cast<int>(Grid::Type::latitudeLongitude):
+    case static_cast<int>(Grid::Type::gaussianLatitudeLongitude): {
+      return process_grml_lat_lon_grid_definition(def_parts);
+    }
+    case static_cast<int>(Grid::Type::polarStereographic): {
+      return process_grml_polar_stereographic_grid_definition(def_parts);
+    }
+    case static_cast<int>(Grid::Type::mercator): {
+      return process_grml_mercator_grid_definition(def_parts);
+    }
+    case static_cast<int>(Grid::Type::lambertConformal): {
+      return process_grml_lambert_conformal_grid_definition(def_parts);
+    }
+    case static_cast<int>(Grid::Type::sphericalHarmonics): {
+      return make_tuple("def_partshericalHarmonics", def_parts[1] + ":" +
+          def_parts[2] + ":" + def_parts[3]);
+    }
+    default: {
+      log_error2("grid type " + def_parts[0] + " not understood", F, "iinv",
+          USER);
+    }
+  }
+
+  // should never get here, but suppresses compiler warning
+  return make_tuple("", "");
+}
+
+struct InventoryData {
+  InventoryData() : file_code(), format_code(), byte_offset(), byte_length(),
+      valid_date(), init_date(), trv(), glst(), llst(), plst(), pclst(), rlst(),
+      elst(), idates(), is_dupe(false) { }
+
+  string file_code, format_code, byte_offset, byte_length, valid_date,
+      init_date;
+  vector<std::pair<string, int>> trv;
+  unordered_map<string, string> glst, llst, plst, pclst, rlst, elst;
+  my::map<InitTimeEntry> idates;
+  bool is_dupe;
+};
+
+void process_grml_product_entry(MySQL::Server& server, string product,
+    InventoryData& inv_data) {
+  static const string F = this_function_label(__func__);
+  auto i = 0;
+  if (regex_search(product, regex("-hour Forecast$"))) {
+    i = stoi(product.substr(0, product.find("-")));
+  } else if (regex_search(product, regex("to initial\\+"))) {
+    auto hr = product.substr(product.find("to initial+") + 11);
+    chop(hr);
+    i = stoi(hr);
+  } else {
+    metautils::log_warning("insert_grml_inventory() does not recognize "
+        "product '" + product + "'", "iinv", USER);
+  }
+  MySQL::LocalQuery q("code", "WGrML.time_ranges", "time_range = '" + product
+      + "'");
+  if (q.submit(server) < 0) {
+    log_error2("error: '" + q.error() + "' while trying to get "
+        "time_range code", F, "iinv", USER);
+  }
+  if (q.num_rows() == 0) {
+    log_error2("no time_range code for '" + product + "'", F, "iinv",
+        USER);
+  }
+  MySQL::Row row;
+  q.fetch_row(row);
+  inv_data.trv.emplace_back(make_pair(row[0], i));
+}
+
+void process_grml_grid_entry(MySQL::Server& server, string code, string
+    definition, InventoryData& inv_data) {
+  static const string F = this_function_label(__func__);
+  auto sp = split(definition, ",");
+  string def, def_params;
+  tie(def, def_params) = process_grml_grid_definition(sp);
+  MySQL::LocalQuery q("code", "WGrML.grid_definitions", "definition = '" + def +
+      "' and def_params = '" + def_params + "'");
+  if (q.submit(server) < 0) {
+    log_error2("error: '" + q.error() + "' while trying to get "
+        "grid_definition code", F, "iinv", USER);
+  }
+  if (q.num_rows() == 0) {
+    log_error2("no gridDefinition code for '" + def + ", " + def_params + "'",
+        F, "iinv", USER);
+  }
+  MySQL::Row row;
+  q.fetch_row(row);
+  inv_data.glst.emplace(code, row[0]);
+}
+
+void process_grml_level_entry(MySQL::Server& server, string code, string
+    description, InventoryData& inv_data) {
+  static const string F = this_function_label(__func__);
+  auto sp = split(description, ":");
+  if (sp.size() < 2 || sp.size() > 3) {
+    log_error2("found bad level code: '" + description + "'", F, "iinv", USER);
+  }
+  string map, typ;
+  if (regex_search(sp[0], regex(","))) {
+    auto i = sp[0].find(",");
+    map = sp[0].substr(0, i);
+    typ = sp[0].substr(i + 1);
+  } else {
+    map = "";
+    typ = sp[0];
+  }
+  string val;
+  switch (sp.size()) {
+    case 2: {
+      val = sp[1];
+      break;
+    }
+    case 3: {
+      val = sp[2] + "," + sp[1];
+      break;
+    }
+  }
+  MySQL::LocalQuery q("code", "WGrML.levels", "map = '" + map + "' and type = '"
+      + typ + "' and value = '" + val + "'");
+  if (q.submit(server) < 0) {
+    log_error2("error: '" + q.error() + "' while trying to get level code", F,
+        "iinv", USER);
+  }
+  if (q.num_rows() == 0) {
+    log_error2("no level code for '" + map + ", " + typ + ", " + val + "'", F,
+        "iinv", USER);
+  }
+  MySQL::Row row;
+  q.fetch_row(row);
+  inv_data.llst.emplace(code, row[0]);
+}
+
+void process_grml_parameter_entry(MySQL::Server& server, string code, string
+    description, InventoryData& inv_data, bool large_byte_offsets) {
+  static const string F = this_function_label(__func__);
+  inv_data.plst.emplace(code, description);
+  auto param = inv_data.format_code + "!" + description;
+  MySQL::LocalQuery q("code", "IGrML.parameters", "parameter = '" + param +
+      "'");
+  if (q.submit(server) < 0) {
+    log_error2("error: '" + q.error() + "' while trying to get parameter code",
+        F, "iinv", USER);
+  }
+  if (q.num_rows() == 0) {
+    if (server.insert("IGrML.parameters", "parameter", "'" + param + "'", "") <
+        0) {
+      log_error2("error: '" + server.error() + "' while trying to insert new "
+          "parameter '" + param + "' into IGrML.parameters", F, "iinv", USER);
+    }
+    q.set("code", "IGrML.parameters", "parameter = '" + param + "'");
+    if (q.submit(server) < 0 || q.num_rows() == 0) {
+      log_error2("error: '" + q.error() + "' while trying to get parameter "
+          "code", F, "iinv", USER);
+    }
+  }
+  MySQL::Row row;
+  q.fetch_row(row);
+  auto tbl = "IGrML.ds" + local_args.dsnum2 + "_inventory_" + row[0];
+  if (!MySQL::table_exists(server, tbl)) {
+    string res;
+    if (large_byte_offsets) {
+      if (server.command("create table " + tbl + " like IGrML."
+          "template_inventory_p_big", res) < 0) {
+        log_error2("error: '" + server.error() + "' while trying to create "
+            "parameter inventory table", F, "iinv", USER);
+      }
+    } else {
+      if (server.command("create table " + tbl + " like IGrML."
+          "template_inventory_p", res) < 0) {
+        log_error2("error: '" + server.error() + "' while trying to create "
+            "parameter inventory table", F, "iinv", USER);
+      }
+    }
+    rename_indexes(server, tbl);
+  }
+// remove the next 12 lines when inventory table names are by code rather than parameter
+if (!MySQL::table_exists(server, "IGrML.ds" + local_args.dsnum2 + "_inventory_" + row[0])) {
+string res;
+if (large_byte_offsets) {
+if (server.command("create table IGrML.`ds" + local_args.dsnum2 + "_inventory_" + param + "` like IGrML.template_inventory_p_big_delete", res) < 0) {
+log_error2("error: '" + server.error() + "' while trying to create parameter inventory table", F, "iinv", USER);
+}
+} else {
+if (server.command("create table IGrML.`ds" + local_args.dsnum2 + "_inventory_" + param + "` like IGrML.template_inventory_p_delete", res) < 0) {
+log_error2("error: '" + server.error() + "' while trying to create parameter inventory table", F, "iinv", USER);
+}
+}
+}
+  inv_data.pclst.emplace(param, row[0]);
+}
+
+void process_grml_header(MySQL::Server& server, string header, InventoryData&
+    inv_data) {
+  static const string F = this_function_label(__func__);
+  auto sp = split(header, "<!>");
+  switch (sp[0][0]) {
+    case 'U': {
+      process_grml_product_entry(server, sp[2], inv_data);
+      break;
+    }
+    case 'G': {
+      process_grml_grid_entry(server, sp[1], sp[2], inv_data);
+      break;
+    }
+    case 'L': {
+      process_grml_level_entry(server, sp[1], sp[2], inv_data);
+      break;
+    }
+    case 'P': {
+      auto b = (sp.size() > 3 && sp[3] == "BIG") ? true : false;
+      process_grml_parameter_entry(server, sp[1], sp[2], inv_data, b);
+      break;
+    }
+    case 'R': {
+      inv_data.rlst.emplace(sp[1], sp[2]);
+      break;
+    }
+    case 'E': {
+      inv_data.elst.emplace(sp[1], sp[2]);
+      break;
+    }
+  }
+}
+
+void insert_into_db(MySQL::Server& server, int line_number, const stringstream&
+    insert_stream, string table, string uflg, const stringstream&
+    dupe_where_conditions, InventoryData& inv_data) {
+  static const string F = this_function_label(__func__);
+  if (server.insert(table, "file_code, byte_offset, byte_length, valid_date, "
+      "init_date, time_range_code, grid_definition_code, level_code, process, "
+      "ensemble, uflag", insert_stream.str(), "") < 0) {
+    if (!regex_search(server.error(), regex("Duplicate entry"))) {
+      log_error2("error: '" + server.error() + "' while inserting row '" +
+          insert_stream.str() + "'", F, "iinv", USER);
+    } else {
+      MySQL::LocalQuery q("uflag", table, dupe_where_conditions.str());
+      MySQL::Row row;
+      if (q.submit(server) < 0 || !q.fetch_row(row)) {
+        log_error2("error: '" + server.error() + "' while trying to get "
+            "flag for duplicate row: '" + dupe_where_conditions.str() + "'", F,
+            "iinv", USER);
+      }
+      if (row[0] == uflg) {
+        inv_data.is_dupe = true;
+        if (local_args.verbose) {
+          cout << "**duplicate ignored - line " << line_number << endl;
+        }
+      } else {
+        if (server.update(table, "byte_offset = " + inv_data.byte_offset + ", "
+            "byte_length = " + inv_data.byte_length + ", init_date = " +
+            inv_data.init_date + ", uflag = '" + uflg + "'",
+            dupe_where_conditions.str()) < 0) {
+          log_error2("error: '" + server.error() + "' while updating "
+              "duplicate row: '" + dupe_where_conditions.str() + "'", F, "iinv",
+              USER);
+        }
+      }
+    }
+  }
+}
+
+void insert_into_db_delete(MySQL::Server& server, int line_number, const stringstream& insert_stream, string table, string uflg, const stringstream& dupe_where_conditions, InventoryData& inv_data) {
+  static const string F = this_function_label(__func__);
+  if (server.insert(table, "webID_code, byte_offset, byte_length, valid_date, init_date, timeRange_code, gridDefinition_code, level_code, process, ensemble, uflag", insert_stream.str(), "") < 0) {
+    if (!regex_search(server.error(), regex("Duplicate entry"))) {
+      log_error2("error: '" + server.error() + "' while inserting row '" + insert_stream.str() + "'", F, "iinv", USER);
+    } else {
+      MySQL::LocalQuery q("uflag", table, dupe_where_conditions.str());
+      MySQL::Row row;
+      if (q.submit(server) < 0 || !q.fetch_row(row)) {
+        log_error2("error: '" + server.error() + "' while trying to get flag for duplicate row: '" + dupe_where_conditions.str() + "'", F, "iinv", USER);
+      }
+      if (row[0] == uflg) {
+        inv_data.is_dupe = true;
+        if (local_args.verbose) {
+          cout << "**duplicate ignored - line " << line_number << endl;
+        }
+      } else {
+        if (server.update(table, "byte_offset = " + inv_data.byte_offset + ", byte_length = " + inv_data.byte_length + ", init_date = " + inv_data.init_date + ", uflag = '" + uflg + "'", dupe_where_conditions.str()) < 0) {
+          log_error2("error: '" + server.error() + "' while updating duplicate row: '" + dupe_where_conditions.str() + "'", F, "iinv", USER);
+        }
+      }
+    }
+  }
+}
+
+long long process_grml_inventory_entry(MySQL::Server& server, int line_number,
+     string inventory_entry, InventoryData& inv_data, string& dupe_dates,
+     string uflg) {
+  static const string F = this_function_label(__func__);
+  auto sp = split(inventory_entry, "|");
+  inv_data.byte_offset = sp[0];
+  inv_data.byte_length = sp[1];
+  inv_data.valid_date = sp[2];
+  inv_data.is_dupe = false;
+  auto u = stoi(sp[3]);
+  if (inv_data.trv[u].second != 0x7fffffff) {
+    inv_data.init_date = DateTime(stoll(sp[2]) * 100).hours_subtracted(inv_data.
+        trv[u].second).to_string("%Y%m%d%H%MM");
+    if (dupe_dates == "N") {
+      InitTimeEntry ite;
+      ite.key = inv_data.init_date;
+      if (!inv_data.idates.found(ite.key, ite)) {
+        ite.time_range_codes.reset(new my::map<StringEntry>);
+        inv_data.idates.insert(ite);
+      }
+      StringEntry se;
+      se.key = inv_data.trv[u].first;
+      if (!ite.time_range_codes->found(se.key, se)) {
+        ite.time_range_codes->insert(se);
+      } else if (ite.time_range_codes->size() > 1) {
+        dupe_dates = "Y";
+      }
+    }
+  } else {
+    inv_data.init_date = "0";
+  }
+
+  // insert string
+  stringstream iss;
+  iss << inv_data.file_code << ", " << sp[0] << ", " << sp[1] << ", " << sp[2]
+      << ", " << inv_data.init_date << ", " << inv_data.trv[u].first << ", " <<
+      inv_data.glst[sp[4]] << ", " << inv_data.llst[sp[5]] << ", ";
+  if (sp.size() > 7 && !sp[7].empty()) {
+    iss << "'" << inv_data.rlst[sp[7]] << "',";
+  } else {
+    iss << "'', ";
+  }
+  if (sp.size() > 8 && !sp[8].empty()) {
+    iss << "'" << inv_data.elst[sp[8]] << "'";
+  } else {
+    iss << "''";
+  }
+  iss << ", '" << uflg << "'";
+
+  // where conditions for duplicate
+  stringstream wss;
+  wss << "file_code = " << inv_data.file_code << " and valid_date = " <<
+      inv_data.valid_date << " and time_range_code = " << inv_data.trv[stoi(sp[
+      3])].first << " and grid_definition_code = " << inv_data.glst[sp[4]] <<
+      " and level_code = " << inv_data.llst[sp[5]];
+  if (sp.size() > 7 && !sp[7].empty()) {
+    wss << " and process = '" << inv_data.rlst[sp[7]] << "'";
+  } else {
+    wss << " and process = ''";
+  }
+  if (sp.size() > 8 && !sp[8].empty()) {
+    wss << " and ensemble = '" << inv_data.elst[sp[8]] << "'";
+  } else {
+    wss << " and ensemble = ''";
+  }
+  auto param = inv_data.format_code + "!" + inv_data.plst[sp[6]];
+  auto tbl = "IGrML.`ds" + local_args.dsnum2 + "_inventory_" + inv_data.
+      pclst[param] + "`";
+  insert_into_db(server, line_number, iss, tbl, uflg, wss, inv_data);
+// remove the next 14 lines when inventory table names are by code rather than parameter
+tbl = "IGrML.`ds" + local_args.dsnum2 + "_inventory_" + param + "`";
+wss.str("");
+wss << "webID_code = " << inv_data.file_code << " and valid_date = " << inv_data.valid_date << " and timeRange_code = " << inv_data.trv[stoi(sp[3])].first << " and gridDefinition_code = " << inv_data.glst[sp[4]] << " and level_code = " << inv_data.llst[sp[5]];
+if (sp.size() > 7 && !sp[7].empty()) {
+wss << " and process = '" << inv_data.rlst[sp[7]] << "'";
+} else {
+wss << " and process = ''";
+}
+if (sp.size() > 8 && !sp[8].empty()) {
+wss << " and ensemble = '" << inv_data.elst[sp[8]] << "'";
+} else {
+wss << " and ensemble = ''";
+}
+insert_into_db_delete(server, line_number, iss, tbl, uflg, wss, inv_data);
+  return stoll(inv_data.byte_length);
+}
+
 void insert_grml_inventory() {
   static const string F = this_function_label(__func__);
   MySQL::Server server(metautils::directives.database_server, metautils::
@@ -478,9 +1039,41 @@ void insert_grml_inventory() {
   }
   MySQL::Row row;
   q.fetch_row(row);
-  auto wic = row[0];
-  auto fc = row[1];
+  InventoryData inv_data;
+  inv_data.file_code = row[0];
+  inv_data.format_code = row[1];
   tindex = row[2];
+  string dup = "N";
+  string uflg = strand(3);
+  int nlin = 0, ndup = 0;
+  long long tbyts = 0;
+  char line[32768];
+  auto hdr_re = regex("<!>");
+  auto inv_re = regex("\\|");
+  ifs.getline(line, 32768);
+  while (!ifs.eof()) {
+    ++nlin;
+    string s = line;
+    if (regex_search(s, hdr_re)) {
+      process_grml_header(server, s, inv_data);
+    } else if (regex_search(s, inv_re)) {
+      auto nbyts = process_grml_inventory_entry(server, nlin, s, inv_data, dup,
+          uflg);
+      tbyts += nbyts;
+      if (inv_data.is_dupe) {
+        ++ndup;
+      }
+    }
+    ifs.getline(line, 32768);
+  }
+  ifs.close();
+  for (const auto& pc : inv_data.pclst) {
+    server._delete("IGrML.`ds" + local_args.dsnum2 + "_inventory_" + pc.second +
+        "`", "webID_code = " + inv_data.file_code + " and uflag != '" + uflg +
+        "'");
+// remove the next line when inventory table names are by code rather than parameter
+server._delete("IGrML.`ds" + local_args.dsnum2 + "_inventory_" + pc.first + "`", "webID_code = " + inv_data.file_code + " and uflag != '" + uflg + "'");
+  }
   if (!MySQL::table_exists(server,"IGrML.ds" + local_args.dsnum2 +
       "_inventory_summary")) {
     string result;
@@ -491,385 +1084,14 @@ void insert_grml_inventory() {
           "inventory_summary table", F, "iinv", USER);
     }
   }
-  my::map<InitTimeEntry> idates;
-  string dup = "N";
-  string uflg = strand(3);
-  int nlin = 0, ndup = 0;
-  long long tbyts = 0;
-  vector<std::pair<string, int>> trv;
-  vector<string> pclst;
-  unordered_map<string, string> glst, llst, plst, rlst, elst;
-  char line[32768];
-  auto hdr_re = regex("<!>");
-  auto inv_re = regex("\\|");
-  ifs.getline(line, 32768);
-  while (!ifs.eof()) {
-    ++nlin;
-    string s = line;
-    if (regex_search(s, hdr_re)) {
-      auto sp = split(s, "<!>");
-      switch (sp[0][0]) {
-        case 'U': {
-          int i;
-          if (sp[2] == "Analysis" || regex_search(sp[2], regex("^0-hour")) ||
-              sp[2] == "Monthly Mean") {
-            i = 0;
-          } else if (regex_search(sp[2], regex("-hour Forecast$"))) {
-            i = stoi(sp[2].substr(0, sp[2].find("-")));
-          } else if (regex_search(sp[2], regex("to initial\\+"))) {
-            auto hr = sp[2].substr(sp[2].find("to initial+") + 11);
-            chop(hr);
-            i = stoi(hr);
-          } else {
-            metautils::log_warning("insert_grml_inventory() does not recognize "
-                "product '" + sp[2] + "'", "iinv", USER);
-          }
-          q.set("code", "WGrML.time_ranges", "time_range = '" + sp[2] + "'");
-          if (q.submit(server) < 0) {
-            log_error2("error: '" + q.error() + "' while trying to get "
-                "time_range code", F, "iinv", USER);
-          }
-          if (q.num_rows() == 0) {
-            log_error2("no time_range code for '" + sp[2] + "'", F, "iinv",
-                USER);
-          }
-          q.fetch_row(row);
-          trv.emplace_back(std::make_pair(row[0], i));
-          break;
-        }
-        case 'G': {
-          auto sp_g = split(sp[2], ",");
-          string d, dp;
-          switch (stoi(sp_g[0])) {
-            case static_cast<int>(Grid::Type::latitudeLongitude):
-            case static_cast<int>(Grid::Type::gaussianLatitudeLongitude): {
-              if (stoi(sp_g[0]) == static_cast<int>(Grid::Type::
-                  latitudeLongitude)) {
-                d = "latLon";
-              } else if (stoi(sp_g[0]) == static_cast<int>(Grid::Type::
-                  gaussianLatitudeLongitude)) {
-                d = "gaussLatLon";
-              }
-              if (sp_g[0].back() == 'C') {
-                d += "Cell";
-              }
-              dp = sp_g[1] + ":" + sp_g[2] + ":";
-              if (sp_g[3][0] == '-') {
-                dp += sp_g[3].substr(1) + "S:";
-              } else {
-                dp += sp_g[3] + "N:";
-              }
-              if (sp_g[4][0] == '-') {
-                dp += sp_g[4].substr(1) + "W:";
-              } else {
-                dp += sp_g[4] + "E:";
-              }
-              if (sp_g[5][0] == '-') {
-                dp += sp_g[5].substr(1) + "S:";
-              } else {
-                dp += sp_g[5] + "N:";
-              }
-              if (sp_g[6][0] == '-') {
-                dp += sp_g[6].substr(1) + "W:";
-              } else {
-                dp += sp_g[6] + "E:";
-              }
-              dp += sp_g[7] + ":" + sp_g[8];
-              break;
-            }
-            case static_cast<int>(Grid::Type::polarStereographic): {
-              d = "polarStereographic";
-              dp = sp_g[1] + ":" + sp_g[2] + ":";
-              if (sp_g[3][0] == '-') {
-                dp += sp_g[3].substr(1) + "S:";
-              } else {
-                dp += sp_g[3] + "N:";
-              }
-              if (sp_g[4][0] == '-') {
-                dp += sp_g[4].substr(1) + "W:";
-              } else {
-                dp += sp_g[4] + "E:";
-              }
-              if (sp_g[5][0] == '-') {
-                dp += sp_g[5].substr(1) + "S:";
-              } else {
-                dp += sp_g[5] + "N:";
-              }
-              if (sp_g[6][0] == '-') {
-                dp += sp_g[6].substr(1) + "W:";
-              } else {
-                dp += sp_g[6] + "E:";
-              }
-              dp += sp_g[9] + ":" + sp_g[7] + ":" + sp_g[8];
-              break;
-            }
-            case static_cast<int>(Grid::Type::mercator): {
-              d = "mercator";
-              dp = sp_g[1] + ":" + sp_g[2] + ":";
-              if (sp_g[3][0] == '-') {
-                dp += sp_g[3].substr(1) + "S:";
-              } else {
-                dp += sp_g[3] + "N:";
-              }
-              if (sp_g[4][0] == '-') {
-                dp += sp_g[4].substr(1) + "W:";
-              } else {
-                dp += sp_g[4] + "E:";
-              }
-              if (sp_g[5][0] == '-') {
-                dp += sp_g[5].substr(1) + "S:";
-              } else {
-                dp += sp_g[5] + "N:";
-              }
-              if (sp_g[6][0] == '-') {
-                dp += sp_g[6].substr(1) + "W:";
-              } else {
-                dp += sp_g[6] + "E:";
-              }
-              dp += sp_g[7] + ":" + sp_g[8] + ":";
-              if (sp_g[9][0] == '-') {
-                dp += sp_g[9].substr(1) + "S";
-              } else {
-                dp += sp_g[9] + "N";
-              }
-              break;
-            }
-            case static_cast<int>(Grid::Type::lambertConformal): {
-              d = "lambertConformal";
-              dp = sp_g[1] + ":" + sp_g[2] + ":";
-              if (sp_g[3][0] == '-') {
-                dp += sp_g[3].substr(1) + "S:";
-              } else {
-                dp += sp_g[3] + "N:";
-              }
-              if (sp_g[4][0] == '-') {
-                dp += sp_g[4].substr(1) + "W:";
-              } else {
-                dp += sp_g[4] + "E:";
-              }
-              if (sp_g[5][0] == '-') {
-                dp += sp_g[5].substr(1) + "S:";
-              } else {
-                dp += sp_g[5] + "N:";
-              }
-              if (sp_g[6][0] == '-') {
-                dp += sp_g[6].substr(1) + "W:";
-              } else {
-                dp += sp_g[6] + "E:";
-              }
-              dp += sp_g[9] + ":" + sp_g[7] + ":" + sp_g[8] + ":";
-              if (sp_g[10][0] == '-') {
-                dp += sp_g[10].substr(1) + "S:";
-              } else {
-                dp += sp_g[10] + "N:";
-              }
-              if (sp_g[11][0] == '-') {
-                dp += sp_g[11].substr(1) + "S";
-              } else {
-                dp += sp_g[11] + "N";
-              }
-              break;
-            }
-            case static_cast<int>(Grid::Type::sphericalHarmonics): {
-              d = "sphericalHarmonics";
-              dp = sp_g[1] + ":" + sp_g[2] + ":" + sp_g[3];
-              break;
-            }
-            default: {
-              log_error2("grid type " + sp_g[0] + " not understood", F, "iinv",
-                  USER);
-            }
-          }
-          q.set("code", "WGrML.grid_definitions", "definition = '" + d +
-              "' and def_params = '" + dp + "'");
-          if (q.submit(server) < 0) {
-            log_error2("error: '" + q.error() + "' while trying to get "
-                "grid_definition code", F, "iinv", USER);
-          }
-          if (q.num_rows() == 0) {
-            log_error2("no gridDefinition code for '" + d + ", " + dp + "'", F,
-                "iinv", USER);
-          }
-          q.fetch_row(row);
-          glst.emplace(sp[1], row[0]);
-          break;
-        }
-        case 'L': {
-          auto sp_l = split(sp[2], ":");
-          if (sp_l.size() < 2 || sp_l.size() > 3) {
-            log_error2("found bad level code: " + sp[2], F, "iinv", USER);
-          }
-          string map, typ;
-          if (regex_search(sp_l[0], regex(","))) {
-            auto i = sp_l[0].find(",");
-            map = sp_l[0].substr(0, i);
-            typ = sp_l[0].substr(i + 1);
-          } else {
-            map = "";
-            typ = sp_l[0];
-          }
-          string val;
-          switch (sp_l.size()) {
-            case 2: {
-              val = sp_l[1];
-              break;
-            }
-            case 3: {
-              val = sp_l[2] + "," + sp_l[1];
-              break;
-            }
-          }
-          q.set("code", "WGrML.levels", "map = '" + map + "' and type = '" +
-              typ + "' and value = '" + val + "'");
-          if (q.submit(server) < 0) {
-            log_error2("error: '" + q.error() + "' while trying to get level "
-                "code", F, "iinv", USER);
-          }
-          if (q.num_rows() == 0) {
-            log_error2("no level code for '" + map + ", " + typ + ", " + val +
-                "'", F, "iinv", USER);
-          }
-          q.fetch_row(row);
-          llst.emplace(sp[1], row[0]);
-          break;
-        }
-        case 'P': {
-          plst.emplace(sp[1], sp[2]);
-          auto pcod = fc + "!" + sp[2];
-          if (!MySQL::table_exists(server, "IGrML.ds" + local_args.dsnum2 +
-              "_inventory_" + pcod)) {
-            string res;
-            if (sp.size() > 3 && sp[3] == "BIG") {
-              if (server.command("create table IGrML.`ds" + local_args.dsnum2 +
-                  "_inventory_" + pcod + "` like IGrML"
-                  ".template_inventory_p_big", res) < 0) {
-                log_error2("error: '" + server.error() + "' while trying to "
-                    "create parameter inventory table", F, "iinv", USER);
-              }
-            } else {
-              if (server.command("create table IGrML.`ds" + local_args.dsnum2 +
-                  "_inventory_" + pcod + "` like IGrML.template_inventory_p",
-                  res) < 0) {
-                log_error2("error: '" + server.error() + "' while trying to "
-                    "create parameter inventory table", F, "iinv", USER);
-              }
-            }
-          }
-          pclst.emplace_back(pcod);
-          break;
-        }
-        case 'R': {
-          rlst.emplace(sp[1], sp[2]);
-          break;
-        }
-        case 'E': {
-          elst.emplace(sp[1], sp[2]);
-          break;
-        }
-      }
-    } else if (regex_search(s, inv_re)) {
-      auto sp_i = split(s, "|");
-      tbyts += stoll(sp_i[1]);
-      auto t = stoi(sp_i[3]);
-      string idat;
-      if (trv[t].second != 0x7fffffff) {
-        idat = DateTime(stoll(sp_i[2]) * 100).hours_subtracted(trv[t].second).
-            to_string("%Y%m%d%H%MM");
-        if (dup == "N") {
-          InitTimeEntry ite;
-          ite.key = idat;
-          if (!idates.found(ite.key, ite)) {
-            ite.time_range_codes.reset(new my::map<StringEntry>);
-            idates.insert(ite);
-          }
-          StringEntry se;
-          se.key = trv[t].first;
-          if (!ite.time_range_codes->found(se.key, se)) {
-            ite.time_range_codes->insert(se);
-          } else if (ite.time_range_codes->size() > 1) {
-            dup = "Y";
-          }
-        }
-      } else {
-        idat = "0";
-      }
-      stringstream iss;
-      iss << wic << ", " << sp_i[0] << ", " << sp_i[1] << ", " << sp_i[2] <<
-          ", " << idat << ", " << trv[t].first << ", " << glst[sp_i[4]] << ", "
-          << llst[sp_i[5]] << ", ";
-      if (sp_i.size() > 7 && !sp_i[7].empty()) {
-        iss << "'" << rlst[sp_i[7]] << "',";
-      } else {
-        iss << "'', ";
-      }
-      if (sp_i.size() > 8 && !sp_i[8].empty()) {
-        iss << "'" << elst[sp_i[8]] << "'";
-      } else {
-        iss << "''";
-      }
-      iss << ", '" << uflg << "'";
-      auto pcode = fc + "!" + plst[sp_i[6]];
-      if (server.insert("IGrML.`ds" + local_args.dsnum2 + "_inventory_" + pcode
-          + "`", "webID_code, byte_offset, byte_length, valid_date, init_date, "
-          "timeRange_code, gridDefinition_code, level_code, process, ensemble, "
-          "uflag", iss.str(), "") < 0) {
-        if (!regex_search(server.error(), regex("Duplicate entry"))) {
-          log_error2("error: '" + server.error() + "' while inserting row '" +
-              iss.str() + "'", F, "iinv", USER);
-        } else {
-          stringstream dss;
-          dss << "webID_code = " << wic << " and valid_date = " << sp_i[2] <<
-              " and timeRange_code = " << trv[t].first << " and "
-              "gridDefinition_code = " << glst[sp_i[4]] << " and level_code = "
-              << llst[sp_i[5]];
-          if (sp_i.size() > 7 && !sp_i[7].empty()) {
-            dss << " and process = '" << rlst[sp_i[7]] << "'";
-          } else {
-            dss << " and process = ''";
-          }
-          if (sp_i.size() > 8 && !sp_i[8].empty()) {
-            dss << " and ensemble = '" << elst[sp_i[8]] << "'";
-          } else {
-            dss << " and ensemble = ''";
-          }
-          q.set("uflag", "IGrML.`ds" + local_args.dsnum2 + "_inventory_" +
-              pcode + "`", dss.str());
-          if (q.submit(server) < 0 || !q.fetch_row(row)) {
-            log_error2("error: '" + server.error() + "' while trying to get "
-                "flag for duplicate row: '" + dss.str() + "'", F, "iinv", USER);
-          }
-          if (row[0] == uflg) {
-            ++ndup;
-            if (local_args.verbose) {
-              cout << "**duplicate ignored - line " << nlin << endl;
-            }
-          } else {
-            if (server.update("IGrML.`ds" + local_args.dsnum2 + "_inventory_" +
-                pcode + "`","byte_offset = " + sp_i[0] + ", byte_length = " +
-                sp_i[1] + ", init_date = " + idat + ", uflag = '" + uflg + "'",
-                dss.str()) < 0) {
-              log_error2("error: '" + server.error() + "' while updating "
-                  "duplicate row: '" + dss.str() + "'", F, "iinv", USER);
-            }
-          }
-        }
-      }
-    }
-    ifs.getline(line, 32768);
-  }
-  ifs.close();
-  for (const auto& pc : pclst) {
-    server._delete("IGrML.`ds" + local_args.dsnum2 + "_inventory_" + pc + "`",
-        "webID_code = " + wic + " and uflag != '" + uflg + "'");
-  }
-//  server.issueCommand("unlock tables", error);
   if (server.insert("IGrML.ds" + local_args.dsnum2 + "_inventory_summary",
-      "file_code, byte_length, dupe_vdates", wic + ", " + lltos(tbyts) + ", '"
-      + dup + "'", "update byte_length = " + lltos(tbyts) + ", dupe_vdates = '"
-      + dup +       "'") < 0) {
+      "file_code, byte_length, dupe_vdates", inv_data.file_code + ", " + lltos(
+      tbyts) + ", '" + dup + "'", "update byte_length = " + lltos(tbyts) + ", "
+      "dupe_vdates = '" + dup + "'") < 0) {
     if (!regex_search(server.error(),regex("Duplicate entry"))) {
-      log_error2("error: '" + server.error() + "' while inserting row '" + wic +
-          ", " + lltos(tbyts) + ", '" + dup + "''", F, "iinv", USER);
+      log_error2("error: '" + server.error() + "' while inserting row '" +
+          inv_data.file_code + ", " + lltos(tbyts) + ", '" + dup + "''", F,
+          "iinv", USER);
     }
   }
   server.disconnect();
@@ -1497,7 +1719,7 @@ void insert_generic_point_inventory(std::ifstream& ifs ,MySQL::Server& server,
     }
   }
   unordered_map<string, string> tmap, omap, pmap, imap;
-  unordered_map<size_t, std::tuple<size_t, size_t>> dmap;
+  unordered_map<size_t, tuple<size_t, size_t>> dmap;
   unordered_map<string, shared_ptr<unordered_map<size_t, size_t>>> dtyps;
   size_t nbyts = 0;
   char line[32768];
@@ -1549,7 +1771,7 @@ void insert_generic_point_inventory(std::ifstream& ifs ,MySQL::Server& server,
               log_error2("error: '" + q.error() + "' while trying to get "
                   "data_type code for '" + sp[2] + "'", F, "iinv", USER);
             }
-            dmap.emplace(stoi(sp[1]), std::make_tuple(stoi(row[0]), stoi(sp2[3].
+            dmap.emplace(stoi(sp[1]), make_tuple(stoi(row[0]), stoi(sp2[3].
                 substr(1))));
             string typ;
             switch (sp2[3][0]) {
