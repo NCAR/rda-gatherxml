@@ -655,8 +655,8 @@ tuple<string, string> process_grml_grid_definition(deque<string>& def_parts) {
       return process_grml_lambert_conformal_grid_definition(def_parts);
     }
     case static_cast<int>(Grid::Type::sphericalHarmonics): {
-      return make_tuple("def_partshericalHarmonics", def_parts[1] + ":" +
-          def_parts[2] + ":" + def_parts[3]);
+      return make_tuple("sphericalHarmonics", def_parts[1] + ":" + def_parts[2]
+          + ":" + def_parts[3]);
     }
     default: {
       log_error2("grid type " + def_parts[0] + " not understood", F, "iinv",
