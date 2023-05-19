@@ -3468,7 +3468,9 @@ void add_new_grid(GridData& gd, CoordinateVariables& cv, size_t nlev, size_t
   if (!g_grml_data->l.entry.parameter_code_table.empty()) {
     for (size_t l = 0; l < nlev; ++l) {
       g_grml_data->l.key = "ds" + g_dsid + "," + gd.level.id + ":";
-      if (gd.level_bounds.ds == nullptr) {
+      if (gd.level.id == "sfc") {
+        g_grml_data->l.key += "0";
+      } else if (gd.level_bounds.ds == nullptr) {
         auto v = (gd.level.ds == nullptr) ? 0. : data_array_value(gd.level.
             data_array, l, gd.level.ds.get());
         if (floatutils::myequalf(v, static_cast<int>(v), 0.001)) {
@@ -3514,7 +3516,9 @@ void update_existing_grid(GridData& gd, CoordinateVariables& cv, size_t nlev,
     g_grml_data->l.key = "ds" + g_dsid + "," + gd.level.id + ":";
     auto v = gd.level.ds == nullptr ? 0. : data_array_value(gd.level.data_array,
         l, gd.level.ds.get());
-    if (floatutils::myequalf(v, static_cast<int>(v), 0.001)) {
+    if (gd.level.id == "sfc") {
+      g_grml_data->l.key += "0";
+    } else if (floatutils::myequalf(v, static_cast<int>(v), 0.001)) {
       g_grml_data->l.key += itos(v);
     } else {
       g_grml_data->l.key += ftos(v, 3);
