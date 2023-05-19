@@ -999,8 +999,9 @@ long long process_grml_inventory_entry(MySQL::Server& server, int line_number,
   auto tbl = "IGrML.`ds" + local_args.dsnum2 + "_inventory_" + inv_data.
       pclst[param] + "`";
   insert_into_db(server, line_number, iss, tbl, uflg, wss, inv_data);
-// remove the next 14 lines when inventory table names are by code rather than parameter
+// remove the next 16 lines when inventory table names are by code rather than parameter
 tbl = "IGrML.`ds" + local_args.dsnum2 + "_inventory_" + param + "`";
+if (MySQL::table_exists(server, tbl)) {
 wss.str("");
 wss << "webID_code = " << inv_data.file_code << " and valid_date = " << inv_data.valid_date << " and timeRange_code = " << inv_data.trv[stoi(sp[3])].first << " and gridDefinition_code = " << inv_data.glst[sp[4]] << " and level_code = " << inv_data.llst[sp[5]];
 if (sp.size() > 7 && !sp[7].empty()) {
@@ -1014,6 +1015,7 @@ wss << " and ensemble = '" << inv_data.elst[sp[8]] << "'";
 wss << " and ensemble = ''";
 }
 insert_into_db_delete(server, line_number, iss, tbl, uflg, wss, inv_data);
+}
   return stoll(inv_data.byte_length);
 }
 
@@ -1077,7 +1079,7 @@ void insert_grml_inventory() {
 // remove the next line when inventory table names are by code rather than parameter
 server._delete("IGrML.`ds" + local_args.dsnum2 + "_inventory_" + pc.first + "`", "webID_code = " + inv_data.file_code + " and uflag != '" + uflg + "'");
   }
-  if (!MySQL::table_exists(server,"IGrML.ds" + local_args.dsnum2 +
+  if (!MySQL::table_exists(server, "IGrML.ds" + local_args.dsnum2 +
       "_inventory_summary")) {
     string result;
     if (server.command("create table IGrML.ds" + local_args.dsnum2 +
