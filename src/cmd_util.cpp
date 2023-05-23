@@ -222,7 +222,7 @@ string gatherxml_utility(string user) {
   if (util.empty()) {
     cerr << "Error: unable to determine gatherxml utility from format (-f) '" <<
         metautils::args.data_format << "'" << endl;
-    cerr << "    Use \"gathexml --showinfo\" to see a list of supported data "
+    cerr << "    Use \"gatherxml --showinfo\" to see a list of supported data "
         "formats" << endl;
     exit(1);
   }
