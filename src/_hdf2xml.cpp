@@ -2884,8 +2884,8 @@ void check_for_forecasts(GridData& grid_data, shared_ptr<TimeData>&
         grid_data.coordinate_variables_set.emplace(grid_data.reference_time.id);
         auto ref_dt = metautils::NcTime::reference_date_time(units_value);
         if (ref_dt.year() == 0) {
-          log_error2("bad netcdf date in units for forecast_reference_time", F,
-              g_util_ident);
+          log_error2("bad netcdf date in units (" + units_value + ") for "
+              "forecast_reference_time", F, g_util_ident);
         }
       }
     }
