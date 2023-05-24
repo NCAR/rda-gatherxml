@@ -2839,6 +2839,7 @@ void find_coordinate_variables(CoordinateVariables& coord_vars, GridData&
       if (attr_it != dse.p_ds->attributes.end() && attr_it->second._class_ ==
           3 && unique_level_id_set.find(var_name) ==
           unique_level_id_set.end()) {
+        coord_vars.level_info.emplace_back();
         coord_vars.level_info.back().ID = var_name;
         attr_it = dse.p_ds->attributes.find("long_name");
         if (attr_it != dse.p_ds->attributes.end() && attr_it->second._class_ ==
