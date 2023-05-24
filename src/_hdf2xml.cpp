@@ -2874,9 +2874,9 @@ void check_for_forecasts(GridData& grid_data, shared_ptr<TimeData>&
         3) {
       string units_value = reinterpret_cast<char *>(attr_it->second.array);
       if (regex_search(units_value, regex("since"))) {
-        units_value = units_value.substr(0, units_value.find("since"));
-        trim(units_value);
-        if (units_value != time_data->units) {
+        auto units = units_value.substr(0, units_value.find("since"));
+        trim(units);
+        if (units != time_data->units) {
           log_error2("time and forecast reference time have different units", F,
               g_util_ident);
         }
