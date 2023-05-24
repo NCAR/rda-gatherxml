@@ -688,7 +688,7 @@ void process_grml_product_entry(MySQL::Server& server, string product,
   if (product == "Analysis" || regex_search(product, regex("^0-hour")) ||
       product == "Monthly Mean") {
     i = 0;
-  } else if (regex_search(product, regex("-hour Forecast$"))) {
+  } else if (regex_search(product, regex("-hour (Forecast|Sum|Mean)$"))) {
     i = stoi(product.substr(0, product.find("-")));
   } else if (regex_search(product, regex("to initial\\+"))) {
     auto hr = product.substr(product.find("to initial+") + 11);
@@ -1074,7 +1074,7 @@ void insert_grml_inventory() {
   ifs.close();
   for (const auto& pc : inv_data.pclst) {
     server._delete("IGrML.`ds" + local_args.dsnum2 + "_inventory_" + pc.second +
-        "`", "webID_code = " + inv_data.file_code + " and uflag != '" + uflg +
+        "`", "file_code = " + inv_data.file_code + " and uflag != '" + uflg +
         "'");
 // remove the next line when inventory table names are by code rather than parameter
 server._delete("IGrML.`ds" + local_args.dsnum2 + "_inventory_" + pc.first + "`", "webID_code = " + inv_data.file_code + " and uflag != '" + uflg + "'");
