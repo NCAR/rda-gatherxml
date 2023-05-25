@@ -566,7 +566,7 @@ void add_gridded_parameters_to_netcdf_level_entry(const vector<NetCDF::
         dt1 = tre.bounded.first_valid_datetime;
         dt2 = tre.bounded.last_valid_datetime;
       }
-      tm = strutils::capitalize(tm);
+//      tm = strutils::capitalize(tm);
       string e;
       auto tr = metautils::NcTime::gridded_netcdf_time_range_description(tre,
           time_data, tm, e);
