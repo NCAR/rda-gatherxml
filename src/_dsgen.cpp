@@ -262,16 +262,16 @@ bool compare_levels(const string& left, const string& right) {
       rv = right;
       ru = "";
     }
-    auto ilv = stoi(lv);
-    auto irv = stoi(rv);
+    auto flv = stof(lv);
+    auto frv = stof(rv);
     if (lu == ru) {
       if (lu == "mbar" || lu == "deg K") {
-        if (ilv >= irv) {
+        if (flv >= frv) {
           return true;
         }
         return false;
       } else {
-        if (ilv <= irv) {
+        if (flv <= frv) {
           return true;
         }
         return false;
@@ -1364,7 +1364,7 @@ void add_vertical_levels(TokenDocument& tdoc, const vector<string>& data_types,
     auto elist2 = g_xdoc.element_list("dsOverview/contentMetadata/levels/"
         "layer");
     elist.insert(elist.end(), elist2.begin(), elist2.end());
-    if (elist.size() > 0) {
+    if (!elist.empty()) {
       tdoc.add_if("__HAS_VERTICAL_LEVELS__");
       vector<string> llst;
       for (const auto& ele : elist) {
@@ -1973,35 +1973,25 @@ void add_more_details(TokenDocument& tdoc) {
 void add_data_license() {
   static const string F = this_function_label(__func__);
   auto id = g_xdoc.element("dsOverview/dataLicense").content();
-  struct stat st;
-  XMLDocument ldoc;
-  if (stat("/usr/local/www/server_root/web/metadata", &st) == 0) {
-    ldoc.open("/usr/local/www/server_root/web/metadata/DataLicenses.xml");
-  } else {
-    auto f = unixutils::remote_web_file("https://rda.ucar.edu/metadata/"
-        "DataLicenses.xml", temp_dir.name());
-    ldoc.open(f);
+  if (id.empty()) {
+    id = "CC-BY-4.0";
   }
-  if (!ldoc) {
-    log_error2("unable to open DataLicenses.xml", F, "dsgen", USER);
+  MySQL::LocalQuery q("name, url, img_url", "wagtail.home_datalicense", "id = "
+      "'" + id + "'");
+  if (q.submit(server) < 0) {
+    log_error2("unable to retrieve data license - error: '" + server.error() +
+        "'", F, "dsgen", USER);
   }
-  auto elist = ldoc.element_list("DataLicenses/License");
-  size_t idx = 0;
-  for (const auto& e : elist) {
-    if (id == e.attribute_value("id")) {
-      update_wagtail("data_license", "{\"title\": \"" + e.element("title").
-          content() + "\", \"href\": \"" + e.element("href").content() + "\", "
-          "\"img_href\": \"" + e.element("img_href").content() + "\"}", F);
-      break;
-    }
-    ++idx;
+  if (q.num_rows() == 0) {
+    log_error2("no data license for id: '" + id + "'", F, "dsgen", USER);
   }
-  if (idx == elist.size()) {
-    update_wagtail("data_license", "{\"title\": \"" + elist.front().element(
-        "title").content() + "\", \"href\": \"" + elist.front().element("href").
-        content() + "\", \"img_href\": \"" + elist.front().element("img_href").
-        content() + "\"}", F);
+  MySQL::Row row;
+  if (!q.fetch_row(row)) {
+    log_error2("unable to retrieve data license - error: '" + q.error() + "'",
+        F, "dsgen", USER);
   }
+  update_wagtail("data_license", "{\"name\": \"" + row[0] + "\", \"url\": \"" +
+      row[1] + "\", \"img_url\": \"" + row[2] + "\"}", F);
 }
 
 void generate_description(string type, string tdir_name) {
@@ -2067,7 +2057,6 @@ void generate_description(string type, string tdir_name) {
   add_more_details(tdoc);
   add_data_citations(tdoc); // wagtail
   add_data_license();
-
   ofs << tdoc;
   ofs.close();
 }
