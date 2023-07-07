@@ -467,7 +467,7 @@ void rename_indexes(MySQL::Server& server, string table) {
     log_error2("unable to show indexes for table '" + table + "'", F, "iinv",
         USER);
   }
-  vector<string> indexes;
+  vector<string> index_names;
   unordered_map<string, vector<string>> index_map;
   auto sp = split(res, "\n");
   for (const auto& p : sp) {
@@ -478,7 +478,7 @@ void rename_indexes(MySQL::Server& server, string table) {
       auto column = sp2[5];
       trim(column);
       if (index_map.find(index_name) == index_map.end()) {
-        indexes.emplace_back(index_name);
+        index_names.emplace_back(index_name);
         index_map.emplace(index_name, vector<string>{ column });
       } else {
         index_map[index_name].emplace_back(column);
@@ -486,7 +486,7 @@ void rename_indexes(MySQL::Server& server, string table) {
     }
   }
   auto index_prefix = table.substr(table.find(".") + 1);
-  for (const auto& e : indexes) {
+  for (const auto& e : index_names) {
     auto index_name = e;
     replace_all(index_name, "dsnnnn_inventory_p", index_prefix);
     string column_list;
