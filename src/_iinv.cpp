@@ -819,19 +819,6 @@ void process_grml_parameter_entry(MySQL::Server& server, string code, string
     }
     rename_indexes(server, tbl);
   }
-// remove the next 12 lines when inventory table names are by code rather than parameter
-if (!MySQL::table_exists(server, "IGrML.ds" + local_args.dsnum2 + "_inventory_" + row[0])) {
-string res;
-if (large_byte_offsets) {
-if (server.command("create table IGrML.`ds" + local_args.dsnum2 + "_inventory_" + param + "` like IGrML.template_inventory_p_big_delete", res) < 0) {
-log_error2("error: '" + server.error() + "' while trying to create parameter inventory table", F, "iinv", USER);
-}
-} else {
-if (server.command("create table IGrML.`ds" + local_args.dsnum2 + "_inventory_" + param + "` like IGrML.template_inventory_p_delete", res) < 0) {
-log_error2("error: '" + server.error() + "' while trying to create parameter inventory table", F, "iinv", USER);
-}
-}
-}
   inv_data.pclst.emplace(param, row[0]);
 }
 
@@ -899,31 +886,6 @@ void insert_into_db(MySQL::Server& server, int line_number, const stringstream&
           log_error2("error: '" + server.error() + "' while updating "
               "duplicate row: '" + dupe_where_conditions.str() + "'", F, "iinv",
               USER);
-        }
-      }
-    }
-  }
-}
-
-void insert_into_db_delete(MySQL::Server& server, int line_number, const stringstream& insert_stream, string table, string uflg, const stringstream& dupe_where_conditions, InventoryData& inv_data) {
-  static const string F = this_function_label(__func__);
-  if (server.insert(table, "webID_code, byte_offset, byte_length, valid_date, init_date, timeRange_code, gridDefinition_code, level_code, process, ensemble, uflag", insert_stream.str(), "") < 0) {
-    if (!regex_search(server.error(), regex("Duplicate entry"))) {
-      log_error2("error: '" + server.error() + "' while inserting row '" + insert_stream.str() + "'", F, "iinv", USER);
-    } else {
-      MySQL::LocalQuery q("uflag", table, dupe_where_conditions.str());
-      MySQL::Row row;
-      if (q.submit(server) < 0 || !q.fetch_row(row)) {
-        log_error2("error: '" + server.error() + "' while trying to get flag for duplicate row: '" + dupe_where_conditions.str() + "'", F, "iinv", USER);
-      }
-      if (row[0] == uflg) {
-        inv_data.is_dupe = true;
-        if (local_args.verbose) {
-          cout << "**duplicate ignored - line " << line_number << endl;
-        }
-      } else {
-        if (server.update(table, "byte_offset = " + inv_data.byte_offset + ", byte_length = " + inv_data.byte_length + ", init_date = " + inv_data.init_date + ", uflag = '" + uflg + "'", dupe_where_conditions.str()) < 0) {
-          log_error2("error: '" + server.error() + "' while updating duplicate row: '" + dupe_where_conditions.str() + "'", F, "iinv", USER);
         }
       }
     }
@@ -999,23 +961,6 @@ long long process_grml_inventory_entry(MySQL::Server& server, int line_number,
   auto tbl = "IGrML.`ds" + local_args.dsnum2 + "_inventory_" + inv_data.
       pclst[param] + "`";
   insert_into_db(server, line_number, iss, tbl, uflg, wss, inv_data);
-// remove the next 16 lines when inventory table names are by code rather than parameter
-tbl = "IGrML.`ds" + local_args.dsnum2 + "_inventory_" + param + "`";
-if (MySQL::table_exists(server, tbl)) {
-wss.str("");
-wss << "webID_code = " << inv_data.file_code << " and valid_date = " << inv_data.valid_date << " and timeRange_code = " << inv_data.trv[stoi(sp[3])].first << " and gridDefinition_code = " << inv_data.glst[sp[4]] << " and level_code = " << inv_data.llst[sp[5]];
-if (sp.size() > 7 && !sp[7].empty()) {
-wss << " and process = '" << inv_data.rlst[sp[7]] << "'";
-} else {
-wss << " and process = ''";
-}
-if (sp.size() > 8 && !sp[8].empty()) {
-wss << " and ensemble = '" << inv_data.elst[sp[8]] << "'";
-} else {
-wss << " and ensemble = ''";
-}
-insert_into_db_delete(server, line_number, iss, tbl, uflg, wss, inv_data);
-}
   return stoll(inv_data.byte_length);
 }
 
@@ -1076,8 +1021,6 @@ void insert_grml_inventory() {
     server._delete("IGrML.`ds" + local_args.dsnum2 + "_inventory_" + pc.second +
         "`", "file_code = " + inv_data.file_code + " and uflag != '" + uflg +
         "'");
-// remove the next line when inventory table names are by code rather than parameter
-server._delete("IGrML.`ds" + local_args.dsnum2 + "_inventory_" + pc.first + "`", "webID_code = " + inv_data.file_code + " and uflag != '" + uflg + "'");
   }
   if (!MySQL::table_exists(server, "IGrML.ds" + local_args.dsnum2 +
       "_inventory_summary")) {
@@ -1204,9 +1147,9 @@ void insert_obml_netcdf_time_series_inventory(std::ifstream& ifs, MySQL::Server&
           local_args.dsnum2 + "_inventory_summary'", F, "iinv", USER);
     }
     if (server.command("create table IObML.ds" + local_args.dsnum2 +
-        "_dataTypes like IObML.template_dataTypes", res) < 0) {
+        "_data_types like IObML.template_data_types", res) < 0) {
       log_error2("error: '" + server.error() + "' while trying to create 'ds" +
-          local_args.dsnum2 + "_dataTypes'", F, "iinv", USER);
+          local_args.dsnum2 + "_data_types'", F, "iinv", USER);
     }
   } else {
     if (server._delete("IObML.ds" + local_args.dsnum2 + "_inventory_summary",
@@ -1274,21 +1217,21 @@ void insert_obml_netcdf_time_series_inventory(std::ifstream& ifs, MySQL::Server&
           auto dec = sp[2].substr(0, 3);
           if (dec != l_dec) {
             if (tss.tellp() > 0) {
-              check_for_times_table(server, "timeSeries", l_dec);
+              check_for_times_table(server, "time_series", l_dec);
               string res;
               if (server.command("insert into IObML.ds" + local_args.dsnum2 +
-                  "_timeSeries_times_" + l_dec + "0 values " + tss.str().substr(
-                  1) + " on duplicate key update time_index = values("
+                  "_time_series_times_" + l_dec + "0 values " + tss.str().
+                  substr(1) + " on duplicate key update time_index = values("
                   "time_index), uflag = values(uflag)", res) < 0) {
                 log_error2("error: '" + server.error() + "' while trying to "
                     "insert list of times into IObML.ds" + local_args.dsnum2 +
-                    "_timeSeries_times_" + l_dec + "0", F, "iinv", USER);
+                    "_time_series_times_" + l_dec + "0", F, "iinv", USER);
               }
               server._delete("IObML.ds" + local_args.dsnum2 +
-                  "_timeSeries_times_" + l_dec + "0", "webID_code = " +
+                  "_time_series_times_" + l_dec + "0", "file_code = " +
                   file_code + " and uflag != '" + uflg + "'");
               server.command("analyze NO_WRITE_TO_BINLOG table IObML.ds" +
-                  local_args.dsnum2 + "_timeSeries_times_" + l_dec + "0", res);
+                  local_args.dsnum2 + "_time_series_times_" + l_dec + "0", res);
             }
             tss.str("");
           }
@@ -1313,21 +1256,21 @@ void insert_obml_netcdf_time_series_inventory(std::ifstream& ifs, MySQL::Server&
   }
   ifs.close();
   if (tss.tellp() > 0) {
-    check_for_times_table(server, "timeSeries", l_dec);
+    check_for_times_table(server, "time_series", l_dec);
     string res;
     if (server.command("insert into IObML.ds" + local_args.dsnum2 +
-        "_timeSeries_times_" + l_dec + "0 values " + tss.str().substr(1) +
+        "_time_series_times_" + l_dec + "0 values " + tss.str().substr(1) +
         " on duplicate key update time_index = values(time_index), uflag = "
         "values(uflag)", res) < 0) {
       log_error2("error: '" + server.error() + "' while trying to insert list "
-          "of times into IObML.ds" + local_args.dsnum2 + "_timeSeries_times_" +
+          "of times into IObML.ds" + local_args.dsnum2 + "_time_series_times_" +
           l_dec + "0", F, "iinv", USER);
     }
-    server._delete("IObML.ds" + local_args.dsnum2 + "_timeSeries_times_" +
-        l_dec + "0", "webID_code = " + file_code + " and uflag != '" + uflg +
+    server._delete("IObML.ds" + local_args.dsnum2 + "_time_series_times_" +
+        l_dec + "0", "file_code = " + file_code + " and uflag != '" + uflg +
         "'");
     server.command("analyze NO_WRITE_TO_BINLOG table IObML.ds" + local_args.
-        dsnum2 + "_timeSeries_times_" + l_dec + "0", res);
+        dsnum2 + "_time_series_times_" + l_dec + "0", res);
   }
   stringstream iss;
   auto nbyts = 0;
@@ -1369,7 +1312,7 @@ void insert_obml_netcdf_time_series_inventory(std::ifstream& ifs, MySQL::Server&
                   dve.data->var_name + "''", F, "iinv", USER);
             }
             dmap.emplace(k, row[0]);
-            if (server.insert("IObML.ds" + local_args.dsnum2 + "_dataTypes",
+            if (server.insert("IObML.ds" + local_args.dsnum2 + "_data_types",
                 file_code + ", " + sp_i[0] + ", " + row[0] + ", '" + dve.data->
                 value_type + "', " + itos(dve.data->offset) + ", " + itos(dve.
                 data->byte_len) + ", " + miss + ", '" + uflg + "'", "update "
@@ -1417,15 +1360,15 @@ void insert_obml_netcdf_time_series_inventory(std::ifstream& ifs, MySQL::Server&
       log_error2("error: '" + server.error() + "' while trying to insert "
           "inventory data", F, "iinv", USER);
     }
-    server._delete(ifil, "webID_code = " + file_code + " and uflag != '" + uflg
-        + "'");
+    server._delete(ifil, "file_code = " + file_code + " and uflag != '" + uflg +
+        "'");
     server.command("analyze NO_WRITE_TO_BINLOG table " + ifil, res);
   }
-  server._delete("IObML.ds" + local_args.dsnum2 + "_dataTypes", "webID_code = "
+  server._delete("IObML.ds" + local_args.dsnum2 + "_data_types", "file_code = "
       + file_code + " and uflag != '" + uflg + "'");
   string res;
   server.command("analyze NO_WRITE_TO_BINLOG table IObML.ds" + local_args.
-      dsnum2 + "_dataTypes", res);
+      dsnum2 + "_data_types", res);
   if (server.command("insert into IObML.ds" + local_args.dsnum2 +
       "_inventory_summary values (" + file_code + ", " + itos(nbyts) + ", " +
       itos(ndbyts) + ", '" + uflg + "') on duplicate key update byte_length = "
@@ -1456,9 +1399,9 @@ void insert_obml_netcdf_point_inventory(std::ifstream& ifs, MySQL::Server&
           local_args.dsnum2 + "_inventory_summary'", F, "iinv", USER);
     }
     if (server.command("create table IObML.ds" + local_args.dsnum2 +
-        "_dataTypes like IObML.template_dataTypes", res) < 0) {
+        "_data_types like IObML.template_data_types", res) < 0) {
       log_error2("error: '" + server.error() + "' while trying to create 'ds" +
-          local_args.dsnum2 + "_dataTypes'", F, "iinv", USER);
+          local_args.dsnum2 + "_data_types'", F, "iinv", USER);
     }
   }
   stringstream tss;
@@ -1531,7 +1474,7 @@ void insert_obml_netcdf_point_inventory(std::ifstream& ifs, MySQL::Server&
                     "_point_times_" + l_dec + "0", F, "iinv", USER);
               }
               server._delete("IObML.ds" + local_args.dsnum2 + "_point_times_" +
-                  l_dec + "0", "webID_code = " + file_code + " and uflag != '" +
+                  l_dec + "0", "file_code = " + file_code + " and uflag != '" +
                   uflg + "'");
               server.command("analyze NO_WRITE_TO_BINLOG table IObML.ds" +
                   local_args.dsnum2 + "_point_times_" + l_dec + "0", res);
@@ -1573,7 +1516,7 @@ void insert_obml_netcdf_point_inventory(std::ifstream& ifs, MySQL::Server&
           + "0", F, "iinv", USER);
     }
     server._delete("IObML.ds" + local_args.dsnum2 + "_point_times_" + l_dec +
-        "0", "webID_code = " + file_code + " and uflag != '" + uflg + "'");
+        "0", "file_code = " + file_code + " and uflag != '" + uflg + "'");
     server.command("analyze NO_WRITE_TO_BINLOG table IObML.ds" + local_args.
         dsnum2 + "_point_times_" + l_dec + "0", res);
   }
@@ -1670,12 +1613,12 @@ void insert_obml_netcdf_point_inventory(std::ifstream& ifs, MySQL::Server&
             "inventory data", F, "iinv", USER);
       }
       server._delete("IObML.ds" + local_args.dsnum2 + "_inventory_" + key,
-          "webID_code = " + file_code + " and uflag != '" + uflg + "'");
+          "file_code = " + file_code + " and uflag != '" + uflg + "'");
       server.command("analyze NO_WRITE_TO_BINLOG table IObML.ds" + local_args.
           dsnum2 + "_inventory_" + key, res);
     }
   }
-  if (server.command("insert into IObML.ds" + local_args.dsnum2 + "_dataTypes "
+  if (server.command("insert into IObML.ds" + local_args.dsnum2 + "_data_types "
       "values " + dss.str().substr(1) + " on duplicate key update value_type = "
       "values(value_type), byte_offset = values(byte_offset), byte_length = "
       "values(byte_length), missing_ind = values(missing_ind), uflag = values("
@@ -1683,10 +1626,10 @@ void insert_obml_netcdf_point_inventory(std::ifstream& ifs, MySQL::Server&
     log_error2("error: '" + server.error() + "' while trying to insert "
         "dataType information '" + dss.str() + "'", F, "iinv", USER);
   }
-  server._delete("IObML.ds" + local_args.dsnum2 + "_dataTypes", "webID_code = "
+  server._delete("IObML.ds" + local_args.dsnum2 + "_data_types", "file_code = "
       + file_code + " and uflag != '" + uflg + "'");
   server.command("analyze NO_WRITE_TO_BINLOG table IObML.ds" + local_args.
-      dsnum2 + "_dataTypes", res);
+      dsnum2 + "_data_types", res);
   if (server.command("insert into IObML.ds" + local_args.dsnum2 +
       "_inventory_summary values (" + file_code + ", " + itos(nbyts) + ", " +
       itos(ndbyts) + ", '" + uflg + "') on duplicate key update byte_length = "
@@ -1705,17 +1648,17 @@ void insert_generic_point_inventory(std::ifstream& ifs ,MySQL::Server& server,
   auto uflg = strand(3);
   int mnlat = 99, mnlon = 99, mxlat = -1, mxlon = -1;
   if (!MySQL::table_exists(server, "IObML.ds" + local_args.dsnum2 +
-      "_dataTypesList_b")) {
+      "_data_types_list_b")) {
     string res;
     if (server.command("create table IObML.ds" + local_args.dsnum2 +
-        "_dataTypesList_b like IObML.template_dataTypesList_b", res) < 0) {
+        "_data_types_list_b like IObML.template_data_types_list_b", res) < 0) {
       log_error2("error: '" + server.error() + "' while trying to create 'ds" +
-          local_args.dsnum2 + "_dataTypesList_b'", F, "iinv", USER);
+          local_args.dsnum2 + "_data_types_list_b'", F, "iinv", USER);
     }
     if (server.command("create table IObML.ds" + local_args.dsnum2 +
-        "_dataTypes like IObML.template_dataTypes", res) < 0) {
+        "_data_types like IObML.template_data_types", res) < 0) {
       log_error2("error: '" + server.error() + "' while trying to create 'ds" +
-          local_args.dsnum2 + "_dataTypes'", F, "iinv", USER);
+          local_args.dsnum2 + "_data_types'", F, "iinv", USER);
     }
     if (server.command("create table IObML.ds" + local_args.dsnum2 +
         "_inventory_summary like IObML.template_inventory_summary", res) < 0) {
@@ -1800,8 +1743,8 @@ void insert_generic_point_inventory(std::ifstream& ifs ,MySQL::Server& server,
               scl = "1";
             }
             if (server.insert("IObML.ds" + local_args.dsnum2 +
-                "_dataTypesList_b", row[0] + ", '" + typ + "', " + scl + ", " +
-                sp2[3].substr(1) + ", NULL") < 0) {
+                "_data_types_list_b", row[0] + ", '" + typ + "', " + scl + ", "
+                + sp2[3].substr(1) + ", NULL") < 0) {
               if (!regex_search(server.error(), regex("Duplicate entry"))) {
                 log_error2("error: '" + server.error() + "' while inserting "
                     "row '" + row[0] + ", '" + typ + "', " + scl + ", " + sp2[
@@ -1861,9 +1804,9 @@ void insert_generic_point_inventory(std::ifstream& ifs ,MySQL::Server& server,
           if (server.insert("IObML.ds" + local_args.dsnum2 + "_inventory_" +
               itos(n) + "_" + itos(m) + "_b", file_code + "," + tmap.at(sp[1]) +
               ", " + sp2[0] + ", '" + bmap + "', " + itos(mn) + ", " + itos(mx)
-              + ", '" + sp[0] + "', '" + uflg + "'", "update dataType_codes = '"
-              + bmap + "', byte_offsets = '" + sp[0] + "', uflag = '" + uflg +
-              "'") < 0) {
+              + ", '" + sp[0] + "', '" + uflg + "'", "update data_type_codes = "
+              "'" + bmap + "', byte_offsets = '" + sp[0] + "', uflag = '" + uflg
+              + "'") < 0) {
             log_error2("error: '" + server.error() + "' for insert: '" +
                 file_code + ", " + tmap.at(sp[1]) + ", " + sp2[0] + ", '" +
                 bmap + "', " + itos(mn) + ", " + itos(mx) + ", '" + sp[0] +
@@ -1879,7 +1822,7 @@ void insert_generic_point_inventory(std::ifstream& ifs ,MySQL::Server& server,
   for (int n = mnlat; n <= mxlat; ++n) {
     for (int m = mnlon; m <= mxlon; ++m) {
       server._delete("IObML.ds" + local_args.dsnum2 + "_inventory_" + itos(n) +
-          "_" + itos(m) + "_b","webID_code = " + file_code + " and uflag != '" +
+          "_" + itos(m) + "_b","file_code = " + file_code + " and uflag != '" +
           uflg + "'");
     }
   }
@@ -1894,7 +1837,7 @@ void insert_generic_point_inventory(std::ifstream& ifs ,MySQL::Server& server,
       "file_code = " + file_code + " and uflag != '" + uflg + "'");
   for (const auto& e : dtyps) {
     for (const auto& e2 : *e.second) {
-      if (server.insert("IObML.ds" + local_args.dsnum2 + "_dataTypes",
+      if (server.insert("IObML.ds" + local_args.dsnum2 + "_data_types",
         file_code + ", " + e.first + ", " + itos(e2.first) + ", '', 0, " + itos(
             e2.second) + ", 0, '" + uflg + "'", "update value_type = '', "
             "byte_offset = 0, byte_length = " + itos(e2.second) + ", "
@@ -1905,7 +1848,7 @@ void insert_generic_point_inventory(std::ifstream& ifs ,MySQL::Server& server,
       }
     }
   }
-  server._delete("IObML.ds" + local_args.dsnum2 + "_dataTypes", "webID_code = "
+  server._delete("IObML.ds" + local_args.dsnum2 + "_data_types", "file_code = "
       + file_code + " and uflag != '" + uflg + "'");
 }
 

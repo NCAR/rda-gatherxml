@@ -458,13 +458,6 @@ void create_obml_tables(MarkupParameters *markup_parameters) {
     log_error2("error: '" + markup_parameters->server.error() + "' while "
         "creating table " + tb_base + "_geobounds", F, "scm", USER);
   }
-/*
-  if (markup_parameters->server.command("create table " + tb_base + "_ID_dataTypes like " +
-      markup_parameters->database + ".template_ID_dataTypes", r) < 0) {
-    log_error2("error: '" + markup_parameters->server.error() + "' while creating table " + tb_base
-        + "_ID_dataTypes", F, "scm", USER);
-  }
-*/
 }
 
 void create_fixml_tables(MarkupParameters *markup_parameters) {
@@ -1002,11 +995,11 @@ void *thread_summarize_IDs(void *args) {
       if (ne_lon == "-9990000") {
         ne_lon = "-8388608";
       }
-      auto ID_code = table_code(srv, a[5] + ".ds" + local_args.dsnum2 + "_ids",
+      auto id_code = table_code(srv, a[5] + ".ds" + local_args.dsnum2 + "_ids",
           "id_type_code = " + id_map[idtyp] + " AND id = '" + ID + "' AND "
           "sw_lat = " + sw_lat + " AND sw_lon = " + sw_lon + " AND ne_lat = " +
           ne_lat + " AND ne_lon = " + ne_lon);
-      if (ID_code.empty()) {
+      if (id_code.empty()) {
         log_error2("unable to get id code", F, "scm", USER);
       }
       v = e.attribute_value("start");
@@ -1050,12 +1043,12 @@ void *thread_summarize_IDs(void *args) {
       auto nobs = e.attribute_value("numObs");
       if (srv.insert(a[5] + ".ds" + local_args.dsnum2 + "_id_list", "id_code, "
           "observation_type_code, platform_type_code, file_code, "
-          "num_observations, start_date, end_date, time_zone", ID_code + ", " +
+          "num_observations, start_date, end_date, time_zone", id_code + ", " +
           a[3] + ", " + a[4] + ", " + a[2] + ", " + nobs + ", " + dt1.to_string(
           "%Y%m%d%H%MM%SS") + ", " + dt2.to_string("%Y%m%d%H%MM%SS") + ", " +
           tz, "") < 0) {
         if (srv.error().find("Duplicate entry") == string::npos) {
-          log_error2("'" + srv.error() + "' while inserting '" + ID_code + ", "
+          log_error2("'" + srv.error() + "' while inserting '" + id_code + ", "
               + a[3] + ", " + a[4] + ", " + a[2] + ", " + nobs + ", " + dt1.
               to_string("%Y%m%d%H%MM%SS") + ", " + dt2.to_string(
               "%Y%m%d%H%MM%SS") + ", " + tz + "' into " + a[5] + ".ds" +

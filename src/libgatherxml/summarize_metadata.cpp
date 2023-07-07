@@ -1341,11 +1341,11 @@ void create_file_list_cache(string file_type, string caller, string user, string
         oq.set("select min(start_date), max(end_date) from WObML.ds" + d2 +
             "_webfiles2 where start_date > 0");
       } else if (file_type == "inv") {
-        if (table_exists(mysrv, "IObML.ds" + d2 + "_dataTypes")) {
+        if (table_exists(mysrv, "IObML.ds" + d2 + "_data_types")) {
           oq.set("select min(start_date), max(end_date) from WObML.ds" + d2
-              + "_webfiles2 as w left join (select distinct webID_code from "
-              "IObML.ds" + d2 + "_dataTypes) as d on d.webID_code = w.code "
-              "where !isnull(d.webID_code) and start_date > 0");
+              + "_webfiles2 as w left join (select distinct file_code from "
+              "IObML.ds" + d2 + "_data_types) as d on d.file_code = w.code "
+              "where !isnull(d.file_code) and start_date > 0");
         } else if (table_exists(mysrv, "IObML.ds" + d2 +
             "_inventory_summary")) {
           oq.set("select min(start_date), max(end_date) from WObML.ds" + d2
@@ -1494,9 +1494,9 @@ void create_file_list_cache(string file_type, string caller, string user, string
             "WObML.ds" + d2 + "_data_types as d left join WObML.ds" + d2 +
             "_data_types_list as l on l.code = d.data_type_code left join "
             "WObML.platform_types as p on p.code = l.platform_type_code left "
-            "join (select distinct webID_code from IObML.ds" + d2 +
-            "_dataTypes) as dt on dt.webID_code = d.webID_code where !isnull("
-            "dt.webID_code)");
+            "join (select distinct file_code from IObML.ds" + d2 +
+            "_data_types) as dt on dt.file_code = d.file_code where !isnull(dt."
+            "file_code)");
       }
 #ifdef DUMP_QUERIES
       {

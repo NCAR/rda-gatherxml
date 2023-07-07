@@ -246,9 +246,9 @@ bool remove_from(string database, string table_ext, string file_field_name,
       }
       if (database == "WObML") {
         local_server._delete("I" + database.substr(1) + ".ds" + g_dsnum2 +
-            "_dataTypes", "file_code = " + file_id_code);
+            "_data_types", "file_code = " + file_id_code);
         auto tables = MySQL::table_names(local_server, "I" + database.substr(1),
-            "ds" + g_dsnum2 + "_timeSeries_times_%", error);
+            "ds" + g_dsnum2 + "_time_series_times_%", error);
         for (const auto& table : tables) {
           local_server._delete("I" + database.substr(1) + "." + table,
               "file_code = " + file_id_code);

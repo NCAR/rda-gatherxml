@@ -28,7 +28,7 @@ void summarize_fix_data(std::string caller,std::string user)
   if (server.command("lock tables WFixML.ds"+dsnum2+"_locations write",error) < 0) {
     metautils::log_error(THIS_FUNC+"(): "+server.error(),caller,user);
   }
-  MySQL::LocalQuery locations_query("webID_code,classification_code,start_date,end_date,box1d_row,box1d_bitmap","WFixML.ds"+dsnum2+"_locations");
+  MySQL::LocalQuery locations_query("file_code,classification_code,start_date,end_date,box1d_row,box1d_bitmap","WFixML.ds"+dsnum2+"_locations");
   if (locations_query.submit(server) < 0) {
     metautils::log_error(THIS_FUNC+"(): "+locations_query.error(),caller,user);
   }
