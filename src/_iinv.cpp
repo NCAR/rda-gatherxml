@@ -474,7 +474,7 @@ void rename_indexes(MySQL::Server& server, string table) {
     auto sp2 = split(p, "|");
     auto index_name = sp2[3];
     trim(index_name);
-    if (index_name.find("dsnnnn_inventory_") == 0) {
+    if (index_name.find("dsnnnn_") == 0) {
       auto column = sp2[5];
       trim(column);
       if (index_map.find(index_name) == index_map.end()) {
