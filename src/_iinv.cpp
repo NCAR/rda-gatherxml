@@ -489,6 +489,10 @@ void rename_indexes(MySQL::Server& server, string table) {
   for (const auto& e : index_names) {
     auto index_name = e;
     replace_all(index_name, "dsnnnn_inventory_p", index_prefix);
+    replace_all(index_name, "dsnnnn_inventory_lati_loni", index_prefix);
+    replace_all(index_name, "dsnnnn_point_times_decade", index_prefix);
+    replace_all(index_name, "dsnnnn_time_series_times_decade", index_prefix);
+    replace_all(index_name, "dsnnnn_", index_prefix.substr(0, 7));
     string column_list;
     for (const auto& c : index_map[e]) {
       append(column_list, c, ", ");
