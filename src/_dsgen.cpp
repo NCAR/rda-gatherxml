@@ -179,9 +179,26 @@ void generate_index(string tdir_name) {
     auto ti = e.content();
     tdoc.add_replacement("__TITLE__", ti);
     update_wagtail("dstitle", ti, F);
+    TempDir d;
+    if (!d.create(metautils::directives.temp_path)) {
+      log_error2("unable to create temporary JSON-LD directory", F, "dsgen",
+          USER);
+    }
     if (!metadataExport::export_to_json_ld(ss, metautils::args.dsnum, g_xdoc,
         0)) {
       log_error2("unable to export JSON-LD metadata", F, "dsgen", USER);
+    }
+    std::ofstream ofs_j(d.name() + "/ds" + metautils::args.dsnum + ".jsonld");
+    if (!ofs_j.is_open()) {
+      log_error2("unable to open output for JSON-LD", F, "dsgen", USER);
+    }
+    ofs_j << ss.str();
+    ofs_j.close();
+    string err;
+    if (unixutils::rdadata_sync(d.name(), ".", "/data/web/jsonld", metautils::
+        directives.rdadata_home, err) < 0) {
+      metautils::log_error2("couldn't sync JSON-LD file - rdadata_sync "
+          "error(s): '" + err + "'", F, "dsgen", USER);
     }
     tdoc.add_replacement("__JSON_LD__", ss.str());
     e = g_xdoc.element("dsOverview/logo");
