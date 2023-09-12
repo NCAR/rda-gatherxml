@@ -312,8 +312,8 @@ int main(int argc, char **argv) {
     }
   } else {
     string b = "/glade/u/home/dattore/conf,/glade/scratch/rdadata,/glade/u/"
-        "home/rdadata,/glade/collections/rda/data,/gpfs/fs1/collections/rda/"
-        "work/logs/md";
+        "home/rdadata,/glade/campaign/collections/rda/data,/gpfs/csfs1/"
+        "collections/rda/work/logs/md";
     auto sp = split(metautils::args.args_string, "!");
     if (sp.size() > 0 && sp.back()[0] == '/') {
 
