@@ -19,6 +19,7 @@ using std::regex;
 using std::regex_search;
 using std::string;
 using std::stringstream;
+using strutils::append;
 using strutils::chop;
 using strutils::split;
 using strutils::substitute;
@@ -45,7 +46,7 @@ string whereis_singularity() {
     s = oss.str();
   }
   trim(s);
-  return move(s);
+  return s;
 }
 
 void show_gatherxml_usage() {
@@ -311,17 +312,18 @@ int main(int argc, char **argv) {
       log_error2("unable to find singularity", "main()", util, u);
     }
   } else {
-    string b = "/glade/u/home/dattore/conf,/glade/scratch/rdadata,/glade/u/"
-        "home/rdadata,/glade/campaign/collections/rda/data,/gpfs/csfs1/"
-        "collections/rda/work/logs/md";
+    string binds;
+    for (const auto& bind : metautils::directives.singularity_binds) {
+      append(binds, bind, ",");
+    }
     auto sp = split(metautils::args.args_string, "!");
     if (sp.size() > 0 && sp.back()[0] == '/') {
 
       // test run must specify full path, so bind that path
       auto idx = sp.back().rfind("/");
-      b += "," + sp.back().substr(0, idx);
+      append(binds, sp.back().substr(0, idx), ",");
     }
-    cmd = s + " -s exec -B " + b + " /glade/u/home/rdadata/bin/singularity/"
+    cmd = s + " -s exec -B " + binds + " /glade/u/home/rdadata/bin/singularity/"
         "gatherxml-exec.sif /usr/local/bin/_" + util;
     if (!metautils::args.args_string.empty()) {
       cmd += " " + substitute(metautils::args.args_string, "!", " ");
