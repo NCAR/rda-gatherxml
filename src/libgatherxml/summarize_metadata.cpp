@@ -34,11 +34,12 @@ using std::string;
 using std::stringstream;
 using std::tie;
 using std::tuple;
+using std::to_string;
 using std::unique_ptr;
 using std::unordered_map;
 using std::unordered_set;
 using std::vector;
-using strutils::itos;
+using strutils::append;
 using strutils::replace_all;
 using strutils::split;
 using strutils::substitute;
@@ -114,7 +115,7 @@ void cmd_dates(string database, size_t date_left_padding, vector<CMDDateRange>&
     MySQL::Row row;
     auto b = q.fetch_row(row);
     if (q.num_rows() < 2 && (!b || row[2] == "0")) {
-      auto i = itos(date_left_padding);
+      auto i = to_string(date_left_padding);
       q.set("select lpad(start_date, " + i + ", '0'), lpad(end_date, " + i +
           ", '0'), 0 from " + tbl + " where start_date != 0 order by "
           "start_date, end_date");
@@ -193,32 +194,51 @@ void summarize_dates(string caller, string user) {
 //  cmd_dates("SatML", 14, v, precision);
   MySQL::Server mysrv(metautils::directives.database_server, metautils::
       directives.rdadb_username, metautils::directives.rdadb_password, "dssdb");
-  if (v.size() > 0) {
+  if (!v.empty()) {
+    MySQL::LocalQuery q("select dsid, gindex, dorder, date_start, time_start, "
+        "start_flag, date_end, time_end, end_flag, time_zone from dsperiod "
+        "where dsid = 'ds" + metautils::args.dsnum + "'");
+    if (q.submit(mysrv) < 0) {
+      log_error2("'" + q.error() + "' when trying to create dsperiod cache", F,
+          caller, user);
+    }
+    unordered_set<string> dsperiod_cache;
+    for (const auto& r : q) {
+      dsperiod_cache.emplace("'" + r[0] + "', " + r[1] + ", " + r[2] + ", '" +
+          r[3] + "', '" + r[4] + "', " + r[5] + ", '" + r[6] + "', '" + r[7] +
+          "', " + r[8] + ", '" + r[9] + "'");
+    }
     precision = (precision - 2) / 2;
     vector<CMDDateRange> v2;
     v2.reserve(v.size());
     auto n = 0;
-    auto b = false;
+    auto has_groups = false;
     for (const auto& e : v) {
       v2.emplace_back(e);
       if (v2[n].gindex != "0") {
-        b = true;
+        has_groups = true;
       }
       ++n;
     }
-    if (!b) {
+    if (!has_groups) {
       auto m = 1;
-      mysrv._delete("dsperiod", "dsid = 'ds" + metautils::args.dsnum + "'");
       for (n = v.size() - 1; n >= 0; --n, ++m) {
         DateTime sdt(stoll(v2[n].start));
         DateTime edt(stoll(v2[n].end));
-        string s = "'ds" + metautils::args.dsnum + "', 0, " + itos(m) + ", '" +
-            sdt.to_string("%Y-%m-%d") + "', '" + sdt.to_string("%T") + "', " +
-            itos(precision) + ", '" + edt.to_string("%Y-%m-%d") + "', '" + edt.
-            to_string("%T") + "', " + itos(precision) + ", '" + sdt.to_string(
-            "%Z") + "'";
-        if (mysrv.insert("dsperiod", s) < 0) {
-          if (!regex_search(mysrv.error(), regex("^Duplicate entry"))) {
+        string s = "'ds" + metautils::args.dsnum + "', 0, " + to_string(m) +
+            ", '" + sdt.to_string("%Y-%m-%d") + "', '" + sdt.to_string("%T") +
+            "', " + to_string(precision) + ", '" + edt.to_string("%Y-%m-%d") +
+            "', '" + edt.to_string("%T") + "', " + to_string(precision) + ", '"
+            + sdt.to_string("%Z") + "'";
+        auto it = dsperiod_cache.find(s);
+        if (it != dsperiod_cache.end()) {
+          dsperiod_cache.erase(it);
+        } else {
+          if (mysrv.insert("dsperiod",
+                "dsid, gindex, dorder, date_start, time_start, start_flag, "
+                "date_end, time_end, end_flag, time_zone",
+                s,
+                "") < 0) {
             log_error2("'" + mysrv.error() + "' when trying to insert into "
                 "dsperiod(1) (" + s + ")", F, caller, user);
           }
@@ -238,32 +258,52 @@ void summarize_dates(string caller, string user) {
           return false;
         }
       });
-      mysrv._delete("dsperiod", "dsid = 'ds" + metautils::args.dsnum + "'");
       for (size_t n = 0; n < v.size(); ++n) {
         DateTime sdt(stoll(v2[n].start));
         DateTime edt(stoll(v2[n].end));
         string s = "'ds" + metautils::args.dsnum + "', " + v2[n].gindex + ", " +
-            itos(n) + ", '" + sdt.to_string("%Y-%m-%d") + "', '" + sdt.
-            to_string("%T") + "', " + itos(precision) + ", '" + edt.to_string(
-            "%Y-%m-%d") + "', '" + edt.to_string("%T") + "', " + itos(precision)
-            + ", '" + sdt.to_string("%Z") + "'";
-        if (mysrv.insert("dsperiod", s) < 0) {
-          auto e = mysrv.error();
-          auto n = 0;
-          while (n < 3 && regex_search(e, regex("^Deadlock"))) {
-            e = "";
-            sleep(30);
-            if (mysrv.insert("dsperiod", s) < 0) {
-              e = mysrv.error();
+            to_string(n) + ", '" + sdt.to_string("%Y-%m-%d") + "', '" + sdt.
+            to_string("%T") + "', " + to_string(precision) + ", '" + edt.
+            to_string("%Y-%m-%d") + "', '" + edt.to_string("%T") + "', " +
+            to_string(precision) + ", '" + sdt.to_string("%Z") + "'";
+        auto it = dsperiod_cache.find(s);
+        if (it != dsperiod_cache.end()) {
+          dsperiod_cache.erase(it);
+        } else {
+          if (mysrv.insert("dsperiod",
+                "dsid, gindex, dorder, date_start, time_start, start_flag, "
+                "date_end, time_end, end_flag, time_zone",
+                s,
+                "") < 0) {
+            auto e = mysrv.error();
+            auto n = 0;
+            while (n < 3 && e.find("Deadlock") == 0) {
+              e = "";
+              sleep(30);
+              if (mysrv.insert("dsperiod",
+                    "dsid, gindex, dorder, date_start, time_start, start_flag, "
+                    "date_end, time_end, end_flag, time_zone",
+                    s,
+                    "") < 0) {
+                e = mysrv.error();
+              }
+              ++n;
             }
-            ++n;
-          }
-          if (!e.empty() && !regex_search(e, regex("^Duplicate entry"))) {
-            log_error2("'" + e + "' when trying to insert into dsperiod(2) (" +
-                s + ")", F, caller, user);
+            if (!e.empty()) {
+              log_error2("'" + e + "' when trying to insert into dsperiod(2) ("
+                  + s + ")", F, caller, user);
+            }
           }
         }
       }
+    }
+    for (const auto& e : dsperiod_cache) {
+      auto sp = split(e, ", ");
+      mysrv._delete("dsperiod", "dsid = " + sp[0] + " and gindex = " + sp[1]
+          + " and dorder = " + sp[2] + " and date_start = " + sp[3] + " and "
+          "time_start = " + sp[4] + " and start_flag = " + sp[5] + " and "
+          "date_end = " + sp[6] + " and time_end = " + sp[7] + " and end_flag "
+          "= " + sp[8] + " and time_zone = " + sp[9]);
     }
   }
   mysrv.disconnect();
@@ -429,11 +469,11 @@ unordered_set<string> summarize_frequencies_from_wgrml_by_dataset(MySQL::Server&
       if (u != "singletimestep") {
         auto l = lround(n);
         if (server.insert("WGrML.frequencies", "'" + metautils::args.dsnum +
-            "', " + itos(l) + ", '" + u + "'") < 0) {
+            "', " + to_string(l) + ", '" + u + "'") < 0) {
           if (!regex_search(server.error(), regex("Duplicate entry"))) {
             log_error2("'" + server.error() + "' while trying to insert '" +
-                metautils::args.dsnum + "', " + itos(l) + ", '" + u + "'", F,
-                caller, user);
+                metautils::args.dsnum + "', " + to_string(l) + ", '" + u + "'",
+                F, caller, user);
           }
         } else {
           auto k = searchutils::time_resolution_keyword("irregular", l, u, "");
@@ -548,7 +588,7 @@ unordered_set<string> summarize_frequencies_from_wgrml_by_data_file(MySQL::
           if (u != "singletimestep") {
             k = searchutils::time_resolution_keyword("irregular", lround(d), u,
                 "");
-            f = "irregular<!>" + itos(lround(d)) + "<!>" + u;
+            f = "irregular<!>" + to_string(lround(d)) + "<!>" + u;
           } else if (n > 0) {
             if (nset.find(dt1) == nset.end()) {
               if (dt1 < smin) {
@@ -603,7 +643,7 @@ unordered_set<string> summarize_frequencies_from_wgrml_by_data_file(MySQL::
       if (!k.empty() && sfreq.find(k) == sfreq.end()) {
         sfreq.emplace(k);
       }
-      auto f = "irregular<!>" + itos(lround(d)) + "<!>" + u;
+      auto f = "irregular<!>" + to_string(lround(d)) + "<!>" + u;
       if (!f.empty() && fset.find(f) == fset.end()) {
         fset.emplace(f);
       }
