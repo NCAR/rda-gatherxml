@@ -829,9 +829,6 @@ void summarize_data_formats(string caller, string user) {
       }
 #endif
       string e;
-      if (mysrv.command("lock tables search.formats write", e) < 0) {
-        log_error2("'" + mysrv.error() + "'", F, caller, user);
-      }
       mysrv._delete("search.formats", "dsid = '" + metautils::args.dsnum +
           "' and (vocabulary = '" + nam + "' or vocabulary = 'dssmm')");
       for (const auto& r : q) {
@@ -839,9 +836,6 @@ void summarize_data_formats(string caller, string user) {
           metautils::log_warning("summarize_data_formats() issued warning: " +
               mysrv.error(), caller, user);
         }
-      }
-      if (mysrv.command("unlock tables", e) < 0) {
-        log_error2("'" + mysrv.error() + "'", F, caller, user);
       }
     }
   }
@@ -1994,7 +1988,6 @@ void summarize_locations(string database, string& error) {
     }
   }
   string err;
-  mysrv.command("lock tables search.locations write", err);
   mysrv._delete("search.locations", "dsid = '" + metautils::args.dsnum + "'");
   for (auto e : v) {
     replace_all(e, "'", "\\'");
@@ -2003,10 +1996,6 @@ void summarize_locations(string database, string& error) {
       error = move(mysrv.error());
       return;
     }
-  }
-  if (mysrv.command("unlock tables", err) < 0) {
-    error = move(mysrv.error());
-    return;
   }
   mysrv.disconnect();
 }
