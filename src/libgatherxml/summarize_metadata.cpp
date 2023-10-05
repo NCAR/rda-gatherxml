@@ -238,7 +238,10 @@ void summarize_dates(string caller, string user) {
                 "dsid, gindex, dorder, date_start, time_start, start_flag, "
                 "date_end, time_end, end_flag, time_zone",
                 s,
-                "") < 0) {
+                "update date_start = values(date_start), time_start = values("
+                "time_start), start_flag = values(start_flag), date_end = "
+                "values(date_end), time_end = values(time_end), end_flag = "
+                "values(end_flag), time_zone = values(time_zone)") < 0) {
             log_error2("'" + mysrv.error() + "' when trying to insert into "
                 "dsperiod(1) (" + s + ")", F, caller, user);
           }
@@ -274,7 +277,10 @@ void summarize_dates(string caller, string user) {
                 "dsid, gindex, dorder, date_start, time_start, start_flag, "
                 "date_end, time_end, end_flag, time_zone",
                 s,
-                "") < 0) {
+                "update date_start = values(date_start), time_start = values("
+                "time_start), start_flag = values(start_flag), date_end = "
+                "values(date_end), time_end = values(time_end), end_flag = "
+                "values(end_flag), time_zone = values(time_zone)") < 0) {
             auto e = mysrv.error();
             auto n = 0;
             while (n < 3 && e.find("Deadlock") == 0) {
@@ -284,7 +290,11 @@ void summarize_dates(string caller, string user) {
                     "dsid, gindex, dorder, date_start, time_start, start_flag, "
                     "date_end, time_end, end_flag, time_zone",
                     s,
-                    "") < 0) {
+                    "update date_start = values(date_start), time_start = "
+                    "values(time_start), start_flag = values(start_flag), "
+                    "date_end = values(date_end), time_end = values(time_end), "
+                    "end_flag = values(end_flag), time_zone = values("
+                    "time_zone)") < 0) {
                 e = mysrv.error();
               }
               ++n;
