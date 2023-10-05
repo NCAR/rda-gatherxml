@@ -16,10 +16,7 @@
 #endif
 #include <mutex.hpp>
 
-using MySQL::LocalQuery;
-using MySQL::Query;
-using MySQL::Row;
-using MySQL::Server;
+using namespace MySQL;
 using metautils::log_error2;
 using miscutils::this_function_label;
 using std::cerr;
