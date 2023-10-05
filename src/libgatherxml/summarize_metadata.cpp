@@ -16,6 +16,10 @@
 #endif
 #include <mutex.hpp>
 
+using MySQL::LocalQuery;
+using MySQL::Query;
+using MySQL::Row;
+using MySQL::Server;
 using metautils::log_error2;
 using miscutils::this_function_label;
 using std::cerr;
@@ -33,13 +37,12 @@ using std::stoll;
 using std::string;
 using std::stringstream;
 using std::tie;
-using std::tuple;
 using std::to_string;
+using std::tuple;
 using std::unique_ptr;
 using std::unordered_map;
 using std::unordered_set;
 using std::vector;
-using strutils::append;
 using strutils::replace_all;
 using strutils::split;
 using strutils::substitute;
@@ -84,8 +87,8 @@ CMDDateRange cmd_date_range(string start, string end, string gindex, size_t&
 void cmd_dates(string database, size_t date_left_padding, vector<CMDDateRange>&
      ranges, size_t& precision) {
   static const string F = this_function_label(__func__);
-  MySQL::Server mysrv(metautils::directives.database_server, metautils::
-      directives.metadb_username, metautils::directives.metadb_password, "");
+  Server mysrv(metautils::directives.database_server, metautils::directives.
+      metadb_username, metautils::directives.metadb_password, "");
   if (!mysrv) {
     myerror = "Error: unable to connect to metadata server";
     exit(1);
@@ -93,10 +96,10 @@ void cmd_dates(string database, size_t date_left_padding, vector<CMDDateRange>&
   string tbl = database + ".ds" + substitute(metautils::args.dsnum, ".", "") +
       "_webfiles2";
   if (table_exists(mysrv, tbl)) {
-    MySQL::LocalQuery q("select min(w.start_date), max(w.end_date), wf.gindex "
-        "from " + tbl + " as w left join dssdb.wfile as wf on wf.wfile = w.id "
-        "where wf.dsid = 'ds" + metautils::args.dsnum + "' and wf.type = 'D' "
-        "and wf.status = 'P' and w.start_date > 0 group by wf.gindex");
+    LocalQuery q("select min(w.start_date), max(w.end_date), wf.gindex from " +
+        tbl + " as w left join dssdb.wfile as wf on wf.wfile = w.id where wf."
+        "dsid = 'ds" + metautils::args.dsnum + "' and wf.type = 'D' and wf."
+        "status = 'P' and w.start_date > 0 group by wf.gindex");
 #ifdef DUMP_QUERIES
     {
     Timer tm;
@@ -112,7 +115,7 @@ void cmd_dates(string database, size_t date_left_padding, vector<CMDDateRange>&
         show() << endl;
     }
 #endif
-    MySQL::Row row;
+    Row row;
     auto b = q.fetch_row(row);
     if (q.num_rows() < 2 && (!b || row[2] == "0")) {
       auto i = to_string(date_left_padding);
@@ -192,10 +195,10 @@ void summarize_dates(string caller, string user) {
   cmd_dates("WObML", 8, v, precision);
   cmd_dates("WFixML", 12, v, precision);
 //  cmd_dates("SatML", 14, v, precision);
-  MySQL::Server mysrv(metautils::directives.database_server, metautils::
-      directives.rdadb_username, metautils::directives.rdadb_password, "dssdb");
+  Server mysrv(metautils::directives.database_server, metautils::directives.
+      rdadb_username, metautils::directives.rdadb_password, "dssdb");
   if (!v.empty()) {
-    MySQL::LocalQuery q("select dsid, gindex, dorder, date_start, time_start, "
+    LocalQuery q("select dsid, gindex, dorder, date_start, time_start, "
         "start_flag, date_end, time_end, end_flag, time_zone from dsperiod "
         "where dsid = 'ds" + metautils::args.dsnum + "'");
     if (q.submit(mysrv) < 0) {
@@ -235,13 +238,13 @@ void summarize_dates(string caller, string user) {
           dsperiod_cache.erase(it);
         } else {
           if (mysrv.insert("dsperiod",
-                "dsid, gindex, dorder, date_start, time_start, start_flag, "
-                "date_end, time_end, end_flag, time_zone",
-                s,
-                "update date_start = values(date_start), time_start = values("
-                "time_start), start_flag = values(start_flag), date_end = "
-                "values(date_end), time_end = values(time_end), end_flag = "
-                "values(end_flag), time_zone = values(time_zone)") < 0) {
+              "dsid, gindex, dorder, date_start, time_start, start_flag, "
+              "date_end, time_end, end_flag, time_zone",
+              s,
+              "update date_start = values(date_start), time_start = values("
+              "time_start), start_flag = values(start_flag), date_end = "
+              "values(date_end), time_end = values(time_end), end_flag = "
+              "values(end_flag), time_zone = values(time_zone)") < 0) {
             log_error2("'" + mysrv.error() + "' when trying to insert into "
                 "dsperiod(1) (" + s + ")", F, caller, user);
           }
@@ -274,27 +277,27 @@ void summarize_dates(string caller, string user) {
           dsperiod_cache.erase(it);
         } else {
           if (mysrv.insert("dsperiod",
-                "dsid, gindex, dorder, date_start, time_start, start_flag, "
-                "date_end, time_end, end_flag, time_zone",
-                s,
-                "update date_start = values(date_start), time_start = values("
-                "time_start), start_flag = values(start_flag), date_end = "
-                "values(date_end), time_end = values(time_end), end_flag = "
-                "values(end_flag), time_zone = values(time_zone)") < 0) {
+              "dsid, gindex, dorder, date_start, time_start, start_flag, "
+              "date_end, time_end, end_flag, time_zone",
+              s,
+              "update date_start = values(date_start), time_start = values("
+              "time_start), start_flag = values(start_flag), date_end = "
+              "values(date_end), time_end = values(time_end), end_flag = "
+              "values(end_flag), time_zone = values(time_zone)") < 0) {
             auto e = mysrv.error();
             auto n = 0;
             while (n < 3 && e.find("Deadlock") == 0) {
               e = "";
               sleep(30);
               if (mysrv.insert("dsperiod",
-                    "dsid, gindex, dorder, date_start, time_start, start_flag, "
-                    "date_end, time_end, end_flag, time_zone",
-                    s,
-                    "update date_start = values(date_start), time_start = "
-                    "values(time_start), start_flag = values(start_flag), "
-                    "date_end = values(date_end), time_end = values(time_end), "
-                    "end_flag = values(end_flag), time_zone = values("
-                    "time_zone)") < 0) {
+                  "dsid, gindex, dorder, date_start, time_start, start_flag, "
+                  "date_end, time_end, end_flag, time_zone",
+                  s,
+                  "update date_start = values(date_start), time_start = "
+                  "values(time_start), start_flag = values(start_flag), "
+                  "date_end = values(date_end), time_end = values(time_end), "
+                  "end_flag = values(end_flag), time_zone = values("
+                  "time_zone)") < 0) {
                 e = mysrv.error();
               }
               ++n;
@@ -319,8 +322,8 @@ void summarize_dates(string caller, string user) {
   mysrv.disconnect();
 }
 
-bool inserted_time_resolution_keyword(MySQL::Server& server, string database,
-    string keyword, string& error) {
+bool inserted_time_resolution_keyword(Server& server, string database, string
+    keyword, string& error) {
   if (server.insert("search.time_resolutions", "'" + keyword + "', 'GCMD', '" +
       metautils::args.dsnum + "', '" + database + "'") < 0) {
     auto e = server.error();
@@ -417,13 +420,13 @@ pair<string, string> gridded_frequency_data(string time_range) {
   return data;
 }
 
-unordered_set<string> summarize_frequencies_from_wgrml_by_dataset(MySQL::Server&
+unordered_set<string> summarize_frequencies_from_wgrml_by_dataset(Server&
     server, string caller, string user) {
   static const string F = this_function_label(__func__);
   unordered_set<string> sfreq; // return value
   auto ds = substitute(metautils::args.dsnum, ".", "");
-  MySQL::LocalQuery q("select distinct frequency_type, nsteps_per, unit from "
-      "WGrML.ds" + ds + "_frequencies where nsteps_per > 0");
+  LocalQuery q("select distinct frequency_type, nsteps_per, unit from WGrML.ds"
+      + ds + "_frequencies where nsteps_per > 0");
 #ifdef DUMP_QUERIES
   {
   Timer tm;
@@ -499,16 +502,16 @@ unordered_set<string> summarize_frequencies_from_wgrml_by_dataset(MySQL::Server&
   return sfreq;
 }
 
-unordered_set<string> summarize_frequencies_from_wgrml_by_data_file(MySQL::
-    Server& server, string file_id_code, string caller, string user) {
+unordered_set<string> summarize_frequencies_from_wgrml_by_data_file(Server&
+    server, string file_id_code, string caller, string user) {
   static const string F = this_function_label(__func__);
   unordered_set<string> sfreq; // return value
   auto ds = substitute(metautils::args.dsnum, ".", "");
 
   // get all of the time ranges for the given file id
-  MySQL::LocalQuery qt("select time_range_code, min(start_date), max("
-      "end_date), sum(nsteps) from WGrML.ds" + ds + "_grids2 where file_code = "
-      + file_id_code + " group by time_range_code, parameter");
+  LocalQuery qt("select time_range_code, min(start_date), max(end_date), sum("
+      "nsteps) from WGrML.ds" + ds + "_grids2 where file_code = " + file_id_code
+      + " group by time_range_code, parameter");
 #ifdef DUMP_QUERIES
   {
   Timer tm;
@@ -525,7 +528,7 @@ unordered_set<string> summarize_frequencies_from_wgrml_by_data_file(MySQL::
 #endif
 
   // create a map of time range codes and their descriptions
-  MySQL::LocalQuery qc("code, time_range", "WGrML.time_ranges");
+  LocalQuery qc("code, time_range", "WGrML.time_ranges");
 #ifdef DUMP_QUERIES
   {
   Timer tm;
@@ -698,8 +701,8 @@ unordered_set<string> summarize_frequencies_from_wgrml_by_data_file(MySQL::
   return sfreq;
 }
 
-unordered_set<string> summarize_frequencies_from_wgrml(MySQL::Server& server,
-    string file_id_code, string caller, string user) {
+unordered_set<string> summarize_frequencies_from_wgrml(Server& server, string
+    file_id_code, string caller, string user) {
   if (file_id_code.empty()) {
 
     // no file id provided, summarize for full dataset
@@ -713,13 +716,13 @@ unordered_set<string> summarize_frequencies_from_wgrml(MySQL::Server& server,
   }
 }
 
-unordered_set<string> summarize_frequencies_from_wobml(MySQL::Server& server,
-    string file_id_code, string caller, string user) {
+unordered_set<string> summarize_frequencies_from_wobml(Server& server, string
+    file_id_code, string caller, string user) {
   static const string F = this_function_label(__func__);
   unordered_set<string> fset;
-  MySQL::LocalQuery q("select min(min_obs_per), max(max_obs_per), unit from "
-      "ObML.ds" + substitute(metautils::args.dsnum, ".", "") + "_frequencies "
-      "group by unit");
+  LocalQuery q("select min(min_obs_per), max(max_obs_per), unit from ObML.ds" +
+      substitute(metautils::args.dsnum, ".", "") + "_frequencies group by "
+      "unit");
 #ifdef DUMP_QUERIES
   {
   Timer tm;
@@ -773,13 +776,13 @@ unordered_set<string> summarize_frequencies_from_wobml(MySQL::Server& server,
 }
 
 void summarize_frequencies(string caller, string user, string file_id_code) {
-  vector<pair<string, unordered_set<string>(*)(MySQL::Server&, string, string,
+  vector<pair<string, unordered_set<string>(*)(Server&, string, string,
       string)>> v{
     make_pair("WGrML", summarize_frequencies_from_wgrml),
     make_pair("WObML", summarize_frequencies_from_wobml),
   };
-  MySQL::Server mysrv(metautils::directives.database_server, metautils::
-      directives.metadb_username, metautils::directives.metadb_password, "");
+  Server mysrv(metautils::directives.database_server, metautils::directives.
+      metadb_username, metautils::directives.metadb_password, "");
   for (const auto& e : v) {
     auto t = e.first + ".ds" + substitute(metautils::args.dsnum, ".", "") +
         "_frequencies";
@@ -804,16 +807,16 @@ void summarize_data_formats(string caller, string user) {
   if (dblst.size() == 0) {
     log_error2("empty CMD database list", F, caller, user);
   }
-  MySQL::Server mysrv(metautils::directives.database_server, metautils::
-      directives.metadb_username, metautils::directives.metadb_password, "");
+  Server mysrv(metautils::directives.database_server, metautils::directives.
+      metadb_username, metautils::directives.metadb_password, "");
   for (const auto& db : dblst) {
     string nam, typ;
     tie(nam, typ) = db;
     auto t = nam + ".ds" + substitute(metautils::args.dsnum, ".", "") +
         "_webfiles2";
     if (t[0] != 'V' && table_exists(mysrv, t)) {
-      MySQL::LocalQuery q("select distinct f.format from " + t + " as p left "
-          "join " + nam + ".formats as f on f.code = p.format_code");
+      LocalQuery q("select distinct f.format from " + t + " as p left join " +
+          nam + ".formats as f on f.code = p.format_code");
 #ifdef DUMP_QUERIES
       {
       Timer tm;
@@ -854,14 +857,14 @@ void create_non_cmd_file_list_cache(string file_type, unordered_set<string>&
 
   // random sleep to minimize collisions from concurrent processes
   sleep(getpid() % 15);
-  MySQL::Server mysrv(metautils::directives.database_server, metautils::
-      directives.rdadb_username, metautils::directives.rdadb_password, "dssdb");
+  Server mysrv(metautils::directives.database_server, metautils::directives.
+      rdadb_username, metautils::directives.rdadb_password, "dssdb");
   if (!mysrv) {
     log_error2("error connecting to database: '" + mysrv.error() + "'", F,
         caller, user);
   }
-  MySQL::LocalQuery q("version", "dataset", "dsid = 'ds" + metautils::args.
-     dsnum + "'");
+  LocalQuery q("version", "dataset", "dsid = 'ds" + metautils::args.dsnum +
+      "'");
 #ifdef DUMP_QUERIES
   {
   Timer tm;
@@ -876,7 +879,7 @@ void create_non_cmd_file_list_cache(string file_type, unordered_set<string>&
       << endl;
   }
 #endif
-  MySQL::Row row;
+  Row row;
   if (!q.fetch_row(row)) {
     log_error2("unable to get dataset version", F, caller, user);
   }
@@ -954,12 +957,12 @@ void create_non_cmd_file_list_cache(string file_type, unordered_set<string>&
   mysrv.disconnect();
 }
 
-void fill_gindex_map(MySQL::Server& server, Mutex& g_mutex, unique_ptr<
-     unordered_map<string, string>>& gindex_map, string caller, string user) {
+void fill_gindex_map(Server& server, Mutex& g_mutex, unique_ptr<unordered_map<
+    string, string>>& gindex_map, string caller, string user) {
   static const string F = this_function_label(__func__);
   if (gindex_map == nullptr && !g_mutex.is_locked()) {
     g_mutex.lock();
-    MySQL::Query q("select gindex, grpid from dssdb.dsgroup where dsid = 'ds" +
+    Query q("select gindex, grpid from dssdb.dsgroup where dsid = 'ds" +
         metautils::args.dsnum + "'");
 #ifdef DUMP_QUERIES
     {
@@ -986,10 +989,10 @@ void fill_gindex_map(MySQL::Server& server, Mutex& g_mutex, unique_ptr<
   }
 }
 
-void fill_data_formats_table(MySQL::Server& server, string db, unordered_map<
-    string, string>& data_formats, string caller, string user) {
+void fill_data_formats_table(Server& server, string db, unordered_map<string,
+    string>& data_formats, string caller, string user) {
   static const string F = this_function_label(__func__);
-  MySQL::Query q("select code, format from " + db + ".formats");
+  Query q("select code, format from " + db + ".formats");
 #ifdef DUMP_QUERIES
   {
   Timer tm;
@@ -1020,10 +1023,9 @@ struct FileEntry {
   string group_id;
 };
 
-void get_file_data(MySQL::Server& server, MySQL::Query& query, string unit,
-    string unit_plural, unordered_map<string, string>& gindex_map,
-    unordered_map<string, string>& data_formats, unordered_map<string,
-    FileEntry>& table) {
+void get_file_data(Server& server, Query& query, string unit, string
+    unit_plural, unordered_map<string, string>& gindex_map, unordered_map<
+    string, string>& data_formats, unordered_map<string, FileEntry>& table) {
   for (const auto& row : query) {
     FileEntry fe;
     fe.data_format = data_formats.find(row[1])->second;
@@ -1055,8 +1057,8 @@ void grml_file_data(string file_type, unordered_map<string, string>&
     caller, string& user) {
   static const string F = this_function_label(__func__);
   auto d = substitute(metautils::args.dsnum, ".", "");
-  MySQL::Server mysrv(metautils::directives.database_server, metautils::
-      directives.metadb_username, metautils::directives.metadb_password, "");
+  Server mysrv(metautils::directives.database_server, metautils::directives.
+      metadb_username, metautils::directives.metadb_password, "");
   if (!mysrv) {
     log_error2("'" + mysrv.error() + "' while trying to connect", F, caller,
         user);
@@ -1065,7 +1067,7 @@ void grml_file_data(string file_type, unordered_map<string, string>&
   if (m.empty()) {
     fill_data_formats_table(mysrv, "WGrML", m, caller, user);
   }
-  MySQL::Query q;
+  Query q;
     q.set("select id, format_code, num_grids, start_date, end_date, gindex, "
         "file_format, data_size from WGrML.ds" + d + "_webfiles2 as w left "
         "join dssdb.wfile as d on d.wfile = w.id where d.dsid = 'ds" +
@@ -1094,17 +1096,17 @@ void obml_file_data(string file_type, unordered_map<string, string>&
     gindex_map, unordered_map<string,  FileEntry>& obml_file_data_table, string&
     caller, string& user) {
   static const string F = this_function_label(__func__);
-  MySQL::Server mysrv(metautils::directives.database_server, metautils::
-      directives.metadb_username, metautils::directives.metadb_password, "");
+  Server mysrv(metautils::directives.database_server, metautils::directives.
+      metadb_username, metautils::directives.metadb_password, "");
   static unordered_map<string, string> map;
   if (map.empty()) {
     fill_data_formats_table(mysrv, "WObML", map, caller, user);
   }
-  MySQL::Query q("select id, format_code, num_observations, start_date, "
-      "end_date, gindex, file_format, data_size from WObML.ds" + substitute(
-      metautils::args.dsnum, ".", "") + "_webfiles2 as w left join dssdb."
-      "wfile as d on d.wfile = w.id where d.dsid = 'ds" + metautils::args.dsnum
-      + "' and d.type = 'D' and d.status = 'P' and num_observations > 0");
+  Query q("select id, format_code, num_observations, start_date, end_date, "
+      "gindex, file_format, data_size from WObML.ds" + substitute(metautils::
+      args.dsnum, ".", "") + "_webfiles2 as w left join dssdb.wfile as d on d."
+      "wfile = w.id where d.dsid = 'ds" + metautils::args.dsnum + "' and d."
+      "type = 'D' and d.status = 'P' and num_observations > 0");
 #ifdef DUMP_QUERIES
   {
   Timer tm;
@@ -1131,8 +1133,8 @@ void fixml_file_data(string file_type, unordered_map<string, string>&
   static const string F = this_function_label(__func__);
   FileEntry fe;
 
-  MySQL::Server mysrv(metautils::directives.database_server, metautils::
-      directives.metadb_username, metautils::directives.metadb_password, "");
+  Server mysrv(metautils::directives.database_server, metautils::directives.
+      metadb_username, metautils::directives.metadb_password, "");
   if (!mysrv) {
     log_error2("'" + mysrv.error() + "' while trying to connect", F, caller,
         user);
@@ -1141,11 +1143,11 @@ void fixml_file_data(string file_type, unordered_map<string, string>&
   if (data_formats.empty()) {
     fill_data_formats_table(mysrv, "WFixML", data_formats, caller, user);
   }
-  MySQL::Query q("select id, format_code, num_fixes, start_date, end_date, "
-      "gindex, file_format, data_size from WFixML.ds" + substitute(metautils::
-      args.dsnum, ".", "") + "_webfiles2 as w left join dssdb.wfile as d on "
-      "d.wfile = w.id where d.dsid = 'ds" + metautils::args.dsnum + "' and d."
-      "type = 'D' and d.status = 'P' and num_fixes > 0");
+  Query q("select id, format_code, num_fixes, start_date, end_date, gindex, "
+      "file_format, data_size from WFixML.ds" + substitute(metautils::args.
+      dsnum, ".", "") + "_webfiles2 as w left join dssdb.wfile as d on d.wfile "
+      "= w.id where d.dsid = 'ds" + metautils::args.dsnum + "' and d.type = "
+      "'D' and d.status = 'P' and num_fixes > 0");
 #ifdef DUMP_QUERIES
   {
   Timer tm;
@@ -1180,8 +1182,8 @@ void write_grml_parameters(string file_type, string tindex, ofstream& ofs,
     log_error2("unsupported file type '" + file_type + "'", F, caller, user);
   }
   string d2 = substitute(metautils::args.dsnum, ".", "");
-  MySQL::Server mysrv(metautils::directives.database_server, metautils::
-      directives.metadb_username, metautils::directives.metadb_password, "");
+  Server mysrv(metautils::directives.database_server, metautils::directives.
+      metadb_username, metautils::directives.metadb_password, "");
   if (!mysrv) {
     log_error2("'" + mysrv.error() + "' while trying to connect", F, caller,
         user);
@@ -1193,7 +1195,7 @@ void write_grml_parameters(string file_type, string tindex, ofstream& ofs,
   static unordered_set<string> invs;
   static string idsel = "";
   if (file_type == "inv" && invs.empty()) {
-    MySQL::LocalQuery q("file_code, dupe_vdates", "IGrML.ds" + d2 +
+    LocalQuery q("file_code, dupe_vdates", "IGrML.ds" + d2 +
         "_inventory_summary");
 #ifdef DUMP_QUERIES
     {
@@ -1223,9 +1225,9 @@ void write_grml_parameters(string file_type, string tindex, ofstream& ofs,
   auto fkey = d2 + ":" + tindex;
   if (ffmap[fkey].empty()) {
     if (!tindex.empty()) {
-      MySQL::LocalQuery q("wfile", "dssdb.wfile", "dsid = 'ds" + metautils::
-          args.dsnum + "' and tindex = " + tindex + " and " + "type = 'D' and "
-          "status = 'P'");
+      LocalQuery q("wfile", "dssdb.wfile", "dsid = 'ds" + metautils::args.dsnum
+          + "' and tindex = " + tindex + " and " + "type = 'D' and status = "
+          "'P'");
 #ifdef DUMP_QUERIES
       {
       Timer tm;
@@ -1245,8 +1247,7 @@ void write_grml_parameters(string file_type, string tindex, ofstream& ofs,
         rdafs[tindex].emplace(r[0]);
       }
     }
-    MySQL::LocalQuery q("code, id, format_code", "WGrML.ds" + d2 +
-        "_webfiles2");
+    LocalQuery q("code, id, format_code", "WGrML.ds" + d2 + "_webfiles2");
 #ifdef DUMP_QUERIES
     {
     Timer tm;
@@ -1273,8 +1274,8 @@ void write_grml_parameters(string file_type, string tindex, ofstream& ofs,
   static vector<tuple<string, string, string, string>> parameter_data;
   if (parameter_data.empty() && !pd_mutex.is_locked()) {
     pd_mutex.lock();
-    MySQL::LocalQuery qs("parameter, start_date, end_date, file_code", "WGrML."
-        "ds" + d2 + "_agrids2");
+    LocalQuery qs("parameter, start_date, end_date, file_code", "WGrML.ds" + d2
+        + "_agrids2");
 #ifdef DUMP_QUERIES
     {
     Timer tm;
@@ -1364,13 +1365,13 @@ void create_file_list_cache(string file_type, string caller, string user, string
     tindex) {
   static const string F = this_function_label(__func__);
   auto d2 = substitute(metautils::args.dsnum, ".", "");
-  MySQL::Server mysrv(metautils::directives.database_server, metautils::
-      directives.metadb_username, metautils::directives.metadb_password, "");
+  Server mysrv(metautils::directives.database_server, metautils::directives.
+      metadb_username, metautils::directives.metadb_password, "");
   static Mutex g_mutex;
   static unique_ptr<unordered_map<string, string>> gmap;
   fill_gindex_map(mysrv, g_mutex, gmap, caller, user);
   unordered_map<string, FileEntry> grmlmap, obmlmap, fixmlmap;
-  MySQL::LocalQuery oq, sq;
+  LocalQuery oq, sq;
   auto b = false;
   if (file_type == "Web" || file_type == "inv") {
     if (table_exists(mysrv, "WGrML.ds" + d2 + "_webfiles2")) {
@@ -1494,7 +1495,7 @@ void create_file_list_cache(string file_type, string caller, string user, string
         show() << endl;
     }
 #endif
-    MySQL::Row row;
+    Row row;
     oq.fetch_row(row);
     string f;
     if (!row[0].empty() && !row[1].empty()) {
@@ -1569,7 +1570,7 @@ void create_file_list_cache(string file_type, string caller, string user, string
       }
 
       // data types and formats
-      MySQL::LocalQuery q;
+      LocalQuery q;
       if (file_type == "Web" || file_type == "inv") {
         q.set("select distinct f.format from WObML.ds" + d2 + "_webfiles2 as w "
             "left join WObML.formats as f on f.code = w.format_code");
@@ -1877,11 +1878,11 @@ void summarize_locations(string database, string& error) {
   static const string F = this_function_label(__func__);
   error = "";
   string d2 = substitute(metautils::args.dsnum, ".", "");
-  MySQL::Server mysrv(metautils::directives.database_server, metautils::
-      directives.metadb_username, metautils::directives.metadb_password, "");
+  Server mysrv(metautils::directives.database_server, metautils::directives.
+      metadb_username, metautils::directives.metadb_password, "");
 
   // get all location names that are NOT included
-  MySQL::LocalQuery q("distinct gcmd_keyword", database + ".ds" + d2 +
+  LocalQuery q("distinct gcmd_keyword", database + ".ds" + d2 +
       "_location_names", "include = 'N'");
 #ifdef DUMP_QUERIES
   {
@@ -1902,8 +1903,8 @@ void summarize_locations(string database, string& error) {
   for (const auto& row : q) {
     auto s = row[0];
     replace_all(s, "'", "\\'");
-    MySQL::LocalQuery qn("name", "search.political_boundaries", "name like '" +
-        s + " >%'");
+    LocalQuery qn("name", "search.political_boundaries", "name like '" + s +
+        " >%'");
 #ifdef DUMP_QUERIES
     {
     Timer tm;
@@ -1959,8 +1960,8 @@ void summarize_locations(string database, string& error) {
   for (const auto& row : q) {
     auto s = row[0];
     replace_all(s, "'", "\\'");
-    MySQL::LocalQuery qn("name", "search.political_boundaries", "name like '" +
-        s + " >%'");
+    LocalQuery qn("name", "search.political_boundaries", "name like '" + s +
+        " >%'");
 #ifdef DUMP_QUERIES
     {
     Timer tm;
