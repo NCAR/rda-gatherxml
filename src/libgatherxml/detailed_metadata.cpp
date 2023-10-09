@@ -21,6 +21,7 @@
 #include <timer.hpp>
 #endif
 
+using namespace MySQL;
 using metautils::log_error2;
 using miscutils::this_function_label;
 using std::cerr;
@@ -210,9 +211,9 @@ bool compare_layers(const string& left, const string& right) {
 void fill_level_code_map(unordered_map<size_t, tuple<string, string, string>>&
     level_code_map) {
   static const string F = this_function_label(__func__);
-  MySQL::Server mysrv(metautils::directives.database_server, metautils::
-      directives.metadb_username, metautils::directives.metadb_password, "");
-  MySQL::LocalQuery q("code, map, type, value", "WGrML.levels");
+  Server mysrv(metautils::directives.database_server, metautils::directives.
+      metadb_username, metautils::directives.metadb_password, "");
+  LocalQuery q("code, map, type, value", "WGrML.levels");
 #ifdef DUMP_QUERIES
   {
   Timer tm;
@@ -247,10 +248,10 @@ void generate_parameter_cross_reference(string format, string title, string
   if (mysystem2("/bin/mkdir -p " + t.name() + "/metadata", oss, ess) != 0) {
     log_error2("unable to create temporary directory tree", F, caller, user);
   }
-  MySQL::Server mysrv(metautils::directives.database_server, metautils::
-      directives.metadb_username, metautils::directives.metadb_password, "");
-  MySQL::LocalQuery q("select distinct parameter from WGrML.summary as s left "
-      "join WGrML.formats as f on f.code = s.format_code where s.dsid = '" +
+  Server mysrv(metautils::directives.database_server, metautils::directives.
+      metadb_username, metautils::directives.metadb_password, "");
+  LocalQuery q("select distinct parameter from WGrML.summary as s left join "
+      "WGrML.formats as f on f.code = s.format_code where s.dsid = '" +
       metautils::args.dsnum + "' and f.format = '" + format + "'");
 #ifdef DUMP_QUERIES
   {
@@ -414,11 +415,11 @@ void generate_level_cross_reference(string format, string title, string
   static const string F = this_function_label(__func__);
   unordered_map<size_t, tuple<string, string, string>> lcmap;
   fill_level_code_map(lcmap);
-  MySQL::Server mysrv(metautils::directives.database_server, metautils::
-      directives.metadb_username, metautils::directives.metadb_password, "");
-  MySQL::LocalQuery q("select distinct level_type_codes from WGrML.summary as s "
-      "left join WGrML.formats as f on f.code = s.format_code where s.dsid = '"
-      + metautils::args.dsnum + "' and f.format = '" + format + "'");
+  Server mysrv(metautils::directives.database_server, metautils::directives.
+      metadb_username, metautils::directives.metadb_password, "");
+  LocalQuery q("select distinct level_type_codes from WGrML.summary as s left "
+      "join WGrML.formats as f on f.code = s.format_code where s.dsid = '" +
+      metautils::args.dsnum + "' and f.format = '" + format + "'");
 #ifdef DUMP_QUERIES
   {
   Timer tm;
@@ -558,14 +559,14 @@ void add_to_formats(XMLDocument& xdoc, string database, string primaries_table,
     vector<pair<string, string>>& format_list, string& formats, string caller,
     string user) {
   static const string F = this_function_label(__func__);
-  MySQL::Server mysrv(metautils::directives.database_server, metautils::
-      directives.metadb_username, metautils::directives.metadb_password, "");
+  Server mysrv(metautils::directives.database_server, metautils::directives.
+      metadb_username, metautils::directives.metadb_password, "");
   if (!mysrv) {
     log_error2("unable to connect to metadata server", F, caller, user);
   }
-  MySQL::LocalQuery q("select distinct f.format, f.code from " + database +
-      ".formats as f left join " + primaries_table + " as p on p.format_code = "
-      "f.code where !isnull(p.format_code)");
+  LocalQuery q("select distinct f.format, f.code from " + database + ".formats "
+      "as f left join " + primaries_table + " as p on p.format_code = f.code "
+      "where p.format_code is not null");
 #ifdef DUMP_QUERIES
   {
   Timer tm;
@@ -601,7 +602,7 @@ void add_to_formats(XMLDocument& xdoc, string database, string primaries_table,
   }
 }
 
-string parameter_query(MySQL::Server& mysrv, string format_code, size_t
+string parameter_query(Server& mysrv, string format_code, size_t
     format_query_result_size) {
   auto d2 = substitute(metautils::args.dsnum, ".", "");
   if (format_query_result_size > 1) {
@@ -614,7 +615,7 @@ string parameter_query(MySQL::Server& mysrv, string format_code, size_t
       "from WGrML.ds" + d2 + "_agrids2 group by parameter, level_type_codes";
 }
 
-string time_range_query(MySQL::Server& mysrv, string format_code) {
+string time_range_query(Server& mysrv, string format_code) {
   auto d2 = substitute(metautils::args.dsnum, ".", "");
   return "select distinct t.time_range, d.definition, d.def_params from WGrML."
       "summary as s left join WGrML.time_ranges as t on t.code = s."
@@ -739,12 +740,11 @@ void write_grid_html(ofstream& ofs, size_t num_products) {
       endl;
 }
 
-void generate_gridded_product_detail(MySQL::Server& mysrv, string file_type,
-    const vector<pair<string, string>>& format_list, TempDir& tdir, string
-    caller, string user) {
+void generate_gridded_product_detail(Server& mysrv, string file_type, const
+    vector<pair<string, string>>& format_list, TempDir& tdir, string caller,
+    string user) {
   static const string F = this_function_label(__func__);
-  MySQL::LocalQuery q;
-  q.set("time_range, code", "WGrML.time_ranges");
+  LocalQuery q("time_range, code", "WGrML.time_ranges");
 #ifdef DUMP_QUERIES
   {
   Timer tm;
@@ -788,7 +788,7 @@ void generate_gridded_product_detail(MySQL::Server& mysrv, string file_type,
     log_error2("unable to open output for product detail", F, caller, user);
   }
   for (const auto& fp : format_list) {
-    MySQL::Query qs;
+    Query qs;
     auto d2 = substitute(metautils::args.dsnum, ".", "");
     if (format_list.size() > 1) {
       qs.set("select a.time_range_codes, a.grid_definition_codes, min(a."
@@ -891,7 +891,7 @@ void generate_gridded_product_detail(MySQL::Server& mysrv, string file_type,
           "grids in this format.  Click a product description to see the "
           "available parameters and levels for that product.";
     } else {
-      MySQL::Row row;
+      Row row;
       q.fetch_row(row);
       vector<size_t> lv;
       bitmap::uncompress_values(row[1], lv);
@@ -997,9 +997,9 @@ void generate_detailed_grid_summary(string file_type, ofstream& ofs, const
   unordered_map<size_t, LevelSummary> lsmap;
   unordered_map<size_t, tuple<string, string, string>> lcmap;
   fill_level_code_map(lcmap);
-  MySQL::Server mysrv(metautils::directives.database_server, metautils::
-      directives.metadb_username, metautils::directives.metadb_password, "");
-  MySQL::LocalQuery q;
+  Server mysrv(metautils::directives.database_server, metautils::directives.
+      metadb_username, metautils::directives.metadb_password, "");
+  LocalQuery q;
   for (const auto& fp : format_list) {
     q.set(parameter_query(mysrv, fp.second, format_list.size()));
 #ifdef DUMP_QUERIES
@@ -1123,7 +1123,7 @@ void generate_detailed_grid_summary(string file_type, ofstream& ofs, const
         "cellpadding=\"5\" border=\"0\"><tr><th class=\"headerRow\" colspan=\""
         << ncols << "\" align=\"center\">Summary for Grids in " << strutils::
         to_capital(f) << " Format</th></tr>" << endl;
-    MySQL::LocalQuery q(time_range_query(mysrv, fp.second));
+    LocalQuery q(time_range_query(mysrv, fp.second));
 #ifdef DUMP_QUERIES
     {
     Timer tm;
@@ -1143,7 +1143,7 @@ void generate_detailed_grid_summary(string file_type, ofstream& ofs, const
     ofs_l << "<tr class=\"bg0\"><td align=\"left\" colspan=\"" << ncols <<
         "\"><b>Product and Coverage Information:</b><br>";
     if (q.num_rows() == 1) {
-      MySQL::Row row;
+      Row row;
       q.fetch_row(row);
       ofs_p << "There is one product and one geographical coverage for all of "
           "the grids in this format:<ul class=\"paneltext\"><span class="
@@ -1245,7 +1245,8 @@ void generate_detailed_grid_summary(string file_type, ofstream& ofs, const
       } else {
         ofs_p << "<div class=\"detail_scroll2\">";
       }
-      ofs_p << "<table style=\"font-size: 14px\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\">";
+      ofs_p << "<table style=\"font-size: 14px\" width=\"100%\" cellspacing=\""
+          "0\" cellpadding=\"0\" border=\"0\">";
       size_t s = ulmap.size() - 1;
       vector<string> ulv;
       ulv.reserve(ulmap.size());
@@ -1328,9 +1329,10 @@ void generate_detailed_grid_summary(string file_type, ofstream& ofs, const
           "valign=\"bottom\"><td>";
       if (q.num_rows() > 1) {
         ofs_l << "<a title=\"Products and Coverages\" href=\"javascript:void("
-            "0)\" onClick=\"popModalWindowWithGetUrl('/cgi-bin/transform?dsnum="
-            << metautils::args.dsnum << "&view=prodcov&formatCode=" << fp.second
-            << "&ftype=" << strutils::to_lower(file_type);
+            "0)\" onClick=\"popModalWindowWithGetUrl(950, 600, '/cgi-bin/"
+            "transform?dsnum=" << metautils::args.dsnum << "&view=prodcov&"
+            "formatCode=" << fp.second << "&ftype=" << strutils::to_lower(
+            file_type);
         for (auto& e : clmap[key].map_list) {
           ofs_l << "&map=" << e;
         }
@@ -1418,8 +1420,8 @@ void generate_detailed_observation_summary(string file_type, ofstream& ofs,
   if (!ofs_o.is_open()) {
     log_error2("unable to open output for observation detail", F, caller, user);
   }
-  MySQL::Server mysrv(metautils::directives.database_server, metautils::
-      directives.metadb_username, metautils::directives.metadb_password, "");
+  Server mysrv(metautils::directives.database_server, metautils::directives.
+      metadb_username, metautils::directives.metadb_password, "");
   string d2 = substitute(metautils::args.dsnum, ".", "");
   xmlutils::DataTypeMapper data_type_mapper(metautils::directives.
       parameter_map_path);
@@ -1439,8 +1441,7 @@ void generate_detailed_observation_summary(string file_type, ofstream& ofs,
         "and data type)</td><td align=\"left\"><b>Temporal/Geographical "
         "Coverage</b><br>(each dot represents a 3&deg; box containing one or "
         "more observations)</td></tr>" << endl;
-    MySQL::Query query;
-    query.set("select distinct t.platform_type, o.obs_type, l.data_type, min("
+    Query query("select distinct t.platform_type, o.obs_type, l.data_type, min("
         "start_date),max(end_date) from WObML.ds" + d2 + "_data_types as d "
         "left join WObML.ds" + d2 + "_data_types_list as l on l.code = d."
         "data_type_code left join WObML.ds" + d2 + "_webfiles2 as p on p.code "
@@ -1613,7 +1614,7 @@ void generate_detailed_observation_summary(string file_type, ofstream& ofs,
 void generate_detailed_fix_summary(string file_type, ofstream& ofs, const
     vector<pair<string, string>>& format_list, string caller, string user) {
   static const string F = this_function_label(__func__);
-  MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
+  Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   string d2 = substitute(metautils::args.dsnum, ".", "");
   my::map<TypeEntry> platform_table;
   for (const auto& fp : format_list) {
@@ -1623,8 +1624,7 @@ void generate_detailed_fix_summary(string file_type, ofstream& ofs, const
     ofs << "<br><center><table class=\"insert\" width=\"95%\" cellspacing=\"1\" cellpadding=\"5\" border=\"0\"><tr><th class=\"headerRow\" colspan=\"3\" align=\"center\">Summary for Cyclone Fixes in " << to_capital(format) << " Format</th></tr>" << endl;
     auto cindex=0;
     ofs << "<tr class=\"bg2\" valign=\"top\"><th align=\"left\">Cyclone Classification</th><td align=\"left\"><b>Average Frequency of Data</b><br>(may vary by individual cyclone ID)</td><td align=\"left\"><b>Temporal/Geographical Coverage</b><br>(each dot represents a 3&deg; box containing one or more fixes)</td></tr>" << endl;
-    MySQL::Query query;
-    query.set("select distinct classification,min(l.start_date),max(l.end_date) from WFixML.ds"+d2+"_locations as l left join WFixML.ds"+d2+"_webfiles2 as p on p.code = l.file_code left join WFixML.classifications as c on c.code = l.classification_code where p.format_code = "+fp.second+" group by classification order by classification");
+    Query query("select distinct classification,min(l.start_date),max(l.end_date) from WFixML.ds"+d2+"_locations as l left join WFixML.ds"+d2+"_webfiles2 as p on p.code = l.file_code left join WFixML.classifications as c on c.code = l.classification_code where p.format_code = "+fp.second+" group by classification order by classification");
     if (query.submit(server) < 0) {
       log_error2("'" + query.error() + "' for '" + query.show() + "'", F,
           caller, user);
@@ -1702,8 +1702,8 @@ void generate_detailed_metadata_view(string caller, string user) {
   if (!xdoc) {
     log_error2("unable to open FormatReferences.xml", F, caller, user);
   }
-  MySQL::Server mysrv_m(metautils::directives.database_server, metautils::
-      directives.metadb_username, metautils::directives.metadb_password, "");
+  Server mysrv_m(metautils::directives.database_server, metautils::directives.
+      metadb_username, metautils::directives.metadb_password, "");
   string fmts, dtyps;
   auto b = false;
 
@@ -1741,7 +1741,7 @@ void generate_detailed_metadata_view(string caller, string user) {
     }
   } else {
     auto e=xdoc.element("dsOverview/title");
-    MySQL::Server server_d(metautils::directives.database_server,metautils::directives.rdadb_username,metautils::directives.rdadb_password,"dssdb");
+    Server server_d(metautils::directives.database_server,metautils::directives.rdadb_username,metautils::directives.rdadb_password,"dssdb");
     if (!b) {
       auto elist=xdoc.element_list("dsOverview/contentMetadata/dataType");
       for (const auto& element : elist) {
@@ -1823,13 +1823,13 @@ void generate_detailed_metadata_view(string caller, string user) {
     ofs << "    print \"</ul></td></tr>\\n\";" << endl;
     ofs << "  }" << endl;
     ofs << "?>" << endl;
-    MySQL::LocalQuery query("dweb_size","dataset","dsid = 'ds"+metautils::args.dsnum+"'");
+    LocalQuery query("dweb_size","dataset","dsid = 'ds"+metautils::args.dsnum+"'");
     if (query.submit(server_d) < 0) {
       myerror = query.error();
       exit(1);
     }
     double volume;
-    MySQL::Row row;
+    Row row;
     query.fetch_row(row);
     if (!row[0].empty()) {
       volume=stoll(row[0]);
@@ -1907,13 +1907,13 @@ void generate_group_detailed_metadata_view(string group_index,string file_type,s
 {
   ofstream ofs;
   string dsnum2=substitute(metautils::args.dsnum,".","");
-  MySQL::LocalQuery query,grml_query,obml_query,fixml_query;
+  LocalQuery query,grml_query,obml_query,fixml_query;
   string gtitle,gsummary,output,error;
 //  list<string> formatList;
 //  bool foundDetail=false;
 
-  MySQL::Server server_m(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
-  MySQL::Server server_d(metautils::directives.database_server,metautils::directives.rdadb_username,metautils::directives.rdadb_password,"dssdb");
+  Server server_m(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
+  Server server_d(metautils::directives.database_server,metautils::directives.rdadb_username,metautils::directives.rdadb_password,"dssdb");
   if (!group_index.empty() || group_index == "0") {
     return;
   }
@@ -1925,7 +1925,7 @@ void generate_group_detailed_metadata_view(string group_index,string file_type,s
     if (query.submit(server_d) < 0) {
       metautils::log_error("generate_group_detailed_metadata_view(): "+query.error(),caller,user);
     }
-    MySQL::Row row;
+    Row row;
     if (query.fetch_row(row)) {
       group_index=row[0];
     } else {
