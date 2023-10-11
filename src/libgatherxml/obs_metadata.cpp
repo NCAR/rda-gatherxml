@@ -31,6 +31,7 @@ using std::unordered_set;
 using std::vector;
 using strutils::ftos;
 using strutils::split;
+using strutils::strand;
 using strutils::substitute;
 
 namespace gatherxml {
@@ -307,17 +308,22 @@ bool summarize_obs_data(string caller, string user) {
       break;
     }
   }
-  mysrv._delete("search.obs_data", "dsid = '" + metautils::args.dsnum + "'");
+  auto uflg = strand(3);
   for (const auto& e : summary_table) {
     auto sp = split(e.first, "<!>");
-    if (mysrv.insert("search.obs_data", "'" + metautils::args.dsnum + "', " +
-        sp[0] + ", " + sp[1] + ", " + sp[2] + ", " + get<0>(e.second) + ", " +
-        get<1>(e.second) + ", " + sp[3] + ", '" + get<2>(e.second) + "'") < 0) {
-      if (!regex_search(mysrv.error(), regex("^Duplicate entry"))) {
-        log_error2("'" + mysrv.error() + "'", F, caller, user);
-      }
+    if (mysrv.insert("search.obs_data",
+        "dsid, format_code, observation_type_code, platform_type_code, "
+        "start_date, end_date, box1d_row, box1d_bitmap, uflg",
+        "'" + metautils::args.dsnum + "', " + sp[0] + ", " + sp[1] + ", " + sp[
+        2] + ", " + get<0>(e.second) + ", " + get<1>(e.second) + ", " + sp[3] +
+        ", '" + get<2>(e.second) + "', '" + uflg + "'",
+        "update start_date = values(start_date), end_date = values(end_date), "
+        "box1d_bitmap = values(box1d_bitmap), uflg = values(uflg)") < 0) {
+      log_error2("'" + mysrv.error() + "'", F, caller, user);
     }
   }
+  mysrv._delete("search.obs_data", "dsid = '" + metautils::args.dsnum + "' and "
+      "uflg != '" + uflg + "'");
   summarize_locations("WObML", e);
   if (!e.empty()) {
     log_error2("'" + e + "'", F, caller, user);
