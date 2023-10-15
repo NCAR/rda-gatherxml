@@ -4,6 +4,7 @@
 #include <datetime.hpp>
 #include <mymap.hpp>
 #include <metadata.hpp>
+#include <MySQL.hpp>
 
 namespace gatherxml {
 
