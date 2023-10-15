@@ -13,6 +13,7 @@
 #include <search.hpp>
 #include <myerror.hpp>
 
+using namespace MySQL;
 using metautils::log_error2;
 using miscutils::this_function_label;
 using std::endl;
@@ -38,7 +39,7 @@ namespace gatherxml {
 
 namespace summarizeMetadata {
 
-void check_point(double latp, double lonp, MySQL::Server& server, unordered_set<
+void check_point(double latp, double lonp, Server& server, unordered_set<
     string>& location_table) {
   static unordered_map<string, vector<string>> point_cache;
   auto k = ftos(latp) + "," + ftos(lonp);
@@ -89,8 +90,8 @@ void check_point(double latp, double lonp, MySQL::Server& server, unordered_set<
         s += " or Within(GeomFromText('" + point2[n] + "'), bounds) = 1";
       }
     }
-    MySQL::Query q("select name, AsText(bounds) from search."
-        "political_boundaries where " + s);
+    Query q("select name, AsText(bounds) from search.political_boundaries "
+        "where " + s);
     if (q.submit(server) < 0) {
       myerror = "Error: '" + q.error() + "'";
       exit(1);
@@ -244,9 +245,9 @@ bool summarize_obs_data(string caller, string user) {
   static const string F = this_function_label(__func__);
   auto d2 = substitute(metautils::args.dsnum, ".", "");
   auto b = false; // return value
-  MySQL::Server mysrv(metautils::directives.database_server, metautils::
-      directives.metadb_username, metautils::directives.metadb_password, "");
-  MySQL::Query q("code, format_code", "WObML.ds" + d2 + "_webfiles2");
+  Server mysrv(metautils::directives.database_server, metautils::directives.
+      metadb_username, metautils::directives.metadb_password, "");
+  Query q("code, format_code", "WObML.ds" + d2 + "_webfiles2");
   if (q.submit(mysrv) < 0) {
     myerror = move(q.error());
     exit(1);
@@ -402,9 +403,9 @@ ObservationData::ObservationData() : num_types(0), observation_types(),
     observation_indexes(), id_tables(), platform_tables(),
     unique_observation_table(), unknown_id_re("unknown"), unknown_ids(nullptr),
     track_unique_observations(true), is_empty(true) {
-  MySQL::Server mysrv(metautils::directives.database_server, metautils::
-      directives.metadb_username, metautils::directives.metadb_password, "");
-  MySQL::LocalQuery q("obs_type", "WObML.obs_types");
+  Server mysrv(metautils::directives.database_server, metautils::directives.
+      metadb_username, metautils::directives.metadb_password, "");
+  LocalQuery q("obs_type", "WObML.obs_types");
   if (q.submit(mysrv) == 0) {
     for (const auto& r : q) {
       observation_types.emplace(num_types, r[0]);

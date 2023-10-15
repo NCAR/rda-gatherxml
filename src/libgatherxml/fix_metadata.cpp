@@ -7,6 +7,8 @@
 #include <strutils.hpp>
 #include <search.hpp>
 
+using namespace MySQL;
+
 namespace gatherxml {
 
 namespace summarizeMetadata {
@@ -15,8 +17,8 @@ void summarize_fix_data(std::string caller,std::string user)
 {
   const std::string THIS_FUNC=__func__;
   std::string dsnum2=strutils::substitute(metautils::args.dsnum,".","");
-  MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
-  MySQL::Query formats_query("code,format_code","WFixML.ds"+dsnum2+"_webfiles2");
+  Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
+  Query formats_query("code,format_code","WFixML.ds"+dsnum2+"_webfiles2");
   if (formats_query.submit(server) < 0) {
     metautils::log_error(THIS_FUNC+"(): "+formats_query.error(),caller,user);
   }
@@ -28,7 +30,7 @@ void summarize_fix_data(std::string caller,std::string user)
   if (server.command("lock tables WFixML.ds"+dsnum2+"_locations write",error) < 0) {
     metautils::log_error(THIS_FUNC+"(): "+server.error(),caller,user);
   }
-  MySQL::LocalQuery locations_query("file_code,classification_code,start_date,end_date,box1d_row,box1d_bitmap","WFixML.ds"+dsnum2+"_locations");
+  LocalQuery locations_query("file_code,classification_code,start_date,end_date,box1d_row,box1d_bitmap","WFixML.ds"+dsnum2+"_locations");
   if (locations_query.submit(server) < 0) {
     metautils::log_error(THIS_FUNC+"(): "+locations_query.error(),caller,user);
   }

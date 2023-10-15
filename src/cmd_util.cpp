@@ -7,6 +7,7 @@
 #include <strutils.hpp>
 #include <utils.hpp>
 
+using namespace MySQL;
 using metautils::log_error2;
 using miscutils::this_function_label;
 using std::endl;
@@ -277,18 +278,18 @@ int main(int argc, char **argv) {
   if (!metautils::read_config(util, u)) {
     log_error2("configuration error: '" + myerror + "'", "main()", util, u);
   }
-  MySQL::Server srv(metautils::directives.database_server, metautils::
-      directives.rdadb_username, metautils::directives.rdadb_password, "dssdb");
+  Server srv(metautils::directives.database_server, metautils::directives.
+      rdadb_username, metautils::directives.rdadb_password, "dssdb");
   if (!srv) {
     log_error2("unable to connect to database; error: " + srv.error(), "main()",
         util, u);
   }
-  MySQL::LocalQuery q("stat_flag", "dssgrp", "logname = '" + u + "'");
+  LocalQuery q("stat_flag", "dssgrp", "logname = '" + u + "'");
   if (q.submit(srv) < 0) {
     log_error2("authorization server error: " + q.error(), "main()", util, u);
   }
   srv.disconnect();
-  MySQL::Row row;
+  Row row;
   if (!q.fetch_row(row)) {
     cerr << "Error: not authorized" << endl;
     return 1;

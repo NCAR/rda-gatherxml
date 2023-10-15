@@ -12,6 +12,7 @@
 #include <utils.hpp>
 #include <myerror.hpp>
 
+using namespace MySQL;
 using metautils::clean_id;
 using metautils::log_error2;
 using miscutils::this_function_label;
@@ -77,7 +78,7 @@ bool is_valid_date(DateTime& datetime) {
 tuple<string, string, string> bufr_types(string bufr_type, size_t code, const
     DateTime& report_datetime, string station_id) {
   static const string F = this_function_label(__func__);
-  static MySQL::Server mysrv;
+  static Server mysrv;
   if (!mysrv) {
     mysrv.connect(metautils::directives.database_server, metautils::directives.
         metadb_username, metautils::directives.metadb_password, "");
@@ -87,7 +88,7 @@ tuple<string, string, string> bufr_types(string bufr_type, size_t code, const
   }
   static unordered_map<size_t, tuple<string, string, string>> map;
   if (map.find(code) == map.end()) {
-    MySQL::LocalQuery q("observation_type, platform_type, id_type", "metautil."
+    LocalQuery q("observation_type, platform_type, id_type", "metautil."
         "bufr_types", "bufr_type = '" + bufr_type + "' and code = " + itos(
         code));
     if (q.submit(mysrv) < 0 || q.num_rows() > 1) {
@@ -99,7 +100,7 @@ tuple<string, string, string> bufr_types(string bufr_type, size_t code, const
           report_datetime.to_string() + "  id: '" + station_id + "'", F,
           "bufr2xml", USER);
     }
-    MySQL::Row row;
+    Row row;
     q.fetch_row(row);
     auto idtyp = row[2];
     map.emplace(code, make_tuple(row[0], row[1], row[2]));

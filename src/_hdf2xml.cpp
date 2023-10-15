@@ -16,6 +16,7 @@
 #include <utils.hpp>
 #include <myerror.hpp>
 
+using namespace MySQL;
 using metautils::NcTime::TimeBounds;
 using metautils::NcTime::TimeData;
 using metautils::NcTime::TimeRange;
@@ -3986,14 +3987,14 @@ void scan_hdf5nc4_file(ScanData& scan_data, gatherxml::markup::ObML::
     string platform = reinterpret_cast<char *>(attr_it->second.array);
     if (!platform.empty()) {
       trim(platform);
-      MySQL::Server server(metautils::directives.database_server, metautils::
+      Server server(metautils::directives.database_server, metautils::
           directives.metadb_username, metautils::directives.metadb_password,
           "");
       if (server) {
-        MySQL::LocalQuery query("obml_platform_type", "search.gcmd_platforms",
-            "path = '" + platform + "'");
+        LocalQuery query("obml_platform_type", "search.gcmd_platforms", "path "
+            "= '" + platform + "'");
         if (query.submit(server) == 0) {
-          MySQL::Row row;
+          Row row;
           if (query.fetch_row(row)) {
             scan_data.platform_type = row[0];
           }

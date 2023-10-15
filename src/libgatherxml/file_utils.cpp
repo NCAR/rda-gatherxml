@@ -10,6 +10,7 @@
 #include <utils.hpp>
 #include <s3.hpp>
 
+using namespace MySQL;
 using std::regex;
 using std::regex_search;
 using std::list;
@@ -31,10 +32,10 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile, TempDir& tdir, list<
   if (filelist != NULL) {
     filelist->clear();
   }
-  MySQL::Server mys(directives.database_server, directives.rdadb_username,
-      directives.rdadb_password, "dssdb");
+  Server mys(directives.database_server, directives.rdadb_username, directives.
+      rdadb_password, "dssdb");
   if (!mys) {
-    error = "Error connecting to MySQL server";
+    error = "Error connecting to database server";
     return false;
   }
   if (regex_search(args.path, regex("^/FS/DECS"))) {
@@ -47,13 +48,13 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile, TempDir& tdir, list<
 
     // Web file
     auto w = metautils::relative_web_filename(args.path + "/" + args.filename);
-    MySQL::LocalQuery q("status, file_format, locflag", "wfile", "dsid = "
-        "'ds" + args.dsnum + "' and wfile = '" + w + "'");
+    LocalQuery q("status, file_format, locflag", "wfile", "dsid = 'ds" + args.
+        dsnum + "' and wfile = '" + w + "'");
     if (q.submit(mys) < 0) {
       error = q.error();
       return false;
     }
-    MySQL::Row row;
+    Row row;
     q.fetch_row(row);
     auto loc = 'G';
     if (!args.override_primary_check) {

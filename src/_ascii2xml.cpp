@@ -11,6 +11,8 @@
 #include <utils.hpp>
 #include <myerror.hpp>
 
+using namespace MySQL;
+
 metautils::Directives metautils::directives;
 metautils::Args metautils::args;
 bool gatherxml::verbose_operation;
@@ -61,15 +63,15 @@ void scan_ghcnv3_file(gatherxml::markup::ObML::ObservationData& obs_data,std::li
     metautils::log_error(THIS_FUNC+"() returned error: unable to create temporary directory","ascii2xml",USER);
   }
 // load the station inventory
-  MySQL::Server server(metautils::directives.database_server,metautils::directives.rdadb_username,metautils::directives.rdadb_password,"dssdb");
+  Server server(metautils::directives.database_server,metautils::directives.rdadb_username,metautils::directives.rdadb_password,"dssdb");
   if (!server) {
     metautils::log_error(THIS_FUNC+"() returned error: '"+server.error()+"' while trying to connect to RDADB","ascii2xml",USER);
   }
-  MySQL::Query query("select wfile from dssdb.wfile where dsid = 'ds564.1' and type = 'O' and wfile like '%qcu.inv'");
+  Query query("select wfile from dssdb.wfile where dsid = 'ds564.1' and type = 'O' and wfile like '%qcu.inv'");
   if (query.submit(server) < 0) {
     metautils::log_error(THIS_FUNC+"() returned error: '"+query.error()+"' while trying to query for station inventory name","ascii2xml",USER);
   }
-  MySQL::Row row;
+  Row row;
   if (!query.fetch_row(row)) {
     metautils::log_error(THIS_FUNC+"() returned error: unable to get station inventory name","ascii2xml",USER);
   }

@@ -22,6 +22,7 @@
 #include <timer.hpp>
 #include <myerror.hpp>
 
+using namespace MySQL;
 using floatutils::myequalf;
 using metautils::log_error2;
 using metautils::log_warning;
@@ -4306,14 +4307,14 @@ void scan_cf_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data,
     }
     string pt = "unknown";
     if (!p.empty()) {
-      MySQL::Server server(metautils::directives.database_server, metautils::
+      Server server(metautils::directives.database_server, metautils::
           directives.metadb_username, metautils::directives.metadb_password,
           "");
       if (server) {
-        MySQL::LocalQuery query("obml_platform_type", "search.gcmd_platforms",
-            "path = '" + p + "'");
+        LocalQuery query("obml_platform_type", "search.gcmd_platforms", "path "
+            "= '" + p + "'");
         if (query.submit(server) == 0) {
-          MySQL::Row row;
+          Row row;
           if (query.fetch_row(row)) {
             pt = row[0];
           }

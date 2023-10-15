@@ -20,6 +20,7 @@
 #include <search.hpp>
 #include <tokendoc.hpp>
 
+using namespace MySQL;
 using metautils::log_error2;
 using miscutils::this_function_label;
 using std::cerr;
@@ -67,7 +68,7 @@ extern const string USER = getenv("USER");
 
 TempDir temp_dir;
 XMLDocument g_xdoc;
-MySQL::Server server;
+Server server;
 string g_dataset_type;
 bool no_dset_waf = false;
 
@@ -213,9 +214,9 @@ void generate_index(string tdir_name) {
       tdoc.add_replacement("__LOGO_IMAGE__", "default_200_200.png");
       tdoc.add_replacement("__LOGO_WIDTH__", "70");
     }
-    MySQL::LocalQuery query("doi", "dssdb.dsvrsn", "dsid = 'ds" + metautils::
-        args.dsnum + "' and status = 'A'");
-    MySQL::Row row;
+    LocalQuery query("doi", "dssdb.dsvrsn", "dsid = 'ds" + metautils::args.dsnum
+        + "' and status = 'A'");
+    Row row;
     string ds;
     if (query.submit(server) == 0 && query.fetch_row(row) && !row[0].empty()) {
       ds = "&nbsp;|&nbsp;<span class=\"blue\">DOI: " + row[0] + "</span>";
@@ -493,9 +494,9 @@ void initialize(string dsnum2, vector<string>& formats, vector<string>&
     std::tie(nm, dt) = db;
     if (nm[0] != 'V' && table_exists(server, nm + ".ds" + dsnum2 +
         "_webfiles2")) {
-      MySQL::LocalQuery q("select distinct format from " + nm + ".formats as f "
-          "left join " + nm + ".ds" + dsnum2 + "_webfiles2 as d on d"
-          ".format_code = f.code where !isnull(d.format_code)");
+      LocalQuery q("select distinct format from " + nm + ".formats as f left "
+          "join " + nm + ".ds" + dsnum2 + "_webfiles2 as d on d.format_code = "
+          "f.code where !isnull(d.format_code)");
       if (q.submit(server) < 0) {
         log_error2("query: " + q.show() + " returned error: " + q.error(), F,
             "dsgen", USER);
@@ -826,24 +827,24 @@ void add_data_formats(TokenDocument& tdoc, vector<string>& formats, bool
 
 void append_book_chapter_to_citation(string& citation, string doi) {
   citation += "\", in ";
-  MySQL::LocalQuery qcw("select pages, isbn from citation.book_chapter_works "
-      "where doi = '" + doi + "'");
-  MySQL::Row rcw;
+  LocalQuery qcw("select pages, isbn from citation.book_chapter_works where "
+      "doi = '" + doi + "'");
+  Row rcw;
   if (qcw.submit(server) != 0 || !qcw.fetch_row(rcw)) {
     citation = "";
     return;
   }
-  MySQL::LocalQuery qbw("select title, publisher from citation.book_works "
-      "where isbn = '" + rcw[1] + "'");
-  MySQL::Row rbw;
+  LocalQuery qbw("select title, publisher from citation.book_works where isbn "
+      "= '" + rcw[1] + "'");
+  Row rbw;
   if (qbw.submit(server) != 0 || !qbw.fetch_row(rbw)) {
     citation = "";
     return;
   }
   citation += htmlutils::unicode_escape_to_html(rbw[0]) + ". Ed. ";
-  MySQL::LocalQuery qwa("select first_name, middle_name, last_name from "
-      "citation.works_authors where id = '" + rcw[1] + "' and id_type = 'ISBN' "
-      "order by sequence");
+  LocalQuery qwa("select first_name, middle_name, last_name from citation."
+      "works_authors where id = '" + rcw[1] + "' and id_type = 'ISBN' order by "
+      "sequence");
   if (qwa.submit(server) != 0) {
     citation = "";
     return;
@@ -869,9 +870,9 @@ void append_book_chapter_to_citation(string& citation, string doi) {
 
 void append_journal_to_citation(string& citation, string doi) {
   citation += ". ";
-  MySQL::LocalQuery q("select pub_name, volume, pages from citation."
-      "journal_works where doi = '" + doi + "'");
-  MySQL::Row row;
+  LocalQuery q("select pub_name, volume, pages from citation.journal_works "
+      "where doi = '" + doi + "'");
+  Row row;
   if (q.submit(server) != 0 || !q.fetch_row(row)) {
     citation = "";
     return;
@@ -890,9 +891,9 @@ void append_journal_to_citation(string& citation, string doi) {
 void append_proceedings_to_citation(string& citation, string doi, string
     publisher) {
   citation += ". <em>";
-  MySQL::LocalQuery q("select pub_name, pages from citation.proceedings_works "
-      "where doi = '" + doi + "'");
-  MySQL::Row row;
+  LocalQuery q("select pub_name, pages from citation.proceedings_works where "
+      "doi = '" + doi + "'");
+  Row row;
   if (q.submit(server) != 0 || !q.fetch_row(row)) {
     citation = "";
     return;
@@ -910,23 +911,23 @@ void append_proceedings_to_citation(string& citation, string doi, string
 
 void add_data_citations(TokenDocument& tdoc) {
   static const string F = this_function_label(__func__);
-  MySQL::LocalQuery qc("select distinct d.doi_work from citation"
-      ".data_citations as d left join dssdb.dsvrsn as v on v.doi = d.doi_data "
-      "where v.dsid = 'ds" + metautils::args.dsnum + "'");
+  LocalQuery qc("select distinct d.doi_work from citation.data_citations as d "
+      "left join dssdb.dsvrsn as v on v.doi = d.doi_data where v.dsid = 'ds" +
+       metautils::args.dsnum + "'");
   if (qc.submit(server) < 0) {
     return;
   }
   vector<tuple<string, string>> clist;
   for (const auto& rc : qc) {
     auto doi = rc[0];
-    MySQL::LocalQuery qw("select title, pub_year, type, publisher from citation"
-        ".works where doi = '" + doi + "'");
-    MySQL::Row rw;
+    LocalQuery qw("select title, pub_year, type, publisher from citation.works "
+        "where doi = '" + doi + "'");
+    Row rw;
     if (qw.submit(server) == 0 && qw.fetch_row(rw)) {
       auto ti = htmlutils::unicode_escape_to_html(rw[0]);
       auto yr = rw[1];
       auto typ = rw[2];
-      MySQL::LocalQuery qwa("select last_name, first_name, middle_name from "
+      LocalQuery qwa("select last_name, first_name, middle_name, orcid_id from "
           "citation.works_authors where id = '" + doi + "' and id_type = 'DOI' "
           "order by sequence");
       if (qwa.submit(server) == 0) {
@@ -934,6 +935,11 @@ void add_data_citations(TokenDocument& tdoc) {
         size_t n = 1;
         for (const auto& rwa : qwa) {
           if (cit.empty()) {
+/*
+            if (!rwa[3].empty()) {
+              cit += "<a href=\"https://orcid.org/" + rwa[3] + "\">";
+            }
+*/
             cit += htmlutils::unicode_escape_to_html(rwa[0]);
             if (!rwa[1].empty()) {
               cit += ", " + rwa[1].substr(0, 1) + ".";
@@ -941,11 +947,21 @@ void add_data_citations(TokenDocument& tdoc) {
             if (!rwa[2].empty()) {
               cit += " " + rwa[2].substr(0, 1) + ".";
             }
+/*
+            if (!rwa[3].empty()) {
+              cit += "</a>";
+            }
+*/
           } else {
             cit += ", ";
             if (n == qwa.num_rows()) {
               cit += "and ";
             }
+/*
+            if (!rwa[3].empty()) {
+              cit += "<a href=\"https://orcid.org/" + rwa[3] + "\">";
+            }
+*/
             if (!rwa[1].empty()) {
               cit += rwa[1].substr(0, 1) + ". ";
             }
@@ -953,6 +969,11 @@ void add_data_citations(TokenDocument& tdoc) {
               cit += rwa[2].substr(0, 1) + ". ";
             }
             cit += htmlutils::unicode_escape_to_html(rwa[0]);
+/*
+            if (!rwa[3].empty()) {
+              cit += "</a>";
+            }
+*/
           }
           ++n;
         }
@@ -1028,8 +1049,8 @@ bool add_temporal_range(TokenDocument& tdoc, string dsnum2, size_t& swp_cnt) {
   static const string F = this_function_label(__func__);
 
   bool grouped_periods = false; // return value
-  MySQL::LocalQuery q("select dsid from dssdb.dsgroup where dsid = 'ds" +
-      metautils::args.dsnum + "'");
+  LocalQuery q("select dsid from dssdb.dsgroup where dsid = 'ds" + metautils::
+      args.dsnum + "'");
   if (q.submit(server) < 0) {
     log_error2("query: " + q.show() + " returned error: " + q.error(), F,
         "dsgen", USER);
@@ -1075,7 +1096,7 @@ bool add_temporal_range(TokenDocument& tdoc, string dsnum2, size_t& swp_cnt) {
   if (q.num_rows() > 0) {
     tdoc.add_if("__HAS_TEMPORAL_RANGE__");
     if (q.num_rows() > 1) {
-      MySQL::LocalQuery qgp("distinct gindex", "dssdb.dsperiod", "dsid = 'ds" +
+      LocalQuery qgp("distinct gindex", "dssdb.dsperiod", "dsid = 'ds" +
           metautils::args.dsnum + "'");
       if (qgp.submit(server) < 0) {
         log_error2("query: " + qgp.show() + " returned error: " + qgp.error(),
@@ -1084,18 +1105,17 @@ bool add_temporal_range(TokenDocument& tdoc, string dsnum2, size_t& swp_cnt) {
       if (qgp.num_rows() > 1) {
         grouped_periods = true;
         tdoc.add_if("__HAS_TEMPORAL_BY_GROUP1__");
-        MySQL::LocalQuery qdt("select min(concat(date_start, ' ', "
-            "time_start)), min(start_flag), max(concat(date_end, ' ', "
-            "time_end)), min(end_flag), any_value(time_zone) from dssdb"
-            ".dsperiod where dsid = 'ds" + metautils::args.dsnum + "' and "
-            "date_start > '0001-01-01' and date_start < '3000-01-01' and "
-            "date_end > '0001-01-01' and date_end < '3000-01-01' group by "
-            "dsid");
+        LocalQuery qdt("select min(concat(date_start, ' ', time_start)), min("
+            "start_flag), max(concat(date_end, ' ', time_end)), min(end_flag), "
+            "any_value(time_zone) from dssdb.dsperiod where dsid = 'ds" +
+            metautils::args.dsnum + "' and date_start > '0001-01-01' and "
+            "date_start < '3000-01-01' and date_end > '0001-01-01' and "
+            "date_end < '3000-01-01' group by dsid");
         if (qdt.submit(server) < 0) {
           log_error2("query: " + qdt.show() + " returned error: " + qdt.error(),
               F, "dsgen", USER);
         }
-        MySQL::Row rdt;
+        Row rdt;
         qdt.fetch_row(rdt);
         auto sdt = metatranslations::date_time(rdt[0], rdt[1], rdt[4]);
         auto edt = metatranslations::date_time(rdt[2], rdt[3], rdt[4]);
@@ -1241,8 +1261,8 @@ void add_variable_table(string data_format, TokenDocument& tdoc, string& json) {
 }
 
 void add_grouped_variables(TokenDocument& tdoc, size_t& swp_cnt) {
-  MySQL::LocalQuery q("gindex, title", "dssdb.dsgroup", "dsid = 'ds" +
-      metautils::args.dsnum + "' and pindex = 0 and dwebcnt > 0");
+  LocalQuery q("gindex, title", "dssdb.dsgroup", "dsid = 'ds" + metautils::args.
+      dsnum + "' and pindex = 0 and dwebcnt > 0");
   if (q.submit(server) != 0) {
     return;
   }
@@ -1315,10 +1335,10 @@ void add_grouped_variables(TokenDocument& tdoc, size_t& swp_cnt) {
 
 void add_variables(TokenDocument& tdoc, size_t& swp_cnt) {
   static const string F = this_function_label(__func__);
-  MySQL::LocalQuery q("select substring_index(path, ' > ', -1) as var from "
-      "search.variables as v left join search.gcmd_sciencekeywords as g on g."
-      "uuid = v.keyword where v.vocabulary = 'GCMD' and v.dsid = '" +
-      metautils::args.dsnum + "' order by var");
+  LocalQuery q("select substring_index(path, ' > ', -1) as var from search."
+      "variables as v left join search.gcmd_sciencekeywords as g on g.uuid = v."
+      "keyword where v.vocabulary = 'GCMD' and v.dsid = '" + metautils::args.
+      dsnum + "' order by var");
   if (q.submit(server) < 0) {
     log_error2("query: " + q.show() + " returned error: " + q.error(), F,
         "dsgen", USER);
@@ -1533,8 +1553,8 @@ void add_data_types(TokenDocument& tdoc, const vector<string>& data_types,
 
 void fill_map(unordered_map<string, string>& map, string query) {
   static const string F = this_function_label(__func__);
-  MySQL::LocalQuery q("select gindex, title from dssdb.dsgroup where dsid = 'ds"
-      + metautils::args.dsnum + "'");
+  LocalQuery q("select gindex, title from dssdb.dsgroup where dsid = 'ds" +
+       metautils::args.dsnum + "'");
   if (q.submit(server) < 0) {
     log_error2("error: " + q.error() + " while getting groups data", F, "dsgen",
         USER);
@@ -1564,7 +1584,7 @@ void add_spatial_coverage(TokenDocument& tdoc, string dsnum2, const vector<
     unordered_map<size_t, tuple<string, string>> gdefs;
     for (const auto& dt : data_types) {
       if (dt == "grid") {
-        MySQL::LocalQuery qgc;
+        LocalQuery qgc;
         if (grouped_periods) {
           qgc.set("select grid_definition_codes, file_code from WGrML.ds" +
               dsnum2 + "_grid_definitions");
@@ -1582,13 +1602,13 @@ void add_spatial_coverage(TokenDocument& tdoc, string dsnum2, const vector<
           for (const auto& v : b) {
             string k;
             if (gdefs.find(v) == gdefs.end()) {
-              MySQL::LocalQuery qgd("definition, def_params", "WGrML"
-                  ".grid_definitions", "code = " + itos(v));
+              LocalQuery qgd("definition, def_params", "WGrML.grid_definitions",
+                  "code = " + itos(v));
               if (qgd.submit(server) < 0) {
                 log_error2("query: " + qgd.show() + " returned error: " + qgd.
                     error(), F, "dsgen", USER);
               }
-              MySQL::Row rgd;
+              Row rgd;
               qgd.fetch_row(rgd);
               gdefs.emplace(v, make_tuple(rgd[0], rgd[1]));
               k = rgd[0] + "<!>" + rgd[1];
@@ -1788,8 +1808,8 @@ void add_spatial_coverage(TokenDocument& tdoc, string dsnum2, const vector<
 
 void add_contributors(TokenDocument& tdoc) {
   static const string F = this_function_label(__func__);
-  MySQL::LocalQuery q("select g.path from search.contributors_new as c left "
-      "join search.gcmd_providers as g on g.uuid = c.keyword where c.dsid = '" +
+  LocalQuery q("select g.path from search.contributors_new as c left join "
+      "search.gcmd_providers as g on g.uuid = c.keyword where c.dsid = '" +
       metautils::args.dsnum + "' and c.vocabulary = 'GCMD'");
   if (q.submit(server) < 0) {
     log_error2("query: " + q.show() + " returned error: " + q.error(), F,
@@ -1827,15 +1847,14 @@ void add_contributors(TokenDocument& tdoc) {
 
 void add_data_volume(TokenDocument& tdoc, size_t& swp_cnt) {
   static const string F = this_function_label(__func__);
-  MySQL::LocalQuery q("dweb_size", "dssdb.dataset", "dsid = 'ds" + metautils::
-     args.dsnum + "'");
+  LocalQuery q("dweb_size", "dssdb.dataset", "dsid = 'ds" + metautils::args.
+      dsnum + "'");
   if (q.submit(server) < 0) {
     log_error2("query: " + q.show() + " returned error: " + q.error(), F,
         "dsgen", USER);
   }
-  MySQL::LocalQuery q2("select dweb_size, title, grpid from dssdb.dsgroup "
-      "where dsid = 'ds" + metautils::args.dsnum + "' and pindex = 0 and "
-      "dweb_size > 0");
+  LocalQuery q2("select dweb_size, title, grpid from dssdb.dsgroup where dsid "
+      "= 'ds" + metautils::args.dsnum + "' and pindex = 0 and dweb_size > 0");
   if (q2.submit(server) < 0) {
     log_error2("query: " + q2.show() + " returned error: " + q2.error(), F,
         "dsgen", USER);
@@ -1844,7 +1863,7 @@ void add_data_volume(TokenDocument& tdoc, size_t& swp_cnt) {
   const int VOLUME_LEN = 4;
   const char *vlist[VOLUME_LEN] = { "MB", "GB", "TB", "PB" };
   string json;
-  MySQL::Row row;
+  Row row;
   if (q.fetch_row(row) && !row[0].empty()) {
     auto v = stof(row[0]) / 1000000.;
     auto n = 0;
@@ -1955,13 +1974,13 @@ void add_related_datasets(TokenDocument& tdoc) {
     });
     string s, json;
     for (const auto& ele : elist) {
-      MySQL::LocalQuery q("dsid, title", "search.datasets", "dsid = '" +
-          ele.attribute_value("ID") + "' and (type = 'P' or type = 'H')");
+      LocalQuery q("dsid, title", "search.datasets", "dsid = '" + ele.
+          attribute_value("ID") + "' and (type = 'P' or type = 'H')");
       if (q.submit(server) < 0) {
         log_error2("query: " + q.show() + " returned error: " + q.error(), F,
             "dsgen", USER);
       }
-      MySQL::Row row;
+      Row row;
       if (q.fetch_row(row)) {
         s += "<tr valign=\"top\"><td><a href=\"/datasets/ds" + row[0] +
             "#description\">" + row[0] + "</a></td><td>-</td><td>" + row[1] +
@@ -1993,8 +2012,8 @@ void add_data_license() {
   if (id.empty()) {
     id = "CC-BY-4.0";
   }
-  MySQL::LocalQuery q("name, url, img_url", "wagtail.home_datalicense", "id = "
-      "'" + id + "'");
+  LocalQuery q("name, url, img_url", "wagtail.home_datalicense", "id = '" + id +
+      "'");
   if (q.submit(server) < 0) {
     log_error2("unable to retrieve data license - error: '" + server.error() +
         "'", F, "dsgen", USER);
@@ -2002,7 +2021,7 @@ void add_data_license() {
   if (q.num_rows() == 0) {
     log_error2("no data license for id: '" + id + "'", F, "dsgen", USER);
   }
-  MySQL::Row row;
+  Row row;
   if (!q.fetch_row(row)) {
     log_error2("unable to retrieve data license - error: '" + q.error() + "'",
         F, "dsgen", USER);
@@ -2114,9 +2133,9 @@ int main(int argc, char **argv) {
   }
   server.connect(metautils::directives.database_server, metautils::directives.
       metadb_username, metautils::directives.metadb_password, "");
-  MySQL::LocalQuery q("select type from search.datasets where dsid = '" +
-      metautils::args.dsnum + "'");
-  MySQL::Row row;
+  LocalQuery q("select type from search.datasets where dsid = '" + metautils::
+      args.dsnum + "'");
+  Row row;
   if (q.submit(server) < 0 || !q.fetch_row(row)) {
     log_error2("unable to determine dataset type", F, "dsgen", USER);
   }

@@ -12,6 +12,7 @@
 #include <search.hpp>
 #include <myerror.hpp>
 
+using namespace MySQL;
 using metautils::log_error2;
 using miscutils::this_function_label;
 using std::cerr;
@@ -71,7 +72,7 @@ bool g_removed_from_wgrml, g_removed_from_wobml, g_removed_from_satml,
     g_removed_from_wfixml;
 bool g_create_web_filelist_cache = false, create_inv_filelist_cache = false;
 
-void parse_args(MySQL::Server& server) {
+void parse_args(Server& server) {
   auto arg_list = split(metautils::args.args_string, "%");
   for (auto arg = arg_list.begin(); arg != arg_list.end(); ++arg) {
     if (*arg == "-d") {
@@ -109,7 +110,7 @@ string tempdir_name() {
   return tdir->name();
 }
 
-void copy_version_controlled_data(MySQL::Server& server, string db, string
+void copy_version_controlled_data(Server& server, string db, string
     file_id_code) {
   string error;
   auto tnames = table_names(server, db, "ds" + g_dsnum2 + "%", error);
@@ -132,11 +133,11 @@ void copy_version_controlled_data(MySQL::Server& server, string db, string
 void clear_tables_by_file_id(string db, string file_id_code, bool
     is_version_controlled) {
   static const string F = this_function_label(__func__);
-  MySQL::Server local_server(metautils::directives.database_server, metautils::
+  Server local_server(metautils::directives.database_server, metautils::
       directives.metadb_username, metautils::directives.metadb_password, "");
   if (!local_server) {
-    log_error2("unable to connect to MySQL server while clearing file code " +
-        file_id_code + " from " + db, F, "dcm", USER);
+    log_error2("unable to connect to database server while clearing file code "
+        + file_id_code + " from " + db, F, "dcm", USER);
   }
   if (is_version_controlled) {
     copy_version_controlled_data(local_server, db, file_id_code);
@@ -155,11 +156,11 @@ void clear_tables_by_file_id(string db, string file_id_code, bool
   local_server.disconnect();
 }
 
-void clear_grid_cache(MySQL::Server& server, string db) {
+void clear_grid_cache(Server& server, string db) {
   static const string F = this_function_label(__func__);
-  MySQL::LocalQuery query("select parameter, level_type_codes, min("
-      "start_date), max(end_date) from " + db + ".ds" + g_dsnum2 + "_agrids2 "
-      "group by parameter, level_type_codes");
+  LocalQuery query("select parameter, level_type_codes, min(start_date), max("
+      "end_date) from " + db + ".ds" + g_dsnum2 + "_agrids2 group by "
+      "parameter, level_type_codes");
   if (query.submit(server) < 0) {
     log_error2("error: '" + query.error() + "' while trying to rebuild grid "
         "cache", F, "dcm", USER);
@@ -184,17 +185,16 @@ bool remove_from(string database, string table_ext, string file_field_name,
   is_version_controlled = false;
   string error;
   auto file_table = database + ".ds" + g_dsnum2 + table_ext;
-  MySQL::Server local_server(metautils::directives.database_server, metautils::
+  Server local_server(metautils::directives.database_server, metautils::
       directives.metadb_username, metautils::directives.metadb_password, "");
   if (!local_server) {
-    log_error2("unable to connect to MySQL server while removing  " + file, F,
-        "dcm", USER);
+    log_error2("unable to connect to database server while removing  " + file,
+        F, "dcm", USER);
   }
-  MySQL::LocalQuery query("code", file_table, file_field_name + " = '" + file +
-      "'");
+  LocalQuery query("code", file_table, file_field_name + " = '" + file + "'");
   if (query.submit(local_server) == 0) {
     if (query.num_rows() == 1) {
-      MySQL::Row row;
+      Row row;
       query.fetch_row(row);
       file_id_code = row[0];
 
@@ -224,8 +224,8 @@ bool remove_from(string database, string table_ext, string file_field_name,
         log_error2("error: '" + local_server.error() + "'", F, "dcm", USER);
       }
       if (database == "WGrML" || database == "WObML") {
-        auto tables = MySQL::table_names(local_server, substitute(database, "W",
-            "I"), "ds" + g_dsnum2 + "_inventory_%", error);
+        auto tables = table_names(local_server, substitute(database, "W", "I"),
+            "ds" + g_dsnum2 + "_inventory_%", error);
         for (const auto& table : tables) {
           local_server._delete(substitute(database, "W", "I") + ".`" + table +
               "`", "file_code = " + file_id_code);
@@ -247,8 +247,8 @@ bool remove_from(string database, string table_ext, string file_field_name,
       if (database == "WObML") {
         local_server._delete("I" + database.substr(1) + ".ds" + g_dsnum2 +
             "_data_types", "file_code = " + file_id_code);
-        auto tables = MySQL::table_names(local_server, "I" + database.substr(1),
-            "ds" + g_dsnum2 + "_time_series_times_%", error);
+        auto tables = table_names(local_server, "I" + database.substr(1), "ds" +
+            g_dsnum2 + "_time_series_times_%", error);
         for (const auto& table : tables) {
           local_server._delete("I" + database.substr(1) + "." + table,
               "file_code = " + file_id_code);
@@ -438,10 +438,10 @@ extern "C" void *t_removed(void *ts) {
     file_removed = true;
     g_removed_from_wfixml = true;
   }
-  MySQL::Server server_d(metautils::directives.database_server, metautils::
-      directives.rdadb_username, metautils::directives.rdadb_password, "");
-  MySQL::LocalQuery query("gindex", "wfile", "wfile = '" + file + "'");
-  MySQL::Row row;
+  Server server_d(metautils::directives.database_server, metautils::directives.
+      rdadb_username, metautils::directives.rdadb_password, "");
+  LocalQuery query("gindex", "wfile", "wfile = '" + file + "'");
+  Row row;
   if (query.submit(server_d) == 0 && query.fetch_row(row)) {
     g_web_gindex_set.emplace(row[0]);
   }
@@ -482,8 +482,8 @@ void generate_dataset_home_page() {
 }
 
 extern "C" void *t_index_variables(void *) {
-  MySQL::Server srv(metautils::directives.database_server, metautils::
-      directives.metadb_username, metautils::directives.metadb_password, "");
+  Server srv(metautils::directives.database_server, metautils::directives.
+      metadb_username, metautils::directives.metadb_password, "");
   string e;
   searchutils::indexed_variables(srv, metautils::args.dsnum, e);
   srv.disconnect();
@@ -550,11 +550,11 @@ int main(int argc, char **argv) {
   }
   metautils::args.args_string = unixutils::unix_args_string(argc, argv, '%');
   metautils::read_config("dcm", USER);
-  MySQL::Server server(metautils::directives.database_server, metautils::
-      directives.metadb_username, metautils::directives.metadb_password, "");
+  Server server(metautils::directives.database_server, metautils::directives.
+      metadb_username, metautils::directives.metadb_password, "");
   if (!server) {
-    log_error2("unable to connect to MySQL server on startup", "main()", "dcm",
-        USER);
+    log_error2("unable to connect to database server on startup", "main()",
+        "dcm", USER);
   }
   parse_args(server);
   g_removed_from_wgrml = false;

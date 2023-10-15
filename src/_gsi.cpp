@@ -13,6 +13,7 @@
 #include <metadata.hpp>
 #include <myerror.hpp>
 
+using namespace MySQL;
 using metautils::log_error2;
 using metautils::log_warning;
 using miscutils::this_function_label;
@@ -39,12 +40,12 @@ string mywarning = "";
 struct ThreadStruct {
   ThreadStruct() : query(), imagetag(), tid(-1) { }
 
-  MySQL::LocalQuery query;
+  LocalQuery query;
   string imagetag;
   pthread_t tid;
 };
 
-MySQL::Server server;
+Server server;
 string dsnum2;
 char bitmap[60][121];
 const string USER = getenv("USER");
@@ -108,8 +109,8 @@ void create_graphics(string plot_script, string image_name, string tempdir_name,
 void *thread_plot(void *tnc) {
   const static string F = this_function_label(__func__);
   ThreadStruct *t = reinterpret_cast<ThreadStruct *>(tnc);
-  MySQL::Server srv(metautils::directives.database_server, metautils::
-      directives.metadb_username, metautils::directives.metadb_password, "");
+  Server srv(metautils::directives.database_server, metautils::directives.
+      metadb_username, metautils::directives.metadb_password, "");
   if (t->query.submit(srv) < 0) {
     log_error2(t->query.error(), F, "gsi", USER);
   }
@@ -179,8 +180,8 @@ void *thread_plot(void *tnc) {
   return nullptr;
 }
 
-void generate_graphics(MySQL::LocalQuery& query, string type, string table,
-    string gindex) {
+void generate_graphics(LocalQuery& query, string type, string table, string
+    gindex) {
   const static string F = this_function_label(__func__);
   if (query.submit(server) < 0) {
     log_error2(query.error(), F, "gsi", USER);
@@ -302,7 +303,8 @@ int main(int argc, char **argv) {
   server.connect(metautils::directives.database_server, metautils::directives.
       metadb_username, metautils::directives.metadb_password, "");
   if (!server) {
-    log_error2("unable to connect to MySQL server on startup", F, "gsi", USER);
+    log_error2("unable to connect to database server on startup", F, "gsi",
+        USER);
   }
   string g;
   for (size_t n = 0; n < sp.size(); ++n) {
@@ -312,7 +314,7 @@ int main(int argc, char **argv) {
   }
   auto dsid = substitute(metautils::args.dsnum, ".", "");
   if (table_exists(server, "WObML.ds" + dsid + "_data_types")) {
-    MySQL::LocalQuery q2;
+    LocalQuery q2;
     string t;
     if (g.empty()) {
       q2.set("select distinct l.observation_type_code, l.platform_type_code, "
@@ -339,7 +341,7 @@ int main(int argc, char **argv) {
     generate_graphics(q2, "obs", t, g);
   }
   if (table_exists(server, "WFixML.ds" + dsid + "_locations")) {
-    MySQL::LocalQuery q2;
+    LocalQuery q2;
     string t;
     if (g.empty()) {
       q2.set("select distinct d.classification_code, c.classification, p."

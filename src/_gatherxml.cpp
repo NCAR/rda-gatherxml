@@ -14,6 +14,7 @@
 #include <MySQL.hpp>
 #include <myerror.hpp>
 
+using namespace MySQL;
 using metautils::log_error2;
 using std::cerr;
 using std::cout;
@@ -64,28 +65,28 @@ void inventory_all() {
     log_error2("unable to inventory '" + metautils::args.data_format +
         "' files", F, "gatherxml", USER);
   }
-  MySQL::Server srv(metautils::directives.database_server, metautils::
-      directives.metadb_username, metautils::directives.metadb_password, "");
+  Server srv(metautils::directives.database_server, metautils::directives.
+      metadb_username, metautils::directives.metadb_password, "");
   if (!srv) {
     log_error2("unable to connected to RDA metadata database server", F,
         "gatherxml", USER);
   }
   string ds = substitute(metautils::args.dsnum, ".", "");
-  MySQL::LocalQuery q;
-  if (MySQL::table_exists(srv, "IGrML.ds" + ds + "_inventory_summary")) {
+  LocalQuery q;
+  if (table_exists(srv, "IGrML.ds" + ds + "_inventory_summary")) {
     q.set("select w.id, f.format from WGrML.ds" + ds + "_webfiles2 as w "
         "left join IGrML.ds" + ds + "_inventory_summary as i on i.file_code = "
         "w.code left join WGrML.formats as f on f.code = w.format_code where "
         "i.file_code is null or inv is null");
-  } else if (MySQL::table_exists(srv, "WGrML.ds" + ds + "_webfiles2")) {
+  } else if (table_exists(srv, "WGrML.ds" + ds + "_webfiles2")) {
     q.set("select w.id, f.format from WGrML.ds" + ds + "_webfiles2 as w left "
         "join WGrML.formats as f on f.code = w.format_code");
-  } else if (MySQL::table_exists(srv, "IObML.ds" + ds + "_inventory_summary")) {
+  } else if (table_exists(srv, "IObML.ds" + ds + "_inventory_summary")) {
     q.set("select w.id, f.format from WObML.ds" + ds + "_webfiles2 as w "
         "left join IObML.ds" + ds + "_inventory_summary as i on i.file_code = "
         "w.code left join WObML.formats as f on f.code = w.format_code where "
         "i.file_code is null or inv is null");
-  } else if (MySQL::table_exists(srv, "WObML.ds" + ds + "_webfiles2")) {
+  } else if (table_exists(srv, "WObML.ds" + ds + "_webfiles2")) {
     q.set("select w.id, f.format from WObML.ds" + ds + "_webfiles2 as w left "
         "join WObML.formats as f on f.code = w.format_code");
   }

@@ -601,7 +601,7 @@ void aggregate_grids(string database, string caller, string user, string
                     "level_type_first, level_type_last, level_type_codes, "
                     "start_date, end_date, uflg",
                 ss.str(),
-                ""
+                "update uflg = values(uflg)"
                 ) < 0) {
             log_error2(srv.error() + " while trying to insert '" + ss.str() +
                 "' into " + database + ".ds" + d + "_agrids2", F, caller, user);
@@ -709,7 +709,7 @@ void aggregate_grids(string database, string caller, string user, string
                 "grid_definition_codes, parameter, level_type_first, "
                 "level_type_last, level_type_codes, start_date, end_date, uflg",
             ss.str(),
-            ""
+            "update uflg = values(uflg)"
             ) < 0) {
         log_error2(srv.error() + " while trying to insert '" + ss.str() +
             "' into " + database + ".ds" + d + "_agrids2", F, caller, user);

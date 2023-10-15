@@ -24,7 +24,7 @@
 #include <timer.hpp>
 #include <myerror.hpp>
 
-using MySQL::table_exists;
+using namespace MySQL;
 using dateutils::string_date_to_ll_string;
 using metautils::log_error2;
 using metautils::log_warning;
@@ -179,14 +179,14 @@ void delete_temporary_directory() {
   }
 }
 
-string table_code(MySQL::Server& srv, string table_name, string
-    where_conditions, bool do_insert = true) {
+string table_code(Server& srv, string table_name, string where_conditions, bool
+    do_insert = true) {
 // where_conditions must have 'and' specified as 'AND' because it is possible
 //   that 'and' is in fields in the database tables
 
   static const string F = this_function_label(__func__);
   replace_all(where_conditions, " &eq; ", " = ");
-  MySQL::LocalQuery q;
+  LocalQuery q;
   q.set("code", table_name, where_conditions);
   if (q.submit(srv) < 0) {
     log_error2("error: '" + q.error() + " from query: '" + q.show() + "'", F,
@@ -236,7 +236,7 @@ string table_code(MySQL::Server& srv, string table_name, string
       return "";
     }
   }
-  MySQL::Row r;
+  Row r;
   q.fetch_row(r);
   return std::move(r[0]);
 }
@@ -291,24 +291,24 @@ struct MarkupParameters {
   string markup_type;
   XMLDocument xdoc;
   string element, data_type;
-  MySQL::Server server;
+  Server server;
   string database, file_type, filename, format;
   unordered_map<string, string> file_map, format_map;
 };
 
 void initialize_web_file(MarkupParameters *markup_parameters) {
   static const string F = this_function_label(__func__);
-  MySQL::Server mysrv_d(metautils::directives.database_server, metautils::
-      directives.rdadb_username, metautils::directives.rdadb_password, "dssdb");
+  Server mysrv_d(metautils::directives.database_server, metautils::directives.
+      rdadb_username, metautils::directives.rdadb_password, "dssdb");
   if (!mysrv_d) {
     log_error2("could not connect to RDADB - error: '" + mysrv_d.error() + "'",
         F, "scm", USER);
   }
   markup_parameters->filename = metautils::relative_web_filename(
       markup_parameters->filename);
-  MySQL::LocalQuery q("tindex", "dssdb.wfile", "wfile = '" + markup_parameters->
+  LocalQuery q("tindex", "dssdb.wfile", "wfile = '" + markup_parameters->
       filename + "'");
-  MySQL::Row r;
+  Row r;
   if (q.submit(mysrv_d) == 0 && q.fetch_row(r) && r[0] != "0") {
     local_args.gindex_list.emplace_back(r[0]);
   }
@@ -516,40 +516,23 @@ void insert_filename(MarkupParameters *markup_parameters) {
     if (!table_exists(markup_parameters->server, tb_nam)) {
       create_tables(markup_parameters);
     }
-
-// patch until all "webfiles2" tables have migrated webID -> id
-string c;
-if (MySQL::field_exists(markup_parameters->server, tb_nam, "id")) {
-c = table_code(markup_parameters->server, tb_nam, "id = '" + markup_parameters->filename + "'", false);
-} else {
-c = table_code(markup_parameters->server, tb_nam, markup_parameters->file_type + "ID = '" + markup_parameters->filename + "'", false);
-}
-
+    auto c = table_code(markup_parameters->server, tb_nam, "id = '" +
+        markup_parameters->filename + "'", false);
     if (c.empty()) {
-
-// patch until all "webfiles2" tables have migrated webID -> id
-string cols;
-if (MySQL::field_exists(markup_parameters->server, tb_nam, "id")) {
-cols = "id, format_code, num_" + markup_parameters->data_type + ", " "start_date, end_date, uflag";
-} else {
-cols = markup_parameters->file_type + "ID, format_code, num_" + markup_parameters->data_type + ", " "start_date, end_date, uflag";
-}
-
-      if (markup_parameters->server.insert(tb_nam, cols, "'" +
-          markup_parameters->filename + "', " + markup_parameters->format_map[
-          markup_parameters->format] + ", 0, 0, 0, '" + strand(5) + "'", "") <
-          0) {
+      if (markup_parameters->server.insert(
+            tb_nam,
+            "id, format_code, num_" + markup_parameters->data_type + ", "
+                "start_date, end_date, uflag",
+            "'" + markup_parameters->filename + "', " + markup_parameters->
+                format_map[markup_parameters->format] + ", 0, 0, 0, '" + strand(
+                5) + "'",
+            ""
+            ) < 0) {
         log_error2("error: '" + markup_parameters->server.error() + " while "
             "inserting into " + tb_nam, F, "scm", USER);
       }
-
-// patch until all "webfiles2" tables have migrated webID -> id
-if (MySQL::field_exists(markup_parameters->server, tb_nam, "id")) {
-c = table_code(markup_parameters->server, tb_nam, "id = '" + markup_parameters->filename + "'", false);
-} else {
-c = table_code(markup_parameters->server, tb_nam, markup_parameters->file_type + "ID = '" + markup_parameters->filename + "'", false);
-}
-
+      c = table_code(markup_parameters->server, tb_nam, "id = '" +
+          markup_parameters->filename + "'", false);
       if (c.empty()) {
         log_error2("error: unable to retrieve code from '" + tb_nam + "' for "
             "value '" + markup_parameters->filename + "'", F, "scm", USER);
@@ -698,7 +681,7 @@ void process_grml_markup(void *markup_parameters) {
     }
     auto gdef = def + ":" + defp;
     if (gd_map.find(gdef) == gd_map.end()) {
-      MySQL::LocalQuery q;
+      LocalQuery q;
       auto c = table_code(gp->server, gp->database + ".grid_definitions",
           "definition = '" + def + "' AND def_params = '" + defp + "'");
       if (c.empty()) {
@@ -922,8 +905,8 @@ void process_grml_markup(void *markup_parameters) {
 void *thread_summarize_IDs(void *args) {
   static const string F = this_function_label(__func__);
   auto &a = *(reinterpret_cast<vector<string> *>(args));
-  MySQL::Server srv(metautils::directives.database_server, metautils::
-      directives.metadb_username, metautils::directives.metadb_password, "");;
+  Server srv(metautils::directives.database_server, metautils::directives.
+      metadb_username, metautils::directives.metadb_password, "");;
   if (!srv) {
     log_error2("could not connect to mysql server - error: '" + srv.error() +
         "'", F, "scm", USER);
@@ -1180,14 +1163,14 @@ void *thread_summarize_file_ID_locations(void *args) {
   static const string F = this_function_label(__func__);
   static unordered_map<string, vector<string>> lmap;
   auto &a = *reinterpret_cast<vector<string> *>(args);
-  MySQL::Server srv(metautils::directives.database_server, metautils::
-      directives.metadb_username, metautils::directives.metadb_password, "");;
+  Server srv(metautils::directives.database_server, metautils::directives.
+      metadb_username, metautils::directives.metadb_password, "");;
   if (!srv) {
     log_error2("could not connect to mysql server - error: " + srv.error(), F,
         "scm", USER);
   }
   if (lmap.size() == 0) {
-    MySQL::LocalQuery q("box1d_row, box1d_column, keyword", "search."
+    LocalQuery q("box1d_row, box1d_column, keyword", "search."
         "locations_by_point");
     if (q.submit(srv) < 0)
       log_error2("'" + q.error() + "'", F, "scm", USER);
@@ -1384,7 +1367,7 @@ void process_obml_markup(void *markup_parameters) {
         dtyp += e.attribute_value("value");
         auto dtyp_k = obs_map[obs] + "|" + plat_map[plat] + "|" + dtyp;
         if (dtyp_map.find(dtyp_k) == dtyp_map.end()) {
-          MySQL::LocalQuery q("code", "WObML.ds" + local_args.dsnum2 +
+          LocalQuery q("code", "WObML.ds" + local_args.dsnum2 +
               "_data_types_list", "observation_type_code = " + obs_map[obs] +
               " and platform_type_code = " + plat_map[plat] + " and data_type "
               "= '" + dtyp + "'");
@@ -1394,7 +1377,7 @@ void process_obml_markup(void *markup_parameters) {
                 dtyp + "''", F, "scm", USER);
           }
           string c;
-          MySQL::Row r;
+          Row r;
           if (q.fetch_row(r)) {
             c = r[0];
           } else {
@@ -1946,8 +1929,8 @@ void *thread_summarize_fix_data(void *) {
 }
 
 void *thread_index_variables(void *) {
-  MySQL::Server srv(metautils::directives.database_server, metautils::
-      directives.metadb_username, metautils::directives.metadb_password, "");
+  Server srv(metautils::directives.database_server, metautils::directives.
+      metadb_username, metautils::directives.metadb_password, "");
   string e;
   if (!searchutils::indexed_variables(srv, metautils::args.dsnum, e)) {
     log_error2(e, "thread_index_variables()", "scm", USER);
@@ -1957,8 +1940,8 @@ void *thread_index_variables(void *) {
 }
 
 void *thread_index_locations(void *) {
-  MySQL::Server srv(metautils::directives.database_server, metautils::
-      directives.metadb_username, metautils::directives.metadb_password, "");
+  Server srv(metautils::directives.database_server, metautils::directives.
+      metadb_username, metautils::directives.metadb_password, "");
   string e;
   if (!searchutils::indexed_locations(srv, metautils::args.dsnum, e)) {
     log_error2(e, "thread_index_locations()", "scm", USER);
@@ -2096,10 +2079,11 @@ int main(int argc, char **argv) {
   Timer tm;
   tm.start();
 
-  MySQL::Server mysrv(metautils::directives.database_server, metautils::
-      directives.metadb_username, metautils::directives.metadb_password, "");
+  Server mysrv(metautils::directives.database_server, metautils::directives.
+      metadb_username, metautils::directives.metadb_password, "");
   if (!mysrv) {
-    log_error2("unable to connect to MySQL server at startup", F, "scm", USER);
+    log_error2("unable to connect to database server at startup", F, "scm",
+        USER);
   }
   unordered_map<string, vector<string>> mmap{
       { "GrML", vector<string>() },
@@ -2201,9 +2185,9 @@ int main(int argc, char **argv) {
   } else if (local_args.refresh_web) {
     if (local_args.gindex_list.size() > 0 && local_args.gindex_list.front() !=
         "all") {
-      MySQL::LocalQuery q("gidx", "dssdb.dsgroup", "dsid = 'ds" + metautils::
-          args.dsnum + "' and gindex = " + local_args.gindex_list.front() +
-          " and pindex = 0");
+      LocalQuery q("gidx", "dssdb.dsgroup", "dsid = 'ds" + metautils::args.dsnum
+          + "' and gindex = " + local_args.gindex_list.front() + " and pindex "
+          "= 0");
       if (q.submit(mysrv) < 0) {
         log_error2("group check failed", F, "scm", USER);
       }
@@ -2245,9 +2229,9 @@ int main(int argc, char **argv) {
         if (local_args.gindex_list.size() == 1) {
           if (local_args.gindex_list.front() == "all") {
             local_args.gindex_list.clear();
-            MySQL::LocalQuery q("select distinct tindex from dssdb.wfile where "
-                "dsid = 'ds" + metautils::args.dsnum + "' and type = 'D' and "
-                "status = 'P'");
+            LocalQuery q("select distinct tindex from dssdb.wfile where dsid = "
+                "'ds" + metautils::args.dsnum + "' and type = 'D' and status = "
+                "'P'");
             if (q.submit(mysrv) < 0) {
               log_error2("error getting group indexes: '" + q.error() + "'", F,
                   "scm", USER);
@@ -2308,9 +2292,9 @@ int main(int argc, char **argv) {
       if (local_args.refresh_inv && local_args.gindex_list.size() == 1) {
         if (local_args.gindex_list.front() == "all") {
           local_args.gindex_list.clear();
-          MySQL::LocalQuery q("select distinct tindex from dssdb.wfile where "
-              "dsid = 'ds" + metautils::args.dsnum + "' and type = 'D' and "
-              "status = 'P'");
+          LocalQuery q("select distinct tindex from dssdb.wfile where dsid = "
+              "'ds" + metautils::args.dsnum + "' and type = 'D' and status = "
+              "'P'");
           if (q.submit(mysrv) < 0) {
             log_error2("error getting group indexes: '" + q.error() + "'", F,
                 "scm", USER);

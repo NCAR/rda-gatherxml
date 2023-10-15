@@ -10,12 +10,14 @@
 #include <utils.hpp>
 #include <myerror.hpp>
 
+using namespace MySQL;
+
 metautils::Directives metautils::directives;
 metautils::Args metautils::args;
 std::string myerror="";
 std::string mywarning="";
 
-MySQL::Server server_m,server_d;
+Server server_m,server_d;
 std::string user=getenv("USER");
 std::string dsnum2;
 std::string ds_meta_link="N";
@@ -32,8 +34,8 @@ void fill_files_with_metadata(std::string filename = "")
 {
   const size_t NUM_DATABASES=7;
   static const std::vector<std::string> dbs{ "WGrML", "WObML", "SatML", "WFixML" };
-  MySQL::LocalQuery query;
-  MySQL::Row row;
+  LocalQuery query;
+  Row row;
   std::string meta_link;
   Entry e;
 
@@ -76,8 +78,8 @@ void update_meta_link(std::string table,std::string file,std::string new_meta_li
 
 void set_file_meta_links()
 {
-  MySQL::LocalQuery query;
-  MySQL::Row row;
+  LocalQuery query;
+  Row row;
   Entry e;
 
 //  query.set("select mssfile,meta_link,'mssfile' from mssfile where dsid = 'ds"+metautils::args.dsnum+"' and property = 'P' and retention_days > 0 union select wfile,meta_link,'wfile' from wfile where dsid = 'ds"+metautils::args.dsnum+"' and type = 'D' and property = 'A'");
@@ -98,7 +100,7 @@ query.set("select mssfile,meta_link,'mssfile' from mssfile where dsid = 'ds"+met
 
 void set_file_meta_link(std::string filename)
 {
-  MySQL::LocalQuery query;
+  LocalQuery query;
   if (strutils::has_beginning(filename,"/FS/DECS/")) {
     query.set("select meta_link,'mssfile' from mssfile where dsid = 'ds"+metautils::args.dsnum+"' and mssfile = '"+filename+"'");
   }
@@ -112,7 +114,7 @@ void set_file_meta_link(std::string filename)
     metautils::log_error("'"+filename+"' is not in dssdb","sml",user);
   }
   else {
-    MySQL::Row row;
+    Row row;
     query.fetch_row(row);
     Entry e;
     if (!files_with_metadata.found(filename,e)) {

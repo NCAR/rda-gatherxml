@@ -18,6 +18,7 @@
 #include <tempfile.hpp>
 #include <myerror.hpp>
 
+using namespace MySQL;
 using metautils::log_error2;
 using miscutils::this_function_label;
 using std::cerr;
@@ -204,8 +205,8 @@ void build_wms_capabilities() {
       0) {
     log_error2("could not create the directory tree", F, "iinv", USER);
   }
-  MySQL::Server server(metautils::directives.database_server, metautils::
-      directives.metadb_username, metautils::directives.metadb_password, "");
+  Server server(metautils::directives.database_server, metautils::directives.
+      metadb_username, metautils::directives.metadb_password, "");
   if (!server) {
     log_error2("could not connect to the metadata database", F, "iinv", USER);
   }
@@ -232,9 +233,9 @@ void build_wms_capabilities() {
   ofs.setf(std::ios::fixed);
   ofs.precision(4);
   auto dfmt = xdoc.element("GrML").attribute_value("format");
-  MySQL::LocalQuery q("code", "WGrML.formats", "format = '" + dfmt + "'");
+  LocalQuery q("code", "WGrML.formats", "format = '" + dfmt + "'");
   string fcod;
-  MySQL::Row row;
+  Row row;
   if (q.submit(server) == 0 && q.fetch_row(row)) {
     fcod = row[0];
   } else {
@@ -460,7 +461,7 @@ void build_wms_capabilities() {
   delete tdir;
 }
 
-void rename_indexes(MySQL::Server& server, string table) {
+void rename_indexes(Server& server, string table) {
   static const string F = this_function_label(__func__);
   string res;
   if (server.command("show index from " + table, res) < 0) {
@@ -685,8 +686,8 @@ struct InventoryData {
   bool is_dupe;
 };
 
-void process_grml_product_entry(MySQL::Server& server, string product,
-    InventoryData& inv_data) {
+void process_grml_product_entry(Server& server, string product, InventoryData&
+    inv_data) {
   static const string F = this_function_label(__func__);
   int i;
   if (product == "Analysis" || regex_search(product, regex("^0-hour")) ||
@@ -702,8 +703,7 @@ void process_grml_product_entry(MySQL::Server& server, string product,
     metautils::log_warning("insert_grml_inventory() does not recognize "
         "product '" + product + "'", "iinv", USER);
   }
-  MySQL::LocalQuery q("code", "WGrML.time_ranges", "time_range = '" + product
-      + "'");
+  LocalQuery q("code", "WGrML.time_ranges", "time_range = '" + product + "'");
   if (q.submit(server) < 0) {
     log_error2("error: '" + q.error() + "' while trying to get "
         "time_range code", F, "iinv", USER);
@@ -712,18 +712,18 @@ void process_grml_product_entry(MySQL::Server& server, string product,
     log_error2("no time_range code for '" + product + "'", F, "iinv",
         USER);
   }
-  MySQL::Row row;
+  Row row;
   q.fetch_row(row);
   inv_data.trv.emplace_back(make_pair(row[0], i));
 }
 
-void process_grml_grid_entry(MySQL::Server& server, string code, string
-    definition, InventoryData& inv_data) {
+void process_grml_grid_entry(Server& server, string code, string definition,
+    InventoryData& inv_data) {
   static const string F = this_function_label(__func__);
   auto sp = split(definition, ",");
   string def, def_params;
   tie(def, def_params) = process_grml_grid_definition(sp);
-  MySQL::LocalQuery q("code", "WGrML.grid_definitions", "definition = '" + def +
+  LocalQuery q("code", "WGrML.grid_definitions", "definition = '" + def +
       "' and def_params = '" + def_params + "'");
   if (q.submit(server) < 0) {
     log_error2("error: '" + q.error() + "' while trying to get "
@@ -733,13 +733,13 @@ void process_grml_grid_entry(MySQL::Server& server, string code, string
     log_error2("no gridDefinition code for '" + def + ", " + def_params + "'",
         F, "iinv", USER);
   }
-  MySQL::Row row;
+  Row row;
   q.fetch_row(row);
   inv_data.glst.emplace(code, row[0]);
 }
 
-void process_grml_level_entry(MySQL::Server& server, string code, string
-    description, InventoryData& inv_data) {
+void process_grml_level_entry(Server& server, string code, string description,
+    InventoryData& inv_data) {
   static const string F = this_function_label(__func__);
   auto sp = split(description, ":");
   if (sp.size() < 2 || sp.size() > 3) {
@@ -765,8 +765,8 @@ void process_grml_level_entry(MySQL::Server& server, string code, string
       break;
     }
   }
-  MySQL::LocalQuery q("code", "WGrML.levels", "map = '" + map + "' and type = '"
-      + typ + "' and value = '" + val + "'");
+  LocalQuery q("code", "WGrML.levels", "map = '" + map + "' and type = '" + typ
+      + "' and value = '" + val + "'");
   if (q.submit(server) < 0) {
     log_error2("error: '" + q.error() + "' while trying to get level code", F,
         "iinv", USER);
@@ -775,18 +775,17 @@ void process_grml_level_entry(MySQL::Server& server, string code, string
     log_error2("no level code for '" + map + ", " + typ + ", " + val + "'", F,
         "iinv", USER);
   }
-  MySQL::Row row;
+  Row row;
   q.fetch_row(row);
   inv_data.llst.emplace(code, row[0]);
 }
 
-void process_grml_parameter_entry(MySQL::Server& server, string code, string
+void process_grml_parameter_entry(Server& server, string code, string
     description, InventoryData& inv_data, bool large_byte_offsets) {
   static const string F = this_function_label(__func__);
   inv_data.plst.emplace(code, description);
   auto param = inv_data.format_code + "!" + description;
-  MySQL::LocalQuery q("code", "IGrML.parameters", "parameter = '" + param +
-      "'");
+  LocalQuery q("code", "IGrML.parameters", "parameter = '" + param + "'");
   if (q.submit(server) < 0) {
     log_error2("error: '" + q.error() + "' while trying to get parameter code",
         F, "iinv", USER);
@@ -803,10 +802,10 @@ void process_grml_parameter_entry(MySQL::Server& server, string code, string
           "code", F, "iinv", USER);
     }
   }
-  MySQL::Row row;
+  Row row;
   q.fetch_row(row);
   auto tbl = "IGrML.ds" + local_args.dsnum2 + "_inventory_" + row[0];
-  if (!MySQL::table_exists(server, tbl)) {
+  if (!table_exists(server, tbl)) {
     string res;
     if (large_byte_offsets) {
       if (server.command("create table " + tbl + " like IGrML."
@@ -826,7 +825,7 @@ void process_grml_parameter_entry(MySQL::Server& server, string code, string
   inv_data.pclst.emplace(param, row[0]);
 }
 
-void process_grml_header(MySQL::Server& server, string header, InventoryData&
+void process_grml_header(Server& server, string header, InventoryData&
     inv_data) {
   static const string F = this_function_label(__func__);
   auto sp = split(header, "<!>");
@@ -859,7 +858,7 @@ void process_grml_header(MySQL::Server& server, string header, InventoryData&
   }
 }
 
-void insert_into_db(MySQL::Server& server, int line_number, const stringstream&
+void insert_into_db(Server& server, int line_number, const stringstream&
     insert_stream, string table, string uflg, const stringstream&
     dupe_where_conditions, InventoryData& inv_data) {
   static const string F = this_function_label(__func__);
@@ -870,8 +869,8 @@ void insert_into_db(MySQL::Server& server, int line_number, const stringstream&
       log_error2("error: '" + server.error() + "' while inserting row '" +
           insert_stream.str() + "'", F, "iinv", USER);
     } else {
-      MySQL::LocalQuery q("uflag", table, dupe_where_conditions.str());
-      MySQL::Row row;
+      LocalQuery q("uflag", table, dupe_where_conditions.str());
+      Row row;
       if (q.submit(server) < 0 || !q.fetch_row(row)) {
         log_error2("error: '" + server.error() + "' while trying to get "
             "flag for duplicate row: '" + dupe_where_conditions.str() + "'", F,
@@ -896,9 +895,8 @@ void insert_into_db(MySQL::Server& server, int line_number, const stringstream&
   }
 }
 
-long long process_grml_inventory_entry(MySQL::Server& server, int line_number,
-     string inventory_entry, InventoryData& inv_data, string& dupe_dates,
-     string uflg) {
+long long process_grml_inventory_entry(Server& server, int line_number, string
+    inventory_entry, InventoryData& inv_data, string& dupe_dates, string uflg) {
   static const string F = this_function_label(__func__);
   auto sp = split(inventory_entry, "|");
   inv_data.byte_offset = sp[0];
@@ -970,8 +968,8 @@ long long process_grml_inventory_entry(MySQL::Server& server, int line_number,
 
 void insert_grml_inventory() {
   static const string F = this_function_label(__func__);
-  MySQL::Server server(metautils::directives.database_server, metautils::
-      directives.metadb_username, metautils::directives.metadb_password, "");
+  Server server(metautils::directives.database_server, metautils::directives.
+      metadb_username, metautils::directives.metadb_password, "");
   std::ifstream ifs(local_args.temp_directory + "/" + metautils::args.filename.
       c_str());
   if (!ifs.is_open()) {
@@ -979,10 +977,10 @@ void insert_grml_inventory() {
   }
   auto wid = substitute(metautils::args.filename, ".GrML_inv", "");
   replace_all(wid, "%", "/");
-  MySQL::LocalQuery q("select code, format_code, tindex from WGrML.ds" +
-      local_args.dsnum2 + "_webfiles2 as w left join dssdb.wfile as x on "
-      "(x.dsid = 'ds" + metautils::args.dsnum + "' and x.type = 'D' and "
-      "x.wfile = w.id) where w.id = '" + wid + "'");
+  LocalQuery q("select code, format_code, tindex from WGrML.ds" + local_args.
+      dsnum2 + "_webfiles2 as w left join dssdb.wfile as x on (x.dsid = 'ds" +
+      metautils::args.dsnum + "' and x.type = 'D' and x.wfile = w.id) where w."
+      "id = '" + wid + "'");
   if (q.submit(server) < 0) {
     log_error2("error: '" + q.error() + "' while looking for code from "
         "webfiles", F, "iinv", USER);
@@ -991,7 +989,7 @@ void insert_grml_inventory() {
     log_error2("did not find " + wid + " in WGrML.ds" + local_args.dsnum2 +
         "_webfiles2", F, "iinv", USER);
   }
-  MySQL::Row row;
+  Row row;
   q.fetch_row(row);
   InventoryData inv_data;
   inv_data.file_code = row[0];
@@ -1026,7 +1024,7 @@ void insert_grml_inventory() {
         "`", "file_code = " + inv_data.file_code + " and uflag != '" + uflg +
         "'");
   }
-  if (!MySQL::table_exists(server, "IGrML.ds" + local_args.dsnum2 +
+  if (!table_exists(server, "IGrML.ds" + local_args.dsnum2 +
       "_inventory_summary")) {
     string result;
     if (server.command("create table IGrML.ds" + local_args.dsnum2 +
@@ -1053,10 +1051,9 @@ void insert_grml_inventory() {
   }
 }
 
-void check_for_times_table(MySQL::Server& server, string type, string
-    last_decade) {
+void check_for_times_table(Server& server, string type, string last_decade) {
   static const string F = this_function_label(__func__);
-  if (!MySQL::table_exists(server, "IObML.ds" + local_args.dsnum2 + "_" + type +
+  if (!table_exists(server, "IObML.ds" + local_args.dsnum2 + "_" + type +
       "_times_" + last_decade + "0")) {
     string res;
     if (server.command("create table IObML.ds" + local_args.dsnum2 + "_" +
@@ -1069,8 +1066,8 @@ void check_for_times_table(MySQL::Server& server, string type, string
   }
 }
 
-void process_IDs(string type, MySQL::Server& server, string ID_index, string
-     ID_data, unordered_map<string, string>& id_table) {
+void process_IDs(string type, Server& server, string ID_index, string ID_data,
+    unordered_map<string, string>& id_table) {
   static const string F = this_function_label(__func__);
   auto sp = split(ID_data, "[!]");
   string qs = "select i.code from WObML.ds" + local_args.dsnum2 + "_ids as i "
@@ -1083,8 +1080,8 @@ void process_IDs(string type, MySQL::Server& server, string ID_index, string
         4]) + " and ne_lon = " + metatranslations::string_coordinate_to_db(sp[
         5]);
   }
-  MySQL::LocalQuery q(qs);
-  MySQL::Row row;
+  LocalQuery q(qs);
+  Row row;
   if (q.submit(server) < 0 || !q.fetch_row(row)) {
     stringstream ess;
     ess << "process_IDs() returned error: " << q.error() << " while trying to "
@@ -1113,7 +1110,7 @@ void process_IDs(string type, MySQL::Server& server, string ID_index, string
       if (type == "irregular") {
         t += "_b";
       }
-      if (!MySQL::table_exists(server,t)) {
+      if (!table_exists(server,t)) {
         string c = "create table " + t + " like IObML"
             ".template_inventory_lati_loni";
         if (type == "irregular") {
@@ -1134,7 +1131,7 @@ void process_IDs(string type, MySQL::Server& server, string ID_index, string
   }
 }
 
-void insert_obml_netcdf_time_series_inventory(std::ifstream& ifs, MySQL::Server&
+void insert_obml_netcdf_time_series_inventory(std::ifstream& ifs, Server&
     server, string file_code, size_t rec_size) {
   static const string F = this_function_label(__func__);
   if (rec_size > 0) {
@@ -1142,7 +1139,7 @@ void insert_obml_netcdf_time_series_inventory(std::ifstream& ifs, MySQL::Server&
         "iinv", USER);
   }
   string uflg = strand(3);
-  if (!MySQL::table_exists(server, "IObML.ds" + local_args.dsnum2 +
+  if (!table_exists(server, "IObML.ds" + local_args.dsnum2 +
       "_inventory_summary")) {
     string res;
     if (server.command("create table IObML.ds" + local_args.dsnum2 +
@@ -1196,9 +1193,8 @@ void insert_obml_netcdf_time_series_inventory(std::ifstream& ifs, MySQL::Server&
           break;
         }
         case 'O': {
-          MySQL::LocalQuery q("code", "WObML.obs_types", "obs_type = '" + sp[2]
-              + "'");
-          MySQL::Row row;
+          LocalQuery q("code", "WObML.obs_types", "obs_type = '" + sp[2] + "'");
+          Row row;
           if (q.submit(server) < 0 || !q.fetch_row(row)) {
             log_error2("error: '" + q.error() + "' while trying to get "
                 "obs_type code for '" + sp[2] + "'", F, "iinv", USER);
@@ -1207,9 +1203,9 @@ void insert_obml_netcdf_time_series_inventory(std::ifstream& ifs, MySQL::Server&
           break;
         }
         case 'P': {
-          MySQL::LocalQuery q("code", "WObML.platform_types", "platform_type = "
-              "'" + sp[2] + "'");
-          MySQL::Row row;
+          LocalQuery q("code", "WObML.platform_types", "platform_type = '" + sp[
+              2] + "'");
+          Row row;
           if (q.submit(server) < 0 || !q.fetch_row(row)) {
             log_error2("error: '" + q.error() + "' while trying to get "
                 "platform code for '" + sp[2] + "'", F, "iinv", USER);
@@ -1305,11 +1301,11 @@ void insert_obml_netcdf_time_series_inventory(std::ifstream& ifs, MySQL::Server&
         for (const auto& p : pmap) {
           auto k = o.first + "|" + p.first + "|" + dve.data->var_name;
           if (dmap.find(k) == dmap.end()) {
-            MySQL::LocalQuery q("code", "WObML.ds" + local_args.dsnum2 +
+            LocalQuery q("code", "WObML.ds" + local_args.dsnum2 +
                 "_data_types_list", "observation_type_code = " + o.second +
                 " and platform_type_code = " + p.second + " and data_type = 'ds"
                 + metautils::args.dsnum + ":" + dve.data->var_name + "'");
-            MySQL::Row row;
+            Row row;
             if (q.submit(server) < 0 || !q.fetch_row(row)) {
               log_error2("error: '" + q.error() + "' while trying to get "
                   "data_type code for '" + o.second + ", " + p.second  + ", '" +
@@ -1385,8 +1381,8 @@ void insert_obml_netcdf_time_series_inventory(std::ifstream& ifs, MySQL::Server&
       "file_code = " + file_code + " and uflag != '" + uflg + "'");
 }
 
-void insert_obml_netcdf_point_inventory(std::ifstream& ifs, MySQL::Server&
-    server, string file_code, size_t rec_size) {
+void insert_obml_netcdf_point_inventory(std::ifstream& ifs, Server& server,
+    string file_code, size_t rec_size) {
   static const string F = this_function_label(__func__);
   if (rec_size > 0) {
     log_error2("can't insert for observations with a record dimension", F,
@@ -1394,7 +1390,7 @@ void insert_obml_netcdf_point_inventory(std::ifstream& ifs, MySQL::Server&
   }
   string uflg = strand(3);
   string res;
-  if (!MySQL::table_exists(server, "IObML.ds" + local_args.dsnum2 +
+  if (!table_exists(server, "IObML.ds" + local_args.dsnum2 +
       "_inventory_summary")) {
     if (server.command("create table IObML.ds" + local_args.dsnum2 +
         "_inventory_summary like IObML.template_inventory_summary", res) <
@@ -1441,9 +1437,9 @@ void insert_obml_netcdf_point_inventory(std::ifstream& ifs, MySQL::Server&
           break;
         }
         case 'O': {
-          MySQL::LocalQuery q("code", "WObML.obs_types", "obs_type = '" + sp_l[
-              2] + "'");
-          MySQL::Row row;
+          LocalQuery q("code", "WObML.obs_types", "obs_type = '" + sp_l[2] +
+              "'");
+          Row row;
           if (q.submit(server) < 0 || !q.fetch_row(row)) {
             log_error2("error: '" + q.error() + "' while trying to get "
                 "obs_type code for '" + sp_l[2] + "'", F, "iinv", USER);
@@ -1452,9 +1448,9 @@ void insert_obml_netcdf_point_inventory(std::ifstream& ifs, MySQL::Server&
           break;
         }
         case 'P': {
-          MySQL::LocalQuery q("code", "WObML.platform_types", "platform_type = "
-              "'" + sp_l[2] + "'");
-          MySQL::Row row;
+          LocalQuery q("code", "WObML.platform_types", "platform_type = '" +
+              sp_l[2] + "'");
+          Row row;
           if (q.submit(server) < 0 || !q.fetch_row(row)) {
             log_error2("error: '" + q.error() + "' while trying to get "
                 "platform code for '" + sp_l[2] + "'", F, "iinv", USER);
@@ -1551,11 +1547,11 @@ void insert_obml_netcdf_point_inventory(std::ifstream& ifs, MySQL::Server&
         for (const auto& p : pmap) {
           auto k = o.first + "|" + p.first + "|" + dve.data->var_name;
           if (dmap.find(k) == dmap.end()) {
-            MySQL::LocalQuery q("code", "WObML.ds" + local_args.dsnum2 +
+            LocalQuery q("code", "WObML.ds" + local_args.dsnum2 +
                 "_data_types_list", "observation_type_code = " + o.second +
                 " and platform_type_code = " + p.second + " and data_type = 'ds"
                 + metautils::args.dsnum + ":" + dve.data->var_name + "'");
-            MySQL::Row row;
+            Row row;
             if (q.submit(server) < 0 || !q.fetch_row(row)) {
               log_error2("error: '" + q.error() + "' while trying to get "
                   "data_type code for '" + o.second + ", " + p.second + ", '" +
@@ -1646,12 +1642,12 @@ void insert_obml_netcdf_point_inventory(std::ifstream& ifs, MySQL::Server&
       "file_code = " + file_code + " and uflag != '" + uflg + "'");
 }
 
-void insert_generic_point_inventory(std::ifstream& ifs ,MySQL::Server& server,
-    string file_code) {
+void insert_generic_point_inventory(std::ifstream& ifs ,Server& server, string
+    file_code) {
   static const string F = this_function_label(__func__);
   auto uflg = strand(3);
   int mnlat = 99, mnlon = 99, mxlat = -1, mxlon = -1;
-  if (!MySQL::table_exists(server, "IObML.ds" + local_args.dsnum2 +
+  if (!table_exists(server, "IObML.ds" + local_args.dsnum2 +
       "_data_types_list_b")) {
     string res;
     if (server.command("create table IObML.ds" + local_args.dsnum2 +
@@ -1686,9 +1682,8 @@ void insert_generic_point_inventory(std::ifstream& ifs ,MySQL::Server& server,
           break;
         }
         case 'O': {
-          MySQL::LocalQuery q("code", "WObML.obs_types", "obs_type = '" + sp[2]
-              + "'");
-          MySQL::Row row;
+          LocalQuery q("code", "WObML.obs_types", "obs_type = '" + sp[2] + "'");
+          Row row;
           if (q.submit(server) < 0 || !q.fetch_row(row)) {
             log_error2("error: '" + q.error() + "' while trying to get "
                 "obs_type code for '" + sp[2] + "'", F, "iinv", USER);
@@ -1697,9 +1692,9 @@ void insert_generic_point_inventory(std::ifstream& ifs ,MySQL::Server& server,
           break;
         }
         case 'P': {
-          MySQL::LocalQuery q("code", "WObML.platform_types", "platform_type = "
-              "'" + sp[2] + "'");
-          MySQL::Row row;
+          LocalQuery q("code", "WObML.platform_types", "platform_type = '" + sp[
+              2] + "'");
+          Row row;
           if (q.submit(server) < 0 || !q.fetch_row(row)) {
             log_error2("error: '" + q.error() + "' while trying to get "
                 "platform_type code for '" + sp[2] + "'", F, "iinv", USER);
@@ -1714,11 +1709,11 @@ void insert_generic_point_inventory(std::ifstream& ifs ,MySQL::Server& server,
         case 'D': {
           if (sp.size() > 2) {
             auto sp2 = split(sp[2], "[!]");
-            MySQL::LocalQuery q("code", "WObML.ds" + local_args.dsnum2 +
+            LocalQuery q("code", "WObML.ds" + local_args.dsnum2 +
                 "_data_types_list", "observation_type_code = " + omap[sp2[0]] +
                 " and platform_type_code = " + pmap[sp2[1]] + " and data_type "
                 "= '" + sp2[2] + "'");
-            MySQL::Row row;
+            Row row;
             if (q.submit(server) < 0 || !q.fetch_row(row)) {
               log_error2("error: '" + q.error() + "' while trying to get "
                   "data_type code for '" + sp[2] + "'", F, "iinv", USER);
@@ -1858,8 +1853,8 @@ void insert_generic_point_inventory(std::ifstream& ifs ,MySQL::Server& server,
 
 void insert_obml_inventory() {
   static const string F = this_function_label(__func__);
-  MySQL::Server srv(metautils::directives.database_server, metautils::
-      directives.metadb_username, metautils::directives.metadb_password, "");
+  Server srv(metautils::directives.database_server, metautils::directives.
+      metadb_username, metautils::directives.metadb_password, "");
   struct stat buf;
   auto fil = unixutils::remote_web_file("https://rda.ucar.edu/datasets/ds" +
       metautils::args.dsnum + "/metadata/inv/" + metautils::args.filename +
@@ -1880,7 +1875,7 @@ void insert_obml_inventory() {
   }
   fil = substitute(metautils::args.filename, ".ObML_inv", "");
   replace_all(fil, "%", "/");
-  MySQL::LocalQuery q("select code, tindex from WObML.ds" + local_args.dsnum2 +
+  LocalQuery q("select code, tindex from WObML.ds" + local_args.dsnum2 +
       "_webfiles2 as w left join dssdb.wfile as x on (x.dsid = 'ds" +
       metautils::args.dsnum + "' and x.type = 'D' and x.wfile = w.id) where w."
       "id = '" + fil + "'");
@@ -1888,7 +1883,7 @@ void insert_obml_inventory() {
     log_error2("error: '" + q.error() + "' while looking for code from "
         "webfiles", F, "iinv", USER);
   }
-  MySQL::Row row;
+  Row row;
   q.fetch_row(row);
   auto wcod = row[0];
   tindex = row[1];

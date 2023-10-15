@@ -10,6 +10,7 @@
 #include <tempfile.hpp>
 #include <myerror.hpp>
 
+using namespace MySQL;
 using metautils::log_error;
 using std::cerr;
 using std::endl;
@@ -228,25 +229,25 @@ int main(int argc, char **argv) {
   }
   metautils::read_config("sdp", G_USER);
   parse_args(argc, argv);
-  MySQL::Server server_m(metautils::directives.database_server, metautils::
-      directives.metadb_username, metautils::directives.metadb_password, "");
+  Server server_m(metautils::directives.database_server, metautils::directives.
+      metadb_username, metautils::directives.metadb_password, "");
   if (!server_m) {
     cerr << "Error connecting to metadata database" << endl;
     exit(1);
   }
-  MySQL::Server server_d(metautils::directives.database_server, metautils::
-      directives.rdadb_username, metautils::directives.rdadb_password, "dssdb");
+  Server server_d(metautils::directives.database_server, metautils::directives.
+      rdadb_username, metautils::directives.rdadb_password, "dssdb");
   if (!server_d) {
     cerr << "Error connecting to RDADB database" << endl;
     exit(1);
   }
-  MySQL::LocalQuery query("type", "search.datasets", "dsid = '" + metautils::
-      args.dsnum + "'");
+  LocalQuery query("type", "search.datasets", "dsid = '" + metautils::args.dsnum
+      + "'");
   if (query.submit(server_m) < 0) {
     log_error("error '" + query.error() + "' while checking dataset type",
         "sdp", G_USER);
   }
-  MySQL::Row row;
+  Row row;
   if (!query.fetch_row(row)) {
     cerr << "Error: ds" << metautils::args.dsnum << " does not exist" << endl;
     exit(1);

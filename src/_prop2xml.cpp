@@ -9,6 +9,8 @@
 #include <strutils.hpp>
 #include <myerror.hpp>
 
+using namespace MySQL;
+
 metautils::Directives metautils::directives;
 metautils::Args metautils::args;
 bool gatherxml::verbose_operation;
@@ -199,15 +201,15 @@ void scan_input_file(gatherxml::markup::ObML::ObservationData& obs_data)
     std::cout << "Beginning scan of input file '"+metautils::args.local_name+"' containing " << num_input_lines << " lines ..." << std::endl;
   }
   std::unordered_set<std::string> platform_types,id_types;
-  MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
+  Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   if (!server) {
     metautils::log_error("scan_input_file(): unable to connect to the metadata database","prop2xml",USER);
   }
-  MySQL::LocalQuery query("platform_type","ObML.platform_types","platform_type != 'unknown'");
+  LocalQuery query("platform_type","ObML.platform_types","platform_type != 'unknown'");
   if (query.submit(server) != 0) {
     metautils::log_error("scan_input_file(): platform_types query error '"+query.error()+"'","prop2xml",USER);
   }
-  MySQL::Row row;
+  Row row;
   while (query.fetch_row(row)) {
     if (!row[0].empty()) {
 	platform_types.emplace(row[0]);
@@ -373,9 +375,9 @@ int main(int argc,char **argv)
   metautils::cmd_register("prop2xml",USER);
   if (metautils::args.dsnum != "999.9") {
     auto verified_file=false;
-    MySQL::Server server(metautils::directives.database_server,metautils::directives.rdadb_username,metautils::directives.rdadb_password,"dssdb");
+    Server server(metautils::directives.database_server,metautils::directives.rdadb_username,metautils::directives.rdadb_password,"dssdb");
     std::string file_type;
-    MySQL::LocalQuery query;
+    LocalQuery query;
     if (std::regex_search(metautils::args.path,std::regex("^/FS/DECS"))) {
 	query.set("dsid","mssfile","mssfile = '"+metautils::args.path+"/"+metautils::args.filename+"' and dsid = 'ds"+metautils::args.dsnum+"'");
     }
@@ -392,7 +394,7 @@ int main(int argc,char **argv)
     }
     if (query.submit(server) == 0) {
 	if (query.num_rows() > 0) {
-	  MySQL::Row row;
+	  Row row;
 	  if (query.fetch_row(row)) {
 	    if (row[0] == "ds"+metautils::args.dsnum) {
 		verified_file=true;

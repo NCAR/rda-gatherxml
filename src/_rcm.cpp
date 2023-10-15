@@ -13,6 +13,7 @@
 #include <utils.hpp>
 #include <myerror.hpp>
 
+using namespace MySQL;
 using metautils::log_error2;
 using miscutils::this_function_label;
 using std::cerr;
@@ -44,8 +45,8 @@ bool verified_new_file_is_archived(string& error) {
   if (metautils::args.dsnum > "998.9" || metautils::args.dsnum == "test") {
     return true;
   }
-  MySQL::Server server(metautils::directives.database_server, metautils::
-      directives.rdadb_username, metautils::directives.rdadb_password, "dssdb");
+  Server server(metautils::directives.database_server, metautils::directives.
+      rdadb_username, metautils::directives.rdadb_password, "dssdb");
   string qs, col;
   if (regex_search(g_old_name, regex(
       "^http(s){0,1}://(rda|dss)\\.ucar\\.edu/"))) {
@@ -54,7 +55,7 @@ bool verified_new_file_is_archived(string& error) {
         "wfile = '" + metautils::relative_web_filename(g_new_name) + "' and "
         "type = 'D' and status = 'P'";
   }
-  MySQL::LocalQuery q(qs);
+  LocalQuery q(qs);
   if (q.submit(server) < 0) {
     log_error2("error: '" + q.error() + "'", F, "rcm", USER);
   }
@@ -80,8 +81,8 @@ void replace_uri(string& sline, string cmdir, string member_name = "") {
 
 void rewrite_uri_in_cmd_file(string db) {
   const string F = this_function_label(__func__);
-  MySQL::LocalQuery query;
-  MySQL::Row row;
+  LocalQuery query;
+  Row row;
   std::ifstream ifs;
   std::ofstream ofs;
   char line[32768],line2[32768];
@@ -310,14 +311,14 @@ bool renamed_cmd() {
   string dsnum2 = substitute(metautils::args.dsnum,".","");
   string new_dsnum2 = substitute(g_new_dsnum,".","");
   string error;
-  MySQL::LocalQuery query,query2;
-  MySQL::Row row;
+  LocalQuery query,query2;
+  Row row;
   string oname,nname,scm_flag,sdum;
 
-  MySQL::Server server(metautils::directives.database_server, metautils::
-      directives.metadb_username, metautils::directives.metadb_password, "");
-  MySQL::Server server_d(metautils::directives.database_server, metautils::
-      directives.rdadb_username, metautils::directives.rdadb_password, "dssdb");
+  Server server(metautils::directives.database_server, metautils::directives.
+      metadb_username, metautils::directives.metadb_password, "");
+  Server server_d(metautils::directives.database_server, metautils::directives.
+      rdadb_username, metautils::directives.rdadb_password, "dssdb");
   string ftbl, col, dcol;
   if (regex_search(g_old_name, regex(
       "^http(s){0,1}://(rda|dss)\\.ucar\\.edu/"))) {
@@ -343,15 +344,14 @@ bool renamed_cmd() {
   }
   auto databases = server.db_names();
   for (const auto& db : databases) {
-    auto table_names = MySQL::table_names(server, db, "ds" + dsnum2 + ftbl,
-        error);
-    for (const auto& table : table_names) {
-      query.set("code", db + "." + table, col + " = '" + oname + "'");
+    auto tbl_names = table_names(server, db, "ds" + dsnum2 + ftbl, error);
+    for (const auto& tbl : tbl_names) {
+      query.set("code", db + "." + tbl, col + " = '" + oname + "'");
       if (query.submit(server) < 0) {
         log_error2("error: '" + query.error() + "'", F, "rcm", USER);
       }
       if (query.num_rows() > 0) {
-        query2.set("code", db + "." + substitute(table, dsnum2, new_dsnum2),
+        query2.set("code", db + "." + substitute(tbl, dsnum2, new_dsnum2),
             "binary " +  col  +  " = '" + nname + "'");
         if (query2.submit(server) < 0) {
           log_error2("error: '" + query2.error() + "'", F, "rcm", USER);
@@ -370,11 +370,11 @@ bool renamed_cmd() {
         }
         if (g_new_dsnum == metautils::args.dsnum) {
           while (query.fetch_row(row)) {
-            if (server.update(db + "." + table, col + " = '" + nname + "'",
+            if (server.update(db + "." + tbl, col + " = '" + nname + "'",
                 "code = " + row[0]) < 0) {
               log_error2("error: '" + server.error() + "'", F, "rcm", USER);
             }
-            server.update(db + "." + table + "2", col + " = '" + nname + "'",
+            server.update(db + "." + tbl + "2", col + " = '" + nname + "'",
                 "code = " + row[0]);
           }
         } else {

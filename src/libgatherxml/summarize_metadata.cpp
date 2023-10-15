@@ -783,7 +783,7 @@ void summarize_frequencies(string caller, string user, string file_id_code) {
   for (const auto& e : v) {
     auto t = e.first + ".ds" + substitute(metautils::args.dsnum, ".", "") +
         "_frequencies";
-    if (MySQL::table_exists(mysrv, t)) {
+    if (table_exists(mysrv, t)) {
       auto e2 = e.second(mysrv, file_id_code, caller, user);
 
       // update searchable time resolution keywords
