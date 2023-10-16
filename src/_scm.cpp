@@ -553,9 +553,6 @@ void clear_obml_tables(MarkupParameters *markup_parameters) {
       local_args.dsnum2 + "_data_types", "file_code = " + markup_parameters->
       file_map[markup_parameters->filename]);
   markup_parameters->server._delete(markup_parameters->database + ".ds" +
-      local_args.dsnum2 + "_frequencies", "file_code = " + markup_parameters->
-      file_map[markup_parameters->filename]);
-  markup_parameters->server._delete(markup_parameters->database + ".ds" +
       local_args.dsnum2 + "_geobounds", "file_code = " + markup_parameters->
       file_map[markup_parameters->filename]);
   markup_parameters->server._delete(markup_parameters->database + ".ds" +
@@ -917,6 +914,7 @@ void *thread_summarize_IDs(void *args) {
   double avgd = 0., navgd = 0., avgm = 0., navgm = 0.;
   size_t obs_count = 0;
   unordered_map<string, string> id_map;
+  auto tbl = a[5] + ".ds" + local_args.dsnum2 + "_id_list";
   auto uflg = strand(3);
   ifs.getline(l, 32768);
   while (!ifs.eof()) {
@@ -1019,7 +1017,6 @@ void *thread_summarize_IDs(void *args) {
         dt2.set(stoll(v));
       }
       auto nobs = e.attribute_value("numObs");
-      auto tbl = a[5] + ".ds" + local_args.dsnum2 + "_id_list";
       auto inserts = id_code + ", " + a[3] + ", " + a[4] + ", " + a[2] + ", " +
           nobs + ", " + dt1.to_string("%Y%m%d%H%MM%SS") + ", " + dt2.to_string(
           "%Y%m%d%H%MM%SS") + ", " + tz + ", '" + uflg + "'";
@@ -1069,8 +1066,7 @@ void *thread_summarize_IDs(void *args) {
     ifs.getline(l, 32768);
   }
   ifs.close();
-  srv._delete(a[5] + ".ds" + local_args.dsnum2 + "_id_list", "file_code = " + a[
-      2] + " and uflg != '" + uflg + "'");
+  srv._delete(tbl, "file_code = " + a[2] + " and uflg != '" + uflg + "'");
   if (navgd > 0.) {
     avgd /= navgd;
   }
@@ -1127,16 +1123,20 @@ void *thread_summarize_IDs(void *args) {
     k = searchutils::time_resolution_keyword("irregular", lround(avgm), u, "");
   }
   string r;
-  if (i != "0" && srv.command("insert into " + a[5] + ".ds" + local_args.dsnum2
-      + "_frequencies values (" + a[2] + ", " + a[3] + ", " + a[4] + ", " + i +
-      ", " + itos(obs_count) + ", '" + u + "', '" + a[7] + "') on duplicate "
-      "key update avg_obs_per = values(avg_obs_per), total_obs = values("
-      "total_obs), uflag = values(uflag)", r) < 0) {
-    if (srv.error().find("Duplicate entry") == string::npos) {
-      log_error2("'" + srv.error() + "' while trying to insert into " + a[5] +
-          ".ds" + local_args.dsnum2 + "_frequencies (" + a[2] + ", " + a[3] +
-          ", " + a[4] + ", " + i + ", " + itos(obs_count) + ", '" + u + "')", F,
-          "scm", USER);
+  if (i != "0") {
+    auto tbl = a[5] + ".ds" + local_args.dsnum2 + "_frequencies";
+    auto inserts = a[2] + ", " + a[3] + ", " + a[4] + ", " + i + ", " + itos(
+        obs_count) + ", '" + u + "', '" + a[7] + "'";
+    if (srv.insert(
+          tbl,
+          "file_code, observation_type_code, platform_type_code, avg_obs_per, "
+              "total_obs, unit, uflag",
+          inserts,
+          "update avg_obs_per = values(avg_obs_per), total_obs = values("
+              "total_obs), uflag = values(uflag)"
+          ) < 0) {
+      log_error2("'" + srv.error() + "' while trying to insert into " + tbl +
+          " (" + inserts + ")", F, "scm", USER);
     }
   }
   if (a[5] == "WObML" && srv.command("insert into " + a[5] + ".ds" + local_args.
@@ -1241,13 +1241,18 @@ void *thread_summarize_file_ID_locations(void *args) {
       my::map<gatherxml::summarizeMetadata::ParentLocation> pmap;
       vector<string> v;
       compress_locations(lset, pmap, v, "scm", USER);
+      auto loc_tbl = a[7] + ".ds" + local_args.dsnum2 + "_location_names";
+      string cols;
       if (a[7] == "WObML") {
-        srv._delete("WObML.ds" + local_args.dsnum2 + "_location_names",
-            "file_code = " + a[2] + " and observation_type_code = " + a[3] +
-            " and platform_type_code = " + a[4]);
+        srv._delete(loc_tbl, "file_code = " + a[2] + " and "
+            "observation_type_code = " + a[3] + " and platform_type_code = " +
+            a[4]);
+        cols = "file_code, observation_type_code, platform_type_code, "
+            "gcmd_keyword, include";
       } else if (a[7] == "WFixML") {
-        srv._delete("WFixML.ds" + local_args.dsnum2 + "_location_names",
-            "file_code = " + a[2] + " and classification_code = " + a[3]);
+        srv._delete(loc_tbl, "file_code = " + a[2] + " and classification_code "
+            "= " + a[3]);
+        cols = "file_code, classification_code, gcmd_keyword, include";
       }
       for (const auto& i : v) {
         gatherxml::summarizeMetadata::ParentLocation pl;
@@ -1255,17 +1260,21 @@ void *thread_summarize_file_ID_locations(void *args) {
         if (pl.matched_set != nullptr) {
           if (pl.matched_set->size() > pl.children_set->size() / 2) {
             replace_all(pl.key, "'", "\\'");
-            string s;
+            string inserts;
             if (!a[4].empty()) {
-              s = a[2] + ", " + a[3] + ", " + a[4] + ", '" + pl.key + "', 'Y'";
+              inserts = a[2] + ", " + a[3] + ", " + a[4] + ", '" + pl.key +
+                  "', 'Y'";
             } else {
-              s = a[2] + ", " + a[3] + ", '" + pl.key + "', 'Y'";
+              inserts = a[2] + ", " + a[3] + ", '" + pl.key + "', 'Y'";
             }
-            if (srv.insert(a[7] + ".ds" + local_args.dsnum2 + "_location_names",
-                s) < 0) {
-              log_error2("'" + srv.error() + "' while inserting '" + s +
-                  "' into " + a[7] + ".ds" + local_args.dsnum2 +
-                  "_location_names", F, "scm", USER);
+            if (srv.insert(
+                  loc_tbl,
+                  cols,
+                  inserts,
+                  ""
+                  ) < 0) {
+              log_error2("'" + srv.error() + "' while inserting '" + inserts +
+                  "' into " + loc_tbl, F, "scm", USER);
             }
             for (auto key : *pl.children_set) {
               replace_all(key, "'", "\\'");
@@ -1273,32 +1282,40 @@ void *thread_summarize_file_ID_locations(void *args) {
                   consolidated_parent_set->find(key) == pl.
                   consolidated_parent_set->end()) {
                 if (!a[4].empty()) {
-                  s = a[2] + ", " + a[3] + ", " + a[4] + ", '" + key + "', 'N'";
+                  inserts = a[2] + ", " + a[3] + ", " + a[4] + ", '" + key +
+                      "', 'N'";
                 } else {
-                  s = a[2] + ", " + a[3] + ", '" + key + "', 'N'";
+                  inserts = a[2] + ", " + a[3] + ", '" + key + "', 'N'";
                 }
-                if (srv.insert(a[7] + ".ds" + local_args.dsnum2 +
-                    "_location_names", s) < 0) {
-                  log_error2("'" + srv.error() + "' while inserting '" + s +
-                      "' into " + a[7] + ".ds" + local_args.dsnum2 +
-                      "_location_names", F, "scm", USER);
+                if (srv.insert(
+                      loc_tbl,
+                      cols,
+                      inserts,
+                      ""
+                      ) < 0) {
+                  log_error2("'" + srv.error() + "' while inserting '" + inserts
+                      + "' into " + loc_tbl, F, "scm", USER);
                 }
               }
             }
           } else {
             for (auto key : *pl.matched_set) {
               replace_all(key, "'", "\\'");
-              string s;
+              string inserts;
               if (!a[4].empty()) {
-                s = a[2] + ", " + a[3] + ", " + a[4] + ", '" + key + "', 'Y'";
+                inserts = a[2] + ", " + a[3] + ", " + a[4] + ", '" + key +
+                    "', 'Y'";
               } else {
-                s = a[2] + ", " + a[3] + ", '" + key + "', 'Y'";
+                inserts = a[2] + ", " + a[3] + ", '" + key + "', 'Y'";
               }
-              if (srv.insert(a[7] + ".ds" + local_args.dsnum2 +
-                  "_location_names", s) < 0) {
-                log_error2("'" + srv.error() + "' while inserting '" + s +
-                    "' into " + a[7] + ".ds" + local_args.dsnum2 +
-                    "_location_names", F, "scm", USER);
+              if (srv.insert(
+                    loc_tbl,
+                    cols,
+                    inserts,
+                    ""
+                    ) < 0) {
+                log_error2("'" + srv.error() + "' while inserting '" + inserts +
+                    "' into " + loc_tbl, F, "scm", USER);
               }
             }
           }
@@ -1397,21 +1414,26 @@ void process_obml_markup(void *markup_parameters) {
           }
           dtyp_map.emplace(dtyp_k, c);
         }
-        string s = op->file_map[op->filename] + ", " + dtyp_map[dtyp_k];
+        auto tbl = "WObML.ds" + local_args.dsnum2 + "_data_types";
+        string inserts = op->file_map[op->filename] + ", " + dtyp_map[dtyp_k];
         auto v = e.element("vertical");
         if (v.name() == "vertical") {
-          s += ", " + v.attribute_value("min_altitude") + ", " + v.
+          inserts += ", " + v.attribute_value("min_altitude") + ", " + v.
               attribute_value("max_altitude") + ", '" + v.attribute_value(
               "vunits") + "', " + v.attribute_value("avg_nlev") + ", " + v.
               attribute_value("avg_vres");
         } else {
-          s += ", 0, 0, NULL, 0, NULL";
+          inserts += ", 0, 0, NULL, 0, NULL";
         }
-        if (op->server.insert("WObML.ds" + local_args.dsnum2 + "_data_types", s)
-            < 0) {
-          log_error2("'" + op->server.error() + "' while trying to insert '" + s
-              + "' into WObML.ds" + local_args.dsnum2 + "_data_types", F, "scm",
-              USER);
+        if (op->server.insert(
+              tbl,
+              "file_code, data_type_code, min_altitude, max_altitude, vunits, "
+                  "avg_nlev, avg_vres",
+              inserts,
+              ""
+              ) < 0) {
+          log_error2("'" + op->server.error() + "' while trying to insert '" +
+              inserts + "' into " + tbl, F, "scm", USER);
         }
       }
       cnt += stoi((platform.p)->attribute_value("numObs"));
@@ -1744,16 +1766,19 @@ void update_fixml_database(FixMLParameters& fixml_parameters) {
   }
   for (const auto& e : fixml_parameters.freq_map) {
     auto sp = split(e.first, "<!>");
-    if (fixml_parameters.server.insert(fixml_parameters.database + ".ds" +
-        local_args.dsnum2 + "_frequencies", fixml_parameters.file_map[
-        fixml_parameters.filename] + ", " + sp[1] + ", " + itos(e.second.first)
-        + ", " + itos(e.second.second) + ", '" + sp[0] + "'") < 0) {
+    auto tbl = fixml_parameters.database + ".ds" + local_args.dsnum2 +
+        "_frequencies";
+    auto inserts = fixml_parameters.file_map[fixml_parameters.filename] + ", " +
+        sp[1] + ", " + itos(e.second.first) + ", " + itos(e.second.second) +
+        ", '" + sp[0] + "'";
+    if (fixml_parameters.server.insert(
+          tbl,
+          "file_code, classification_code, min_obs_per, max_obs_per, unit",
+          inserts,
+          ""
+          ) < 0) {
       log_error2("error: '" + fixml_parameters.server.error() + "' while "
-          "trying to insert into " + fixml_parameters.database + ".ds" +
-          local_args.dsnum2 + "_frequencies '" + fixml_parameters.file_map[
-          fixml_parameters.filename] + ", " + sp[1] + ", " + itos(e.second.
-          first) + ", " + itos(e.second.second) + ", '" + sp[0] + "''", F,
-          "scm", USER);
+          "trying to insert into " + tbl + " '" + inserts, F, "scm", USER);
     }
     if (fixml_parameters.database == "WFixML") {
       auto s = searchutils::time_resolution_keyword("irregular", e.second.
