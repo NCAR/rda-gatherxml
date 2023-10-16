@@ -689,40 +689,39 @@ void process_grml_markup(void *markup_parameters) {
     for (const auto& ge : g.element_addresses()) {
       auto enam = ge.p->name();
       if (enam == "process") {
+        auto tbl = gp->database + ".ds" + local_args.dsnum2 + "_processes";
         if (!found_process) {
-          if (!table_exists(gp->server, gp->database + ".ds" + local_args.dsnum2              + "_processes")) {
+          if (!table_exists(gp->server, tbl)) {
             string r;
-            if (gp->server.command("create table " + gp->database + ".ds" +
-                local_args.dsnum2 + "_processes like " + gp->database +
-                ".template_processes", r) < 0) {
+            if (gp->server.command("create table " + tbl + " like " + gp->
+                database + ".template_processes", r) < 0) {
               log_error2("error: '" + gp->server.error() + "' while creating "
-                  "table " + gp->database + ".ds" + local_args.dsnum2 +
-                  "_processes", F, "scm", USER);
+                  "table " + tbl, F, "scm", USER);
             }
           }
           found_process = true;
         }
-        if (gp->server.insert(gp->database + ".ds" + local_args.dsnum2 +
-            "_processes", gp->file_map[gp->filename] + ", " + tr_map[tr] + ", "
-            + gd_map[gdef] + ", '" + ge.p->attribute_value("value") + "'") <
-            0) {
+        if (gp->server.insert(
+              tbl,
+              "file_code, time_range_code, grid_definition_code, process",
+              gp->file_map[gp->filename] + ", " + tr_map[tr] + ", " + gd_map[
+                  gdef] + ", '" + ge.p->attribute_value("value") + "'",
+              ""
+              ) < 0) {
           if (gp->server.error().find("Duplicate entry") == string::npos) {
             log_error2("error: '" + gp->server.error() + "' while inserting "
-                "into " + gp->database + ".ds" + local_args.dsnum2 +
-                "_processes", F, "scm", USER);
+                "into " + tbl, F, "scm", USER);
           }
         }
       } else if (enam == "ensemble") {
+        auto tbl = gp->database + ".ds" + local_args.dsnum2 + "_ensembles";
         if (!found_ensemble) {
-          if (!table_exists(gp->server, gp->database + ".ds" + local_args.
-              dsnum2 + "_ensembles")) {
+          if (!table_exists(gp->server, tbl)) {
             string r;
-            if (gp->server.command("create table " + gp->database + ".ds" +
-                local_args.dsnum2 + "_ensembles like " + gp->database +
-                ".template_ensembles", r) < 0) {
+            if (gp->server.command("create table " + tbl + " like " + gp->
+                database + ".template_ensembles", r) < 0) {
               log_error2("error: '" + gp->server.error() + " while creating "
-                  "table " + gp->database + ".ds" + local_args.dsnum2 +
-                  "_ensembles", F, "scm", USER);
+                  "table " + tbl, F, "scm", USER);
             }
           }
           found_ensemble = true;
@@ -731,14 +730,18 @@ void process_grml_markup(void *markup_parameters) {
         if (v.empty()) {
           v = "0";
         }
-        if (gp->server.insert(gp->database + ".ds" + local_args.dsnum2 +
-            "_ensembles", gp->file_map[gp->filename] + ", " + tr_map[tr] + ", "
-            + gd_map[gdef] + ", '" + ge.p->attribute_value("type") + "', '" +
-            ge.p->attribute_value("ID") + "', " + v) < 0) {
+        if (gp->server.insert(
+              tbl,
+              "file_code, time_range_code, grid_definition_code, type, id, "
+                  "size",
+              gp->file_map[gp->filename] + ", " + tr_map[tr] + ", " + gd_map[
+                  gdef] + ", '" + ge.p->attribute_value("type") + "', '" + ge.
+                  p->attribute_value("ID") + "', " + v,
+              ""
+              ) < 0) {
           if (gp->server.error().find("Duplicate entry") == string::npos) {
             log_error2("error: '" + gp->server.error() + "' while inserting "
-                "into " + gp->database + ".ds" + local_args.dsnum2 +
-                "_ensembles", F, "scm", USER);
+                "into " + tbl, F, "scm", USER);
           }
         }
       } else if (enam == "level" || enam == "layer") {
