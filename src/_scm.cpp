@@ -548,15 +548,6 @@ void insert_filename(MarkupParameters *markup_parameters) {
   }
 }
 
-void clear_grml_tables(MarkupParameters *markup_parameters) {
-  markup_parameters->server._delete(markup_parameters->database + ".ds" +
-      local_args.dsnum2 + "_processes", "file_code = " + markup_parameters->
-      file_map[markup_parameters->filename]);
-  markup_parameters->server._delete(markup_parameters->database + ".ds" +
-      local_args.dsnum2 + "_ensembles", "file_code = " + markup_parameters->
-      file_map[markup_parameters->filename]);
-}
-
 void clear_obml_tables(MarkupParameters *markup_parameters) {
   markup_parameters->server._delete(markup_parameters->database + ".ds" +
       local_args.dsnum2 + "_data_types", "file_code = " + markup_parameters->
@@ -591,9 +582,7 @@ void clear_fixml_tables(MarkupParameters *markup_parameters) {
 }
 
 void clear_tables(MarkupParameters *markup_parameters) {
-  if (markup_parameters->markup_type == "GrML") {
-    clear_grml_tables(markup_parameters);
-  } else if (markup_parameters->markup_type == "ObML") {
+  if (markup_parameters->markup_type == "ObML") {
     clear_obml_tables(markup_parameters);
   } else if (markup_parameters->markup_type == "SatML") {
     clear_satml_tables(markup_parameters);
@@ -703,15 +692,14 @@ void process_grml_markup(void *markup_parameters) {
         }
         if (gp->server.insert(
               tbl,
-              "file_code, time_range_code, grid_definition_code, process",
+              "file_code, time_range_code, grid_definition_code, process, uflg",
               gp->file_map[gp->filename] + ", " + tr_map[tr] + ", " + gd_map[
-                  gdef] + ", '" + ge.p->attribute_value("value") + "'",
-              ""
+                  gdef] + ", '" + ge.p->attribute_value("value") + "', '" + uflg
+                  + "'",
+              "update uflg = values(uflg)"
               ) < 0) {
-          if (gp->server.error().find("Duplicate entry") == string::npos) {
-            log_error2("error: '" + gp->server.error() + "' while inserting "
-                "into " + tbl, F, "scm", USER);
-          }
+          log_error2("error: '" + gp->server.error() + "' while inserting into "
+              + tbl, F, "scm", USER);
         }
       } else if (enam == "ensemble") {
         auto tbl = gp->database + ".ds" + local_args.dsnum2 + "_ensembles";
@@ -733,16 +721,14 @@ void process_grml_markup(void *markup_parameters) {
         if (gp->server.insert(
               tbl,
               "file_code, time_range_code, grid_definition_code, type, id, "
-                  "size",
+                  "size, uflg",
               gp->file_map[gp->filename] + ", " + tr_map[tr] + ", " + gd_map[
                   gdef] + ", '" + ge.p->attribute_value("type") + "', '" + ge.
-                  p->attribute_value("ID") + "', " + v,
-              ""
+                  p->attribute_value("ID") + "', " + v + ", '" + uflg + "'",
+              "update uflg = values(uflg)"
               ) < 0) {
-          if (gp->server.error().find("Duplicate entry") == string::npos) {
-            log_error2("error: '" + gp->server.error() + "' while inserting "
-                "into " + tbl, F, "scm", USER);
-          }
+          log_error2("error: '" + gp->server.error() + "' while inserting into "
+              + tbl, F, "scm", USER);
         }
       } else if (enam == "level" || enam == "layer") {
         auto lm = ge.p->attribute_value("map");
@@ -854,6 +840,12 @@ void process_grml_markup(void *markup_parameters) {
     }
   }
   gp->server._delete(gp->database + ".ds" + local_args.dsnum2 + "_grids2",
+      "file_code = " + gp->file_map[gp->filename] + " and uflg != '" + uflg +
+      "'");
+  gp->server._delete(gp->database + ".ds" + local_args.dsnum2 + "_processes",
+      "file_code = " + gp->file_map[gp->filename] + " and uflg != '" + uflg +
+      "'");
+  gp->server._delete(gp->database + ".ds" + local_args.dsnum2 + "_ensembles",
       "file_code = " + gp->file_map[gp->filename] + " and uflg != '" + uflg +
       "'");
   mndt = string_date_to_ll_string(mndt);
@@ -2129,7 +2121,8 @@ int main(int argc, char **argv) {
     if ((local_args.summ_type.empty() || local_args.summ_type == "GrML") &&
         mmap["GrML"].size() > 0) {
       if (local_args.cmd_directory == "wfmd") {
-        mysrv._delete("WGrML.summary", "dsid = '" + metautils::args.dsnum + "'");
+        mysrv._delete("WGrML.summary", "dsid = '" + metautils::args.dsnum +
+            "'");
       }
     }
     summarize_markup(local_args.summ_type, mmap);
