@@ -550,9 +550,6 @@ void insert_filename(MarkupParameters *markup_parameters) {
 
 void clear_grml_tables(MarkupParameters *markup_parameters) {
   markup_parameters->server._delete(markup_parameters->database + ".ds" +
-      local_args.dsnum2 + "_grids2", "file_code = " + markup_parameters->
-      file_map[markup_parameters->filename]);
-  markup_parameters->server._delete(markup_parameters->database + ".ds" +
       local_args.dsnum2 + "_processes", "file_code = " + markup_parameters->
       file_map[markup_parameters->filename]);
   markup_parameters->server._delete(markup_parameters->database + ".ds" +
@@ -642,7 +639,8 @@ void process_grml_markup(void *markup_parameters) {
   string mndt = "3000-12-31 23:59 +0000";
   string mxdt = "0001-01-01 00:00 +0000";
   auto cnt = 0;
-  auto b = false, b2 = false;
+  auto found_process = false, found_ensemble = false;
+  auto uflg = strand(3);
   for (const auto& g : gp->xdoc.element_list("GrML/" + gp->element)) {
     auto tr = g.attribute_value("timeRange");
     auto prod = to_lower(tr);
@@ -697,7 +695,7 @@ void process_grml_markup(void *markup_parameters) {
     for (const auto& ge : g.element_addresses()) {
       auto enam = ge.p->name();
       if (enam == "process") {
-        if (!b) {
+        if (!found_process) {
           if (!table_exists(gp->server, gp->database + ".ds" + local_args.dsnum2              + "_processes")) {
             string r;
             if (gp->server.command("create table " + gp->database + ".ds" +
@@ -708,7 +706,7 @@ void process_grml_markup(void *markup_parameters) {
                   "_processes", F, "scm", USER);
             }
           }
-          b = true;
+          found_process = true;
         }
         if (gp->server.insert(gp->database + ".ds" + local_args.dsnum2 +
             "_processes", gp->file_map[gp->filename] + ", " + tr_map[tr] + ", "
@@ -721,7 +719,7 @@ void process_grml_markup(void *markup_parameters) {
           }
         }
       } else if (enam == "ensemble") {
-        if (!b2) {
+        if (!found_ensemble) {
           if (!table_exists(gp->server, gp->database + ".ds" + local_args.
               dsnum2 + "_ensembles")) {
             string r;
@@ -733,7 +731,7 @@ void process_grml_markup(void *markup_parameters) {
                   "_ensembles", F, "scm", USER);
             }
           }
-          b2 = true;
+          found_ensemble = true;
         }
         auto v = ge.p->attribute_value("size");
         if (v.empty()) {
@@ -840,20 +838,27 @@ void process_grml_markup(void *markup_parameters) {
       });
       string s;
       bitmap::compress_values(e.second->level_code_list, s);
-      auto sp = split(e.first, "<!>");
       auto tbl = gp->database + ".ds" + local_args.dsnum2 + "_grids2";
-      auto cols = "file_code, time_range_code, grid_definition_code, "
-          "parameter, level_type_codes, start_date, end_date, nsteps";
+      auto sp = split(e.first, "<!>");
       auto inserts = gp->file_map[gp->filename] + ", " + tr_map[tr] + ", " +
           gd_map[gdef] + ", '" + sp[0] + "', '" + s + "', " + sp[1] + ", " + sp[
-          2] + ", " + sp[3];
-      if (gp->server.insert(tbl, cols, inserts, "") < 0) {
+          2] + ", " + sp[3] + ", '" + uflg + "'";
+      if (gp->server.insert(
+            tbl,
+            "file_code, time_range_code, grid_definition_code, parameter, "
+                "level_type_codes, start_date, end_date, nsteps, uflg",
+            inserts,
+            "update uflg = values(uflg)"
+            ) < 0) {
         log_error2("error: '" + gp->server.error() + " while inserting '" +
             inserts + "' into '" + tbl + "'", F, "scm", USER);
       }
       e.second.reset();
     }
   }
+  gp->server._delete(gp->database + ".ds" + local_args.dsnum2 + "_grids2",
+      "file_code = " + gp->file_map[gp->filename] + " and uflg != '" + uflg +
+      "'");
   mndt = string_date_to_ll_string(mndt);
   replace_all(mndt, "+0000", "");
   mxdt = string_date_to_ll_string(mxdt);
