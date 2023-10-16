@@ -1991,8 +1991,12 @@ void summarize_locations(string database, string& error) {
   mysrv._delete("search.locations", "dsid = '" + metautils::args.dsnum + "'");
   for (auto e : v) {
     replace_all(e, "'", "\\'");
-    if (mysrv.insert("search.locations", "'" + e + "', 'GCMD', 'Y', '" +
-        metautils::args.dsnum + "'") < 0) {
+    if (mysrv.insert(
+          "search.locations",
+          "keyword, vocabulary, include, dsid",
+          "'" + e + "', 'GCMD', 'Y', '" + metautils::args.dsnum + "'",
+          ""
+          ) < 0) {
       error = move(mysrv.error());
       return;
     }
