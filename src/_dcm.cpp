@@ -199,7 +199,7 @@ bool remove_from(string database, string table_ext, string file_field_name,
       file_id_code = row[0];
 
       // check for a file moved to the saved area
-      query.set("sid", "dssdb.file", "dsid = 'ds" + metautils::args.dsnum +
+      query.set("sid", "dssdb.sfile", "dsid = 'ds" + metautils::args.dsnum +
           "' and sfile = '" + file + "'");
       if (query.submit(local_server) < 0) {
         log_error2("error: '" + local_server.error() + "' while trying to "
