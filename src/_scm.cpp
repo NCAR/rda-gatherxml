@@ -559,9 +559,6 @@ void clear_grml_tables(MarkupParameters *markup_parameters) {
 
 void clear_obml_tables(MarkupParameters *markup_parameters) {
   markup_parameters->server._delete(markup_parameters->database + ".ds" +
-      local_args.dsnum2 + "_id_list", "file_code = " + markup_parameters->
-      file_map[markup_parameters->filename]);
-  markup_parameters->server._delete(markup_parameters->database + ".ds" +
       local_args.dsnum2 + "_data_types", "file_code = " + markup_parameters->
       file_map[markup_parameters->filename]);
   markup_parameters->server._delete(markup_parameters->database + ".ds" +
@@ -590,9 +587,6 @@ void clear_fixml_tables(MarkupParameters *markup_parameters) {
       file_map[markup_parameters->filename]);
   markup_parameters->server._delete(markup_parameters->database + ".ds" +
       local_args.dsnum2 + "_frequencies", "file_code = " + markup_parameters->
-      file_map[markup_parameters->filename]);
-  markup_parameters->server._delete(markup_parameters->database + ".ds" +
-      local_args.dsnum2 + "_id_list", "file_code = " + markup_parameters->
       file_map[markup_parameters->filename]);
 }
 
@@ -928,6 +922,7 @@ void *thread_summarize_IDs(void *args) {
   double avgd = 0., navgd = 0., avgm = 0., navgm = 0.;
   size_t obs_count = 0;
   unordered_map<string, string> id_map;
+  auto uflg = strand(3);
   ifs.getline(l, 32768);
   while (!ifs.eof()) {
     if (l[2] == '<' && l[3] == 'I' && l[4] == 'D') {
@@ -1032,18 +1027,16 @@ void *thread_summarize_IDs(void *args) {
       auto tbl = a[5] + ".ds" + local_args.dsnum2 + "_id_list";
       auto inserts = id_code + ", " + a[3] + ", " + a[4] + ", " + a[2] + ", " +
           nobs + ", " + dt1.to_string("%Y%m%d%H%MM%SS") + ", " + dt2.to_string(
-          "%Y%m%d%H%MM%SS") + ", " + tz;
+          "%Y%m%d%H%MM%SS") + ", " + tz + ", '" + uflg + "'";
       if (srv.insert(
             tbl,
             "id_code, observation_type_code, platform_type_code, file_code, "
-                "num_observations, start_date, end_date, time_zone",
+                "num_observations, start_date, end_date, time_zone, uflg",
             inserts,
-            ""
+            "update uflg = values(uflg)"
             ) < 0) {
-        if (srv.error().find("Duplicate entry") == string::npos) {
-          log_error2("'" + srv.error() + "' while inserting '" + inserts +
-              "' into " + tbl, F, "scm", USER);
-        }
+        log_error2("'" + srv.error() + "' while inserting '" + inserts +
+            "' into " + tbl, F, "scm", USER);
       }
       for (const auto& element : e.element_list("dataType")) {
         if (dt2 != dt1 || (dt1.time() == 999999 && dt2.time() == 999999)) {
@@ -1081,6 +1074,8 @@ void *thread_summarize_IDs(void *args) {
     ifs.getline(l, 32768);
   }
   ifs.close();
+  srv._delete(a[5] + ".ds" + local_args.dsnum2 + "_id_list", "file_code = " + a[
+      2] + " and uflg != '" + uflg + "'");
   if (navgd > 0.) {
     avgd /= navgd;
   }
@@ -1593,6 +1588,7 @@ void process_fixml_markup(void *markup_parameters) {
   auto fp = reinterpret_cast<FixMLParameters *>(markup_parameters);
   string mndt = "30001231235959";
   string mxdt = "10000101000000";
+  auto uflg = strand(3);
   auto cnt = 0;
   for (const auto& f : fp->xdoc.element_list("FixML/" + fp->element)) {
     for (const auto& _class : f.element_list("classification")) {
@@ -1613,13 +1609,13 @@ void process_fixml_markup(void *markup_parameters) {
       auto tbl = fp->database + ".ds" + local_args.dsnum2 + "_id_list";
       auto inserts = "'" + f.attribute_value("ID") + "', " + fp->stg_map[stg] +
           ", " + fp->file_map[fp->filename] + ", " + _class.attribute_value(
-          "nfixes");
+          "nfixes") + ", '" + uflg + "'";
       if (fp->server.insert(
             tbl,
-            "id, classification_code, file_code, num_fixes",
+            "id, classification_code, file_code, num_fixes, uflg",
             inserts,
             "update num_fixes = num_fixes + " + _class.attribute_value(
-                "nfixes")
+                "nfixes") + ", uflg = '" + uflg + "'"
             ) < 0) {
         log_error2("error: '" + fp->server.error() + "' while inserting '" +
             inserts + "' into " + tbl, F, "scm", USER);
@@ -1671,10 +1667,13 @@ cerr << n << " " << dt1.to_string() << " " << dt2.to_string() << endl;
       }
     }
   }
-  auto s = "num_fixes = " + itos(cnt) + ", start_date = " + mndt + ", end_date "
-      "= " + mxdt;
+  fp->server._delete(fp->database + ".ds" + local_args.dsnum2 + "_id_list",
+      "file_code = " + fp->file_map[fp->filename] + " and uflg != '" + uflg +
+      "'");
   auto tb_nam = fp->database + ".ds" + local_args.dsnum2 + "_" + fp->file_type +
       "files2";
+  auto s = "num_fixes = " + itos(cnt) + ", start_date = " + mndt + ", end_date "
+      "= " + mxdt;
   if (fp->server.update(tb_nam, s + ", uflag = '" + strand(5) + "'", "code = " +
       fp->file_map[fp->filename]) < 0) {
     log_error2("error: '" + fp->server.error() + "' while updating " + tb_nam +
