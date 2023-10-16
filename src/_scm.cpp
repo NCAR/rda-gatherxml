@@ -1029,18 +1029,20 @@ void *thread_summarize_IDs(void *args) {
         dt2.set(stoll(v));
       }
       auto nobs = e.attribute_value("numObs");
-      if (srv.insert(a[5] + ".ds" + local_args.dsnum2 + "_id_list", "id_code, "
-          "observation_type_code, platform_type_code, file_code, "
-          "num_observations, start_date, end_date, time_zone", id_code + ", " +
-          a[3] + ", " + a[4] + ", " + a[2] + ", " + nobs + ", " + dt1.to_string(
-          "%Y%m%d%H%MM%SS") + ", " + dt2.to_string("%Y%m%d%H%MM%SS") + ", " +
-          tz, "") < 0) {
+      auto tbl = a[5] + ".ds" + local_args.dsnum2 + "_id_list";
+      auto inserts = id_code + ", " + a[3] + ", " + a[4] + ", " + a[2] + ", " +
+          nobs + ", " + dt1.to_string("%Y%m%d%H%MM%SS") + ", " + dt2.to_string(
+          "%Y%m%d%H%MM%SS") + ", " + tz;
+      if (srv.insert(
+            tbl,
+            "id_code, observation_type_code, platform_type_code, file_code, "
+                "num_observations, start_date, end_date, time_zone",
+            inserts,
+            ""
+            ) < 0) {
         if (srv.error().find("Duplicate entry") == string::npos) {
-          log_error2("'" + srv.error() + "' while inserting '" + id_code + ", "
-              + a[3] + ", " + a[4] + ", " + a[2] + ", " + nobs + ", " + dt1.
-              to_string("%Y%m%d%H%MM%SS") + ", " + dt2.to_string(
-              "%Y%m%d%H%MM%SS") + ", " + tz + "' into " + a[5] + ".ds" +
-              local_args.dsnum2 + "_id_list", F, "scm", USER);
+          log_error2("'" + srv.error() + "' while inserting '" + inserts +
+              "' into " + tbl, F, "scm", USER);
         }
       }
       for (const auto& element : e.element_list("dataType")) {
@@ -1608,16 +1610,19 @@ void process_fixml_markup(void *markup_parameters) {
         }
         fp->stg_map.emplace(stg, c);
       }
-      if (fp->server.insert(fp->database + ".ds" + local_args.dsnum2 +
-          "_id_list", "'" + f.attribute_value("ID") + "', " + fp->stg_map[stg] +
+      auto tbl = fp->database + ".ds" + local_args.dsnum2 + "_id_list";
+      auto inserts = "'" + f.attribute_value("ID") + "', " + fp->stg_map[stg] +
           ", " + fp->file_map[fp->filename] + ", " + _class.attribute_value(
-          "nfixes"), "update num_fixes = num_fixes + " + _class.attribute_value(
-          "nfixes")) < 0) {
+          "nfixes");
+      if (fp->server.insert(
+            tbl,
+            "id, classification_code, file_code, num_fixes",
+            inserts,
+            "update num_fixes = num_fixes + " + _class.attribute_value(
+                "nfixes")
+            ) < 0) {
         log_error2("error: '" + fp->server.error() + "' while inserting '" +
-            f.attribute_value("ID") + "', " + fp->stg_map[stg] + ", " + fp->
-            file_map[fp->filename] + ", " + _class.attribute_value("nfixes") +
-            "' into " + fp->database + ".ds" + local_args.dsnum2 + "_id_list",
-            F, "scm", USER);
+            inserts + "' into " + tbl, F, "scm", USER);
       }
       auto e = _class.element("start");
       auto v = string_date_to_ll_string(e.attribute_value("dateTime"));
