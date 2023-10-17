@@ -556,9 +556,6 @@ void clear_obml_tables(MarkupParameters *markup_parameters) {
       local_args.dsnum2 + "_geobounds", "file_code = " + markup_parameters->
       file_map[markup_parameters->filename]);
   markup_parameters->server._delete(markup_parameters->database + ".ds" +
-      local_args.dsnum2 + "_location_names", "file_code = " +
-      markup_parameters->file_map[markup_parameters->filename]);
-  markup_parameters->server._delete(markup_parameters->database + ".ds" +
       local_args.dsnum2 + "_locations", "file_code = " + markup_parameters->
       file_map[markup_parameters->filename]);
 }
@@ -1237,23 +1234,19 @@ void *thread_summarize_file_ID_locations(void *args) {
         }
       }
     }
-    if (lset.size() > 0) {
+    if (!lset.empty()) {
       my::map<gatherxml::summarizeMetadata::ParentLocation> pmap;
       vector<string> v;
       compress_locations(lset, pmap, v, "scm", USER);
       auto loc_tbl = a[7] + ".ds" + local_args.dsnum2 + "_location_names";
       string cols;
       if (a[7] == "WObML") {
-        srv._delete(loc_tbl, "file_code = " + a[2] + " and "
-            "observation_type_code = " + a[3] + " and platform_type_code = " +
-            a[4]);
         cols = "file_code, observation_type_code, platform_type_code, "
-            "gcmd_keyword, include";
+            "gcmd_keyword, include, uflg";
       } else if (a[7] == "WFixML") {
-        srv._delete(loc_tbl, "file_code = " + a[2] + " and classification_code "
-            "= " + a[3]);
-        cols = "file_code, classification_code, gcmd_keyword, include";
+        cols = "file_code, classification_code, gcmd_keyword, include, uflg";
       }
+      auto uflg = strand(3);
       for (const auto& i : v) {
         gatherxml::summarizeMetadata::ParentLocation pl;
         pmap.found(i, pl);
@@ -1263,15 +1256,16 @@ void *thread_summarize_file_ID_locations(void *args) {
             string inserts;
             if (!a[4].empty()) {
               inserts = a[2] + ", " + a[3] + ", " + a[4] + ", '" + pl.key +
-                  "', 'Y'";
+                  "', 'Y', '" + uflg + "'";
             } else {
-              inserts = a[2] + ", " + a[3] + ", '" + pl.key + "', 'Y'";
+              inserts = a[2] + ", " + a[3] + ", '" + pl.key + "', 'Y', '" + uflg
+                  + "'";
             }
             if (srv.insert(
                   loc_tbl,
                   cols,
                   inserts,
-                  ""
+                  "update uflg = values(uflg)"
                   ) < 0) {
               log_error2("'" + srv.error() + "' while inserting '" + inserts +
                   "' into " + loc_tbl, F, "scm", USER);
@@ -1283,15 +1277,16 @@ void *thread_summarize_file_ID_locations(void *args) {
                   consolidated_parent_set->end()) {
                 if (!a[4].empty()) {
                   inserts = a[2] + ", " + a[3] + ", " + a[4] + ", '" + key +
-                      "', 'N'";
+                      "', 'N', '" + uflg + "'";
                 } else {
-                  inserts = a[2] + ", " + a[3] + ", '" + key + "', 'N'";
+                  inserts = a[2] + ", " + a[3] + ", '" + key + "', 'N', '" +
+                      uflg + "'";
                 }
                 if (srv.insert(
                       loc_tbl,
                       cols,
                       inserts,
-                      ""
+                      "update uflg = values(uflg)"
                       ) < 0) {
                   log_error2("'" + srv.error() + "' while inserting '" + inserts
                       + "' into " + loc_tbl, F, "scm", USER);
@@ -1304,15 +1299,16 @@ void *thread_summarize_file_ID_locations(void *args) {
               string inserts;
               if (!a[4].empty()) {
                 inserts = a[2] + ", " + a[3] + ", " + a[4] + ", '" + key +
-                    "', 'Y'";
+                    "', 'Y', '" + uflg + "'";
               } else {
-                inserts = a[2] + ", " + a[3] + ", '" + key + "', 'Y'";
+                inserts = a[2] + ", " + a[3] + ", '" + key + "', 'Y', '" + uflg
+                    + "'";
               }
               if (srv.insert(
                     loc_tbl,
                     cols,
                     inserts,
-                    ""
+                    "update uflg = values(uflg)"
                     ) < 0) {
                 log_error2("'" + srv.error() + "' while inserting '" + inserts +
                     "' into " + loc_tbl, F, "scm", USER);
@@ -1324,6 +1320,8 @@ void *thread_summarize_file_ID_locations(void *args) {
         pl.children_set.reset();
         pl.consolidated_parent_set.reset();
       }
+      srv._delete(loc_tbl, "file_code = " + a[2] + " and uflg != '" + uflg +
+          "'");
     }
     xdoc.close();
   } else {
