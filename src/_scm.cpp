@@ -1208,17 +1208,28 @@ void *thread_summarize_file_ID_locations(void *args) {
       } else {
         lb = b;
       }
-      auto s = a[2] + ", " + a[3];
+      auto tbl = a[7] + ".ds" + local_args.dsnum2 + "_locations";
+      string cols = "file_code";
+      auto inserts = a[2];
       if (!a[4].empty()) {
-        s += ", " + a[4];
+        cols += ", observation_type_code, platform_type_code";
+        inserts += ", " + a[3] + ", " +a[4];
+      } else {
+        cols += ", classification_code";
+        inserts += ", " + a[3];
       }
-      s += ", " + a[5] + ", " + a[6] + ", " + e.attribute_value("row") + ", '" +
-          lb + "'";
-      if (srv.insert(a[7] + ".ds" + local_args.dsnum2 + "_locations", s) < 0) {
+      cols += ", start_date, end_date, box1d_row, box1d_bitmap";
+      inserts += ", " + a[5] + ", " + a[6] + ", " + e.attribute_value("row") +
+          ", '" + lb + "'";
+      if (srv.insert(
+            tbl,
+            cols,
+            inserts,
+            ""
+            ) < 0) {
         if (srv.error().find("Duplicate entry") == string::npos) {
-          log_error2("'" + srv.error() + "' while trying to insert into " + a[7]
-              + ".ds" + local_args.dsnum2 + "_locations (" + s + ") into " + a[
-              7] + ".ds" + local_args.dsnum2 + "_locations", F, "scm", USER);
+          log_error2("'" + srv.error() + "' while trying to insert into " + tbl +
+              " (" + inserts + ")", F, "scm", USER);
         }
       }
       size_t i = stoi(e.attribute_value("row"));
