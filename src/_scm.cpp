@@ -550,9 +550,6 @@ void insert_filename(MarkupParameters *markup_parameters) {
 
 void clear_obml_tables(MarkupParameters *markup_parameters) {
   markup_parameters->server._delete(markup_parameters->database + ".ds" +
-      local_args.dsnum2 + "_data_types", "file_code = " + markup_parameters->
-      file_map[markup_parameters->filename]);
-  markup_parameters->server._delete(markup_parameters->database + ".ds" +
       local_args.dsnum2 + "_geobounds", "file_code = " + markup_parameters->
       file_map[markup_parameters->filename]);
 }
@@ -1357,6 +1354,7 @@ void process_obml_markup(void *markup_parameters) {
   auto uflag = strand(3);
   unordered_map<string, string> obs_map, plat_map, dtyp_map;
   unordered_set<string> kml_table;
+  auto dt_tbl = "WObML.ds" + local_args.dsnum2 + "_data_types";
   for (const auto& o : op->xdoc.element_list("ObML/" + op->element)) {
     auto obs = o.attribute_value("value");
     if (obs_map.find(obs) == obs_map.end()) {
@@ -1418,7 +1416,6 @@ void process_obml_markup(void *markup_parameters) {
           }
           dtyp_map.emplace(dtyp_k, c);
         }
-        auto tbl = "WObML.ds" + local_args.dsnum2 + "_data_types";
         string inserts = op->file_map[op->filename] + ", " + dtyp_map[dtyp_k];
         auto v = e.element("vertical");
         if (v.name() == "vertical") {
@@ -1429,15 +1426,16 @@ void process_obml_markup(void *markup_parameters) {
         } else {
           inserts += ", 0, 0, NULL, 0, NULL";
         }
+        inserts += ", '" + uflag + "'";
         if (op->server.insert(
-              tbl,
+              dt_tbl,
               "file_code, data_type_code, min_altitude, max_altitude, vunits, "
-                  "avg_nlev, avg_vres",
+                  "avg_nlev, avg_vres, uflg",
               inserts,
-              ""
+              "update uflg = values(uflg)"
               ) < 0) {
           log_error2("'" + op->server.error() + "' while trying to insert '" +
-              inserts + "' into " + tbl, F, "scm", USER);
+              inserts + "' into " + dt_tbl, F, "scm", USER);
         }
       }
       cnt += stoi((platform.p)->attribute_value("numObs"));
@@ -1492,6 +1490,8 @@ void process_obml_markup(void *markup_parameters) {
       }
     }
   }
+  op->server._delete(dt_tbl, "file_code = " + op->file_map[op->filename] + " "
+      "and uflg != '" + uflag + "'");
   op->server._delete("WObML.ds" + local_args.dsnum2 + "_frequencies",
       "file_code = " + op->file_map[op->filename] + " and uflag != '" + uflag +
       "'");
