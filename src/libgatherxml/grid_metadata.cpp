@@ -82,21 +82,26 @@ void summarize_grid_levels(string database, string caller, string user) {
     vector<size_t> v;
     uncompress_values(row[1], v);
     for (const auto& lval : v) {
-      auto key = row[0] + "," + itos(lval);
+      auto key = row[0] + ", " + itos(lval);
       if (uset.find(key) == uset.end()) {
         uset.emplace(key);
       }
     }
   }
-  string e;
-  srv._delete(database + ".ds" + d + "_levels");
+  auto uflg = strand(3);
   for (const auto& e : uset) {
-    if (srv.insert(database + ".ds" + d + "_levels", e) < 0) {
-      log_error2(srv.error() + " while inserting '" + e + "' into " + database +
-          ".ds" + d + "_levels", F, caller,
-          user);
+    auto tbl = database + ".ds" + d + "_levels";
+    if (srv.insert(
+          tbl,
+          "format_code, level_type_code, uflg",
+          e + ", '" + uflg + "'",
+          "update uflg = values(uflg)"
+          ) < 0) {
+      log_error2(srv.error() + " while inserting '" + e + "' into " + tbl, F,
+          caller, user);
     }
   }
+  srv._delete(database + ".ds" + d + "_levels", "uflg != '" + uflg + "'");
   srv.disconnect();
 }
 
