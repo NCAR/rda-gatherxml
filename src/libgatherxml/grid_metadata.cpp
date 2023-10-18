@@ -49,62 +49,6 @@ namespace gatherxml {
 
 namespace summarizeMetadata {
 
-void summarize_grid_levels(string database, string caller, string user) {
-  const static string F = this_function_label(__func__);
-  string d = substitute(metautils::args.dsnum, ".", "");
-  string t, i;
-  if (database == "WGrML") {
-    t = "_webfiles2";
-  } else {
-    log_error2("unknown database '" + database + "'", F, caller, user);
-  }
-  Server srv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "");
-  LocalQuery q("select distinct p.format_code, g.level_type_codes from " +
-      database + ".ds" + d + "_agrids2 as g left join " + database + ".ds" + d
-      + t + " as p on p.code = g.file_code where !isnull(p.format_code)");
-#ifdef DUMP_QUERIES
-  {
-  Timer tm;
-  tm.start();
-#endif
-  if (q.submit(srv) < 0) {
-    log_error2(q.error() + "' for '" + q.show() + "'", F, caller, user);
-  }
-#ifdef DUMP_QUERIES
-  tm.stop();
-  cerr << "Elapsed time: " << tm.elapsed_time() << " " << F << ": " << q.show()
-      << endl;
-  }
-#endif
-  unordered_set<string> uset;
-  for (const auto& row : q) {
-    vector<size_t> v;
-    uncompress_values(row[1], v);
-    for (const auto& lval : v) {
-      auto key = row[0] + ", " + itos(lval);
-      if (uset.find(key) == uset.end()) {
-        uset.emplace(key);
-      }
-    }
-  }
-  auto uflg = strand(3);
-  for (const auto& e : uset) {
-    auto tbl = database + ".ds" + d + "_levels";
-    if (srv.insert(
-          tbl,
-          "format_code, level_type_code, uflg",
-          e + ", '" + uflg + "'",
-          "update uflg = values(uflg)"
-          ) < 0) {
-      log_error2(srv.error() + " while inserting '" + e + "' into " + tbl, F,
-          caller, user);
-    }
-  }
-  srv._delete(database + ".ds" + d + "_levels", "uflg != '" + uflg + "'");
-  srv.disconnect();
-}
-
 struct GridSummaryEntry {
   struct Data {
     Data() : start(), end(), level_code_set() { }
@@ -483,6 +427,62 @@ void summarize_grid_resolutions(string caller, string user, string
   srv.disconnect();
 }
 
+void summarize_grid_levels(string database, string caller, string user) {
+  const static string F = this_function_label(__func__);
+  string d = substitute(metautils::args.dsnum, ".", "");
+  string t, i;
+  if (database == "WGrML") {
+    t = "_webfiles2";
+  } else {
+    log_error2("unknown database '" + database + "'", F, caller, user);
+  }
+  Server srv(metautils::directives.database_server, metautils::directives.
+      metadb_username, metautils::directives.metadb_password, "");
+  LocalQuery q("select distinct p.format_code, g.level_type_codes from " +
+      database + ".ds" + d + "_agrids2 as g left join " + database + ".ds" + d
+      + t + " as p on p.code = g.file_code where !isnull(p.format_code)");
+#ifdef DUMP_QUERIES
+  {
+  Timer tm;
+  tm.start();
+#endif
+  if (q.submit(srv) < 0) {
+    log_error2(q.error() + "' for '" + q.show() + "'", F, caller, user);
+  }
+#ifdef DUMP_QUERIES
+  tm.stop();
+  cerr << "Elapsed time: " << tm.elapsed_time() << " " << F << ": " << q.show()
+      << endl;
+  }
+#endif
+  unordered_set<string> uset;
+  for (const auto& row : q) {
+    vector<size_t> v;
+    uncompress_values(row[1], v);
+    for (const auto& lval : v) {
+      auto key = row[0] + ", " + itos(lval);
+      if (uset.find(key) == uset.end()) {
+        uset.emplace(key);
+      }
+    }
+  }
+  auto uflg = strand(3);
+  for (const auto& e : uset) {
+    auto tbl = database + ".ds" + d + "_levels";
+    if (srv.insert(
+          tbl,
+          "format_code, level_type_code, uflg",
+          e + ", '" + uflg + "'",
+          "update uflg = values(uflg)"
+          ) < 0) {
+      log_error2(srv.error() + " while inserting '" + e + "' into " + tbl, F,
+          caller, user);
+    }
+  }
+  srv._delete(database + ".ds" + d + "_levels", "uflg != '" + uflg + "'");
+  srv.disconnect();
+}
+
 void aggregate_grids(string database, string caller, string user, string
     file_id_code) {
   static const string F = this_function_label(__func__);
@@ -754,6 +754,7 @@ void aggregate_grids(string database, string caller, string user, string
   } else {
     srv._delete("WGrML.ds" + d + "_agrids_cache", "uflg != '" + uflg + "'");
   }
+  summarize_grid_levels(database, caller, user);
   srv.disconnect();
 }
 
