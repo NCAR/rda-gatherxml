@@ -569,13 +569,14 @@ void clear_tables(MarkupParameters *markup_parameters) {
 }
 
 struct GrMLParameters : public MarkupParameters {
-  GrMLParameters() : prod_set() {
+  GrMLParameters() : prod_set(), summ_lev(false) {
     markup_type = "GrML";
     element = "grid";
     data_type = "grids";
   }
 
   unordered_set<string> prod_set;
+  bool summ_lev;
 };
 
 struct ParameterData {
@@ -722,6 +723,20 @@ void process_grml_markup(void *markup_parameters) {
             log_error2("unable to get level code", F, "scm", USER);
           }
           lev_map.emplace(ltyp, c);
+        }
+        if (gp->server.insert(
+              gp->database + ".ds" + local_args.dsnum2 + "_levels",
+              "format_code, level_type_code",
+              gp->format_map[gp->format] + ", " + lev_map[ltyp],
+              ""
+              ) < 0) {
+          if (gp->server.error().find("Duplicate entry") == string::npos) {
+            log_error2("error: '" + gp->server.error() + "' while inserting "
+                "into " + gp->database + ".ds" + local_args.dsnum2 + "_levels",
+                F, "scm", USER);
+          }
+        } else {
+          gp->summ_lev = true;
         }
 
         // parameters
@@ -1709,6 +1724,10 @@ void update_grml_database(GrMLParameters& grml_parameters) {
   }
   gatherxml::summarizeMetadata::summarize_grids(grml_parameters.database, "scm",
       USER, grml_parameters.file_map[grml_parameters.filename]);
+  if (grml_parameters.summ_lev) {
+    gatherxml::summarizeMetadata::summarize_grid_levels(grml_parameters.
+        database, "scm", USER);
+  }
 }
 
 void update_obml_database(ObMLParameters& obml_parameters) {
@@ -2222,16 +2241,11 @@ int main(int argc, char **argv) {
         if (table_exists(mysrv, "WGrML.ds" + local_args.dsnum2 +
             "_agrids_cache")) {
           gatherxml::summarizeMetadata::summarize_grids("WGrML", "scm", USER);
-/*
           targs.emplace_back(vector<string>());
           targs.back().emplace_back("WGrML");
-*/
           pthread_t t;
-/*
-aggregate grids should have been called if a web file was summarized, and should not be necessary for web refresh?
           pthread_create(&t, nullptr, thread_aggregate_grids, &targs.back());
           tv.emplace_back(t);
-*/
           pthread_create(&t, nullptr, thread_summarize_grid_resolutions,
               nullptr);
           tv.emplace_back(t);
