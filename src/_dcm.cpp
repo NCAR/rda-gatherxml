@@ -117,6 +117,9 @@ void copy_version_controlled_data(Server& server, string db, string
   for (auto t : tnames) {
     t = db + "." + t;
     if (field_exists(server, t, "file_code")) {
+      if (t.front() == 'W') {
+        t = t.substr(1);
+      }
       if (!table_exists(server, "V" + t)) {
         if (server.command("create table V" + t + " like " + t, error) < 0) {
           log_error2("error: '" + server.error() + "' while trying to create V"
