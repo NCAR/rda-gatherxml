@@ -42,6 +42,7 @@ using std::unordered_set;
 using std::vector;
 using strutils::replace_all;
 using strutils::split;
+using strutils::strand;
 using strutils::substitute;
 using unixutils::mysystem2;
 
@@ -441,8 +442,12 @@ unordered_set<string> summarize_frequencies_from_wgrml_by_dataset(Server&
   server._delete("WGrML.frequencies", "dsid =  '" + metautils::args.dsnum +
       "'");
   for (const auto& r : q) {
-    if (server.insert("WGrML.frequencies", "'" + metautils::args.dsnum + "', " +
-        r[1] + ", '" + r[2] + "'") < 0) {
+    if (server.insert(
+          "WGrML.frequencies",
+          "dsid, nsteps_per, unit",
+          "'" + metautils::args.dsnum + "', " + r[1] + ", '" + r[2] + "'",
+          ""
+          ) < 0) {
       if (!regex_search(server.error(), regex("Duplicate entry"))) {
         log_error2("'" + server.error() + "' while trying to insert '" +
             metautils::args.dsnum + "', " + r[1] + ", '" + r[2] + "'", F,
@@ -1987,20 +1992,23 @@ void summarize_locations(string database, string& error) {
       }
     }
   }
+  auto uflg = strand(3);
   string err;
-  mysrv._delete("search.locations", "dsid = '" + metautils::args.dsnum + "'");
   for (auto e : v) {
     replace_all(e, "'", "\\'");
     if (mysrv.insert(
           "search.locations",
-          "keyword, vocabulary, include, dsid",
-          "'" + e + "', 'GCMD', 'Y', '" + metautils::args.dsnum + "'",
-          ""
+          "keyword, vocabulary, include, dsid, uflg",
+          "'" + e + "', 'GCMD', 'Y', '" + metautils::args.dsnum + "', '" + uflg
+              + "'",
+          "update uflg = values(uflg)"
           ) < 0) {
       error = move(mysrv.error());
       return;
     }
   }
+  mysrv._delete("search.locations", "dsid = '" + metautils::args.dsnum + "' "
+     "and uflg != '" + uflg + "'");
   mysrv.disconnect();
 }
 
