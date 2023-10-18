@@ -548,12 +548,6 @@ void insert_filename(MarkupParameters *markup_parameters) {
   }
 }
 
-void clear_obml_tables(MarkupParameters *markup_parameters) {
-  markup_parameters->server._delete(markup_parameters->database + ".ds" +
-      local_args.dsnum2 + "_geobounds", "file_code = " + markup_parameters->
-      file_map[markup_parameters->filename]);
-}
-
 void clear_satml_tables(MarkupParameters *markup_parameters) {
   markup_parameters->server._delete(markup_parameters->database + ".ds" +
       local_args.dsnum2 + "_products", "file_code = " + markup_parameters->
@@ -567,9 +561,7 @@ void clear_fixml_tables(MarkupParameters *markup_parameters) {
 }
 
 void clear_tables(MarkupParameters *markup_parameters) {
-  if (markup_parameters->markup_type == "ObML") {
-    clear_obml_tables(markup_parameters);
-  } else if (markup_parameters->markup_type == "SatML") {
+  if (markup_parameters->markup_type == "SatML") {
     clear_satml_tables(markup_parameters);
   } else if (markup_parameters->markup_type == "FixML") {
     clear_fixml_tables(markup_parameters);
@@ -1110,7 +1102,6 @@ void *thread_summarize_IDs(void *args) {
     i = itos(lround(avgm));
     k = searchutils::time_resolution_keyword("irregular", lround(avgm), u, "");
   }
-  string r;
   if (i != "0") {
     auto tbl = a[5] + ".ds" + local_args.dsnum2 + "_frequencies";
     auto inserts = a[2] + ", " + a[3] + ", " + a[4] + ", " + i + ", " + itos(
@@ -1127,18 +1118,24 @@ void *thread_summarize_IDs(void *args) {
           " (" + inserts + ")", F, "scm", USER);
     }
   }
-  if (a[5] == "WObML" && srv.command("insert into " + a[5] + ".ds" + local_args.
-      dsnum2 + "_geobounds (select i2.file_code, min(i.sw_lat), min(i.sw_lon), "
-      "max(i.ne_lat), max(i.ne_lon) from " + a[5] + ".ds" + local_args.dsnum2 +
-      "_id_list as i2 left join " + a[5] + ".ds" + local_args.dsnum2 + "_ids "
-      "as i on i.code = i2.id_code where i2.file_code = " + a[2] + " and i."
-      "sw_lat > -990000 and i.sw_lon > -1810000 and i.ne_lat < 990000 and i."
-      "ne_lon < 1810000) on duplicate key update min_lat = values(min_lat), "
-      "max_lat = values(max_lat),  min_lon = values(min_lon),  max_lon = "
-      "values(max_lon)", r) < 0) {
-    log_error2("'" + srv.error() + "' while trying to insert into " + a[5] +
-        ".ds" + local_args.dsnum2 + "_geobounds for file_code = " + a[2], F,
-        "scm", USER);
+  if (a[5] == "WObML") {
+    auto tbl = a[5] + ".ds" + local_args.dsnum2 + "_geobounds";
+    auto uflg = strand(3);
+    string r;
+    if (srv.command("insert into " + tbl + " (file_code, min_lat, min_lon, "
+        "max_lat, max_lon, uflg) select i2.file_code, min(i.sw_lat), min(i."
+        "sw_lon), max(i.ne_lat), max(i.ne_lon), '" + uflg + "' from " + a[5] +
+        ".ds" + local_args.dsnum2 + "_id_list as i2 left join " + a[5] + ".ds" +
+        local_args.dsnum2 + "_ids as i on i.code = i2.id_code where i2."
+        "file_code = " + a[2] + " and i.sw_lat > -990000 and i.sw_lon > "
+        "-1810000 and i.ne_lat < 990000 and i.ne_lon < 1810000 on duplicate "
+        "key update min_lat = values(min_lat), max_lat = values(max_lat), "
+        "min_lon = values(min_lon),  max_lon = values(max_lon), uflg = values("
+        "uflg)", r) < 0) {
+      log_error2("'" + srv.error() + "' while trying to insert into " + tbl +
+          " for file_code = " + a[2], F, "scm", USER);
+    }
+    srv._delete(tbl, "file_code = " + a[2] + " and uflg != '" + uflg + "'");
   }
   srv.disconnect();
   return nullptr;
