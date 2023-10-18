@@ -439,20 +439,18 @@ unordered_set<string> summarize_frequencies_from_wgrml_by_dataset(Server&
         show() << endl;
     }
 #endif
-  server._delete("WGrML.frequencies", "dsid =  '" + metautils::args.dsnum +
-      "'");
+  auto uflg = strand(3);
   for (const auto& r : q) {
     if (server.insert(
           "WGrML.frequencies",
-          "dsid, nsteps_per, unit",
-          "'" + metautils::args.dsnum + "', " + r[1] + ", '" + r[2] + "'",
-          ""
+          "dsid, nsteps_per, unit, uflg",
+          "'" + metautils::args.dsnum + "', " + r[1] + ", '" + r[2] + "', '" +
+              uflg + "'",
+          "update uflg = values(uflg)"
           ) < 0) {
-      if (!regex_search(server.error(), regex("Duplicate entry"))) {
-        log_error2("'" + server.error() + "' while trying to insert '" +
-            metautils::args.dsnum + "', " + r[1] + ", '" + r[2] + "'", F,
-            caller, user);
-      }
+      log_error2("'" + server.error() + "' while trying to insert '" +
+          metautils::args.dsnum + "', " + r[1] + ", '" + r[2] + "'", F, caller,
+          user);
     }
     auto k = searchutils::time_resolution_keyword(r[0], stoi(r[1]), r[2], "");
     if (!k.empty() && sfreq.find(k) == sfreq.end()) {
@@ -483,13 +481,16 @@ unordered_set<string> summarize_frequencies_from_wgrml_by_dataset(Server&
       grids_per(stoi(r[2]), DateTime(stoll(r[0])), DateTime(stoll(r[1])), n, u);
       if (u != "singletimestep") {
         auto l = lround(n);
-        if (server.insert("WGrML.frequencies", "'" + metautils::args.dsnum +
-            "', " + to_string(l) + ", '" + u + "'") < 0) {
-          if (!regex_search(server.error(), regex("Duplicate entry"))) {
-            log_error2("'" + server.error() + "' while trying to insert '" +
-                metautils::args.dsnum + "', " + to_string(l) + ", '" + u + "'",
-                F, caller, user);
-          }
+        if (server.insert(
+              "WGrML.frequencies",
+              "dsid, nsteps_per, unit, uflg",
+              "'" + metautils::args.dsnum + "', " + to_string(l) + ", '" + u +
+                  "', '" + uflg + "'",
+              "update uflg = values(uflg)"
+              ) < 0) {
+          log_error2("'" + server.error() + "' while trying to insert '" +
+              metautils::args.dsnum + "', " + to_string(l) + ", '" + u + "'", F,
+              caller, user);
         } else {
           auto k = searchutils::time_resolution_keyword("irregular", l, u, "");
           if (!k.empty() && sfreq.find(k) == sfreq.end()) {
@@ -499,6 +500,8 @@ unordered_set<string> summarize_frequencies_from_wgrml_by_dataset(Server&
       }
     }
   }
+  server._delete("WGrML.frequencies", "dsid =  '" + metautils::args.dsnum +
+      "' and uflg != '" + uflg + "'");
   server._delete("search.time_resolutions", "dsid = '" + metautils::args.dsnum +
       "' and origin = 'WGrML'");
   return sfreq;
@@ -675,16 +678,20 @@ unordered_set<string> summarize_frequencies_from_wgrml_by_data_file(Server&
     server._delete("WGrML.ds" + ds + "_frequencies", "file_code = " +
         file_id_code);
   }
-  if (fset.size() > 0) {
+  if (!fset.empty()) {
+    auto uflg = strand(3);
     for (const auto& e : fset) {
       auto sp = split(e, "<!>");
-      if (server.insert("WGrML.frequencies", "'" + metautils::args.dsnum + "', "
-          + sp[1] + ", '" + sp[2] + "'") < 0) {
-        if (!regex_search(server.error(), regex("Duplicate entry"))) {
-          log_error2("'" + server.error() + "' while trying to insert '" +
-              metautils::args.dsnum + "', " + sp[1] + ", '" + sp[2] + "'", F,
-              caller, user);
-        }
+      if (server.insert(
+            "WGrML.frequencies",
+            "dsid, nsteps_per, unit, uflg",
+            "'" + metautils::args.dsnum + "', " + sp[1] + ", '" + sp[2] + "', '"
+                + uflg + "'",
+            "update uflg = values(uflg)"
+            ) < 0) {
+        log_error2("'" + server.error() + "' while trying to insert '" +
+            metautils::args.dsnum + "', " + sp[1] + ", '" + sp[2] + "'", F,
+            caller, user);
       }
       if (server.insert("WGrML.ds" + ds + "_frequencies", file_id_code + ", '" +
           sp[0] + "', " + sp[1] + ", '" + sp[2] + "'") < 0) {
@@ -693,6 +700,8 @@ unordered_set<string> summarize_frequencies_from_wgrml_by_data_file(Server&
             F, caller, user);
       }
     }
+    server._delete("WGrML.frequencies", "dsid =  '" + metautils::args.dsnum +
+        "' and uflg != '" + uflg + "'");
   } else {
     if (server.insert("WGrML.ds" + ds + "_frequencies", file_id_code + ", '" +
         smin + "', 0, ''") < 0) {
