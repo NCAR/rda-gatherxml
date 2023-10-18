@@ -555,9 +555,6 @@ void clear_obml_tables(MarkupParameters *markup_parameters) {
   markup_parameters->server._delete(markup_parameters->database + ".ds" +
       local_args.dsnum2 + "_geobounds", "file_code = " + markup_parameters->
       file_map[markup_parameters->filename]);
-  markup_parameters->server._delete(markup_parameters->database + ".ds" +
-      local_args.dsnum2 + "_locations", "file_code = " + markup_parameters->
-      file_map[markup_parameters->filename]);
 }
 
 void clear_satml_tables(MarkupParameters *markup_parameters) {
@@ -567,9 +564,6 @@ void clear_satml_tables(MarkupParameters *markup_parameters) {
 }
 
 void clear_fixml_tables(MarkupParameters *markup_parameters) {
-  markup_parameters->server._delete(markup_parameters->database + ".ds" +
-      local_args.dsnum2 + "_locations", "file_code = " + markup_parameters->
-      file_map[markup_parameters->filename]);
   markup_parameters->server._delete(markup_parameters->database + ".ds" +
       local_args.dsnum2 + "_frequencies", "file_code = " + markup_parameters->
       file_map[markup_parameters->filename]);
@@ -1183,6 +1177,19 @@ void *thread_summarize_file_ID_locations(void *args) {
     unordered_set<string> lset;
     size_t min = 999;
     size_t max = 0;
+    auto tbl = a[7] + ".ds" + local_args.dsnum2 + "_locations";
+    string cols = "file_code";
+    auto istart = a[2];
+    if (!a[4].empty()) {
+      cols += ", observation_type_code, platform_type_code";
+      istart += ", " + a[3] + ", " +a[4];
+    } else {
+      cols += ", classification_code";
+      istart += ", " + a[3];
+    }
+    cols += ", start_date, end_date, box1d_row, box1d_bitmap, uflg";
+    istart += ", " + a[5] + ", " + a[6];
+    auto uflg = strand(3);
     for (const auto& e : xdoc.element_list("locations/box1d")) {
       auto b = e.attribute_value("bitmap");
       string lb;
@@ -1208,29 +1215,16 @@ void *thread_summarize_file_ID_locations(void *args) {
       } else {
         lb = b;
       }
-      auto tbl = a[7] + ".ds" + local_args.dsnum2 + "_locations";
-      string cols = "file_code";
-      auto inserts = a[2];
-      if (!a[4].empty()) {
-        cols += ", observation_type_code, platform_type_code";
-        inserts += ", " + a[3] + ", " +a[4];
-      } else {
-        cols += ", classification_code";
-        inserts += ", " + a[3];
-      }
-      cols += ", start_date, end_date, box1d_row, box1d_bitmap";
-      inserts += ", " + a[5] + ", " + a[6] + ", " + e.attribute_value("row") +
-          ", '" + lb + "'";
+      auto inserts = istart + ", " + e.attribute_value("row") + ", '" + lb +
+          "', '" + uflg + "'";
       if (srv.insert(
             tbl,
             cols,
             inserts,
-            ""
+            "update uflg = values(uflg)"
             ) < 0) {
-        if (srv.error().find("Duplicate entry") == string::npos) {
-          log_error2("'" + srv.error() + "' while trying to insert into " + tbl +
-              " (" + inserts + ")", F, "scm", USER);
-        }
+        log_error2("'" + srv.error() + "' while trying to insert into " + tbl +
+            " (" + inserts + ")", F, "scm", USER);
       }
       size_t i = stoi(e.attribute_value("row"));
       if (min == 999) {
@@ -1245,6 +1239,7 @@ void *thread_summarize_file_ID_locations(void *args) {
         }
       }
     }
+    srv._delete(tbl, "file_code = " + a[2] + " and uflg != '" + uflg + "'");
     if (!lset.empty()) {
       my::map<gatherxml::summarizeMetadata::ParentLocation> pmap;
       vector<string> v;
@@ -2150,13 +2145,6 @@ int main(int argc, char **argv) {
         if (mmap.find(k) != mmap.end()) {
           mmap[k].emplace_back(s);
         }
-      }
-    }
-    if ((local_args.summ_type.empty() || local_args.summ_type == "GrML") &&
-        mmap["GrML"].size() > 0) {
-      if (local_args.cmd_directory == "wfmd") {
-        mysrv._delete("WGrML.summary", "dsid = '" + metautils::args.dsnum +
-            "'");
       }
     }
     summarize_markup(local_args.summ_type, mmap);
