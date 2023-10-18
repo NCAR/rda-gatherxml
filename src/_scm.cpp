@@ -724,13 +724,15 @@ void process_grml_markup(void *markup_parameters) {
           }
           lev_map.emplace(ltyp, c);
         }
-        if (gp->server.insert(gp->database + ".ds" + local_args.dsnum2 +
-            "_levels", gp->format_map[gp->format] + ", " + lev_map[ltyp]) < 0) {
-          if (gp->server.error().find("Duplicate entry") == string::npos) {
-            log_error2("error: '" + gp->server.error() + "' while inserting "
-                "into " + gp->database + ".ds" + local_args.dsnum2 + "_levels",
-                F, "scm", USER);
-          }
+        if (gp->server.insert(
+              gp->database + ".ds" + local_args.dsnum2 + "_levels",
+              "format_code, level_type_code",
+              gp->format_map[gp->format] + ", " + lev_map[ltyp],
+              "update format_code = format_code"
+              ) < 0) {
+          log_error2("error: '" + gp->server.error() + "' while inserting into "
+              + gp->database + ".ds" + local_args.dsnum2 + "_levels", F, "scm",
+              USER);
         } else {
           gp->summ_lev = true;
         }
