@@ -219,17 +219,11 @@ string table_code(Server& srv, string table_name, string where_conditions, bool
       vals += s;
     }
     string r;
-    if (srv.command("lock table " + table_name + " write", r) < 0) {
-      log_error2(srv.error(), F, "scm", USER);
-    }
     if (srv.insert(table_name, cols, vals, "") < 0) {
       if (srv.error().find("Duplicate entry") != 0) {
         log_error2("server error: '" + srv.error() + "' while inserting (" +
             cols + ") values(" + vals + ") into " + table_name, F, "scm", USER);
       }
-    }
-    if (srv.command("unlock tables", r) < 0) {
-      log_error2(srv.error(), F, "scm", USER);
     }
     q.submit(srv);
     if (q.num_rows() == 0) { // this really should not happen if insert worked
