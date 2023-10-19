@@ -512,6 +512,13 @@ extern "C" void *t_aggregate_grids(void *ts) {
   return nullptr;
 }
 
+extern "C" void *t_summarize_grid_levels(void *ts) {
+  ThreadStruct *t = (ThreadStruct *)ts;
+  gatherxml::summarizeMetadata::summarize_grid_levels(t->strings[0], "dcm",
+      USER);
+  return nullptr;
+}
+
 extern "C" void *t_summarize_grid_resolutions(void *) {
   gatherxml::summarizeMetadata::summarize_grid_resolutions("dcm", USER, "");
   return nullptr;
@@ -649,6 +656,9 @@ int main(int argc, char **argv) {
     pthread_create(&threads[2].tid, nullptr, t_summarize_grids, &threads[2]);
     threads[3].strings.emplace_back("WGrML");
     pthread_create(&threads[3].tid, nullptr, t_aggregate_grids, &threads[3]);
+    threads[4].strings.emplace_back("WGrML");
+    pthread_create(&threads[4].tid, nullptr, t_summarize_grid_levels,
+        &threads[4]);
     pthread_create(&threads[5].tid, nullptr, t_summarize_grid_resolutions,
         nullptr);
     pthread_create(&threads[6].tid, nullptr, t_generate_detailed_metadata_view,
