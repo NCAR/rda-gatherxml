@@ -330,14 +330,16 @@ void summarize_grids(string database, string caller, string user, string
         }
         std::sort(v.begin(), v.end(), std::less<size_t>());
         compress_values(v, b);
-        if (srv.insert(database + ".summary",
-            "dsid, format_code, time_range_code, grid_definition_code, "
-            "parameter, level_type_codes, start_date, end_date, uflg",
-            "'" + metautils::args.dsnum + "', " + gse.key + ", '" + b + "', " +
-            d1 + ", " + d2 + ", '" + uflg + "'",
-            "update level_type_codes = '" + b + "', start_date = if (" + d1 +
-            " < start_date, " + d1 + ", start_date), end_date = if (" + d2 +
-            " > end_date, " + d2 + ", end_date), uflg = values(uflg)") < 0) {
+        if (srv.insert(
+              database + ".summary",
+              "dsid, format_code, time_range_code, grid_definition_code, "
+              "parameter, level_type_codes, start_date, end_date, uflg",
+              "'" + metautils::args.dsnum + "', " + gse.key + ", '" + b + "', "
+                  + d1 + ", " + d2 + ", '" + uflg + "'",
+              "update level_type_codes = '" + b + "', start_date = if (" + d1 +
+                  " < start_date, " + d1 + ", start_date), end_date = if (" + d2
+                  + " > end_date, " + d2 + ", end_date), uflg = values(uflg)"
+              ) < 0) {
           log_error2(srv.error() + " while trying to insert ('" + metautils::
               args.dsnum + "', " + gse.key + ", '" + b + "', " + d1 + ", " + d2
               + ")", F, caller, user);
