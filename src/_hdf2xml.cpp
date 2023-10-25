@@ -14,6 +14,7 @@
 #include <metadata.hpp>
 #include <strutils.hpp>
 #include <utils.hpp>
+#include <timer.hpp>
 #include <myerror.hpp>
 
 using namespace MySQL;
@@ -4236,6 +4237,8 @@ int main(int argc, char **argv) {
     metautils::check_for_existing_cmd("GrML");
     metautils::check_for_existing_cmd("ObML");
   }
+  Timer tmr;
+  tmr.start();
   ScanData scan_data;
   scan_file(scan_data);
   if (!metautils::args.inventory_only) {
@@ -4255,4 +4258,8 @@ int main(int argc, char **argv) {
     }
   }
   write_inventory();
+  tmr.stop();
+  metautils::log_warning("execution time: " + ftos(tmr.elapsed_time()) +
+      " seconds", "gatherxml.time", USER);
+  return 0;
 }

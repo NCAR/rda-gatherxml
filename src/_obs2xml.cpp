@@ -19,11 +19,13 @@
 #include <surface.hpp>
 #include <td32.hpp>
 #include <raob.hpp>
+#include <timer.hpp>
 #include <myerror.hpp>
 
 using std::string;
 using std::stringstream;
 using std::unique_ptr;
+using strutils::ftos;
 using strutils::is_numeric;
 using strutils::replace_all;
 using strutils::split;
@@ -977,7 +979,7 @@ void scan_file(gatherxml::markup::ObML::ObservationData& obs_data)
                 inv_I_table.insert(ie);
               }
               inv_line << "|" << ie.num;
-              inv_line << "|" << strutils::ftos(obs->location().latitude,4) << "|" << strutils::ftos(obs->location().longitude,4);
+              inv_line << "|" << ftos(obs->location().latitude,4) << "|" << ftos(obs->location().longitude,4);
               inv_lines.emplace_back(inv_line.str());
             }
           }
@@ -1077,6 +1079,8 @@ int main(int argc,char **argv)
   if (!metautils::args.inventory_only) {
     metautils::check_for_existing_cmd("ObML");
   }
+  Timer tmr;
+  tmr.start();
   gatherxml::markup::ObML::ObservationData obs_data;
   scan_file(obs_data);
   if (!metautils::args.inventory_only) {
@@ -1104,5 +1108,8 @@ int main(int argc,char **argv)
   if (inv_stream.is_open()) {
     gatherxml::fileInventory::close(inv_file,inv_dir,inv_stream,"ObML",metautils::args.update_summary,true,"obs2xml",USER);
   }
+  tmr.stop();
+  metautils::log_warning("execution time: " + ftos(tmr.elapsed_time()) +
+      " seconds", "gatherxml.time", USER);
   return 0;
 }

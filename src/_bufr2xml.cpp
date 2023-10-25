@@ -10,6 +10,7 @@
 #include <bufr.hpp>
 #include <strutils.hpp>
 #include <utils.hpp>
+#include <timer.hpp>
 #include <myerror.hpp>
 
 using namespace MySQL;
@@ -470,6 +471,8 @@ int main(int argc, char **argv) {
   atexit(clean_up);
   metautils::cmd_register("bufr2xml", USER);
   metautils::check_for_existing_cmd("ObML");
+  Timer tmr;
+  tmr.start();
   gatherxml::markup::ObML::ObservationData o;
   scan_file(b, o);
   if (!o.is_empty) {
@@ -495,4 +498,8 @@ int main(int argc, char **argv) {
       log_error2(ess.str(), "main(): running scm", "bufr2xml", USER);
     }
   }
+  tmr.stop();
+  metautils::log_warning("execution time: " + ftos(tmr.elapsed_time()) +
+      " seconds", "gatherxml.time", USER);
+  return 0;
 }
