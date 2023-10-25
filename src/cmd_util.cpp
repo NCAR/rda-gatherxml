@@ -2,6 +2,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <unistd.h>
+#include <sys/stat.h>
 #include <metadata.hpp>
 #include <MySQL.hpp>
 #include <strutils.hpp>
@@ -314,8 +315,11 @@ int main(int argc, char **argv) {
     }
   } else {
     string binds;
+    struct stat buf;
     for (const auto& bind : metautils::directives.singularity_binds) {
-      append(binds, bind, ",");
+      if (stat(bind.c_str(), &buf) == 0) {
+        append(binds, bind, ",");
+      }
     }
     auto sp = split(metautils::args.args_string, "!");
     if (sp.size() > 0 && sp.back()[0] == '/') {
