@@ -166,8 +166,8 @@ void *thread_plot(void *tnc) {
     log_error2("can't create temporary directory", F, "gsi", USER);
   }
   stringstream oss, ess;
-  if (mysystem2("/bin/mkdir -p " + tdir->name() + "/datasets/ds" + metautils::
-      args.dsnum + "/metadata", oss, ess) != 0) {
+  if (mysystem2("/bin/mkdir -m 0755 -p " + tdir->name() + "/datasets/ds" +
+      metautils::args.dsnum + "/metadata", oss, ess) != 0) {
     log_error2("can't create directory tree", F, "gsi", USER);
   }
   create_graphics(plt_p->name(), img_p->name(), tdir->name(), t->imagetag);
@@ -273,8 +273,8 @@ void generate_graphics(LocalQuery& query, string type, string table, string
     log_error2("can't create temporary directory", F, "gsi", USER);
   }
   stringstream oss, ess;
-  if (mysystem2("/bin/mkdir -p " + tdir->name() + "/datasets/ds" + metautils::
-      args.dsnum + "/metadata", oss, ess) != 0) {
+  if (mysystem2("/bin/mkdir -m 0755 -p " + tdir->name() + "/datasets/ds" +
+      metautils::args.dsnum + "/metadata", oss, ess) != 0) {
     log_error2("can't create directory tree", F, "gsi", USER);
   }
   create_graphics(plt_p->name(), img_p->name(), tdir->name());

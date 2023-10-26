@@ -268,7 +268,7 @@ bool remove_from(string database, string table_ext, string file_field_name,
         }
         if (is_version_controlled) {
           stringstream oss, ess;
-          if (mysystem2("/bin/mkdir -p " + tdir->name() + "/metadata/" +
+          if (mysystem2("/bin/mkdir -m 0755 -p " + tdir->name() + "/metadata/" +
                md_directory + "/v", oss, ess) < 0) {
             log_error2("could not create the temporary directory tree", F,
                 "dcm", USER);
