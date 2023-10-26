@@ -58,6 +58,7 @@ using strutils::substitute;
 using strutils::to_lower;
 using strutils::trim;
 using unixutils::mysystem2;
+using unixutils::open_output;
 
 metautils::Directives metautils::directives;
 metautils::Args metautils::args;
@@ -5550,14 +5551,15 @@ void write_parameter_map(string tempdir_name, ScanData& scan_data) {
     mysystem2("/bin/rm " + scan_data.map_name, oss, ess);
   }
   stringstream oss, ess;
-  if (mysystem2("/bin/mkdir -p " + tempdir_name + "/metadata/ParameterTables",
-      oss, ess) != 0) {
+  if (mysystem2("/bin/mkdir -m 0755 -p " + tempdir_name + "/metadata/"
+      "ParameterTables", oss, ess) != 0) {
     log_error2("can't create directory tree for netCDF variables", F, "nc2xml",
         USER);
   }
   scan_data.map_name = tempdir_name + "/metadata/ParameterTables/netCDF.ds" +
       metautils::args.dsnum + ".xml";
-  std::ofstream ofs(scan_data.map_name.c_str());
+  std::ofstream ofs;
+  open_output(ofs, scan_data.map_name);
   if (!ofs.is_open()) {
     log_error2("can't open parameter map file for output", F, "nc2xml", USER);
   }

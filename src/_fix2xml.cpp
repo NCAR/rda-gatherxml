@@ -10,7 +10,6 @@
 #include <strutils.hpp>
 #include <utils.hpp>
 #include <tempfile.hpp>
-#include <MySQL.hpp>
 #include <metadata.hpp>
 #include <datetime.hpp>
 #include <myerror.hpp>

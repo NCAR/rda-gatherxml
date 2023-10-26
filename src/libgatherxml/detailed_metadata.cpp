@@ -55,6 +55,7 @@ using strutils::substitute;
 using strutils::to_capital;
 using strutils::to_lower;
 using unixutils::mysystem2;
+using unixutils::open_output;
 
 namespace gatherxml {
 
@@ -245,7 +246,8 @@ void generate_parameter_cross_reference(string format, string title, string
 
   // create the directory tree in the temp directory
   stringstream oss, ess;
-  if (mysystem2("/bin/mkdir -p " + t.name() + "/metadata", oss, ess) != 0) {
+  if (mysystem2("/bin/mkdir -m 0755 -p " + t.name() + "/metadata", oss, ess) !=
+      0) {
     log_error2("unable to create temporary directory tree", F, caller, user);
   }
   Server mysrv(metautils::directives.database_server, metautils::directives.
@@ -289,12 +291,14 @@ void generate_parameter_cross_reference(string format, string title, string
         ptmap[key].emplace(c, pd);
       }
     }
-    ofstream ofs((t.name() + "/metadata/" + html_file).c_str());
+    ofstream ofs;
+    open_output(ofs, t.name() + "/metadata/" + html_file);
     if (!ofs.is_open()) {
       log_error2("unable to open html file for output", F, caller, user);
     }
-    ofstream ofs2((t.name() + "/metadata/" + substitute(html_file, ".html",
-        ".xml")).c_str());
+    ofstream ofs2;
+    open_output(ofs2, t.name() + "/metadata/" + substitute(html_file, ".html",
+        ".xml"));
     if (!ofs2.is_open()) {
       log_error2("unable to open xml file for output", F, caller, user);
     }
@@ -469,10 +473,12 @@ void generate_level_cross_reference(string format, string title, string
 
     // create the directory tree in the temp directory
     stringstream oss, ess;
-    if (mysystem2("/bin/mkdir -p " + t.name() + "/metadata", oss, ess) != 0) {
+    if (mysystem2("/bin/mkdir -m 0755 -p " + t.name() + "/metadata", oss, ess)
+        != 0) {
       log_error2("unable to create temporary directory tree", F, caller, user);
     }
-    ofstream ofs((t.name() + "/metadata/" + html_file).c_str());
+    ofstream ofs;
+    open_output(ofs, t.name() + "/metadata/" + html_file);
     if (!ofs.is_open()) {
       log_error2("unable to open html file for output", F, caller, user);
     }
@@ -783,7 +789,8 @@ void generate_gridded_product_detail(Server& mysrv, string file_type, const
     gdmap.emplace(stoi(r[2]), gridutils::convert_grid_definition(r[0] + "<!>" +
         r[1]));
   }
-  ofstream ofs((tdir.name() + "/metadata/product-detail.html").c_str());
+  ofstream ofs;
+  open_output(ofs, tdir.name() + "/metadata/product-detail.html");
   if (!ofs.is_open()) {
     log_error2("unable to open output for product detail", F, caller, user);
   }
@@ -977,15 +984,18 @@ void generate_detailed_grid_summary(string file_type, ofstream& ofs, const
 
   // create the directory tree in the temp directory
   stringstream oss, ess;
-  if (mysystem2("/bin/mkdir -p " + t.name() + "/metadata", oss, ess) != 0) {
+  if (mysystem2("/bin/mkdir -m 0755 -p " + t.name() + "/metadata", oss, ess) !=
+      0) {
     log_error2("unable to create temporary directory tree - '" + ess.str() +
         "'", F, caller, user);
   }
-  ofstream ofs_p((t.name() + "/metadata/parameter-detail.html").c_str());
+  ofstream ofs_p;
+  open_output(ofs_p, t.name() + "/metadata/parameter-detail.html");
   if (!ofs_p.is_open()) {
     log_error2("unable to open output for parameter detail", F, caller, user);
   }
-  ofstream ofs_l((t.name() + "/metadata/level-detail.html").c_str());
+  ofstream ofs_l;
+  open_output(ofs_l, t.name() + "/metadata/level-detail.html");
   if (!ofs_l.is_open()) {
     log_error2("unable to open output for level detail", F, caller, user);
   }
@@ -1412,11 +1422,13 @@ void generate_detailed_observation_summary(string file_type, ofstream& ofs,
 
   // create the directory tree in the temp directory
   stringstream oss, ess;
-  if (mysystem2("/bin/mkdir -p " + t.name() + "/metadata", oss, ess) != 0) {
+  if (mysystem2("/bin/mkdir -m 0755 -p " + t.name() + "/metadata", oss, ess) !=
+      0) {
     log_error2("unable to create temporary directory tree - '" + ess.str() +
         "'", F, caller, user);
   }
-  ofstream ofs_o((t.name() + "/metadata/obs-detail.html").c_str());
+  ofstream ofs_o;
+  open_output(ofs_o, t.name() + "/metadata/obs-detail.html");
   if (!ofs_o.is_open()) {
     log_error2("unable to open output for observation detail", F, caller, user);
   }
@@ -1765,10 +1777,11 @@ void generate_detailed_metadata_view(string caller, string user) {
     }
 // create the metadata directory tree in the temp directory
     stringstream oss,ess;
-    if (mysystem2("/bin/mkdir -p "+t.name()+"/metadata",oss,ess) != 0) {
+    if (mysystem2("/bin/mkdir -m 0755 -p "+t.name()+"/metadata",oss,ess) != 0) {
       metautils::log_error("generate_detailed_metadata_view(): unable to create metadata directory tree - '"+ess.str()+"'",caller,user);
     }
-    ofstream ofs((t.name()+"/metadata/detailed.html").c_str());
+    ofstream ofs;
+    open_output(ofs, t.name()+"/metadata/detailed.html");
     if (!ofs.is_open()) {
       metautils::log_error("generate_detailed_metadata_view(): unable to open output for detailed.html",caller,user);
     }
@@ -1905,7 +1918,6 @@ void generate_detailed_metadata_view(string caller, string user) {
 
 void generate_group_detailed_metadata_view(string group_index,string file_type,string caller,string user)
 {
-  ofstream ofs;
   string dsnum2=substitute(metautils::args.dsnum,".","");
   LocalQuery query,grml_query,obml_query,fixml_query;
   string gtitle,gsummary,output,error;

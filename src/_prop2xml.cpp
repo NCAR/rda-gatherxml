@@ -254,7 +254,7 @@ void scan_input_file(gatherxml::markup::ObML::ObservationData& obs_data)
   server.disconnect();
   TempDir tdir;
   std::stringstream oss,ess;
-  if (!tdir.create(metautils::directives.temp_path) || unixutils::mysystem2("/bin/mkdir -p "+tdir.name()+"/metadata/ParameterTables",oss,ess) < 0) {
+  if (!tdir.create(metautils::directives.temp_path) || unixutils::mysystem2("/bin/mkdir -m 0755 -p "+tdir.name()+"/metadata/ParameterTables",oss,ess) < 0) {
     metautils::log_error("can't create temporary directory for data type map","prop2xml",USER);
   }
   auto existing_datatype_map=unixutils::remote_web_file("https://rda.ucar.edu/metadata/ParameterTables/"+metautils::args.data_format+".ds"+metautils::args.dsnum+".xml",tdir.name());
@@ -274,7 +274,8 @@ void scan_input_file(gatherxml::markup::ObML::ObservationData& obs_data)
     std::cout << "Writing parameter map ..." << std::endl;
   }
   std::string datatype_map=tdir.name()+"/metadata/ParameterTables/"+metautils::args.data_format+".ds"+metautils::args.dsnum+".xml";
-  std::ofstream ofs(datatype_map.c_str());
+  std::ofstream ofs;
+  unixutils::open_output(ofs, datatype_map);
   if (!ofs.is_open()) {
     metautils::log_error("unable to write data type map to temporary directory","prop2xml",USER);
   }

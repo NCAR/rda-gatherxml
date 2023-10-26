@@ -33,6 +33,7 @@ using strutils::replace_all;
 using strutils::substitute;
 using strutils::to_upper;
 using unixutils::mysystem2;
+using unixutils::open_output;
 using unixutils::rdadata_sync;
 using unixutils::rdadata_sync_from;
 
@@ -92,7 +93,7 @@ void open(string& filename, unique_ptr<TempDir>& tdir, std::ofstream& ofs,
       log_error2("unable to create temporary directory", F, caller, user);
     }
   }
-  ofs.open(tdir->name() + "/" + filename + "." + cmd_type + "_inv");
+  open_output(ofs, tdir->name() + "/" + filename + "." + cmd_type + "_inv");
   if (!ofs.is_open()) {
     log_error2("couldn't open the inventory output file", F, caller, user);
   }
@@ -122,7 +123,8 @@ void copy_ancillary_files(string file_type, string metadata_file, string
 
     // create the directory tree in the temp directory
     string p = "metadata/wfmd";
-    if (mysystem2("/bin/mkdir -p " + td.name() + "/" + p, oss, ess) != 0) {
+    if (mysystem2("/bin/mkdir -m 0755 -p " + td.name() + "/" + p, oss, ess) !=
+        0) {
       log_error2("unable to create a temporary directory - '" + ess.str() + "'",
           F, caller, user);
     }
@@ -135,8 +137,9 @@ void copy_ancillary_files(string file_type, string metadata_file, string
         std::ifstream ifs(tf.name().c_str());
         if (ifs.is_open()) {
           auto sp2 = split(sp[n], file_type);
-          std::ofstream ofs((td.name() + "/" + p + "/" + file_type_name + "." +
-              file_type + sp2[1]).c_str());
+          std::ofstream ofs;
+          open_output(ofs, td.name() + "/" + p + "/" + file_type_name + "." +
+              file_type + sp2[1]);
           char l[32768];
           ifs.getline(l, 32768);
           while (!ifs.eof()) {
@@ -201,7 +204,7 @@ void write_initialize(string& filename, string ext, string tdir_name, std::
 
     // gridded content metadata is not stored on the server; it goes into a temp
     //   directory for 'scm' and then gets deleted
-    ofs.open(tdir_name + "/" + filename + "." + ext);
+    open_output(ofs, tdir_name + "/" + filename + "." + ext);
   } else {
 
     // this section is for metadata that gets stored on the server
@@ -209,11 +212,11 @@ void write_initialize(string& filename, string ext, string tdir_name, std::
 
     // create the directory tree in the temp directory
     stringstream oss, ess;
-    if (mysystem2("/bin/mkdir -p " + tdir_name + "/" + s + "/", oss, ess) !=
-        0) {
+    if (mysystem2("/bin/mkdir -m 0755 -p " + tdir_name + "/" + s + "/", oss,
+        ess) != 0) {
       log_error2("unable to create a temporary directory", F, caller, user);;
     }
-    ofs.open(tdir_name + "/" + s + "/" + filename + "." + ext);
+    open_output(ofs, tdir_name + "/" + s + "/" + filename + "." + ext);
   }
   if (!ofs.is_open()) {
     log_error2("unable to open file for output", F, caller, user);
@@ -235,7 +238,8 @@ void copy(string metadata_file, string URL, string caller, string user) {
   // create the directory tree in the temp directory
   string s = "metadata/wfmd";
   stringstream oss, ess;
-  if (mysystem2("/bin/mkdir -p " + tdir.name() + "/" + s, oss, ess) != 0) {
+  if (mysystem2("/bin/mkdir -m 0755 -p " + tdir.name() + "/" + s, oss, ess) !=
+      0) {
     log_error2("unable to create a temporary directory - '" + ess.str() + "'",
         F, caller, user);
   }
@@ -245,7 +249,8 @@ void copy(string metadata_file, string URL, string caller, string user) {
   if (!ifs.is_open()) {
     log_error2("unable to open input file", F, caller, user);
   }
-  std::ofstream ofs((tdir.name() + "/" + s + "/" + f + ".FixML").c_str());
+  std::ofstream ofs;
+  open_output(ofs, tdir.name() + "/" + s + "/" + f + ".FixML");
   if (!ofs.is_open()) {
     log_error2("unable to open output file", F, caller, user);
   }
@@ -363,8 +368,9 @@ void write(my::map<FeatureEntry>& feature_table, my::map<StageEntry>&
   }
   ofs << "</FixML>" << endl;
   for (const auto& k : stage_table.keys()) {
-    std::ofstream ofs2((t.name() + "/metadata/wfmd/" + f + ".FixML." + k +
-        ".locations.xml").c_str());
+    std::ofstream ofs2;
+    open_output(ofs2, t.name() + "/metadata/wfmd/" + f + ".FixML." + k +
+        ".locations.xml");
     ofs2 << "<?xml version=\"1.0\" ?>" << endl;
     ofs2 << "<locations parent=\"" << f << ".FixML\" stage=\"" << k << "\">" <<
         endl;
@@ -956,7 +962,7 @@ void copy(string metadata_file, string URL, string caller, string user) {
   }
   string s = "metadata/wfmd";
   stringstream oss, ess;
-  if (mysystem2("/bin/mkdir -p " + t.name() + "/" + s, oss, ess) != 0) {
+  if (mysystem2("/bin/mkdir -m 0755 -p " + t.name() + "/" + s, oss, ess) != 0) {
     log_error2("unable to create a temporary directory - '" + ess.str() + "'",
         F, caller, user);
   }
@@ -970,7 +976,8 @@ void copy(string metadata_file, string URL, string caller, string user) {
   }
   auto f = metautils::relative_web_filename(URL);
   replace_all(f, "/", "%");
-  std::ofstream ofs((t.name() + "/" + s + "/" + f + ".ObML").c_str());
+  std::ofstream ofs;
+  open_output(ofs, t.name() + "/" + s + "/" + f + ".ObML");
   if (!ofs.is_open()) {
     log_error2("unable to open output file", F, caller, user);
   }
@@ -1082,8 +1089,9 @@ void write(ObservationData& obs_data, string caller, string user) {
       for (const auto& k : obs_data.platform_tables[xx]->keys()) {
         PlatformEntry pe;
         obs_data.platform_tables[xx]->found(k, pe);
-        std::ofstream ofs2((t.name() + "/" + s + "/" + f + ".ObML." +
-            obs_data.observation_types[xx] + "." + k + ".IDs.xml").c_str());
+        std::ofstream ofs2;
+        open_output(ofs2, t.name() + "/" + s + "/" + f + ".ObML." + obs_data.
+            observation_types[xx] + "." + k + ".IDs.xml");
         ofs2 << "<?xml version=\"1.0\" ?>" << endl;
         ofs2 << "<IDs parent=\"" << f << ".ObML\" group=\"" << obs_data.
             observation_types[xx] << "." << k << "\">" << endl;
@@ -1220,8 +1228,8 @@ void write(ObservationData& obs_data, string caller, string user) {
             "\" end=\"" << pd.end.to_string("%Y-%m-%d") << "\" />" << endl;
         ofs << "      <locations ref=\"" << f << ".ObML." << obs_data.
             observation_types[xx] << "." << k << ".locations.xml\" />" << endl;
-        ofs2.open((t.name() + "/" + s + "/" + f + ".ObML." + obs_data.
-            observation_types[xx] + "." + k + ".locations.xml").c_str());
+        open_output(ofs2, t.name() + "/" + s + "/" + f + ".ObML." + obs_data.
+            observation_types[xx] + "." + k + ".locations.xml");
         ofs2 << "<?xml version=\"1.0\" ?>" << endl;
         ofs2 << "<locations parent=\"" << f << ".ObML\" group=\"" << obs_data.
             observation_types[xx] << "." << k << "\">" << endl;
@@ -1339,8 +1347,9 @@ void write(my::map<ScanLineEntry>& scan_line_table, std::list<string>&
       ofs << "        <scanLines ref=\"" << metautils::args.filename << "." << k
           << ".scanLines\" num=\"" << se.scan_line_list.size() << "\" />" <<
           endl;
-      std::ofstream ofs2((t.name() + "/" + metadata_path + "/" + metautils::
-          args.filename + "." + k + ".scanLines").c_str());
+      std::ofstream ofs2;
+      open_output(ofs2, t.name() + "/" + metadata_path + "/" + metautils::args.
+          filename + "." + k + ".scanLines");
       ofs2 << "<?xml version=\"1.0\" ?>" << endl;
       ofs2 << "<scanLines parent=\"" << metautils::args.filename << ".SatML\">"
           << endl;
@@ -1374,8 +1383,9 @@ void write(my::map<ScanLineEntry>& scan_line_table, std::list<string>&
           "%Y-%m-%d %T %Z") << "\" />" << endl;
       ofs << "    <images ref=\"" << metautils::args.filename << ".images\" "
           "num=\"" << ie.image_list.size() << "\" />" << endl;
-      std::ofstream ofs2((t.name() + "/" + metadata_path + "/" + metautils::
-          args.filename + ".images").c_str());
+      std::ofstream ofs2;
+      open_output(ofs2, t.name() + "/" + metadata_path + "/" + metautils::args.
+          filename + ".images");
       ofs2 << "<?xml version=\"1.0\" ?>" << endl;
       ofs2 << "<images parent=\"" << metautils::args.filename << ".SatML\">" <<
           endl;

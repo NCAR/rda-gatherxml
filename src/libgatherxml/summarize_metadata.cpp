@@ -45,6 +45,7 @@ using strutils::split;
 using strutils::strand;
 using strutils::substitute;
 using unixutils::mysystem2;
+using unixutils::open_output;
 
 namespace gatherxml {
 
@@ -928,12 +929,13 @@ void create_non_cmd_file_list_cache(string file_type, unordered_set<string>&
 
     // create the directory tree in the temp directory
     stringstream oss, ess;
-    if (mysystem2("/bin/mkdir -p " + tdir.name() + "/metadata", oss, ess) !=
-        0) {
+    if (mysystem2("/bin/mkdir -m 0755 -p " + tdir.name() + "/metadata", oss,
+        ess) != 0) {
       log_error2("unable to create a temporary directory (1) - '" + ess.str() +
           "'", F, caller, user);
     }
-    ofstream ofs((tdir.name() + "/metadata/" + f).c_str());
+    ofstream ofs;
+    open_output(ofs, tdir.name() + "/metadata/" + f);
     if (!ofs.is_open()) {
       log_error2("unable to open output for " + f, F, caller, user);
     }
@@ -1440,12 +1442,13 @@ void create_file_list_cache(string file_type, string caller, string user, string
 
       // create the directory tree in the temp directory
       stringstream oss, ess;
-      if (mysystem2("/bin/mkdir -p " + tdir.name() + "/metadata", oss, ess) !=
-          0) {
+      if (mysystem2("/bin/mkdir -m 0755 -p " + tdir.name() + "/metadata", oss,
+          ess) != 0) {
         log_error2("unable to create a temporary directory tree (1) - '" + ess.
             str() + "'", F, caller, user);
       }
-      ofstream ofs((tdir.name() + "/metadata/" + f).c_str());
+      ofstream ofs;
+      open_output(ofs, tdir.name() + "/metadata/" + f);
       if (!ofs.is_open()) {
         log_error2("unable to open temporary file for " + f, F, caller, user);
       }
@@ -1526,12 +1529,13 @@ void create_file_list_cache(string file_type, string caller, string user, string
 
       // create the directory tree in the temp directory
       stringstream oss, ess;
-      if (mysystem2("/bin/mkdir -p " + tdir.name() + "/metadata", oss, ess) !=
-          0) {
+      if (mysystem2("/bin/mkdir -m 0755 -p " + tdir.name() + "/metadata", oss,
+          ess) != 0) {
         log_error2("unable to create a temporary directory tree (2) - '" + ess.
             str() + "'", F, caller, user);
       }
-      ofstream ofs((tdir.name() + "/metadata/" + f).c_str());
+      ofstream ofs;
+      open_output(ofs, tdir.name() + "/metadata/" + f);
       if (!ofs.is_open()) {
         log_error2("unable to open temporary file for " + f, F, caller, user);
       }
@@ -1817,12 +1821,13 @@ void create_file_list_cache(string file_type, string caller, string user, string
 
     // create the directory tree in the temp directory
     stringstream oss, ess;
-    if (mysystem2("/bin/mkdir -p " + tdir.name() + "/metadata", oss, ess) !=
-        0) {
+    if (mysystem2("/bin/mkdir -m 0755 -p " + tdir.name() + "/metadata", oss,
+        ess) != 0) {
       log_error2("unable to create a temporary directory tree (3) - '" + ess.
           str() + "'", F, caller, user);
     }
-    ofstream ofs((tdir.name() + "/metadata/" + f).c_str());
+    ofstream ofs;
+    open_output(ofs, tdir.name() + "/metadata/" + f);
     if (!ofs.is_open()) {
       log_error2("unable to open temporary file for " + f, F, caller, user);
     }

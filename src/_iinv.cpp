@@ -52,6 +52,7 @@ using strutils::strand;
 using strutils::substitute;
 using strutils::trim;
 using unixutils::mysystem2;
+using unixutils::open_output;
 
 metautils::Directives metautils::directives;
 metautils::Args metautils::args;
@@ -201,8 +202,8 @@ void build_wms_capabilities() {
     log_error2("could not create a temporary directory", F, "iinv", USER);
   }
   stringstream oss, ess;
-  if (mysystem2("/bin/mkdir -p " + tdir->name() + "/metadata/wms", oss, ess) <
-      0) {
+  if (mysystem2("/bin/mkdir -m 0755 -p " + tdir->name() + "/metadata/wms", oss,
+      ess) < 0) {
     log_error2("could not create the directory tree", F, "iinv", USER);
   }
   Server server(metautils::directives.database_server, metautils::directives.
@@ -226,7 +227,8 @@ void build_wms_capabilities() {
       data_root_alias);
   replace_all(gfil, wh + "/", "");
   replace_all(gfil, "/", "%");
-  std::ofstream ofs((tdir->name() + "/metadata/wms/" + gfil).c_str());
+  std::ofstream ofs;
+  open_output(ofs, tdir->name() + "/metadata/wms/" + gfil);
   if (!ofs.is_open()) {
     log_error2("could not open the output file", F, "iinv", USER);
   }

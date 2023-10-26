@@ -7,6 +7,7 @@
 #include <map>
 #include <unordered_map>
 #include <unordered_set>
+#include <gatherxml.hpp>
 #include <MySQL.hpp>
 #include <metadata.hpp>
 #include <metahelpers.hpp>
@@ -59,6 +60,7 @@ using strutils::to_capital;
 using strutils::to_upper;
 using strutils::trim;
 using unixutils::exists_on_server;
+using unixutils::open_output;
 
 metautils::Directives metautils::directives;
 metautils::Args metautils::args;
@@ -130,9 +132,9 @@ void generate_index(string tdir_name) {
   static const string F = this_function_label(__func__);
   ofstream ofs;
   if (g_dataset_type == "W") {
-    ofs.open((tdir_name + "/test_index.html").c_str());
+    open_output(ofs, tdir_name + "/test_index.html");
   } else {
-    ofs.open((tdir_name + "/index.html").c_str());
+    open_output(ofs, tdir_name + "/index.html");
   }
   if (!ofs.is_open()) {
     log_error2("unable to open output for 'index.html'", F, "dsgen", USER);
@@ -189,7 +191,8 @@ void generate_index(string tdir_name) {
         0)) {
       log_error2("unable to export JSON-LD metadata", F, "dsgen", USER);
     }
-    std::ofstream ofs_j(d.name() + "/ds" + metautils::args.dsnum + ".jsonld");
+    std::ofstream ofs_j;
+    open_output(ofs_j, d.name() + "/ds" + metautils::args.dsnum + ".jsonld");
     if (!ofs_j.is_open()) {
       log_error2("unable to open output for JSON-LD", F, "dsgen", USER);
     }
@@ -2035,9 +2038,9 @@ void generate_description(string type, string tdir_name) {
   string dsnum2 = substitute(metautils::args.dsnum, ".", "");
   ofstream ofs;
   if (g_dataset_type == "W") {
-    ofs.open((tdir_name + "/test_description.html").c_str());
+    open_output(ofs, tdir_name + "/test_description.html");
   } else {
-    ofs.open((tdir_name + "/description.html").c_str());
+    open_output(ofs, tdir_name + "/description.html");
   }
   if (!ofs.is_open()) {
     log_error2("unable to open output for 'description.html'", F, "dsgen",

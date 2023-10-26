@@ -29,6 +29,7 @@ using strutils::substitute;
 using strutils::to_lower;
 using unixutils::exists_on_server;
 using unixutils::mysystem2;
+using unixutils::open_output;
 
 metautils::Directives metautils::directives;
 metautils::Args metautils::args;
@@ -115,13 +116,13 @@ void rewrite_uri_in_cmd_file(string db) {
     nname = metautils::relative_web_filename(nname);
   }
   stringstream oss, ess;
-  if (mysystem2("/bin/mkdir -p " + tdir.name() + "/metadata/" + cmdir, oss, ess)
-      != 0) {
+  if (mysystem2("/bin/mkdir -m 0755 -p " + tdir.name() + "/metadata/" + cmdir,
+      oss, ess) != 0) {
     log_error2("error: unable to create temporary directory tree (1)", F, "rcm",
         USER);
   }
-  if (db == "WGrML" && mysystem2("/bin/mkdir -p " + tdir.name() + "/metadata/"
-      "inv", oss, ess) != 0) {
+  if (db == "WGrML" && mysystem2("/bin/mkdir -m 0755 -p " + tdir.name() +
+      "/metadata/inv", oss, ess) != 0) {
     log_error2("error: unable to create temporary directory tree (2)", F, "rcm",
         USER);
   }
@@ -154,8 +155,8 @@ void rewrite_uri_in_cmd_file(string db) {
       log_error2("unable to open old file '" + f + "' for input", F, "rcm",
           USER);
     }
-    ofs.open((tdir.name() + "/metadata/" + cmdir + "/" + nname + ".ObML").
-        c_str());
+    open_output(ofs, tdir.name() + "/metadata/" + cmdir + "/" + nname +
+        ".ObML");
     if (!ofs.is_open()) {
       log_error2("unable to open new file for output", F, "rcm", USER);
     }
@@ -177,8 +178,9 @@ void rewrite_uri_in_cmd_file(string db) {
               "https://rda.ucar.edu/datasets/ds" + metautils::args.dsnum +
               "/metadata/" + cmdir + "/" + ref_file, tdir.name()).c_str());
           if (ifs2.is_open()) {
-            std::ofstream ofs2((tdir.name() + "/metadata/" + cmdir + "/" +
-                new_ref_file).c_str());
+            std::ofstream ofs2;
+            open_output(ofs2, tdir.name() + "/metadata/" + cmdir + "/" +
+                new_ref_file);
             if (!ofs2.is_open()) {
               log_error2("could not open output file for a reference", F, "rcm",
                   USER);
@@ -255,8 +257,8 @@ void rewrite_uri_in_cmd_file(string db) {
     if (!ifs.is_open()) {
       log_error2("unable to open old file for input", F, "rcm", USER);
     }
-    ofs.open((tdir.name() + "/metadata/" + cmdir + "/" + nname + ".FixML").
-        c_str());
+    open_output(ofs, tdir.name() + "/metadata/" + cmdir + "/" + nname +
+        ".FixML");
     if (!ofs.is_open()) {
       log_error2("unable to open new file for output", F, "rcm", USER);
     }
