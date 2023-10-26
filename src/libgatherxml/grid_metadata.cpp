@@ -272,6 +272,9 @@ void summarize_grids(string database, string caller, string user, string
       }
     }
   }
+  Transaction tx;
+  tx.start(srv);
+  tx.lock_rows("WGrML.summary", "dsid = '" + metautils::args.dsnum + "'");
   auto uflg = strand(3);
   vector<size_t> v;
   for (const auto& key : summ_map.keys()) {
@@ -355,6 +358,7 @@ void summarize_grids(string database, string caller, string user, string
   }
   srv._delete(database + ".summary", "dsid = '" + metautils::args.dsnum + "' "
       "and uflg != '" + uflg + "'");
+  tx.commit();
   srv.disconnect();
 }
 
