@@ -344,8 +344,8 @@ int main(int argc, char **argv) {
       auto idx = sp.back().rfind("/");
       append(binds, sp.back().substr(0, idx), ",");
     }
-    cmd = s + " -s exec -B " + binds + " /glade/u/home/rdadata/bin/singularity/"
-        "gatherxml-exec.sif /usr/local/bin/_" + util;
+    cmd = s + " -s exec --env PYTHONPATH=x -B " + binds + " /glade/u/home/"
+        "rdadata/bin/singularity/gatherxml-exec.sif /usr/local/bin/_" + util;
     if (!metautils::args.args_string.empty()) {
       cmd += " " + substitute(metautils::args.args_string, "!", " ");
     }
