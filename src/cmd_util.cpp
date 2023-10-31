@@ -36,13 +36,29 @@ string myerror = "";
 string mywarning = "";
 const char ARG_DELIMITER = '!';
 
+string whereis_lmod() {
+  string s; // return value
+  stringstream oss, ess;
+  if (mysystem2("/bin/tcsh -c 'echo $LMOD_CMD'", oss, ess) == 0) {
+    s = oss.str();
+    trim(s);
+  }
+  return s;
+}
+
 string whereis_singularity() {
   string s; // return value
   stringstream oss, ess;
   if (mysystem2("/bin/tcsh -c 'which singularity'", oss, ess) != 0) {
-    if (mysystem2("/bin/tcsh -c 'module load singularity; which singularity'",
-        oss, ess) == 0) {
-      s = oss.str();
+    auto m = whereis_lmod();
+    if (!m.empty()) {
+      if (mysystem2("/bin/tcsh -c 'eval `" + m + " tcsh load apptainer`; which "
+          "singularity'", oss, ess) == 0) {
+        s = oss.str();
+      } else if (mysystem2("/bin/tcsh -c 'eval `" + m + " tcsh load "
+          "singularity`; which singularity'", oss, ess) == 0) {
+        s = oss.str();
+      }
     }
   } else {
     s = oss.str();
