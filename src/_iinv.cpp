@@ -463,55 +463,6 @@ void build_wms_capabilities() {
   delete tdir;
 }
 
-void rename_indexes(Server& server, string table) {
-  static const string F = this_function_label(__func__);
-  string res;
-  if (server.command("show index from " + table, res) < 0) {
-    log_error2("unable to show indexes for table '" + table + "'", F, "iinv",
-        USER);
-  }
-  vector<string> index_names;
-  unordered_map<string, vector<string>> index_map;
-  auto sp = split(res, "\n");
-  for (const auto& p : sp) {
-    auto sp2 = split(p, "|");
-    auto index_name = sp2[3];
-    trim(index_name);
-    if (index_name.find("dsnnnn_") == 0) {
-      auto column = sp2[5];
-      trim(column);
-      if (index_map.find(index_name) == index_map.end()) {
-        index_names.emplace_back(index_name);
-        index_map.emplace(index_name, vector<string>{ column });
-      } else {
-        index_map[index_name].emplace_back(column);
-      }
-    }
-  }
-  auto index_prefix = table.substr(table.find(".") + 1);
-  for (const auto& e : index_names) {
-    auto index_name = e;
-    replace_all(index_name, "dsnnnn_inventory_p", index_prefix);
-    replace_all(index_name, "dsnnnn_inventory_lati_loni", index_prefix);
-    replace_all(index_name, "dsnnnn_point_times_decade", index_prefix);
-    replace_all(index_name, "dsnnnn_time_series_times_decade", index_prefix);
-    replace_all(index_name, "dsnnnn_", index_prefix.substr(0, 7));
-    string column_list;
-    for (const auto& c : index_map[e]) {
-      append(column_list, c, ", ");
-    }
-    if (server.command("alter table " + table + " add index " + index_name + "("
-        + column_list + ")", res) < 0) {
-      log_error2("unable to create index '" + index_name + "' in table '" +
-          table + "', error: '" + server.error() + "'", F, "iinv", USER);
-    }
-    if (server.command("alter table " + table + " drop index " + e, res) < 0) {
-      log_error2("unable to drop index '" + e + "' from table '" + table + "', "
-          "error: '" + server.error() + "'", F, "iinv", USER);
-    }
-  }
-}
-
 tuple<string, string> process_grml_lat_lon_grid_definition(deque<string>&
     def_parts) {
   string d, dp; // return values
@@ -808,21 +759,17 @@ void process_grml_parameter_entry(Server& server, string code, string
   q.fetch_row(row);
   auto tbl = "IGrML.ds" + local_args.dsnum2 + "_inventory_" + row[0];
   if (!table_exists(server, tbl)) {
-    string res;
     if (large_byte_offsets) {
-      if (server.command("create table " + tbl + " like IGrML."
-          "template_inventory_p_big", res) < 0) {
+      if (server.duplicate_table("IGrML.template_inventory_p_big", tbl) < 0) {
         log_error2("error: '" + server.error() + "' while trying to create "
             "parameter inventory table", F, "iinv", USER);
       }
     } else {
-      if (server.command("create table " + tbl + " like IGrML."
-          "template_inventory_p", res) < 0) {
+      if (server.duplicate_table("IGrML.template_inventory_p", tbl) < 0) {
         log_error2("error: '" + server.error() + "' while trying to create "
             "parameter inventory table", F, "iinv", USER);
       }
     }
-    rename_indexes(server, tbl);
   }
   inv_data.pclst.emplace(param, row[0]);
 }
@@ -1028,10 +975,8 @@ void insert_grml_inventory() {
   }
   if (!table_exists(server, "IGrML.ds" + local_args.dsnum2 +
       "_inventory_summary")) {
-    string result;
-    if (server.command("create table IGrML.ds" + local_args.dsnum2 +
-        "_inventory_summary like IGrML.template_inventory_summary", result) <
-        0) {
+    if (server.duplicate_table("IGrML.template_inventory_summary", "IGrML.ds" +
+        local_args.dsnum2 + "_inventory_summary") < 0) {
       log_error2("error: '" + server.error() + "' while trying to create "
           "inventory_summary table", F, "iinv", USER);
     }
@@ -1057,10 +1002,9 @@ void check_for_times_table(Server& server, string type, string last_decade) {
   static const string F = this_function_label(__func__);
   if (!table_exists(server, "IObML.ds" + local_args.dsnum2 + "_" + type +
       "_times_" + last_decade + "0")) {
-    string res;
-    if (server.command("create table IObML.ds" + local_args.dsnum2 + "_" +
-        type + "_times_" + last_decade + "0 like IObML.template_" + type +
-        "_times_decade", res) < 0) {
+    if (server.duplicate_table("IObML.template_" + type + "_times_decade",
+        "IObML.ds" + local_args.dsnum2 + "_" + type + "_times_" + last_decade +
+        "0") < 0) {
       log_error2("error: '" + server.error() + "' while trying to create 'ds" +
           local_args.dsnum2 + "_" + type + "_times_" + last_decade + "0'", F,
           "iinv", USER);
@@ -1107,21 +1051,19 @@ void process_IDs(string type, Server& server, string ID_index, string ID_data,
     for (size_t m = nln; m <= xln; ++m) {
       auto slt = itos(n);
       auto sln = itos(m);
-      string t = "IObML.ds" + local_args.dsnum2 + "_inventory_" + slt + "_" +
+      string tbl = "IObML.ds" + local_args.dsnum2 + "_inventory_" + slt + "_" +
           sln;
       if (type == "irregular") {
-        t += "_b";
+        tbl += "_b";
       }
-      if (!table_exists(server,t)) {
-        string c = "create table " + t + " like IObML"
-            ".template_inventory_lati_loni";
+      if (!table_exists(server, tbl)) {
+        string templ = "IObML.template_inventory_lati_loni";
         if (type == "irregular") {
-          c += "_b";
+          templ += "_b";
         }
-        string res;
-        if (server.command(c, res) < 0) {
+        if (server.duplicate_table(templ, tbl) < 0) {
           log_error2("error: '" + server.error() + "' while trying to create '"
-              + t + "'", F, "iinv", USER);
+              + tbl + "'", F, "iinv", USER);
         }
       }
       auto s = row[0] + "|" + itos(nlt) + "|" + itos(nln);
@@ -1143,14 +1085,13 @@ void insert_obml_netcdf_time_series_inventory(std::ifstream& ifs, Server&
   string uflg = strand(3);
   if (!table_exists(server, "IObML.ds" + local_args.dsnum2 +
       "_inventory_summary")) {
-    string res;
-    if (server.command("create table IObML.ds" + local_args.dsnum2 +
-        "_inventory_summary like IObML.template_inventory_summary", res) < 0) {
+    if (server.duplicate_table("IObML.template_inventory_summary", "IObML.ds" +
+        local_args.dsnum2 + "_inventory_summary") < 0) {
       log_error2("error: '" + server.error() + "' while trying to create 'ds" +
           local_args.dsnum2 + "_inventory_summary'", F, "iinv", USER);
     }
-    if (server.command("create table IObML.ds" + local_args.dsnum2 +
-        "_data_types like IObML.template_data_types", res) < 0) {
+    if (server.duplicate_table("IObML.template_data_types", "IObML.ds" +
+        local_args.dsnum2 + "_data_types") < 0) {
       log_error2("error: '" + server.error() + "' while trying to create 'ds" +
           local_args.dsnum2 + "_data_types'", F, "iinv", USER);
     }
@@ -1391,17 +1332,15 @@ void insert_obml_netcdf_point_inventory(std::ifstream& ifs, Server& server,
         "iinv", USER);
   }
   string uflg = strand(3);
-  string res;
   if (!table_exists(server, "IObML.ds" + local_args.dsnum2 +
       "_inventory_summary")) {
-    if (server.command("create table IObML.ds" + local_args.dsnum2 +
-        "_inventory_summary like IObML.template_inventory_summary", res) <
-        0) {
+    if (server.duplicate_table("IObML.template_inventory_summary", "IObML.ds" +
+        local_args.dsnum2 + "_inventory_summary") < 0) {
       log_error2("error: '" + server.error() + "' while trying to create 'ds" +
           local_args.dsnum2 + "_inventory_summary'", F, "iinv", USER);
     }
-    if (server.command("create table IObML.ds" + local_args.dsnum2 +
-        "_data_types like IObML.template_data_types", res) < 0) {
+    if (server.duplicate_table("IObML.template_data_types", "IObML.ds" +
+        local_args.dsnum2 + "_data_types") < 0) {
       log_error2("error: '" + server.error() + "' while trying to create 'ds" +
           local_args.dsnum2 + "_data_types'", F, "iinv", USER);
     }
@@ -1620,6 +1559,7 @@ void insert_obml_netcdf_point_inventory(std::ifstream& ifs, Server& server,
           dsnum2 + "_inventory_" + key, res);
     }
   }
+  string res;
   if (server.command("insert into IObML.ds" + local_args.dsnum2 + "_data_types "
       "values " + dss.str().substr(1) + " on duplicate key update value_type = "
       "values(value_type), byte_offset = values(byte_offset), byte_length = "
@@ -1651,19 +1591,18 @@ void insert_generic_point_inventory(std::ifstream& ifs ,Server& server, string
   int mnlat = 99, mnlon = 99, mxlat = -1, mxlon = -1;
   if (!table_exists(server, "IObML.ds" + local_args.dsnum2 +
       "_data_types_list_b")) {
-    string res;
-    if (server.command("create table IObML.ds" + local_args.dsnum2 +
-        "_data_types_list_b like IObML.template_data_types_list_b", res) < 0) {
+    if (server.duplicate_table("IObML.template_data_types_list_b", "IObML.ds" +
+        local_args.dsnum2 + "_data_types_list_b") < 0) {
       log_error2("error: '" + server.error() + "' while trying to create 'ds" +
           local_args.dsnum2 + "_data_types_list_b'", F, "iinv", USER);
     }
-    if (server.command("create table IObML.ds" + local_args.dsnum2 +
-        "_data_types like IObML.template_data_types", res) < 0) {
+    if (server.duplicate_table("IObML.template_data_types", "IObML.ds" +
+        local_args.dsnum2 + "_data_types") < 0) {
       log_error2("error: '" + server.error() + "' while trying to create 'ds" +
           local_args.dsnum2 + "_data_types'", F, "iinv", USER);
     }
-    if (server.command("create table IObML.ds" + local_args.dsnum2 +
-        "_inventory_summary like IObML.template_inventory_summary", res) < 0) {
+    if (server.duplicate_table("IObML.template_inventory_summary", "IObML.ds" +
+        local_args.dsnum2 + "_inventory_summary") < 0) {
       log_error2("error: '" + server.error() + "' while trying to create 'ds" +
           local_args.dsnum2 + "_inventory_summary'", F, "iinv", USER);
     }
