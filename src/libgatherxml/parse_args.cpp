@@ -13,8 +13,6 @@ extern const string USER;
 
 namespace gatherxml {
 
-extern bool verbose_operation;
-
 void parse_args(char arg_delimiter) {
   static const string F = this_function_label(__func__);
   verbose_operation = false;
@@ -47,7 +45,7 @@ void parse_args(char arg_delimiter) {
         metautils::args.update_db = false;
       }
     } else if (sp[n] == "-V") {
-      verbose_operation=true;
+      verbose_operation = true;
     } else if (sp[n] == "-NC") {
       if (USER == "dattore") {
         metautils::args.override_primary_check = true;
