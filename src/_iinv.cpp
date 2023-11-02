@@ -1173,8 +1173,6 @@ void insert_obml_netcdf_time_series_inventory(std::ifstream& ifs, Server&
               server._delete("IObML.ds" + local_args.dsnum2 +
                   "_time_series_times_" + l_dec + "0", "file_code = " +
                   file_code + " and uflag != '" + uflg + "'");
-              server.command("analyze NO_WRITE_TO_BINLOG table IObML.ds" +
-                  local_args.dsnum2 + "_time_series_times_" + l_dec + "0", res);
             }
             tss.str("");
           }
@@ -1212,8 +1210,6 @@ void insert_obml_netcdf_time_series_inventory(std::ifstream& ifs, Server&
     server._delete("IObML.ds" + local_args.dsnum2 + "_time_series_times_" +
         l_dec + "0", "file_code = " + file_code + " and uflag != '" + uflg +
         "'");
-    server.command("analyze NO_WRITE_TO_BINLOG table IObML.ds" + local_args.
-        dsnum2 + "_time_series_times_" + l_dec + "0", res);
   }
   stringstream iss;
   auto nbyts = 0;
@@ -1305,13 +1301,10 @@ void insert_obml_netcdf_time_series_inventory(std::ifstream& ifs, Server&
     }
     server._delete(ifil, "file_code = " + file_code + " and uflag != '" + uflg +
         "'");
-    server.command("analyze NO_WRITE_TO_BINLOG table " + ifil, res);
   }
   server._delete("IObML.ds" + local_args.dsnum2 + "_data_types", "file_code = "
       + file_code + " and uflag != '" + uflg + "'");
   string res;
-  server.command("analyze NO_WRITE_TO_BINLOG table IObML.ds" + local_args.
-      dsnum2 + "_data_types", res);
   if (server.command("insert into IObML.ds" + local_args.dsnum2 +
       "_inventory_summary values (" + file_code + ", " + itos(nbyts) + ", " +
       itos(ndbyts) + ", '" + uflg + "') on duplicate key update byte_length = "
@@ -1417,8 +1410,6 @@ void insert_obml_netcdf_point_inventory(std::ifstream& ifs, Server& server,
               server._delete("IObML.ds" + local_args.dsnum2 + "_point_times_" +
                   l_dec + "0", "file_code = " + file_code + " and uflag != '" +
                   uflg + "'");
-              server.command("analyze NO_WRITE_TO_BINLOG table IObML.ds" +
-                  local_args.dsnum2 + "_point_times_" + l_dec + "0", res);
             }
             tss.str("");
           }
@@ -1458,8 +1449,6 @@ void insert_obml_netcdf_point_inventory(std::ifstream& ifs, Server& server,
     }
     server._delete("IObML.ds" + local_args.dsnum2 + "_point_times_" + l_dec +
         "0", "file_code = " + file_code + " and uflag != '" + uflg + "'");
-    server.command("analyze NO_WRITE_TO_BINLOG table IObML.ds" + local_args.
-        dsnum2 + "_point_times_" + l_dec + "0", res);
   }
   stringstream dss;
   auto nbyts = 0;
@@ -1555,8 +1544,6 @@ void insert_obml_netcdf_point_inventory(std::ifstream& ifs, Server& server,
       }
       server._delete("IObML.ds" + local_args.dsnum2 + "_inventory_" + key,
           "file_code = " + file_code + " and uflag != '" + uflg + "'");
-      server.command("analyze NO_WRITE_TO_BINLOG table IObML.ds" + local_args.
-          dsnum2 + "_inventory_" + key, res);
     }
   }
   string res;
@@ -1570,8 +1557,6 @@ void insert_obml_netcdf_point_inventory(std::ifstream& ifs, Server& server,
   }
   server._delete("IObML.ds" + local_args.dsnum2 + "_data_types", "file_code = "
       + file_code + " and uflag != '" + uflg + "'");
-  server.command("analyze NO_WRITE_TO_BINLOG table IObML.ds" + local_args.
-      dsnum2 + "_data_types", res);
   if (server.command("insert into IObML.ds" + local_args.dsnum2 +
       "_inventory_summary values (" + file_code + ", " + itos(nbyts) + ", " +
       itos(ndbyts) + ", '" + uflg + "') on duplicate key update byte_length = "
