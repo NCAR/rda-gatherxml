@@ -560,9 +560,8 @@ void aggregate_grids(string database, string caller, string user, string
 #endif
 //std::cerr << q.show() << std::endl;
   std::unordered_set<size_t> gd_set, ds_set;
-  vector<size_t> dsv;
+  vector<size_t> dsv, trv;
   string d1, d2;
-  vector<size_t> trv;
   string lkey;
   auto uflg = strand(3);
   for (const auto& r : q) {
@@ -570,12 +569,6 @@ void aggregate_grids(string database, string caller, string user, string
     if (key != lkey) {
       if (!lkey.empty()) {
         if (!file_id_code.empty()) {
-          string trb;
-          bitmap::compress_values(trv, trb);
-          if (trb.length() > 255) {
-            exit_on_bitmap_too_long(file_id_code, lkey, trb, trv, F + "[tr2]",
-                caller, user);
-          }
           vector<size_t> gdv;
           gdv.reserve(gd_set.size());
           for (const auto& e : gd_set) {
@@ -586,17 +579,22 @@ void aggregate_grids(string database, string caller, string user, string
             }
           }
           std::sort(gdv.begin(), gdv.end(), std::less<size_t>());
-          string gdb;
-          bitmap::compress_values(gdv, gdb);
-          if (gdb.length() > 255) {
-            exit_on_bitmap_too_long(file_id_code, lkey, gdb, gdv, F + "[gd2]",
-                caller, user);
-          }
           stringstream ss;
           ss << file_id_code << ", ";
-          add_bitmap(trb, trv, ss);
+          string bmap;
+          bitmap::compress_values(trv, bmap);
+          if (bmap.length() > 255) {
+            exit_on_bitmap_too_long(file_id_code, lkey, bmap, trv, F + "[tr2]",
+                caller, user);
+          }
+          add_bitmap(bmap, trv, ss);
           ss << ", ";
-          add_bitmap(gdb, gdv, ss);
+          bitmap::compress_values(gdv, bmap);
+          if (bmap.length() > 255) {
+            exit_on_bitmap_too_long(file_id_code, lkey, bmap, gdv, F + "[gd2]",
+                caller, user);
+          }
+          add_bitmap(bmap, gdv, ss);
           auto sp = split(lkey, "','");
           ss << ", '" << sp[0] << "', ";
           vector<size_t> lv;
@@ -649,12 +647,6 @@ void aggregate_grids(string database, string caller, string user, string
   }
   if (!d1.empty()) {
     if (!file_id_code.empty()) {
-      string trb;
-      bitmap::compress_values(trv, trb);
-      if (trb.length() > 255) {
-        exit_on_bitmap_too_long(file_id_code, lkey, trb, trv, F + "[tr1]",
-            caller, user);
-      }
       vector<size_t> gdv;
       gdv.reserve(gd_set.size());
       for (const auto& e : gd_set) {
@@ -665,17 +657,22 @@ void aggregate_grids(string database, string caller, string user, string
         }
       }
       std::sort(gdv.begin(), gdv.end(), std::less<size_t>());
-      string gdb;
-      bitmap::compress_values(gdv, gdb);
-      if (gdb.length() > 255) {
-        exit_on_bitmap_too_long(file_id_code, lkey, gdb, gdv, F + "[gd1]",
-            caller, user);
-      }
       stringstream ss;
       ss << file_id_code << ", ";
-      add_bitmap(trb, trv, ss);
+      string bmap;
+      bitmap::compress_values(trv, bmap);
+      if (bmap.length() > 255) {
+        exit_on_bitmap_too_long(file_id_code, lkey, bmap, trv, F + "[tr1]",
+            caller, user);
+      }
+      add_bitmap(bmap, trv, ss);
       ss << ", ";
-      add_bitmap(gdb, gdv, ss);
+      bitmap::compress_values(gdv, bmap);
+      if (bmap.length() > 255) {
+        exit_on_bitmap_too_long(file_id_code, lkey, bmap, gdv, F + "[gd1]",
+            caller, user);
+      }
+      add_bitmap(bmap, gdv, ss);
       auto sp = split(lkey, "','");
       ss << ", '" << sp[0] << "', ";
       vector<size_t> lv;
@@ -694,6 +691,18 @@ void aggregate_grids(string database, string caller, string user, string
         log_error2(srv.error() + " while trying to insert '" + ss.str() +
             "' into " + database + ".ds" + d + "_agrids2", F, caller, user);
       }
+      std::sort(dsv.begin(), dsv.end(), std::less<size_t>());
+      string dsb;
+      bitmap::compress_values(dsv, dsb);
+      if (srv.insert(
+            database + ".ds" + d + "_grid_definitions",
+            "file_code, grid_definition_codes, uflg",
+            file_id_code + ", '" + sql_ready(dsb) + "', '" + uflg + "'",
+            "update uflg = values(uflg)"
+            ) < 0) {
+        log_error2(srv.error() + " while trying to insert (" + file_id_code +
+            ", '" + dsb + "')", F, caller, user);
+      }
     }
     if (srv.insert(
           database + ".ds" + d + "_agrids_cache",
@@ -705,20 +714,6 @@ void aggregate_grids(string database, string caller, string user, string
           ) < 0) {
       log_error2(srv.error() + " while trying to insert ('" + lkey + "', " + d1
           + ", " + d2 + ")", F, caller, user);
-    }
-    std::sort(dsv.begin(), dsv.end(), std::less<size_t>());
-    string dsb;
-    bitmap::compress_values(dsv, dsb);
-    if (!file_id_code.empty()) {
-      if (srv.insert(
-            database + ".ds" + d + "_grid_definitions",
-            "file_code, grid_definition_codes, uflg",
-            file_id_code + ", '" + sql_ready(dsb) + "', '" + uflg + "'",
-            "update uflg = values(uflg)"
-            ) < 0) {
-        log_error2(srv.error() + " while trying to insert (" + file_id_code +
-            ", '" + dsb + "')", F, caller, user);
-      }
     }
   }
   if (!file_id_code.empty()) {
