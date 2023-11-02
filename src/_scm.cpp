@@ -372,23 +372,20 @@ void process_data_format(MarkupParameters *markup_parameters) {
 void create_grml_tables(MarkupParameters *markup_parameters) {
   static const string F = this_function_label(__func__);
   auto tb_base = markup_parameters->database + ".ds" + local_args.dsnum2;
-  string r;
-  if (markup_parameters->server.command("create table " + tb_base + "_" +
-      markup_parameters->file_type + "files2 like " + markup_parameters->
-      database + ".template_" + markup_parameters->file_type + "files2", r) <
-      0) {
+  if (markup_parameters->server.duplicate_table(markup_parameters->database +
+      ".template_" + markup_parameters->file_type + "files2", tb_base + "_" +
+      markup_parameters->file_type + "files2") < 0) {
     log_error2("error: '" + markup_parameters->server.error() + "' while "
         "creating table " + tb_base + "_" + markup_parameters->file_type +
         "files2", F, "scm", USER);
   }
-  if (markup_parameters->server.command("create table " + tb_base +
-      "_levels like " + markup_parameters->database + ".template_levels", r) <
-      0) {
+  if (markup_parameters->server.duplicate_table(markup_parameters->database +
+      ".template_levels", tb_base + "_levels") < 0) {
     log_error2("error: '" + markup_parameters->server.error() + "' while "
         "creating table " + tb_base + "_levels", F, "scm", USER);
   }
-  if (markup_parameters->server.command("create table " + tb_base + "_grids2 "
-      "like " + markup_parameters->database + ".template_grids2", r) < 0) {
+  if (markup_parameters->server.duplicate_table(markup_parameters->database +
+      ".template_grids2", tb_base + "_grids2") < 0) {
     log_error2("error: '" + markup_parameters->server.error() + "' while "
         "creating table " + tb_base + "_grids2", F, "scm", USER);
   }
@@ -397,58 +394,50 @@ void create_grml_tables(MarkupParameters *markup_parameters) {
 void create_obml_tables(MarkupParameters *markup_parameters) {
   static const string F = this_function_label(__func__);
   auto tb_base = "WObML.ds" + local_args.dsnum2;
-  string r;
-  if (markup_parameters->server.command("create table " + tb_base + "_" +
-      markup_parameters->file_type + "files2 like " + markup_parameters->
-      database + ".template_" + markup_parameters->file_type + "files2", r) <
-      0) {
+  if (markup_parameters->server.duplicate_table(markup_parameters->database +
+      ".template_" + markup_parameters->file_type + "files2", tb_base + "_" +
+      markup_parameters->file_type + "files2") < 0) {
     log_error2("error: '" + markup_parameters->server.error() + "' while "
         "creating table " + tb_base + "_" + markup_parameters->file_type +
         "files2", F, "scm", USER);
   }
-  if (markup_parameters->server.command("create table " + tb_base +
-      "_locations like " + markup_parameters->database + ".template_locations",
-      r) < 0) {
+  if (markup_parameters->server.duplicate_table(markup_parameters->database +
+      ".template_locations", tb_base + "_locations") < 0) {
     log_error2("error: '" + markup_parameters->server.error() + "' while "
         "creating table " + tb_base + "_locations", F, "scm", USER);
   }
-  if (markup_parameters->server.command("create table " + tb_base +
-      "_location_names like " + markup_parameters->database +
-      ".template_location_names", r) < 0) {
+  if (markup_parameters->server.duplicate_table(markup_parameters->database +
+      ".template_location_names", tb_base + "_location_names") < 0) {
     log_error2("error: '" + markup_parameters->server.error() + "' while "
         "creating table " + tb_base + "_location_names", F, "scm", USER);
   }
-  if (markup_parameters->server.command("create table " + tb_base +
-      "_data_types like " + markup_parameters->database +
-      ".template_data_types", r) < 0) {
+  if (markup_parameters->server.duplicate_table(markup_parameters->database +
+      ".template_data_types", tb_base + "_data_types") < 0) {
     log_error2("error: '" + markup_parameters->server.error() + "' while "
         "creating table " + tb_base + "_data_types", F, "scm", USER);
   }
-  if (markup_parameters->server.command("create table " + tb_base +
-      "_data_types_list like " + markup_parameters->database +
-      ".template_data_types_list", r) < 0) {
+  if (markup_parameters->server.duplicate_table(markup_parameters->database +
+      ".template_data_types_list", tb_base + "_data_types_list") < 0) {
     log_error2("error: '" + markup_parameters->server.error() + "' while "
         "creating table " + tb_base + "_data_types_list", F, "scm", USER);
   }
-  if (markup_parameters->server.command("create table " + tb_base +
-      "_frequencies like " + markup_parameters->database +
-      ".template_frequencies", r) < 0) {
+  if (markup_parameters->server.duplicate_table(markup_parameters->database +
+      ".template_frequencies", tb_base + "_frequencies") < 0) {
     log_error2("error: '" + markup_parameters->server.error() + "' while "
         "creating table " + tb_base + "_frequencies", F, "scm", USER);
   }
-  if (markup_parameters->server.command("create table " + tb_base + "_ids "
-      "like " + markup_parameters->database + ".template_ids", r) < 0) {
+  if (markup_parameters->server.duplicate_table(markup_parameters->database +
+      ".template_ids", tb_base + "_ids") < 0) {
     log_error2("error: '" + markup_parameters->server.error() + "' while "
         "creating table " + tb_base + "_ids", F, "scm", USER);
   }
-  if (markup_parameters->server.command("create table " + tb_base + "_id_list "
-      "like " + markup_parameters->database + ".template_id_list", r) < 0) {
+  if (markup_parameters->server.duplicate_table(markup_parameters->database +
+      ".template_id_list", tb_base + "_id_list") < 0) {
     log_error2("error: '" + markup_parameters->server.error() + "' while "
         "creating table " + tb_base + "_id_list", F, "scm", USER);
   }
-  if (markup_parameters->server.command("create table " + tb_base +
-      "_geobounds like " + markup_parameters->database + ".template_geobounds",
-      r) < 0) {
+  if (markup_parameters->server.duplicate_table(markup_parameters->database +
+      ".template_geobounds", tb_base + "_geobounds") < 0) {
     log_error2("error: '" + markup_parameters->server.error() + "' while "
         "creating table " + tb_base + "_geobounds", F, "scm", USER);
   }
@@ -457,35 +446,30 @@ void create_obml_tables(MarkupParameters *markup_parameters) {
 void create_fixml_tables(MarkupParameters *markup_parameters) {
   static const string F = this_function_label(__func__);
   auto tb_base = markup_parameters->database + ".ds" + local_args.dsnum2;
-  string r;
-  if (markup_parameters->server.command("create table " + tb_base + "_" +
-      markup_parameters->file_type + "files2 like " + markup_parameters->
-      database + "template_" + markup_parameters->file_type + "files2", r) <
-      0) {
+  if (markup_parameters->server.duplicate_table(markup_parameters->database +
+      "template_" + markup_parameters->file_type + "files2", tb_base + "_" +
+      markup_parameters->file_type + "files2") < 0) {
     log_error2("error: '" + markup_parameters->server.error() + "' while "
         "creating table " + tb_base + "_" + markup_parameters->file_type +
         "files2", F, "scm", USER);
   }
-  if (markup_parameters->server.command("create table " + tb_base + "_id_list "
-      "like " + markup_parameters->database + ".template_id_list", r) < 0) {
+  if (markup_parameters->server.duplicate_table(markup_parameters->database +
+      ".template_id_list", tb_base + "_id_list") < 0) {
     log_error2("error: '" + markup_parameters->server.error() + "' while "
         "creating table " + tb_base + "_id_list", F, "scm", USER);
   }
-  if (markup_parameters->server.command("create table " + tb_base +
-      "_locations like " + markup_parameters->database + ".template_locations",
-      r) < 0) {
+  if (markup_parameters->server.duplicate_table(markup_parameters->database +
+      ".template_locations", tb_base + "_locations") < 0) {
     log_error2("error: '" + markup_parameters->server.error() + "' while "
         "creating table " + tb_base + "_locations", F, "scm", USER);
   }
-  if (markup_parameters->server.command("create table " + tb_base +
-      "_location_names like " + markup_parameters->database +
-      ".template_location_names", r) < 0) {
+  if (markup_parameters->server.duplicate_table(markup_parameters->database +
+      ".template_location_names", tb_base + "_location_names") < 0) {
     log_error2("error: '" + markup_parameters->server.error() + "' while "
         "creating table " + tb_base + "_location_names", F, "scm", USER);
   }
-  if (markup_parameters->server.command("create table " + tb_base +
-      "_frequencies like " + markup_parameters->database +
-      ".template_frequencies", r) < 0) {
+  if (markup_parameters->server.duplicate_table(markup_parameters->database +
+      ".template_frequencies", tb_base + "_frequencies") < 0) {
     log_error2("error: '" + markup_parameters->server.error() + "' while "
         "creating table " + tb_base + "_frequencies", F, "scm", USER);
   }
@@ -653,8 +637,8 @@ void process_grml_markup(void *markup_parameters) {
         if (!found_process) {
           if (!table_exists(gp->server, tbl)) {
             string r;
-            if (gp->server.command("create table " + tbl + " like " + gp->
-                database + ".template_processes", r) < 0) {
+            if (gp->server.duplicate_table(gp->database + ".template_processes",
+                tbl) < 0) {
               log_error2("error: '" + gp->server.error() + "' while creating "
                   "table " + tbl, F, "scm", USER);
             }
@@ -677,8 +661,8 @@ void process_grml_markup(void *markup_parameters) {
         if (!found_ensemble) {
           if (!table_exists(gp->server, tbl)) {
             string r;
-            if (gp->server.command("create table " + tbl + " like " + gp->
-                database + ".template_ensembles", r) < 0) {
+            if (gp->server.duplicate_table(gp->database + ".template_ensembles",
+                tbl) < 0) {
               log_error2("error: '" + gp->server.error() + " while creating "
                   "table " + tbl, F, "scm", USER);
             }
@@ -839,9 +823,8 @@ void process_grml_markup(void *markup_parameters) {
   if (!table_exists(gp->server, gp->database + ".ds" + local_args.dsnum2 +
       "_agrids2")) {
     string r;
-    if (gp->server.command("create table " + gp->database + ".ds" + local_args.
-        dsnum2 + "_agrids2 like " + gp->database + ".template_agrids2", r) <
-        0) {
+    if (gp->server.duplicate_table(gp->database + ".template_agrids2", gp->
+        database + ".ds" + local_args.dsnum2 + "_agrids2") < 0) {
       log_error2("error: '" + gp->server.error() + " while creating table " +
           gp->database + ".ds" + local_args.dsnum2 + "_agrids2", F, "scm",
           USER);
@@ -850,9 +833,8 @@ void process_grml_markup(void *markup_parameters) {
   if (!table_exists(gp->server, gp->database + ".ds" + local_args.dsnum2 +
       "_agrids_cache")) {
     string r;
-    if (gp->server.command("create table " + gp->database + ".ds" + local_args.
-        dsnum2 + "_agrids_cache like " + gp->database +
-        ".template_agrids_cache", r) < 0) {
+    if (gp->server.duplicate_table(gp->database + ".template_agrids_cache", gp->
+        database + ".ds" + local_args.dsnum2 + "_agrids_cache") < 0) {
       log_error2("error: '" + gp->server.error() + " while creating table " +
           gp->database + ".ds" + local_args.dsnum2 + "_agrids_cache", F, "scm",
           USER);
@@ -861,9 +843,8 @@ void process_grml_markup(void *markup_parameters) {
   if (!table_exists(gp->server, gp->database + ".ds" + local_args.dsnum2 +
       "_grid_definitions")) {
     string r;
-    if (gp->server.command("create table " + gp->database + ".ds" + local_args.
-        dsnum2 + "_grid_definitions like " + gp->database +
-        ".template_grid_definitions", r) < 0) {
+    if (gp->server.duplicate_table(gp->database + ".template_grid_definitions",
+        gp->database + ".ds" + local_args.dsnum2 + "_grid_definitions") < 0) {
       log_error2("error: '" + gp->server.error() + " while creating table " +
           gp->database + ".ds" + local_args.dsnum2 + "_grid_definitions", F,
           "scm", USER);
@@ -1149,7 +1130,7 @@ void *thread_summarize_file_ID_locations(void *args) {
     log_error2("could not connect to mysql server - error: " + srv.error(), F,
         "scm", USER);
   }
-  if (lmap.size() == 0) {
+  if (lmap.empty()) {
     LocalQuery q("box1d_row, box1d_column, keyword", "search."
         "locations_by_point");
     if (q.submit(srv) < 0)
@@ -1551,9 +1532,8 @@ void process_satml_markup(void *markup_parameters) {
     if (!b) {
       if (!table_exists(sp->server, sp->database + ".ds" + local_args.dsnum2              + "_products")) {
         string r;
-        if (sp->server.command("create table " + sp->database + ".ds" +
-            local_args.dsnum2 + "_products like " + sp->database +
-            ".template_products", r) < 0) {
+        if (sp->server.duplicate_table(sp->database + ".template_products", sp->
+            database + ".ds" + local_args.dsnum2 + "_products") < 0) {
           log_error2("error: '" + sp->server.error() + "' while creating table "
               + sp->database + ".ds" + local_args.dsnum2 + "_products", F,
              "scm", USER);
@@ -2106,7 +2086,6 @@ int main(int argc, char **argv) {
   // start the execution timer
   Timer tm;
   tm.start();
-
   Server mysrv(metautils::directives.database_server, metautils::directives.
       metadb_username, metautils::directives.metadb_password, "");
   if (!mysrv) {
