@@ -670,8 +670,8 @@ unordered_set<string> summarize_frequencies_from_wgrml_by_data_file(Server&
   }
   if (!table_exists(server, "WGrML.ds" + ds + "_frequencies")) {
     string e;
-    if (server.command("create table WGrML.ds" + ds + "_frequencies like WGrML."
-        "template_frequencies", e) < 0) {
+    if (server.duplicate_table("WGrML.template_frequencies", "WGrML.ds" + ds +
+        "_frequencies") < 0) {
       log_error2("'" + server.error() + "' while creating table WGrML.ds" + ds +
           "_frequencies", F, caller, user);
     }
