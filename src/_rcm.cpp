@@ -7,13 +7,14 @@
 #include <regex>
 #include <sys/stat.h>
 #include <gatherxml.hpp>
-#include <MySQL.hpp>
+#include <PostgreSQL.hpp>
+#include <pglocks.hpp>
 #include <metadata.hpp>
 #include <strutils.hpp>
 #include <utils.hpp>
 #include <myerror.hpp>
 
-using namespace MySQL;
+using namespace PostgreSQL;
 using metautils::log_error2;
 using miscutils::this_function_label;
 using std::cerr;
@@ -344,8 +345,8 @@ bool renamed_cmd() {
     }
     scm_flag = "-wf";
   }
-  auto databases = server.db_names();
-  for (const auto& db : databases) {
+  auto schemas = server.schema_names();
+  for (const auto& db : schemas) {
     auto tbl_names = table_names(server, db, "ds" + dsnum2 + ftbl, error);
     for (const auto& tbl : tbl_names) {
       query.set("code", db + "." + tbl, col + " = '" + oname + "'");
