@@ -2,13 +2,13 @@
 #include <sys/stat.h>
 #include <gatherxml.hpp>
 #include <datetime.hpp>
-#include <MySQL.hpp>
+#include <PostgreSQL.hpp>
 #include <bitmap.hpp>
 #include <strutils.hpp>
 #include <utils.hpp>
-#include <search.hpp>
+#include <search_pg.hpp>
 
-using namespace MySQL;
+using namespace PostgreSQL;
 using metautils::log_error2;
 using miscutils::this_function_label;
 using std::string;
@@ -25,7 +25,7 @@ void summarize_fix_data(string caller, string user) {
   static const string F = this_function_label(__func__);
   string dsnum2 = substitute(metautils::args.dsnum, ".", "");
   Server server(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "");
+      metadb_username, metautils::directives.metadb_password, "rdadb");
   Query formats_query("code, format_code", "WFixML.ds" + dsnum2 + "_webfiles2");
   if (formats_query.submit(server) < 0) {
     log_error2(formats_query.error(), F, caller, user);
@@ -82,7 +82,8 @@ void summarize_fix_data(string caller, string user) {
           "'" + metautils::args.dsnum + "', " + parts[0] + ", " + parts[1] +
               ", '" + se.start_date + "', '" + se.  end_date + "', " + parts[2]
               + ", '" + se.box1d_bitmap + "', '" + uflg + "'",
-          "update uflg = values(uflg)"
+          "(dsid, format_code, classification_code, box1d_row) do update set "
+              "uflg = excluded.uflg"
           ) < 0) {
       if (server.error().find("Duplicate entry") != 0) {
         log_error2(server.error(), F, caller, user);
