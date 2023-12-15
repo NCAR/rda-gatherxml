@@ -4,13 +4,13 @@
 #include <sys/stat.h>
 #include <sstream>
 #include <regex>
-#include <MySQL.hpp>
+#include <PostgreSQL.hpp>
 #include <metadata.hpp>
 #include <strutils.hpp>
 #include <utils.hpp>
 #include <s3.hpp>
 
-using namespace MySQL;
+using namespace PostgreSQL;
 using std::regex;
 using std::regex_search;
 using std::list;
@@ -33,7 +33,7 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile, TempDir& tdir, list<
     filelist->clear();
   }
   Server mys(directives.database_server, directives.rdadb_username, directives.
-      rdadb_password, "dssdb");
+      rdadb_password, "rdadb");
   if (!mys) {
     error = "Error connecting to database server";
     return false;
@@ -48,8 +48,8 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile, TempDir& tdir, list<
 
     // Web file
     auto w = metautils::relative_web_filename(args.path + "/" + args.filename);
-    LocalQuery q("status, file_format, locflag", "wfile", "dsid = 'ds" + args.
-        dsnum + "' and wfile = '" + w + "'");
+    LocalQuery q("status, file_format, locflag", "dssdb.wfile", "dsid = 'ds" +
+        args.dsnum + "' and wfile = '" + w + "'");
     if (q.submit(mys) < 0) {
       error = q.error();
       return false;
