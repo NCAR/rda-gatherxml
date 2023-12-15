@@ -1,5 +1,5 @@
 BootStrap: localimage
-From: /glade/u/home/rdadata/lib/singularity/gatherxml-2-pkgs.sif
+From: /glade/u/home/rdadata/lib/singularity/gatherxml_pg-2-pkgs.sif
 Stage: full
 
 %post
@@ -14,7 +14,8 @@ Stage: full
     cd /usr/local
     /usr/bin/python3.9 -m venv rdaviz
     /usr/local/rdaviz/bin/pip3 install wheel
-    /usr/local/rdaviz/bin/pip3 install cartopy==0.19.0.post1
+    /usr/local/rdaviz/bin/pip3 install shapely==1.8.5
+    /usr/local/rdaviz/bin/pip3 install cartopy==0.21
     /usr/local/rdaviz/bin/pip3 install matplotlib
     /usr/local/rdaviz/bin/pip3 install scipy
 
