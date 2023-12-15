@@ -5,11 +5,11 @@
 #include <strutils.hpp>
 #include <utils.hpp>
 #include <bitmap.hpp>
-#include <MySQL.hpp>
+#include <PostgreSQL.hpp>
 #include <tempfile.hpp>
 #include <myerror.hpp>
 
-using namespace MySQL;
+using namespace PostgreSQL;
 using metautils::log_error2;
 using metautils::log_warning;
 using miscutils::this_function_label;
@@ -50,7 +50,7 @@ void close(string filename, unique_ptr<TempDir>& tdir, std::ofstream& ofs,
   ofs.close();
   ofs.clear();
   Server srv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "");
+      metadb_username, metautils::directives.metadb_password, "rdadb");
   srv.update("W" + cmd_type + ".ds" + substitute(metautils::args.dsnum, ".", "")
       + "_webfiles2", "inv = 'Y'", "id = '" + substitute(filename, "%", "/") +
       "'");
