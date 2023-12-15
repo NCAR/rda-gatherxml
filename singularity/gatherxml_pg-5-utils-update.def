@@ -1,10 +1,10 @@
 BootStrap: localimage
-From: /glade/u/home/rdadata/lib/singularity/gatherxml-5-utils.sif
+From: /glade/u/home/rdadata/lib/singularity/gatherxml_pg-5-utils.sif
 Stage: compile
 
 %setup
-    cp /glade/u/home/dattore/gatherxml/Makefile ${SINGULARITY_ROOTFS}/gatherxml/
-    cp -p /glade/u/home/dattore/gatherxml/src/$UTILITY.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
+    cp /glade/u/home/dattore/gatherxml_pg/Makefile ${SINGULARITY_ROOTFS}/gatherxml/
+    cp -p /glade/u/home/dattore/gatherxml_pg/src/$UTILITY.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
     echo $UTILITY > ${SINGULARITY_ROOTFS}/gatherxml/utility
 
 %post
