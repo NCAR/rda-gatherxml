@@ -5,15 +5,15 @@
 #include <sys/stat.h>
 #include <gatherxml.hpp>
 #include <datetime.hpp>
-#include <MySQL.hpp>
+#include <PostgreSQL.hpp>
 #include <bsort.hpp>
 #include <strutils.hpp>
 #include <utils.hpp>
 #include <bitmap.hpp>
-#include <search.hpp>
+#include <search_pg.hpp>
 #include <myerror.hpp>
 
-using namespace MySQL;
+using namespace PostgreSQL;
 using metautils::log_error2;
 using miscutils::this_function_label;
 using std::endl;
@@ -246,7 +246,7 @@ bool summarize_obs_data(string caller, string user) {
   auto d2 = substitute(metautils::args.dsnum, ".", "");
   auto b = false; // return value
   Server mysrv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "");
+      metadb_username, metautils::directives.metadb_password, "rdadb");
   Query q("code, format_code", "WObML.ds" + d2 + "_webfiles2");
   if (q.submit(mysrv) < 0) {
     myerror = move(q.error());
@@ -312,14 +312,18 @@ bool summarize_obs_data(string caller, string user) {
   auto uflg = strand(3);
   for (const auto& e : summary_table) {
     auto sp = split(e.first, "<!>");
-    if (mysrv.insert("search.obs_data",
-        "dsid, format_code, observation_type_code, platform_type_code, "
-        "start_date, end_date, box1d_row, box1d_bitmap, uflg",
-        "'" + metautils::args.dsnum + "', " + sp[0] + ", " + sp[1] + ", " + sp[
-        2] + ", " + get<0>(e.second) + ", " + get<1>(e.second) + ", " + sp[3] +
-        ", '" + get<2>(e.second) + "', '" + uflg + "'",
-        "update start_date = values(start_date), end_date = values(end_date), "
-        "box1d_bitmap = values(box1d_bitmap), uflg = values(uflg)") < 0) {
+    if (mysrv.insert(
+          "search.obs_data",
+          "dsid, format_code, observation_type_code, platform_type_code, "
+              "start_date, end_date, box1d_row, box1d_bitmap, uflg",
+          "'" + metautils::args.dsnum + "', " + sp[0] + ", " + sp[1] + ", " +
+              sp[2] + ", " + get<0>(e.second) + ", " + get<1>(e.second) + ", " +
+              sp[3] + ", '" + get<2>(e.second) + "', '" + uflg + "'",
+          "(dsid, format_code, observation_type_code, platform_type_code, "
+              "box1d_row) do update set start_date = excluded.start_date, "
+              "end_date = excluded.end_date, box1d_bitmap = excluded."
+              "box1d_bitmap, uflg = excluded.uflg"
+          ) < 0) {
       log_error2("'" + mysrv.error() + "'", F, caller, user);
     }
   }
@@ -404,7 +408,7 @@ ObservationData::ObservationData() : num_types(0), observation_types(),
     unique_observation_table(), unknown_id_re("unknown"), unknown_ids(nullptr),
     track_unique_observations(true), is_empty(true) {
   Server mysrv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "");
+      metadb_username, metautils::directives.metadb_password, "rdadb");
   LocalQuery q("obs_type", "WObML.obs_types");
   if (q.submit(mysrv) == 0) {
     for (const auto& r : q) {
