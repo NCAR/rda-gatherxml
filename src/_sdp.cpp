@@ -6,11 +6,11 @@
 #include <metadata.hpp>
 #include <strutils.hpp>
 #include <utils.hpp>
-#include <MySQL.hpp>
+#include <PostgreSQL.hpp>
 #include <tempfile.hpp>
 #include <myerror.hpp>
 
-using namespace MySQL;
+using namespace PostgreSQL;
 using metautils::log_error;
 using std::cerr;
 using std::endl;
@@ -258,9 +258,9 @@ int main(int argc, char **argv) {
     exit(1);
   }
   auto dsnum2 = strutils::substitute(metautils::args.dsnum, ".", "");
-  auto db_names = server_m.db_names();
+  auto schema_names = server_m.schema_names();
   auto found_cmd_db = false;
-  for (const auto& db : db_names) {
+  for (const auto& db : schema_names) {
     if (table_exists(server_m, db + ".ds" + dsnum2 + "_primaries")) {
       found_cmd_db = true;
       break;
