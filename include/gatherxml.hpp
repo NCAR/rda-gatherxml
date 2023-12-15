@@ -4,7 +4,7 @@
 #include <datetime.hpp>
 #include <mymap.hpp>
 #include <metadata.hpp>
-#include <MySQL.hpp>
+#include <PostgreSQL.hpp>
 
 namespace gatherxml {
 
@@ -98,8 +98,8 @@ struct SummaryEntry {
 
 extern void aggregate_grids(std::string database, std::string caller, std::
     string user, std::string file_ID_code = "");
-extern void check_point(double latp, double lonp, MySQL::Server& server, my::
-    map<CodeEntry>& location_table);
+extern void check_point(double latp, double lonp, PostgreSQL::Server& server,
+    my::map<CodeEntry>& location_table);
 extern void compress_locations(std::unordered_set<std::string>& location_list,
     my::map<ParentLocation>& parent_location_table, std::vector<std::string>&
     sorted_array, std::string caller, std::string user);
@@ -352,5 +352,11 @@ extern void write_initialize(std::string& filename, std::string ext, std::string
     tdir_name, std::ofstream& ofs, std::string caller, std::string user);
 
 } // end namespace gatherxml::markup
+
+namespace pglocks {
+
+extern std::unordered_map<std::string, long long> pglocks;
+
+} // end namespace gatherxml::pglocks
 
 } // end namespace gatherxml
