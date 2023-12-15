@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <signal.h>
 #include <gatherxml.hpp>
+#include <pglocks.hpp>
 #include <hdf.hpp>
 #include <netcdf.hpp>
 #include <metadata.hpp>
@@ -17,7 +18,7 @@
 #include <timer.hpp>
 #include <myerror.hpp>
 
-using namespace MySQL;
+using namespace PostgreSQL;
 using metautils::NcTime::TimeBounds;
 using metautils::NcTime::TimeData;
 using metautils::NcTime::TimeRange;
@@ -3933,7 +3934,9 @@ void scan_gridded_hdf5nc4_file(ScanData& scan_data) {
       }
     }
     auto e = metautils::NcLevel::write_level_map(coord_vars.level_info);
-    if (!e.empty()) log_error2(e, F, g_util_ident);
+    if (!e.empty()) {
+      log_error2(e, F, g_util_ident);
+    }
   }
   scan_data.write_type = ScanData::GrML_type;
   if (g_grml_data->gtb.empty()) {
