@@ -9,6 +9,7 @@
 #include <unordered_set>
 #include <unordered_map>
 #include <gatherxml.hpp>
+#include <pglocks.hpp>
 #include <grid.hpp>
 #include <mymap.hpp>
 #include <strutils.hpp>
@@ -17,12 +18,12 @@
 #include <xmlutils.hpp>
 #include <metadata.hpp>
 #include <netcdf.hpp>
-#include <MySQL.hpp>
+#include <PostgreSQL.hpp>
 #include <bufr.hpp>
 #include <timer.hpp>
 #include <myerror.hpp>
 
-using namespace MySQL;
+using namespace PostgreSQL;
 using floatutils::myequalf;
 using metautils::log_error2;
 using metautils::log_warning;

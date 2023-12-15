@@ -5,11 +5,12 @@
 #include <regex>
 #include <signal.h>
 #include <gatherxml.hpp>
+#include <pglocks.hpp>
 #include <utils.hpp>
 #include <strutils.hpp>
 #include <myerror.hpp>
 
-using namespace MySQL;
+using namespace PostgreSQL;
 
 metautils::Directives metautils::directives;
 metautils::Args metautils::args;

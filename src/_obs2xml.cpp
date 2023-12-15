@@ -8,6 +8,7 @@
 #include <sstream>
 #include <regex>
 #include <gatherxml.hpp>
+#include <pglocks.hpp>
 #include <adpstream.hpp>
 #include <observation.hpp>
 #include <adpobs.hpp>
