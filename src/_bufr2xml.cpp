@@ -7,13 +7,14 @@
 #include <regex>
 #include <unordered_map>
 #include <gatherxml.hpp>
+#include <pglocks.hpp>
 #include <bufr.hpp>
 #include <strutils.hpp>
 #include <utils.hpp>
 #include <timer.hpp>
 #include <myerror.hpp>
 
-using namespace MySQL;
+using namespace PostgreSQL;
 using metautils::clean_id;
 using metautils::log_error2;
 using miscutils::this_function_label;
@@ -82,7 +83,7 @@ tuple<string, string, string> bufr_types(string bufr_type, size_t code, const
   static Server mysrv;
   if (!mysrv) {
     mysrv.connect(metautils::directives.database_server, metautils::directives.
-        metadb_username, metautils::directives.metadb_password, "");
+        metadb_username, metautils::directives.metadb_password, "rdadb");
     if (!mysrv) {
       log_error2("unable to connect to the database", F, "bufr2xml", USER);
     }

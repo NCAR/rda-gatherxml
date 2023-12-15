@@ -4,6 +4,7 @@
 #include <sstream>
 #include <regex>
 #include <gatherxml.hpp>
+#include <pglocks.hpp>
 #include <little_r.hpp>
 #include <marine.hpp>
 #include <metadata.hpp>
@@ -11,7 +12,7 @@
 #include <utils.hpp>
 #include <myerror.hpp>
 
-using namespace MySQL;
+using namespace PostgreSQL;
 
 metautils::Directives metautils::directives;
 metautils::Args metautils::args;
