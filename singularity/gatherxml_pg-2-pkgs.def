@@ -1,18 +1,21 @@
 BootStrap: localimage
-From: /glade/u/home/rdadata/lib/singularity/gatherxml-1-os.sif
+From: /glade/u/home/rdadata/lib/singularity/gatherxml_pg-1-os.sif
 
 %post
+    apt-get install dialog apt-utils -y
+    ln -fs /usr/share/zoneinfo/America/Denver /etc/localtime
+    DEBIAN_FRONTEND=noninteractive apt-get install -y tzdata
+    dpkg-reconfigure --frontend noninteractive tzdata
     apt-get install -y software-properties-common dirmngr apt-transport-https
-    apt-key adv --fetch-keys 'https://mariadb.org/mariadb_release_signing_key.asc'
-    add-apt-repository 'deb [arch=amd64,arm64,ppc64el,s390x] https://mirrors.gigenet.com/mariadb/repo/10.3/ubuntu focal main'
     apt-get update -y
-    apt-get install -y libmariadbclient-dev
+    apt-get install -y libpq-dev
     apt-get install -y libssl-dev
     apt-get install -y rsync
     apt-get install -y openssh-client
     apt-get install -y libcurl4-openssl-dev
     apt-get install -y curl
     apt-get install -y cmake
+    apt-get install -y libz-dev
 #
 # build jasper library from source
     cd / \
