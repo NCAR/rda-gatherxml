@@ -16,15 +16,16 @@
 #include <bsort.hpp>
 #include <bitmap.hpp>
 #include <xml.hpp>
-#include <MySQL.hpp>
+#include <PostgreSQL.hpp>
+#include <pglocks.hpp>
 #include <tempfile.hpp>
 #include <metahelpers.hpp>
 #include <xmlutils.hpp>
-#include <search.hpp>
+#include <search_pg.hpp>
 #include <timer.hpp>
 #include <myerror.hpp>
 
-using namespace MySQL;
+using namespace PostgreSQL;
 using dateutils::string_date_to_ll_string;
 using metautils::log_error2;
 using metautils::log_warning;
@@ -56,6 +57,7 @@ using strutils::itos;
 using strutils::lltos;
 using strutils::replace_all;
 using strutils::split;
+using strutils::sql_ready;
 using strutils::strand;
 using strutils::substitute;
 using strutils::to_lower;
@@ -196,6 +198,7 @@ string table_code(Server& srv, string table_name, string where_conditions, bool
     if (!do_insert) {
       return "";
     }
+    auto pkey = split_tablename(table_name).second + "_pkey";
     string cols, vals;
     auto sp = split(where_conditions, " AND ");
     for (size_t n = 0; n < sp.size(); ++n) {
@@ -219,11 +222,14 @@ string table_code(Server& srv, string table_name, string where_conditions, bool
       vals += s;
     }
     string r;
-    if (srv.insert(table_name, cols, vals, "") < 0) {
-      if (srv.error().find("Duplicate entry") != 0) {
-        log_error2("server error: '" + srv.error() + "' while inserting (" +
-            cols + ") values(" + vals + ") into " + table_name, F, "scm", USER);
-      }
+    if (srv.insert(
+          table_name,
+          cols,
+          vals,
+          "on constraint " + pkey + " do nothing"
+          ) < 0) {
+      log_error2("server error: '" + srv.error() + "' while inserting (" + cols
+          + ") values(" + vals + ") into " + table_name, F, "scm", USER);
     }
     q.submit(srv);
     if (q.num_rows() == 0) { // this really should not happen if insert worked
@@ -293,7 +299,7 @@ struct MarkupParameters {
 void initialize_web_file(MarkupParameters *markup_parameters) {
   static const string F = this_function_label(__func__);
   Server mysrv_d(metautils::directives.database_server, metautils::directives.
-      rdadb_username, metautils::directives.rdadb_password, "dssdb");
+      rdadb_username, metautils::directives.rdadb_password, "rdadb");
   if (!mysrv_d) {
     log_error2("could not connect to RDADB - error: '" + mysrv_d.error() + "'",
         F, "scm", USER);
@@ -352,7 +358,7 @@ void process_data_format(MarkupParameters *markup_parameters) {
         "keyword, vocabulary, dsid",
         "'" + markup_parameters->format + "', '" + markup_parameters->database +
             "', '" + metautils::args.dsnum + "'",
-        "update dsid=dsid"
+        "(keyword, vocabulary, dsid) do nothing"
         ) < 0) {
     log_error2("error: '" + markup_parameters->server.error() + "' while "
         "inserting into search.formats", F, "scm", USER);
@@ -621,7 +627,6 @@ void process_grml_markup(void *markup_parameters) {
     }
     auto gdef = def + ":" + defp;
     if (gd_map.find(gdef) == gd_map.end()) {
-      LocalQuery q;
       auto c = table_code(gp->server, gp->database + ".grid_definitions",
           "definition = '" + def + "' AND def_params = '" + defp + "'");
       if (c.empty()) {
@@ -640,7 +645,6 @@ void process_grml_markup(void *markup_parameters) {
         auto tbl = gp->database + ".ds" + local_args.dsnum2 + "_processes";
         if (!found_process) {
           if (!table_exists(gp->server, tbl)) {
-            string r;
             if (gp->server.duplicate_table(gp->database + ".template_processes",
                 tbl) < 0) {
               log_error2("error: '" + gp->server.error() + "' while creating "
@@ -655,7 +659,8 @@ void process_grml_markup(void *markup_parameters) {
               gp->file_map[gp->filename] + ", " + tr_map[tr] + ", " + gd_map[
                   gdef] + ", '" + ge.p->attribute_value("value") + "', '" + uflg
                   + "'",
-              "update uflg = values(uflg)"
+              "(file_code, time_range_code, grid_definition_code, process) do "
+                  "update set uflg = excluded.uflg"
               ) < 0) {
           log_error2("error: '" + gp->server.error() + "' while inserting into "
               + tbl, F, "scm", USER);
@@ -664,7 +669,6 @@ void process_grml_markup(void *markup_parameters) {
         auto tbl = gp->database + ".ds" + local_args.dsnum2 + "_ensembles";
         if (!found_ensemble) {
           if (!table_exists(gp->server, tbl)) {
-            string r;
             if (gp->server.duplicate_table(gp->database + ".template_ensembles",
                 tbl) < 0) {
               log_error2("error: '" + gp->server.error() + " while creating "
@@ -684,7 +688,8 @@ void process_grml_markup(void *markup_parameters) {
               gp->file_map[gp->filename] + ", " + tr_map[tr] + ", " + gd_map[
                   gdef] + ", '" + ge.p->attribute_value("type") + "', '" + ge.
                   p->attribute_value("ID") + "', " + v + ", '" + uflg + "'",
-              "update uflg = values(uflg)"
+              "(file_code, time_range_code, grid_definition_code, type, id, "
+                  "size) do update set uflg = excluded.uflg"
               ) < 0) {
           log_error2("error: '" + gp->server.error() + "' while inserting into "
               + tbl, F, "scm", USER);
@@ -710,7 +715,7 @@ void process_grml_markup(void *markup_parameters) {
               gp->database + ".ds" + local_args.dsnum2 + "_levels",
               "format_code, level_type_code",
               gp->format_map[gp->format] + ", " + lev_map[ltyp],
-              "update format_code=format_code"
+              "(format_code, level_type_code) do nothing"
               ) < 0) {
           log_error2("error: '" + gp->server.error() + "' while inserting into "
               + gp->database + ".ds" + local_args.dsnum2 + "_levels", F, "scm",
@@ -740,12 +745,12 @@ void process_grml_markup(void *markup_parameters) {
           }
           if (p_set.find(p) == p_set.end()) {
             auto d = PMAP.description(gp->format, p);
-            replace_all(d, "'", "\\'");
             if (gp->server.insert(
                   "search.variables",
                   "keyword, vocabulary, dsid",
-                  "'" + d + "', 'CMDMAP', '" + metautils::args.dsnum + "'",
-                  "update keyword=keyword"
+                  "'" + sql_ready(d) + "', 'CMDMAP', '" + metautils::args.
+                      dsnum + "'",
+                  "(keyword, vocabulary, dsid) do nothing"
                   ) < 0) {
               log_error2("error: '" + gp->server.error() + "' while inserting "
                   "into search.variables", F, "scm", USER);
@@ -794,7 +799,9 @@ void process_grml_markup(void *markup_parameters) {
             "file_code, time_range_code, grid_definition_code, parameter, "
                 "level_type_codes, start_date, end_date, nsteps, uflg",
             inserts,
-            "update uflg = values(uflg)"
+            "(file_code, time_range_code, grid_definition_code, parameter, "
+                "start_date, end_date, nsteps) do update set uflg = excluded."
+                "uflg"
             ) < 0) {
         log_error2("error: '" + gp->server.error() + " while inserting '" +
             inserts + "' into '" + tbl + "'", F, "scm", USER);
@@ -826,7 +833,6 @@ void process_grml_markup(void *markup_parameters) {
   }
   if (!table_exists(gp->server, gp->database + ".ds" + local_args.dsnum2 +
       "_agrids2")) {
-    string r;
     if (gp->server.duplicate_table(gp->database + ".template_agrids2", gp->
         database + ".ds" + local_args.dsnum2 + "_agrids2") < 0) {
       log_error2("error: '" + gp->server.error() + " while creating table " +
@@ -836,7 +842,6 @@ void process_grml_markup(void *markup_parameters) {
   }
   if (!table_exists(gp->server, gp->database + ".ds" + local_args.dsnum2 +
       "_agrids_cache")) {
-    string r;
     if (gp->server.duplicate_table(gp->database + ".template_agrids_cache", gp->
         database + ".ds" + local_args.dsnum2 + "_agrids_cache") < 0) {
       log_error2("error: '" + gp->server.error() + " while creating table " +
@@ -846,7 +851,6 @@ void process_grml_markup(void *markup_parameters) {
   }
   if (!table_exists(gp->server, gp->database + ".ds" + local_args.dsnum2 +
       "_grid_definitions")) {
-    string r;
     if (gp->server.duplicate_table(gp->database + ".template_grid_definitions",
         gp->database + ".ds" + local_args.dsnum2 + "_grid_definitions") < 0) {
       log_error2("error: '" + gp->server.error() + " while creating table " +
@@ -860,7 +864,7 @@ void *thread_summarize_IDs(void *args) {
   static const string F = this_function_label(__func__);
   auto &a = *(reinterpret_cast<vector<string> *>(args));
   Server srv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "");;
+      metadb_username, metautils::directives.metadb_password, "rdadb");;
   if (!srv) {
     log_error2("could not connect to mysql server - error: '" + srv.error() +
         "'", F, "scm", USER);
@@ -988,7 +992,8 @@ void *thread_summarize_IDs(void *args) {
             "id_code, observation_type_code, platform_type_code, file_code, "
                 "num_observations, start_date, end_date, time_zone, uflg",
             inserts,
-            "update uflg = values(uflg)"
+            "(id_code, observation_type_code, platform_type_code, file_code) "
+                "do update set uflg = excluded.uflg"
             ) < 0) {
         log_error2("'" + srv.error() + "' while inserting '" + inserts +
             "' into " + tbl, F, "scm", USER);
@@ -1094,27 +1099,28 @@ void *thread_summarize_IDs(void *args) {
           "file_code, observation_type_code, platform_type_code, avg_obs_per, "
               "total_obs, unit, uflag",
           inserts,
-          "update avg_obs_per = values(avg_obs_per), total_obs = values("
-              "total_obs), uflag = values(uflag)"
+          "(file_code, observation_type_code, platform_type_code, unit) do "
+              "update set avg_obs_per = excluded.avg_obs_per, total_obs = "
+              "excluded.total_obs, uflag = excluded.uflag"
           ) < 0) {
       log_error2("'" + srv.error() + "' while trying to insert into " + tbl +
           " (" + inserts + ")", F, "scm", USER);
     }
   }
   if (a[5] == "WObML") {
-    auto tbl = a[5] + ".ds" + local_args.dsnum2 + "_geobounds";
+    auto tbl = "\"" + a[5] + "\".ds" + local_args.dsnum2 + "_geobounds";
+    auto pkey = "ds" + local_args.dsnum2 + "_geobounds_pkey";
     auto uflg = strand(3);
-    string r;
     if (srv.command("insert into " + tbl + " (file_code, min_lat, min_lon, "
-        "max_lat, max_lon, uflg) select i2.file_code, min(i.sw_lat), min(i."
-        "sw_lon), max(i.ne_lat), max(i.ne_lon), '" + uflg + "' from " + a[5] +
-        ".ds" + local_args.dsnum2 + "_id_list as i2 left join " + a[5] + ".ds" +
-        local_args.dsnum2 + "_ids as i on i.code = i2.id_code where i2."
-        "file_code = " + a[2] + " and i.sw_lat > -990000 and i.sw_lon > "
-        "-1810000 and i.ne_lat < 990000 and i.ne_lon < 1810000 on duplicate "
-        "key update min_lat = values(min_lat), max_lat = values(max_lat), "
-        "min_lon = values(min_lon),  max_lon = values(max_lon), uflg = values("
-        "uflg)", r) < 0) {
+        "max_lat, max_lon, uflg) select " + a[2] + " as file_code, min(i."
+        "sw_lat), min(i.sw_lon), max(i.ne_lat), max(i.ne_lon), '" + uflg +
+        "' from \"" + a[5] + "\".ds" + local_args.dsnum2 + "_id_list as i2 "
+        "left join \"" + a[5] + "\".ds" + local_args.dsnum2 + "_ids as i on i."
+        "code = i2.id_code where i2.file_code = " + a[2] + " and i.sw_lat > "
+        "-990000 and i.sw_lon > -1810000 and i.ne_lat < 990000 and i.ne_lon < "
+        "1810000 on conflict on constraint " + pkey + " do update set min_lat "
+        "= excluded.min_lat, max_lat = excluded.max_lat, min_lon = excluded."
+        "min_lon,  max_lon = excluded.max_lon, uflg = excluded.uflg") < 0) {
       log_error2("'" + srv.error() + "' while trying to insert into " + tbl +
           " for file_code = " + a[2], F, "scm", USER);
     }
@@ -1129,7 +1135,7 @@ void *thread_summarize_file_ID_locations(void *args) {
   static unordered_map<string, vector<string>> lmap;
   auto &a = *reinterpret_cast<vector<string> *>(args);
   Server srv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "");;
+      metadb_username, metautils::directives.metadb_password, "rdadb");;
   if (!srv) {
     log_error2("could not connect to mysql server - error: " + srv.error(), F,
         "scm", USER);
@@ -1155,6 +1161,7 @@ void *thread_summarize_file_ID_locations(void *args) {
     size_t min = 999;
     size_t max = 0;
     auto tbl = a[7] + ".ds" + local_args.dsnum2 + "_locations";
+    auto pkey = "ds" + local_args.dsnum2 + "_locations_pkey";
     string cols = "file_code";
     auto istart = a[2];
     if (!a[4].empty()) {
@@ -1198,7 +1205,7 @@ void *thread_summarize_file_ID_locations(void *args) {
             tbl,
             cols,
             inserts,
-            "update uflg = values(uflg)"
+            "on constraint " + pkey + " do update set uflg = excluded.uflg"
             ) < 0) {
         log_error2("'" + srv.error() + "' while trying to insert into " + tbl +
             " (" + inserts + ")", F, "scm", USER);
@@ -1222,6 +1229,7 @@ void *thread_summarize_file_ID_locations(void *args) {
       vector<string> v;
       compress_locations(lset, pmap, v, "scm", USER);
       auto loc_tbl = a[7] + ".ds" + local_args.dsnum2 + "_location_names";
+      auto loc_pkey = "ds" + local_args.dsnum2 + "_location_names_pkey";
       string cols;
       if (a[7] == "WObML") {
         cols = "file_code, observation_type_code, platform_type_code, "
@@ -1235,41 +1243,36 @@ void *thread_summarize_file_ID_locations(void *args) {
         pmap.found(i, pl);
         if (pl.matched_set != nullptr) {
           if (pl.matched_set->size() > pl.children_set->size() / 2) {
-            replace_all(pl.key, "'", "\\'");
-            string inserts;
+            string inserts = a[2] + ", " + a[3] + ", ";
             if (!a[4].empty()) {
-              inserts = a[2] + ", " + a[3] + ", " + a[4] + ", '" + pl.key +
-                  "', 'Y', '" + uflg + "'";
-            } else {
-              inserts = a[2] + ", " + a[3] + ", '" + pl.key + "', 'Y', '" + uflg
-                  + "'";
+              inserts +=  a[4] + ", ";
             }
+            inserts += "'" + sql_ready(pl.key) + "', 'Y', '" + uflg + "'";
             if (srv.insert(
                   loc_tbl,
                   cols,
                   inserts,
-                  "update uflg = values(uflg)"
+                  "on constraint " + loc_pkey + " do update set uflg = "
+                      "excluded.uflg"
                   ) < 0) {
               log_error2("'" + srv.error() + "' while inserting '" + inserts +
                   "' into " + loc_tbl, F, "scm", USER);
             }
             for (auto key : *pl.children_set) {
-              replace_all(key, "'", "\\'");
               if (pl.matched_set->find(key) == pl.matched_set->end() && pl.
                   consolidated_parent_set->find(key) == pl.
                   consolidated_parent_set->end()) {
+                inserts = a[2] + ", " + a[3] + ", ";
                 if (!a[4].empty()) {
-                  inserts = a[2] + ", " + a[3] + ", " + a[4] + ", '" + key +
-                      "', 'N', '" + uflg + "'";
-                } else {
-                  inserts = a[2] + ", " + a[3] + ", '" + key + "', 'N', '" +
-                      uflg + "'";
+                  inserts += a[4] + ", ";
                 }
+                inserts += "'" + sql_ready(key) + "', 'N', '" + uflg + "'";
                 if (srv.insert(
                       loc_tbl,
                       cols,
                       inserts,
-                      "update uflg = values(uflg)"
+                      "on constraint " + loc_pkey + " do update set uflg = "
+                          "excluded.uflg"
                       ) < 0) {
                   log_error2("'" + srv.error() + "' while inserting '" + inserts
                       + "' into " + loc_tbl, F, "scm", USER);
@@ -1278,20 +1281,17 @@ void *thread_summarize_file_ID_locations(void *args) {
             }
           } else {
             for (auto key : *pl.matched_set) {
-              replace_all(key, "'", "\\'");
-              string inserts;
+              string inserts = a[2] + ", " + a[3] + ", ";
               if (!a[4].empty()) {
-                inserts = a[2] + ", " + a[3] + ", " + a[4] + ", '" + key +
-                    "', 'Y', '" + uflg + "'";
-              } else {
-                inserts = a[2] + ", " + a[3] + ", '" + key + "', 'Y', '" + uflg
-                    + "'";
+                inserts += a[4] + ", ";
               }
+              inserts += "'" + sql_ready(key) + "', 'Y', '" + uflg + "'";
               if (srv.insert(
                     loc_tbl,
                     cols,
                     inserts,
-                    "update uflg = values(uflg)"
+                    "on constraint " + loc_pkey + " do update set uflg = "
+                        "excluded.uflg"
                     ) < 0) {
                 log_error2("'" + srv.error() + "' while inserting '" + inserts +
                     "' into " + loc_tbl, F, "scm", USER);
@@ -1363,36 +1363,13 @@ void process_obml_markup(void *markup_parameters) {
         dtyp += e.attribute_value("value");
         auto dtyp_k = obs_map[obs] + "|" + plat_map[plat] + "|" + dtyp;
         if (dtyp_map.find(dtyp_k) == dtyp_map.end()) {
-          LocalQuery q("code", "WObML.ds" + local_args.dsnum2 +
+          auto c = table_code(op->server, "WObML.ds" + local_args.dsnum2 +
               "_data_types_list", "observation_type_code = " + obs_map[obs] +
-              " and platform_type_code = " + plat_map[plat] + " and data_type "
+              " AND platform_type_code = " + plat_map[plat] + " AND data_type "
               "= '" + dtyp + "'");
-          if (q.submit(op->server) < 0) {
-            log_error2("'" + q.error() + "' while trying to get data_type code "
-                "(1) for '" + obs_map[obs] + ", " + plat_map[plat] + ", '" +
-                dtyp + "''", F, "scm", USER);
-          }
-          string c;
-          Row r;
-          if (q.fetch_row(r)) {
-            c = r[0];
-          } else {
-            if (op->server.insert("WObML.ds" + local_args.dsnum2 +
-                "_data_types_list", obs_map[obs] + ", " + plat_map[plat] + ", '"
-                + dtyp + "', NULL") < 0) {
-              log_error2("'" + op->server.error() + "' while trying to insert '"
-                  + obs_map[obs] + ", " + plat_map[plat] + ", '" + dtyp +
-                  "'' into WObML.ds" + local_args.dsnum2 + "_data_types_list",
-                  F, "scm", USER);
-            }
-            auto lid = op->server.last_insert_ID();
-            if (lid == 0) {
-              log_error2("'" + q.error() + "' while trying to get data_type "
-                  "code (2) for '" + obs_map[obs] + ", " + plat_map[plat] +
-                  ", '" + dtyp + "''", F, "scm", USER);
-            } else {
-              c = lltos(lid);
-            }
+          if (c.empty()) {
+            log_error2("unable to get data_type code for '" + obs_map[obs] +
+                ", " + plat_map[plat] + ", '" + dtyp + "''", F, "scm", USER);
           }
           dtyp_map.emplace(dtyp_k, c);
         }
@@ -1412,7 +1389,7 @@ void process_obml_markup(void *markup_parameters) {
               "file_code, data_type_code, min_altitude, max_altitude, vunits, "
                   "avg_nlev, avg_vres, uflg",
               inserts,
-              "update uflg = values(uflg)"
+              "(file_code, data_type_code) do update set uflg = excluded.uflg"
               ) < 0) {
           log_error2("'" + op->server.error() + "' while trying to insert '" +
               inserts + "' into " + dt_tbl, F, "scm", USER);
@@ -1535,7 +1512,6 @@ void process_satml_markup(void *markup_parameters) {
     }
     if (!b) {
       if (!table_exists(sp->server, sp->database + ".ds" + local_args.dsnum2              + "_products")) {
-        string r;
         if (sp->server.duplicate_table(sp->database + ".template_products", sp->
             database + ".ds" + local_args.dsnum2 + "_products") < 0) {
           log_error2("error: '" + sp->server.error() + "' while creating table "
@@ -1545,9 +1521,13 @@ void process_satml_markup(void *markup_parameters) {
       }
       b = true;
     }
-    if (sp->server.insert(sp->database + ".ds" + local_args.dsnum2 +
-        "_products", sp->file_map[sp->filename] + ", '" + ptyp + "', " + itos(
-        n), "update num_products = value(num_products)") < 0) {
+    if (sp->server.insert(
+          sp->database + ".ds" + local_args.dsnum2 + "_products",
+          "file_code, product, num_products",
+          sp->file_map[sp->filename] + ", '" + ptyp + "', " + itos(n),
+          "(file_code, product) do update set num_products = excluded."
+              "num_products"
+          ) < 0) {
       if (sp->server.error().find("Duplicate entry") == string::npos) {
         log_error2("error: '" + sp->server.error() + "' while inserting into " +
             sp->database + ".ds" + local_args.dsnum2 + "_products", F, "scm",
@@ -1614,8 +1594,8 @@ void process_fixml_markup(void *markup_parameters) {
             tbl,
             "id, classification_code, file_code, num_fixes, uflg",
             inserts,
-            "update num_fixes = num_fixes + " + _class.attribute_value(
-                "nfixes") + ", uflg = '" + uflg + "'"
+            "(id, classification_code, file_code) do update set num_fixes = "
+                "excluded.num_fixes, uflg = excluded.uflg"
             ) < 0) {
         log_error2("error: '" + fp->server.error() + "' while inserting '" +
             inserts + "' into " + tbl, F, "scm", USER);
@@ -1766,26 +1746,29 @@ void update_fixml_database(FixMLParameters& fixml_parameters) {
     if (fixml_parameters.database == "WFixML") {
       auto s = searchutils::time_resolution_keyword("irregular", e.second.
           first, sp[0], "");
-      if (fixml_parameters.server.insert("search.time_resolutions", "'" + s +
-          "', 'GCMD', '" + metautils::args.dsnum + "', 'WFixML'") < 0) {
-        if (fixml_parameters.server.error().find("Duplicate entry") == string::
-            npos) {
-          log_error2("error: '" + fixml_parameters.server.error() + "' while "
-              "trying to insert into search.time_resolutions ''" + s + "', "
-              "'GCMD', '" + metautils::args.dsnum + "', 'WFixML''", F, "scm",
-              USER);
-        }
+      if (fixml_parameters.server.insert(
+            "search.time_resolutions",
+            "keyword, vocabulary, dsid, origin",
+            "'" + s + "', 'GCMD', '" + metautils::args.dsnum + "', 'WFixML'",
+            "(keyword, vocabulary, dsid, origin) do nothing"
+            ) < 0) {
+        log_error2("error: '" + fixml_parameters.server.error() + "' while "
+            "trying to insert into search.time_resolutions ''" + s + "', "
+            "'GCMD', '" + metautils::args.dsnum + "', 'WFixML''", F, "scm",
+            USER);
       }
       s = searchutils::time_resolution_keyword("irregular", e.second.second, sp[
           0], "");
-      if (fixml_parameters.server.insert("search.time_resolutions", "'" + s +
-          "', 'GCMD', '" + metautils::args.dsnum + "', 'WFixML'") < 0) {
-        if (fixml_parameters.server.error().find("Duplicate entry") == string::
-            npos)
-          log_error2("error: '" + fixml_parameters.server.error() + "' while "
-              "trying to insert into search.time_resolutions ''" + s + "', "
-              "'GCMD', '" + metautils::args.dsnum + "', 'WFixML''", F, "scm",
-              USER);
+      if (fixml_parameters.server.insert(
+            "search.time_resolutions",
+            "keyword, vocabulary, dsid, origin",
+            "'" + s + "', 'GCMD', '" + metautils::args.dsnum + "', 'WFixML'",
+            "(keyword, vocabulary, dsid, origin) do nothing"
+            ) < 0) {
+        log_error2("error: '" + fixml_parameters.server.error() + "' while "
+            "trying to insert into search.time_resolutions ''" + s + "', "
+            "'GCMD', '" + metautils::args.dsnum + "', 'WFixML''", F, "scm",
+            USER);
       }
     }
   }
@@ -1830,7 +1813,8 @@ void summarize_markup(string markup_type, unordered_map<string, vector<
       log_error2("invalid markup type '" + t + "'", F, "scm", USER);
     }
     mp->server.connect(metautils::directives.database_server, metautils::
-        directives.metadb_username, metautils::directives.metadb_password, "");
+        directives.metadb_username, metautils::directives.metadb_password,
+        "rdadb");
     if (!mp->server) {
       log_error2("could not connect to metadata database - error: '" + mp->
           server.error() + "'", F, "scm", USER);
@@ -1872,7 +1856,7 @@ void summarize_markup(string markup_type, unordered_map<string, vector<
               "keyword, process, vocabulary, dsid",
               "'grid', '" + p + "', '" + gp->database + "', '" + metautils::
                   args.dsnum + "'",
-              "update keyword=keyword"
+              "(keyword, process, vocabulary, dsid) do nothing"
               ) < 0) {
           err = gp->server.error();
           break;
@@ -1884,7 +1868,7 @@ void summarize_markup(string markup_type, unordered_map<string, vector<
             "keyword, process, vocabulary, dsid",
             "'platform_observation', '', '" + mp->database + "', '" +
                 metautils::args.dsnum + "'",
-            "update keyword=keyword"
+            "(keyword, process, vocabulary, dsid) do nothing"
             ) < 0) {
         err = mp->server.error();
       }
@@ -1894,7 +1878,7 @@ void summarize_markup(string markup_type, unordered_map<string, vector<
             "keyword, process, vocabulary, dsid",
             "'satellite', '', '" + mp->database + "', '" + metautils::args.dsnum
                 + "'",
-            "update keyword=keyword"
+            "(keyword, process, vocabulary, dsid) do nothing"
             ) < 0) {
         err = mp->server.error();
       }
@@ -1904,7 +1888,7 @@ void summarize_markup(string markup_type, unordered_map<string, vector<
             "keyword, process, vocabulary, dsid",
             "'cyclone_fix', '', '" + mp->database + "', '" + metautils::args.
                 dsnum + "'",
-            "update keyword=keyword"
+            "(keyword, process, vocabulary, dsid) do nothing"
             ) < 0) {
         err = mp->server.error();
       }
@@ -1960,7 +1944,7 @@ void *thread_summarize_fix_data(void *) {
 
 void *thread_index_variables(void *) {
   Server srv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "");
+      metadb_username, metautils::directives.metadb_password, "rdadb");
   string e;
   if (!searchutils::indexed_variables(srv, metautils::args.dsnum, e)) {
     log_error2(e, "thread_index_variables()", "scm", USER);
@@ -1971,7 +1955,7 @@ void *thread_index_variables(void *) {
 
 void *thread_index_locations(void *) {
   Server srv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "");
+      metadb_username, metautils::directives.metadb_password, "rdadb");
   string e;
   if (!searchutils::indexed_locations(srv, metautils::args.dsnum, e)) {
     log_error2(e, "thread_index_locations()", "scm", USER);
@@ -2109,7 +2093,7 @@ int main(int argc, char **argv) {
   Timer tm;
   tm.start();
   Server mysrv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "");
+      metadb_username, metautils::directives.metadb_password, "rdadb");
   if (!mysrv) {
     log_error2("unable to connect to database server at startup", F, "scm",
         USER);
