@@ -281,6 +281,30 @@ void summarize_grids(string database, string caller, string user, string
   for (const auto& key : summ_map.keys()) {
     GridSummaryEntry gse;
     summ_map.found(key, gse);
+    auto sp = split(gse.key, ",");
+    q.set("level_type_codes, start_date, end_date", tbl, "dsid = '" +
+         metautils::args.dsnum + "' and format_code = " + sp[0] + " and "
+         "time_range_code = " + sp[1] + " and grid_definition_code = " + sp[2] +
+         " and parameter = " + sp[3]);
+    if (q.submit(srv) < 0) {
+      log_error2(q.error(), F, caller, user);
+    }
+    auto d1 = lltos(gse.data->start);
+    auto d2 = lltos(gse.data->end);
+    if (q.num_rows() == 1) {
+      Row row;
+      q.fetch_row(row);
+      vector<size_t> v2;
+      uncompress_values(row[0], v2);
+      for (const auto& e : v2) {
+        if (gse.data->level_code_set.find(e) == gse.data->level_code_set.
+            end()) {
+          gse.data->level_code_set.insert(e);
+        }
+      }
+      d1 = min(row[1], d1);
+      d2 = max(row[2], d2);
+    }
     v.clear();
     v.reserve(gse.data->level_code_set.size());
     for (const auto& e : gse.data->level_code_set) {
@@ -289,78 +313,27 @@ void summarize_grids(string database, string caller, string user, string
     std::sort(v.begin(), v.end(), std::less<size_t>());
     string b;
     compress_values(v, b);
-    auto d1 = lltos(gse.data->start);
-    auto d2 = lltos(gse.data->end);
     if (srv.insert(
           tbl,
           "dsid, format_code, time_range_code, grid_definition_code, "
               "parameter, level_type_codes, start_date, end_date, uflg",
           "'" + metautils::args.dsnum + "', " + gse.key + ", '" + b + "', " + d1
               + ", " + d2 + ", '" + uflg + "'",
-          ""
+          "update level_type_codes = values(level_type_codes), start_date = "
+              "values(start_date), end_date = values(end_date), uflg = values("
+              "uflg)"
           ) < 0) {
-      if (srv.error().find("Duplicate entry") == 0) {
-        auto sp = split(gse.key, ",");
-        q.set("level_type_codes", tbl, "dsid = '" + metautils::args.dsnum + "' "
-            "and format_code = " + sp[0] + " and time_range_code = " + sp[1] +
-            " and grid_definition_code = " + sp[2] + " and parameter = " + sp[
-            3]);
-#ifdef DUMP_QUERIES
-        {
-        Timer tm;
-        tm.start();
-#endif
-        if (q.submit(srv) < 0) {
-          log_error2(q.error(), F, caller, user);
-        }
-#ifdef DUMP_QUERIES
-        tm.stop();
-        cerr << "Elapsed time: " << tm.elapsed_time() << " " << F << ": " << q.
-            show() << endl;
-        }
-#endif
-        Row row;
-        q.fetch_row(row);
-        vector<size_t> v2;
-        uncompress_values(row[0], v2);
-        for (const auto& e : v2) {
-          if (gse.data->level_code_set.find(e) == gse.data->level_code_set.
-              end()) {
-            gse.data->level_code_set.insert(e);
-          }
-        }
-        v.clear();
-        v.reserve(gse.data->level_code_set.size());
-        for (const auto& e : gse.data->level_code_set) {
-          v.emplace_back(e);
-        }
-        std::sort(v.begin(), v.end(), std::less<size_t>());
-        compress_values(v, b);
-        if (srv.insert(
-              tbl,
-              "dsid, format_code, time_range_code, grid_definition_code, "
-                  "parameter, level_type_codes, start_date, end_date, uflg",
-              "'" + metautils::args.dsnum + "', " + gse.key + ", '" + b + "', "
-                  + d1 + ", " + d2 + ", '" + uflg + "'",
-              "update level_type_codes = '" + b + "', start_date = if (" + d1 +
-                  " < start_date, " + d1 + ", start_date), end_date = if (" + d2
-                  + " > end_date, " + d2 + ", end_date), uflg = values(uflg)"
-              ) < 0) {
-          log_error2(srv.error() + " while trying to insert ('" + metautils::
-              args.dsnum + "', " + gse.key + ", '" + b + "', " + d1 + ", " + d2
-              + ")", F, caller, user);
-        }
-      } else {
-        log_error2(srv.error() + " while trying to insert ('" + metautils::args.
-            dsnum + "', " + gse.key + ", '" + b + "', " + d1 + ", " + d2 + ")",
-            F, caller, user);
-      }
+      log_error2(srv.error() + " while trying to insert ('" + metautils::args.
+          dsnum + "', " + gse.key + ", '" + b + "', " + d1 + ", " + d2 + ")", F,
+          caller, user);
     }
     gse.data->level_code_set.clear();
     gse.data.reset();
   }
-  srv._delete(tbl, "dsid = '" + metautils::args.dsnum + "' and uflg != '" + uflg
-      + "'");
+  if (file_id_code.empty()) {
+    srv._delete(tbl, "dsid = '" + metautils::args.dsnum + "' and uflg != '" +
+        uflg + "'");
+  }
   tx.commit();
   srv.disconnect();
 }
@@ -478,11 +451,13 @@ void summarize_grid_resolutions(string caller, string user, string
       }
       auto k = searchutils::horizontal_resolution_keyword(xres, rtyp);
       if (!k.empty()) {
-        if (srv.insert("search.grid_resolutions", "'" + k + "', 'GCMD', '" +
-            metautils::args.dsnum+"', 'WGrML'") < 0) {
-          if (!regex_search(srv.error(), regex("Duplicate entry"))) {
-            log_error2(srv.error(), F, caller, user);
-          }
+        if (srv.insert(
+              "search.grid_resolutions",
+              "keyword, vocabulary, dsid, origin",
+              "'" + k + "', 'GCMD', '" + metautils::args.dsnum+"', 'WGrML'",
+              "update keyword=keyword"
+              ) < 0) {
+          log_error2(srv.error(), F, caller, user);
         }
       } else {
         log_warning(F+" issued warning: no grid resolution for " +
@@ -559,7 +534,7 @@ void aggregate_grids(string database, string caller, string user, string
   }
 #endif
 //std::cerr << q.show() << std::endl;
-  std::unordered_set<size_t> gd_set, ds_set;
+  unordered_set<size_t> gd_set, ds_set;
   vector<size_t> dsv, trv;
   string d1, d2;
   string lkey;
