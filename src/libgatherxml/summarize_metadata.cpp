@@ -5,10 +5,10 @@
 #include <unordered_set>
 #include <gatherxml.hpp>
 #include <datetime.hpp>
-#include <MySQL.hpp>
+#include <PostgreSQL.hpp>
 #include <strutils.hpp>
 #include <utils.hpp>
-#include <search.hpp>
+#include <search_pg.hpp>
 #include <xml.hpp>
 #include <myerror.hpp>
 #ifdef DUMP_QUERIES
@@ -16,7 +16,7 @@
 #endif
 #include <mutex.hpp>
 
-using namespace MySQL;
+using namespace PostgreSQL;
 using metautils::log_error2;
 using miscutils::this_function_label;
 using std::cerr;
@@ -42,6 +42,7 @@ using std::unordered_set;
 using std::vector;
 using strutils::replace_all;
 using strutils::split;
+using strutils::sql_ready;
 using strutils::strand;
 using strutils::substitute;
 using unixutils::mysystem2;
@@ -87,13 +88,13 @@ void cmd_dates(string database, size_t date_left_padding, vector<CMDDateRange>&
      ranges, size_t& precision) {
   static const string F = this_function_label(__func__);
   Server mysrv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "");
+      metadb_username, metautils::directives.metadb_password, "rdadb");
   if (!mysrv) {
     myerror = "Error: unable to connect to metadata server";
     exit(1);
   }
-  string tbl = database + ".ds" + substitute(metautils::args.dsnum, ".", "") +
-      "_webfiles2";
+  string tbl = postgres_ready(database) + ".ds" + substitute(metautils::args.
+      dsnum, ".", "") + "_webfiles2";
   if (table_exists(mysrv, tbl)) {
     LocalQuery q("select min(w.start_date), max(w.end_date), wf.gindex from " +
         tbl + " as w left join dssdb.wfile as wf on wf.wfile = w.id where wf."
@@ -118,9 +119,8 @@ void cmd_dates(string database, size_t date_left_padding, vector<CMDDateRange>&
     auto b = q.fetch_row(row);
     if (q.num_rows() < 2 && (!b || row[2] == "0")) {
       auto i = to_string(date_left_padding);
-      q.set("select lpad(start_date, " + i + ", '0'), lpad(end_date, " + i +
-          ", '0'), 0 from " + tbl + " where start_date != 0 order by "
-          "start_date, end_date");
+      q.set("start_date, end_date", tbl, "start_date != 0 order by start_date, "
+          "end_date");
 #ifdef DUMP_QUERIES
       {
       Timer tm;
@@ -140,7 +140,7 @@ void cmd_dates(string database, size_t date_left_padding, vector<CMDDateRange>&
         vector<CMDDateRange> v;
         v.reserve(q.num_rows());
         for (const auto& r : q) {
-          v.emplace_back(cmd_date_range(r[0], r[1], r[2], precision));
+          v.emplace_back(cmd_date_range(r[0], r[1], "0", precision));
         }
 /*
         sort(v.begin(), v.end(),
@@ -195,11 +195,11 @@ void summarize_dates(string caller, string user) {
   cmd_dates("WFixML", 12, v, precision);
 //  cmd_dates("SatML", 14, v, precision);
   Server mysrv(metautils::directives.database_server, metautils::directives.
-      rdadb_username, metautils::directives.rdadb_password, "dssdb");
+      rdadb_username, metautils::directives.rdadb_password, "rdadb");
   if (!v.empty()) {
     LocalQuery q("select dsid, gindex, dorder, date_start, time_start, "
-        "start_flag, date_end, time_end, end_flag, time_zone from dsperiod "
-        "where dsid = 'ds" + metautils::args.dsnum + "'");
+        "start_flag, date_end, time_end, end_flag, time_zone from dssdb."
+        "dsperiod where dsid = 'ds" + metautils::args.dsnum + "'");
     if (q.submit(mysrv) < 0) {
       log_error2("'" + q.error() + "' when trying to create dsperiod cache", F,
           caller, user);
@@ -236,14 +236,17 @@ void summarize_dates(string caller, string user) {
         if (it != dsperiod_cache.end()) {
           dsperiod_cache.erase(it);
         } else {
-          if (mysrv.insert("dsperiod",
-              "dsid, gindex, dorder, date_start, time_start, start_flag, "
-              "date_end, time_end, end_flag, time_zone",
-              s,
-              "update date_start = values(date_start), time_start = values("
-              "time_start), start_flag = values(start_flag), date_end = "
-              "values(date_end), time_end = values(time_end), end_flag = "
-              "values(end_flag), time_zone = values(time_zone)") < 0) {
+          if (mysrv.insert(
+                "dssdb.dsperiod",
+                "dsid, gindex, dorder, date_start, time_start, start_flag, "
+                    "date_end, time_end, end_flag, time_zone",
+                s,
+                "(dsid, gindex, dorder) do update set date_start = excluded."
+                    "date_start, time_start = excluded.time_start, start_flag "
+                    "= excluded.start_flag, date_end = excluded.date_end, "
+                    "time_end = excluded.time_end, end_flag = excluded."
+                    "end_flag, time_zone = excluded.time_zone"
+                ) < 0) {
             log_error2("'" + mysrv.error() + "' when trying to insert into "
                 "dsperiod(1) (" + s + ")", F, caller, user);
           }
@@ -275,28 +278,34 @@ void summarize_dates(string caller, string user) {
         if (it != dsperiod_cache.end()) {
           dsperiod_cache.erase(it);
         } else {
-          if (mysrv.insert("dsperiod",
-              "dsid, gindex, dorder, date_start, time_start, start_flag, "
-              "date_end, time_end, end_flag, time_zone",
-              s,
-              "update date_start = values(date_start), time_start = values("
-              "time_start), start_flag = values(start_flag), date_end = "
-              "values(date_end), time_end = values(time_end), end_flag = "
-              "values(end_flag), time_zone = values(time_zone)") < 0) {
+          if (mysrv.insert(
+                "dssdb.dsperiod",
+                "dsid, gindex, dorder, date_start, time_start, start_flag, "
+                    "date_end, time_end, end_flag, time_zone",
+                s,
+                "(dsid, gindex, dorder) do update set date_start = excluded."
+                    "date_start, time_start = excluded.time_start, start_flag "
+                    "= excluded.start_flag, date_end = excluded.date_end, "
+                    "time_end = excluded.time_end, end_flag = excluded."
+                    "end_flag, time_zone = excluded.time_zone"
+                ) < 0) {
             auto e = mysrv.error();
             auto n = 0;
             while (n < 3 && e.find("Deadlock") == 0) {
               e = "";
               sleep(30);
-              if (mysrv.insert("dsperiod",
-                  "dsid, gindex, dorder, date_start, time_start, start_flag, "
-                  "date_end, time_end, end_flag, time_zone",
-                  s,
-                  "update date_start = values(date_start), time_start = "
-                  "values(time_start), start_flag = values(start_flag), "
-                  "date_end = values(date_end), time_end = values(time_end), "
-                  "end_flag = values(end_flag), time_zone = values("
-                  "time_zone)") < 0) {
+              if (mysrv.insert(
+                    "dssdb.dsperiod",
+                    "dsid, gindex, dorder, date_start, time_start, start_flag, "
+                        "date_end, time_end, end_flag, time_zone",
+                    s,
+                    "(dsid, gindex, dorder) do update set date_start = "
+                        "excluded.date_start, time_start = excluded."
+                        "time_start, start_flag = excluded.start_flag, "
+                        "date_end = excluded.date_end, time_end = excluded."
+                        "time_end, end_flag = excluded.end_flag, time_zone = "
+                        "excluded.time_zone"
+                    ) < 0) {
                 e = mysrv.error();
               }
               ++n;
@@ -311,8 +320,8 @@ void summarize_dates(string caller, string user) {
     }
     for (const auto& e : dsperiod_cache) {
       auto sp = split(e, ", ");
-      mysrv._delete("dsperiod", "dsid = " + sp[0] + " and gindex = " + sp[1]
-          + " and dorder = " + sp[2] + " and date_start = " + sp[3] + " and "
+      mysrv._delete("dssdb.dsperiod", "dsid = " + sp[0] + " and gindex = " + sp[
+          1] + " and dorder = " + sp[2] + " and date_start = " + sp[3] + " and "
           "time_start = " + sp[4] + " and start_flag = " + sp[5] + " and "
           "date_end = " + sp[6] + " and time_end = " + sp[7] + " and end_flag "
           "= " + sp[8] + " and time_zone = " + sp[9]);
@@ -323,8 +332,13 @@ void summarize_dates(string caller, string user) {
 
 bool inserted_time_resolution_keyword(Server& server, string database, string
     keyword, string& error) {
-  if (server.insert("search.time_resolutions", "'" + keyword + "', 'GCMD', '" +
-      metautils::args.dsnum + "', '" + database + "'") < 0) {
+  if (server.insert(
+        "search.time_resolutions",
+        "keyword, vocabulary, dsid, origin",
+        "'" + keyword + "', 'GCMD', '" + metautils::args.dsnum + "', '" +
+            database + "'",
+        ""
+        ) < 0) {
     auto e = server.error();
     if (!regex_search(e, regex("Duplicate entry"))) {
       e += "\ntried to insert into search.time_resolutions ('" + keyword +
@@ -424,8 +438,8 @@ unordered_set<string> summarize_frequencies_from_wgrml_by_dataset(Server&
   static const string F = this_function_label(__func__);
   unordered_set<string> sfreq; // return value
   auto ds = substitute(metautils::args.dsnum, ".", "");
-  LocalQuery q("select distinct frequency_type, nsteps_per, unit from WGrML.ds"
-      + ds + "_frequencies where nsteps_per > 0");
+  LocalQuery q("select distinct frequency_type, nsteps_per, unit from "
+      "\"WGrML\".ds" + ds + "_frequencies where nsteps_per > 0");
 #ifdef DUMP_QUERIES
   {
   Timer tm;
@@ -447,7 +461,7 @@ unordered_set<string> summarize_frequencies_from_wgrml_by_dataset(Server&
           "dsid, nsteps_per, unit, uflg",
           "'" + metautils::args.dsnum + "', " + r[1] + ", '" + r[2] + "', '" +
               uflg + "'",
-          "update uflg = values(uflg)"
+          "(dsid, nsteps_per, unit) do update set uflg = excluded.uflg"
           ) < 0) {
       log_error2("'" + server.error() + "' while trying to insert '" +
           metautils::args.dsnum + "', " + r[1] + ", '" + r[2] + "'", F, caller,
@@ -459,7 +473,7 @@ unordered_set<string> summarize_frequencies_from_wgrml_by_dataset(Server&
     }
   }
   q.set("select min(distinct frequency_type), max(distinct frequency_type), "
-      "count(distinct frequency_type) from WGrML.ds" + ds + "_frequencies "
+      "count(distinct frequency_type) from \"WGrML\".ds" + ds + "_frequencies "
       "where nsteps_per = 0");
 #ifdef DUMP_QUERIES
   {
@@ -487,7 +501,7 @@ unordered_set<string> summarize_frequencies_from_wgrml_by_dataset(Server&
               "dsid, nsteps_per, unit, uflg",
               "'" + metautils::args.dsnum + "', " + to_string(l) + ", '" + u +
                   "', '" + uflg + "'",
-              "update uflg = values(uflg)"
+              "(dsid, nsteps_per, unit) do update set uflg = excluded.uflg"
               ) < 0) {
           log_error2("'" + server.error() + "' while trying to insert '" +
               metautils::args.dsnum + "', " + to_string(l) + ", '" + u + "'", F,
@@ -516,8 +530,8 @@ unordered_set<string> summarize_frequencies_from_wgrml_by_data_file(Server&
 
   // get all of the time ranges for the given file id
   LocalQuery qt("select time_range_code, min(start_date), max(end_date), sum("
-      "nsteps) from WGrML.ds" + ds + "_grids2 where file_code = " + file_id_code
-      + " group by time_range_code, parameter");
+      "nsteps) from \"WGrML\".ds" + ds + "_grids2 where file_code = " +
+      file_id_code + " group by time_range_code, parameter");
 #ifdef DUMP_QUERIES
   {
   Timer tm;
@@ -688,24 +702,32 @@ unordered_set<string> summarize_frequencies_from_wgrml_by_data_file(Server&
             "dsid, nsteps_per, unit, uflg",
             "'" + metautils::args.dsnum + "', " + sp[1] + ", '" + sp[2] + "', '"
                 + uflg + "'",
-            "update uflg = values(uflg)"
+            "(dsid, nsteps_per, unit) do update set uflg = excluded.uflg"
             ) < 0) {
         log_error2("'" + server.error() + "' while trying to insert '" +
             metautils::args.dsnum + "', " + sp[1] + ", '" + sp[2] + "'", F,
             caller, user);
       }
-      if (server.insert("WGrML.ds" + ds + "_frequencies", file_id_code + ", '" +
-          sp[0] + "', " + sp[1] + ", '" + sp[2] + "'") < 0) {
+      if (server.insert(
+            "WGrML.ds" + ds + "_frequencies",
+            "file_code, frequency_type, nsteps_per, unit",
+            file_id_code + ", '" + sp[0] + "', " + sp[1] + ", '" + sp[2] + "'",
+            ""
+            ) < 0) {
         log_error2("'" + server.error() + "' while trying to insert '" +
             file_id_code + ", '" + sp[0] + "', " + sp[1] + ", '" + sp[2] + "''",
             F, caller, user);
       }
     }
-    server._delete("WGrML.frequencies", "dsid =  '" + metautils::args.dsnum +
-        "' and uflg != '" + uflg + "'");
+    server._delete("WGrML.frequencies", "dsid =  '" + metautils::args.dsnum
+        + "' and uflg != '" + uflg + "'");
   } else {
-    if (server.insert("WGrML.ds" + ds + "_frequencies", file_id_code + ", '" +
-        smin + "', 0, ''") < 0) {
+    if (server.insert(
+          "WGrML.ds" + ds + "_frequencies",
+          "file_code, frequency_type, nsteps_per, unit",
+          file_id_code + ", '" + smin + "', 0, ''",
+          ""
+          ) < 0) {
       log_error2("'" + server.error() + "' while trying to insert '" +
           file_id_code + ", '" + smin + "', 0, ''", F, caller, user);
     }
@@ -794,7 +816,7 @@ void summarize_frequencies(string caller, string user, string file_id_code) {
     make_pair("WObML", summarize_frequencies_from_wobml),
   };
   Server mysrv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "");
+      metadb_username, metautils::directives.metadb_password, "rdadb");
   for (const auto& e : v) {
     auto t = e.first + ".ds" + substitute(metautils::args.dsnum, ".", "") +
         "_frequencies";
@@ -820,15 +842,15 @@ void summarize_data_formats(string caller, string user) {
     log_error2("empty CMD database list", F, caller, user);
   }
   Server mysrv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "");
+      metadb_username, metautils::directives.metadb_password, "rdadb");
   for (const auto& db : dblst) {
     string nam, typ;
     tie(nam, typ) = db;
-    auto t = nam + ".ds" + substitute(metautils::args.dsnum, ".", "") +
-        "_webfiles2";
-    if (t[0] != 'V' && table_exists(mysrv, t)) {
-      LocalQuery q("select distinct f.format from " + t + " as p left join " +
-          nam + ".formats as f on f.code = p.format_code");
+    auto t = "ds" + substitute(metautils::args.dsnum, ".", "") + "_webfiles2";
+    if (nam[0] != 'V' && table_exists(mysrv, nam + "." + t)) {
+      LocalQuery q("select distinct f.format from " + postgres_ready(nam) + "."
+          + t + " as p left join " + postgres_ready(nam) + ".formats as f on f."
+          "code = p.format_code");
 #ifdef DUMP_QUERIES
       {
       Timer tm;
@@ -847,7 +869,12 @@ void summarize_data_formats(string caller, string user) {
       mysrv._delete("search.formats", "dsid = '" + metautils::args.dsnum +
           "' and (vocabulary = '" + nam + "' or vocabulary = 'dssmm')");
       for (const auto& r : q) {
-        if (mysrv.insert("search.formats", "keyword, vocabulary, dsid", "'" + r[0] + "', '" + nam + "', '" + metautils::args.dsnum + "'", "") < 0) {
+        if (mysrv.insert(
+              "search.formats",
+              "keyword, vocabulary, dsid",
+              "'" + r[0] + "', '" + nam + "', '" + metautils::args.dsnum + "'",
+              "(keyword, vocabulary, dsid) do nothing"
+              ) < 0) {
           metautils::log_warning("summarize_data_formats() issued warning: " +
               mysrv.error(), caller, user);
         }
@@ -864,13 +891,13 @@ void create_non_cmd_file_list_cache(string file_type, unordered_set<string>&
   // random sleep to minimize collisions from concurrent processes
   sleep(getpid() % 15);
   Server mysrv(metautils::directives.database_server, metautils::directives.
-      rdadb_username, metautils::directives.rdadb_password, "dssdb");
+      rdadb_username, metautils::directives.rdadb_password, "rdadb");
   if (!mysrv) {
     log_error2("error connecting to database: '" + mysrv.error() + "'", F,
         caller, user);
   }
-  LocalQuery q("version", "dataset", "dsid = 'ds" + metautils::args.dsnum +
-      "'");
+  LocalQuery q("version", "dssdb.dataset", "dsid = 'ds" + metautils::args.dsnum
+      + "'");
 #ifdef DUMP_QUERIES
   {
   Timer tm;
@@ -999,7 +1026,7 @@ void fill_gindex_map(Server& server, Mutex& g_mutex, unique_ptr<unordered_map<
 void fill_data_formats_table(Server& server, string db, unordered_map<string,
     string>& data_formats, string caller, string user) {
   static const string F = this_function_label(__func__);
-  Query q("select code, format from " + db + ".formats");
+  Query q("code, format", db + ".formats");
 #ifdef DUMP_QUERIES
   {
   Timer tm;
@@ -1065,7 +1092,7 @@ void grml_file_data(string file_type, unordered_map<string, string>&
   static const string F = this_function_label(__func__);
   auto d = substitute(metautils::args.dsnum, ".", "");
   Server mysrv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "");
+      metadb_username, metautils::directives.metadb_password, "rdadb");
   if (!mysrv) {
     log_error2("'" + mysrv.error() + "' while trying to connect", F, caller,
         user);
@@ -1074,12 +1101,10 @@ void grml_file_data(string file_type, unordered_map<string, string>&
   if (m.empty()) {
     fill_data_formats_table(mysrv, "WGrML", m, caller, user);
   }
-  Query q;
-    q.set("select id, format_code, num_grids, start_date, end_date, gindex, "
-        "file_format, data_size from WGrML.ds" + d + "_webfiles2 as w left "
-        "join dssdb.wfile as d on d.wfile = w.id where d.dsid = 'ds" +
-        metautils::args.dsnum + "' and d.type = 'D' and d.status = 'P' and "
-        "num_grids > 0");
+  Query q("select id, format_code, num_grids, start_date, end_date, gindex, "
+      "file_format, data_size from \"WGrML\".ds" + d + "_webfiles2 as w left "
+      "join dssdb.wfile as d on d.wfile = w.id where d.dsid = 'ds" + metautils::
+      args.dsnum + "' and d.type = 'D' and d.status = 'P' and num_grids > 0");
 #ifdef DUMP_QUERIES
   {
   Timer tm;
@@ -1104,16 +1129,16 @@ void obml_file_data(string file_type, unordered_map<string, string>&
     caller, string& user) {
   static const string F = this_function_label(__func__);
   Server mysrv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "");
+      metadb_username, metautils::directives.metadb_password, "rdadb");
   static unordered_map<string, string> map;
   if (map.empty()) {
     fill_data_formats_table(mysrv, "WObML", map, caller, user);
   }
   Query q("select id, format_code, num_observations, start_date, end_date, "
-      "gindex, file_format, data_size from WObML.ds" + substitute(metautils::
-      args.dsnum, ".", "") + "_webfiles2 as w left join dssdb.wfile as d on d."
-      "wfile = w.id where d.dsid = 'ds" + metautils::args.dsnum + "' and d."
-      "type = 'D' and d.status = 'P' and num_observations > 0");
+      "gindex, file_format, data_size from \"WObML\".ds" + substitute(
+      metautils::args.dsnum, ".", "") + "_webfiles2 as w left join dssdb.wfile "
+      "as d on d.wfile = w.id where d.dsid = 'ds" + metautils::args.dsnum + "' "
+      "and d.type = 'D' and d.status = 'P' and num_observations > 0");
 #ifdef DUMP_QUERIES
   {
   Timer tm;
@@ -1141,7 +1166,7 @@ void fixml_file_data(string file_type, unordered_map<string, string>&
   FileEntry fe;
 
   Server mysrv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "");
+      metadb_username, metautils::directives.metadb_password, "rdadb");
   if (!mysrv) {
     log_error2("'" + mysrv.error() + "' while trying to connect", F, caller,
         user);
@@ -1151,7 +1176,7 @@ void fixml_file_data(string file_type, unordered_map<string, string>&
     fill_data_formats_table(mysrv, "WFixML", data_formats, caller, user);
   }
   Query q("select id, format_code, num_fixes, start_date, end_date, gindex, "
-      "file_format, data_size from WFixML.ds" + substitute(metautils::args.
+      "file_format, data_size from \"WFixML\".ds" + substitute(metautils::args.
       dsnum, ".", "") + "_webfiles2 as w left join dssdb.wfile as d on d.wfile "
       "= w.id where d.dsid = 'ds" + metautils::args.dsnum + "' and d.type = "
       "'D' and d.status = 'P' and num_fixes > 0");
@@ -1190,7 +1215,7 @@ void write_grml_parameters(string file_type, string tindex, ofstream& ofs,
   }
   string d2 = substitute(metautils::args.dsnum, ".", "");
   Server mysrv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "");
+      metadb_username, metautils::directives.metadb_password, "rdadb");
   if (!mysrv) {
     log_error2("'" + mysrv.error() + "' while trying to connect", F, caller,
         user);
@@ -1262,7 +1287,7 @@ void write_grml_parameters(string file_type, string tindex, ofstream& ofs,
 #endif
     if (q.submit(mysrv) < 0) {
       log_error2("'" + q.error() + "' while trying to get metadata files from "
-          + "WGrML" + ".ds" + d2 + "_webfiles2", F, caller, user);
+          "WGrML" + ".ds" + d2 + "_webfiles2", F, caller, user);
     }
 #ifdef DUMP_QUERIES
     tm.stop();
@@ -1373,7 +1398,7 @@ void create_file_list_cache(string file_type, string caller, string user, string
   static const string F = this_function_label(__func__);
   auto d2 = substitute(metautils::args.dsnum, ".", "");
   Server mysrv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "");
+      metadb_username, metautils::directives.metadb_password, "rdadb");
   static Mutex g_mutex;
   static unique_ptr<unordered_map<string, string>> gmap;
   fill_gindex_map(mysrv, g_mutex, gmap, caller, user);
@@ -1396,18 +1421,18 @@ void create_file_list_cache(string file_type, string caller, string user, string
         obml_file_data(file_type, *gmap, obmlmap, caller, user);
       }
       if (file_type == "Web") {
-        oq.set("select min(start_date), max(end_date) from WObML.ds" + d2 +
+        oq.set("select min(start_date), max(end_date) from \"WObML\".ds" + d2 +
             "_webfiles2 where start_date > 0");
       } else if (file_type == "inv") {
         if (table_exists(mysrv, "IObML.ds" + d2 + "_data_types")) {
-          oq.set("select min(start_date), max(end_date) from WObML.ds" + d2
+          oq.set("select min(start_date), max(end_date) from \"WObML\".ds" + d2
               + "_webfiles2 as w left join (select distinct file_code from "
-              "IObML.ds" + d2 + "_data_types) as d on d.file_code = w.code "
-              "where !isnull(d.file_code) and start_date > 0");
+              "\"IObML\".ds" + d2 + "_data_types) as d on d.file_code = w.code "
+              "where d.file_code is not null and start_date > 0");
         } else if (table_exists(mysrv, "IObML.ds" + d2 +
             "_inventory_summary")) {
-          oq.set("select min(start_date), max(end_date) from WObML.ds" + d2
-              + "_webfiles2 as w left join IObML.ds" + d2 +
+          oq.set("select min(start_date), max(end_date) from \"WObML\".ds" + d2
+              + "_webfiles2 as w left join \"IObML\".ds" + d2 +
               "_inventory_summary as i on i.file_code = w.code where i."
               "file_code is not null and start_date > 0");
         } else {
@@ -1546,17 +1571,17 @@ void create_file_list_cache(string file_type, string caller, string user, string
       // platform types
       if (file_type == "Web") {
         oq.set("select distinct l.platform_type_code, p.platform_type from "
-            "WObML.ds" + d2 + "_data_types as d left join WObML.ds" + d2 +
-            "_data_types_list as l on l.code = d.data_type_code left join "
-            "WObML.platform_types as p on p.code = l.platform_type_code");
+            "\"WObML\".ds" + d2 + "_data_types as d left join \"WObML\".ds" + d2
+            + "_data_types_list as l on l.code = d.data_type_code left join "
+            "\"WObML\".platform_types as p on p.code = l.platform_type_code");
       } else if (file_type == "inv") {
         oq.set("select distinct l.platform_type_code, p.platform_type from "
-            "WObML.ds" + d2 + "_data_types as d left join WObML.ds" + d2 +
-            "_data_types_list as l on l.code = d.data_type_code left join "
-            "WObML.platform_types as p on p.code = l.platform_type_code left "
-            "join (select distinct file_code from IObML.ds" + d2 +
-            "_data_types) as dt on dt.file_code = d.file_code where !isnull(dt."
-            "file_code)");
+            "\"WObML\".ds" + d2 + "_data_types as d left join \"WObML\".ds" + d2
+            + "_data_types_list as l on l.code = d.data_type_code left join "
+            "\"WObML\".platform_types as p on p.code = l.platform_type_code "
+            "left join (select distinct file_code from \"IObML\".ds" + d2 +
+            "_data_types) as dt on dt.file_code = d.file_code where dt."
+            "file_code is not null");
       }
 #ifdef DUMP_QUERIES
       {
@@ -1581,11 +1606,11 @@ void create_file_list_cache(string file_type, string caller, string user, string
       // data types and formats
       LocalQuery q;
       if (file_type == "Web" || file_type == "inv") {
-        q.set("select distinct f.format from WObML.ds" + d2 + "_webfiles2 as w "
-            "left join WObML.formats as f on f.code = w.format_code");
-        oq.set("select distinct l.data_type from WObML.ds" + d2 + "_data_types "
-            "as d left join WObML.ds" + d2 + "_data_types_list as l on l.code "
-            "= d.data_type_code");
+        q.set("select distinct f.format from \"WObML\".ds" + d2 + "_webfiles2 "
+            "as w left join \"WObML\".formats as f on f.code = w.format_code");
+        oq.set("select distinct l.data_type from \"WObML\".ds" + d2 +
+            "_data_types as d left join \"WObML\".ds" + d2 + "_data_types_list "
+            "as l on l.code = d.data_type_code");
       } else {
         q.set("");
         oq.set("");
@@ -1669,17 +1694,18 @@ void create_file_list_cache(string file_type, string caller, string user, string
       // groups
       if (tindex.empty()) {
         if (field_exists(mysrv, "WObML.ds" + d2 + "_webfiles2", "dsid")) {
-          oq.set("select distinct g.gindex, g.title, g.grpid from WObML.ds" + d2
-              + "_webfiles2 as p left join dssdb.wfile as w on (w.wfile = p.id "
-              "and w.type = p.type and w.dsid = p.dsid) left join dssdb."
+          oq.set("select distinct g.gindex, g.title, g.grpid from \"WObML\".ds"
+              + d2 + "_webfiles2 as p left join dssdb.wfile as w on (w.wfile = "
+              "p.id and w.type = p.type and w.dsid = p.dsid) left join dssdb."
               "dsgroup as g on (g.dsid = 'ds" + metautils::args.dsnum + "' and "
-              "g.gindex = w.gindex) where !isnull(w.wfile) order by g.gindex");
+              "g.gindex = w.gindex) where w.wfile is not null order by g."
+              "gindex");
         } else {
-          oq.set("select distinct g.gindex, g.title, g.grpid from WObML.ds" + d2
-              + "_webfiles2 as p left join dssdb.wfile as w on w.wfile = p.id "
-              "left join dssdb.dsgroup as g on (g.dsid = 'ds" + metautils::args.
-              dsnum + "' and g.gindex = w.gindex) where !isnull(w.wfile) order "
-              "by g.gindex");
+          oq.set("select distinct g.gindex, g.title, g.grpid from \"WObML\".ds"
+              + d2 + "_webfiles2 as p left join dssdb.wfile as w on w.wfile = "
+              "p.id left join dssdb.dsgroup as g on (g.dsid = 'ds" + metautils::
+              args.dsnum + "' and g.gindex = w.gindex) where w.wfile is not "
+              "null order by g.gindex");
         }
 #ifdef DUMP_QUERIES
         {
@@ -1878,9 +1904,9 @@ void create_file_list_cache(string file_type, string caller, string user, string
     create_non_cmd_file_list_cache(file_type, cmdset, caller, user);
   }
   mysrv.connect(metautils::directives.database_server, metautils::directives.
-      rdadb_username, metautils::directives.rdadb_password, "dssdb");
-  mysrv.update("dataset", "meta_link = 'Y', version = version + 1", "dsid = 'ds"
-      + metautils::args.dsnum + "'");
+      rdadb_username, metautils::directives.rdadb_password, "rdadb");
+  mysrv.update("dssdb.dataset", "meta_link = 'Y', version = version + 1",
+      "dsid = 'ds" + metautils::args.dsnum + "'");
   mysrv.disconnect();
 }
 
@@ -1889,7 +1915,7 @@ void summarize_locations(string database, string& error) {
   error = "";
   string d2 = substitute(metautils::args.dsnum, ".", "");
   Server mysrv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "");
+      metadb_username, metautils::directives.metadb_password, "rdadb");
 
   // get all location names that are NOT included
   LocalQuery q("distinct gcmd_keyword", database + ".ds" + d2 +
@@ -1912,9 +1938,8 @@ void summarize_locations(string database, string& error) {
   unordered_set<string> nset;
   for (const auto& row : q) {
     auto s = row[0];
-    replace_all(s, "'", "\\'");
-    LocalQuery qn("name", "search.political_boundaries", "name like '" + s +
-        " >%'");
+    LocalQuery qn("name", "search.political_boundaries", "name like '" +
+        sql_ready(s) + " >%'");
 #ifdef DUMP_QUERIES
     {
     Timer tm;
@@ -1969,9 +1994,8 @@ void summarize_locations(string database, string& error) {
   vector<string> v;
   for (const auto& row : q) {
     auto s = row[0];
-    replace_all(s, "'", "\\'");
-    LocalQuery qn("name", "search.political_boundaries", "name like '" + s +
-        " >%'");
+    LocalQuery qn("name", "search.political_boundaries", "name like '" +
+       sql_ready(s) + " >%'");
 #ifdef DUMP_QUERIES
     {
     Timer tm;
@@ -2009,13 +2033,13 @@ void summarize_locations(string database, string& error) {
   auto uflg = strand(3);
   string err;
   for (auto e : v) {
-    replace_all(e, "'", "\\'");
     if (mysrv.insert(
           "search.locations",
           "keyword, vocabulary, include, dsid, uflg",
-          "'" + e + "', 'GCMD', 'Y', '" + metautils::args.dsnum + "', '" + uflg
-              + "'",
-          "update uflg = values(uflg)"
+          "'" + sql_ready(e) + "', 'GCMD', 'Y', '" + metautils::args.dsnum +
+              "', '" + uflg + "'",
+          "(keyword, vocabulary, dsid) do update set include = excluded."
+              "include, uflg = excluded.uflg"
           ) < 0) {
       error = move(mysrv.error());
       return;
