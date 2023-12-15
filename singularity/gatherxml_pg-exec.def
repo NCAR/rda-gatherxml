@@ -1,5 +1,5 @@
 BootStrap: localimage
-From: /glade/u/home/rdadata/lib/singularity/gatherxml-5-utils.sif
+From: /glade/u/home/rdadata/lib/singularity/gatherxml_pg-5-utils.sif
 Stage: compile
 
 BootStrap: library
@@ -21,6 +21,7 @@ Stage: binary
     # other
     /etc/ssl
     /usr/bin/convert-im6.q16 /usr/bin/convert
+    /usr/bin/curl
     /usr/bin/rsync
     /usr/bin/ssh
 
@@ -53,9 +54,6 @@ Stage: binary
     rm /usr/lib/x86_64-linux-gnu/libzstd*
     rm -rf /usr/local/rdaviz/lib/python3.9/site-packages/fontTools
     rm -rf /usr/local/rdaviz/lib/python3.9/site-packages/pip*
-    rm -rf /usr/local/rdaviz/lib/python3.9/site-packages/scipy/integrate
-    rm -rf /usr/local/rdaviz/lib/python3.9/site-packages/scipy/optimize
-    rm -rf /usr/local/rdaviz/lib/python3.9/site-packages/scipy/stats
     rm -rf /usr/local/rdaviz/lib/python3.9/site-packages/wheel*
     rm -rf /usr/sbin
     rm -rf /usr/share
@@ -75,5 +73,5 @@ Stage: binary
       /glade/u/home/dattore/conf
       /glade/scratch/rdadata
       /glade/u/home/rdadata
-      /glade/collections/rda/data
-      /gpfs/fs1/collections/rda/work/logs/md
+      /glade/campaign/collections/rda/data
+      /gpfs/csfs1/collections/rda/work/logs/md
