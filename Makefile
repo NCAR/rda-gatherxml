@@ -2,10 +2,6 @@ ifeq ($(strip $(HOST)),)
 	HOST = $(shell hostname)
 endif
 #
-# Compiler options
-#
-COMPILE_OPTIONS = -Wall -Wold-style-cast -O3 -std=c++14 -Weffc++
-#
 # Local include directory
 #
 INCLUDEDIR = ./include
@@ -18,16 +14,20 @@ SOURCEDIR = ./src
 #
 OKAY_TO_MAKE = 0
 #
+TIMESTAMP = $(shell date +%Y%m%d%H%M%S)
+#
 ifneq ($(or $(findstring casper,$(HOST))),)
 # Settings for the DAV nodes
 	BUILDEXT = dav
-	COMPILER = /glade/u/apps/dav/opt/ncarcompilers/0.4.1/g++
+	COMPILER = /glade/u/apps/dav/opt/gnu/9.1.0/bin/g++
 	GCCVERSION = $(shell $(COMPILER) --version |grep "^g++" |awk '{print $$3}')
-	EXPECTEDGCCVERSION = 7.3.0
+	EXPECTEDGCCVERSION = 9.1.0
 	GLOBALINCLUDEDIR = /glade/u/home/dattore/cpp/lib/include
-	MYSQLINCLUDEDIR = /usr/include/mysql
+	DBINCLUDEDIR = /glade/work/dattore/conda-envs/libpq/include
 	LIBDIR = /glade/u/home/rdadata/lib/dav
-	MYSQLLIBDIR = /usr/lib64/mysql
+	DBLIBDIR = /gpfs/fs1/work/dattore/conda-envs/libpq/lib
+	DBLIBS = -lpq -lpostgresql
+	JASPERINCLUDEDIR = /glade/work/dattore/conda-envs/jasper/include
 	JASPERLIBDIR = /glade/u/home/dattore/cpp/lib/jasper/lib
 	BINDIR = /glade/u/home/rdadata/bin/dav
 	LOCALBINDIR = /ncar/rda/setuid/bin
@@ -39,13 +39,14 @@ endif
 ifneq ($(or $(findstring cheyenne,$(HOST)), $(findstring chadmin,$(HOST))),)
 # Cheyenne settings
 	BUILDEXT = ch
-	COMPILER = /glade/u/apps/ch/opt/gnu/7.1.0/bin/g++
-	GCCVERSION = $(shell $(COMPILLER) --version |grep "^g++" |awk '{print $$3}')
-	EXPECTEDGCCVERSION = 7.1.0
+	COMPILER = /glade/u/apps/ch/opt/gnu/9.1.0/bin/g++
+	GCCVERSION = $(shell $(COMPILER) --version |grep "^g++" |awk '{print $$3}')
+	EXPECTEDGCCVERSION = 9.1.0
 	GLOBALINCLUDEDIR = /glade/u/home/dattore/cpp/lib/include
-	MYSQLINCLUDEDIR = /glade/u/apps/ch/opt/mysql/5.7.19/gnu/4.8.5/include
+	DBINCLUDEDIR = /glade/work/dattore/conda-envs/libpq/include
 	LIBDIR = /glade/u/home/rdadata/lib/ch
-	MYSQLLIBDIR = /glade/u/apps/ch/opt/mysql/5.7.19/gnu/4.8.5/lib
+	DBLIBDIR = /gpfs/fs1/work/dattore/conda-envs/libpq/lib
+	DBLIBS = -lpq -lpostgresql
 	JASPERLIBDIR = /glade/u/home/dattore/cpp/lib/jasper/lib
 	BINDIR = /glade/u/home/rdadata/bin/ch
 	LOCALBINDIR = /ncar/rda/setuid/bin
@@ -65,9 +66,10 @@ else ifneq ($(findstring rda-web-dev,$(HOST)),)
 endif
 	COMPILER = g++49
 	GLOBALINCLUDEDIR = /glade/u/home/dattore/cpp/lib/include
-        MYSQLINCLUDEDIR = /usr/include/mysql
+        DBINCLUDEDIR = /usr/include/mysql
         LIBDIR = /usr/local/decs/lib
-        MYSQLLIBDIR = /usr/lib64/mysql
+        DBLIBDIR = /usr/lib64/mysql
+	DBLIBS = mysqlclient
 	JASPERLIBDIR = /usr/lib64
 	BINDIR = /usr/local/decs/bin
 	LOCALBINDIR = $(BINDIR)
@@ -76,22 +78,52 @@ endif
 	RDADATARUN = /usr/local/decs/bin/rdadatarun
 endif
 #
+ifneq ($(findstring rda-web-test01,$(HOST)),)
+# Settings for alma-linux machines
+ifneq ($(findstring rda-web-test01,$(HOST)),)
+	BUILDEXT = alma-web-test
+endif
+	COMPILER = g++
+	GLOBALINCLUDEDIR = /glade/u/home/dattore/cpp/lib/include
+        DBINCLUDEDIR = /usr/include/mysql
+        LIBDIR = /usr/local/decs/lib
+        DBLIBDIR = /usr/lib64
+	DBLIBS = mysqlclient
+	JASPERLIBDIR = /usr/lib64
+	BINDIR = /usr/local/decs/bin
+	LOCALBINDIR = $(BINDIR)
+	RUNPATH = -Wl,-rpath,$(LIBDIR)
+	OKAY_TO_MAKE = 1
+	RDADATARUN = /usr/local/decs/bin/rdadatarun
+endif
+#
+ifneq ($(findstring rda-work,$(HOST)),)
+# Settings for rda-work
+	BUILDEXT = work
+	COMPILER = g++
+	GLOBALINCLUDEDIR = /glade/u/home/dattore/cpp/lib/include
+	DBINCLUDEDIR = /usr/pgsql-12/include
+        LIBDIR = /usr/local/decs/lib
+	DBLIBDIR = /usr/lib64
+	DBLIBS = -lpq -lpostgresql
+	JASPERLIBDIR = /usr/lib64
+	BINDIR = /usr/local/decs/bin
+	LOCALBINDIR = $(BINDIR)
+	RUNPATH = -Wl,-rpath,$(LIBDIR)
+	OKAY_TO_MAKE = 1
+	RDADATARUN = /usr/local/decs/bin/rdadatarun
+endif
 ifneq ($(findstring singularity,$(HOST)),)
 # Settings for singularity containers
 	BUILDEXT = singularity
 	COMPILER = g++
 	GLOBALINCLUDEDIR = /usr/include/myincludes
-        MYSQLINCLUDEDIR = /usr/include/mysql
+        DBINCLUDEDIR = /usr/include/postgresql
         LIBDIR = /usr/lib64/mylibs
-ifneq ($(findstring centos,$(VERSION)),)
-        MYSQLLIBDIR = /usr/lib64
-	JASPERLIBDIR = /usr/lib64
-else
-ifneq ($(findstring ubuntu,$(VERSION)),)
-        MYSQLLIBDIR = /usr/lib/x86_64-linux-gnu
-	JASPERLIBDIR = /usr/lib/x86_64-linux-gnu
-endif
-endif
+        DBLIBDIR = /usr/lib/x86_64-linux-gnu
+	DBLIBS = -lpq -lpostgresql
+	JASPERINCLUDEDIR = /usr/include/jasper
+	JASPERLIBDIR = /usr/lib/x86_64-linux-gnu/lib
 	BINDIR = /usr/local/bin
 	RUNPATH = -Wl,-rpath,$(LIBDIR)
 	OKAY_TO_MAKE = 1
@@ -105,8 +137,12 @@ ifeq ($(OKAY_TO_MAKE),0)
 WRONG-HOST: ;
 endif
 #
+# Compiler options
+#
+COMPILE_OPTIONS = -Wall -Wold-style-cast -O3 -std=c++17 -Weffc++ $(DIRECTIVES)
+#
 # Run-path settings
-MYSQLRUNPATH = -Wl,-rpath,$(MYSQLLIBDIR)
+DBRUNPATH = -Wl,-rpath,$(DBLIBDIR)
 JASPERRUNPATH = -Wl,-rpath,$(JASPERLIBDIR)
 #
 EXECUTABLE =
@@ -115,18 +151,20 @@ EXECUTABLE =
 #
 BUILDDIR = ./build-$(BUILDEXT)
 #
+PWD = $(shell pwd)
+#
 # Get the list of libary object files by checking the library source directory
 #
 GATHERXMLOBJS = $(subst $(SOURCEDIR),$(BUILDDIR),$(patsubst %.cpp,%.o,$(wildcard $(SOURCEDIR)/libgatherxml/*.cpp)))
 #
-.PHONY: builddir clean install
+.PHONY: builddir get_version clean install
 #
 all: _ascii2xml _bufr2xml _dcm _dsgen _fix2xml _gatherxml _grid2xml _gsi _hdf2xml _iinv _nc2xml _obs2xml _prop2xml _rcm _scm _sdp _sml
 #
 # libgatherxml.so
 #
 $(BUILDDIR)/libgatherxml/%.o: $(SOURCEDIR)/libgatherxml/%.cpp $(INCLUDEDIR)/gatherxml.hpp
-	$(COMPILER) $(COMPILE_OPTIONS) -c -fPIC $< -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -o $@
+	$(COMPILER) $(COMPILE_OPTIONS) -c -fPIC $< -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -o $@
 #
 libgatherxml.so: CHECKDIR=$(LIBDIR)
 libgatherxml.so: CHECK_TARGET=libgatherxml.so
@@ -134,44 +172,52 @@ libgatherxml.so: builddir get_version $(GATHERXMLOBJS) $(INCLUDEDIR)/gatherxml.h
 ifeq ($(OKAY_TO_MAKE),1)
 	$(COMPILER) -shared -o $(BUILDDIR)/$@.$(NEW_VERSION) -Wl,-soname,$@.$(NEW_VERSION) $(GATHERXMLOBJS)
 	$(MAKE) NEW_VERSION=$(NEW_VERSION) TARGET=$@ INSTALLDIR=$(LIBDIR) install
-ifneq ($(findstring rda-web-test,$(HOST)),)
-	$(RDADATARUN) rsync -a $(LIBDIR)/$@.$(NEW_VERSION) rdadata@rda-web-prod.ucar.edu:$(LIBDIR)/ \
-	  && $(RDADATARUN) rsync -a $(LIBDIR)/$@ rdadata@rda-web-prod.ucar.edu:$(LIBDIR)/
+ifneq ($(findstring rda-web-test01,$(HOST)),)
+	$(RDADATARUN) rsync -a $(LIBDIR)/$@.$(NEW_VERSION) rdadata@rda-web-prod01.ucar.edu:$(LIBDIR)/ \
+	  && $(RDADATARUN) rsync -a $(LIBDIR)/$@ rdadata@rda-web-prod01.ucar.edu:$(LIBDIR)/
 endif
 endif
 #
-_ascii2xml: $(SOURCEDIR)/_ascii2xml.cpp builddir
+_ascii2xml: CHECKDIR=$(BINDIR)
+_ascii2xml: CHECK_TARGET=_ascii2xml
+_ascii2xml: $(SOURCEDIR)/_ascii2xml.cpp builddir get_version
 ifeq ($(OKAY_TO_MAKE),1)
-ifeq ($(strip $(VERSION)),)
-	$(error no version number given)
+	$(eval LINK_LIBS = $(DBLIBS) -lgatherxml -lobs -lutils -lutilsthread -ldatetime -lbitmap -lio -lmetautils_pg -lmetahelpers_pg -lgridutils -lsearch_pg -lxml -ls3 -lmyssl -lssl -lcurl -lz -lpthread)
+ifneq ($(or $(findstring BUG,$(VERSION)),$(findstring MINOR,$(VERSION)),$(findstring MAJOR,$(VERSION)),$(findstring singularity,$(HOST))),)
+	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(LIBDIR) -L$(DBLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 else
-	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -lmysql -lmysqlclient -lgatherxml -lobs -lutils -lutilsthread -ldatetime -lbitmap -lio -lmetautils -lmetahelpers -lgridutils -lsearch -lxml -lz -lpthread -o $(BUILDDIR)/$@.$(VERSION)
+	$(COMPILER) $(COMPILE_OPTIONS) -Wl,-rpath,$(BUILDDIR) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(BUILDDIR) -L$(LIBDIR) -L$(DBLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 endif
+	$(MAKE) NEW_VERSION=$(NEW_VERSION) TARGET=$@ INSTALLDIR=$(BINDIR) install
 endif
 #
 _bufr2xml: CHECKDIR=$(BINDIR)
 _bufr2xml: CHECK_TARGET=_bufr2xml
 _bufr2xml: $(SOURCEDIR)/_bufr2xml.cpp builddir get_version
 ifeq ($(OKAY_TO_MAKE),1)
-ifneq ($(or $(findstring BUG,$(VERSION)),$(findstring MINOR,$(VERSION)),$(findstring MAJOR,$(VERSION))),)
-	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -lmysql -lmysqlclient -lgatherxml -lio -lutils -lutilsthread -ldatetime -lmetautils -lmetahelpers -lbufr -lobs -lbitmap -lgridutils -lsearch -lxml -lz -lpthread -o $(BUILDDIR)/$@.$(NEW_VERSION)
+	$(eval LINK_LIBS = $(DBLIBS) -lgatherxml -lio -lutils -lutilsthread -ldatetime -lmetautils_pg -lmetahelpers_pg -lbufr -lobs -lbitmap -lgridutils -lsearch_pg -lxml -ls3 -lmyssl -lcurl -lz -lpthread)
+ifneq ($(or $(findstring BUG,$(VERSION)),$(findstring MINOR,$(VERSION)),$(findstring MAJOR,$(VERSION)),$(findstring singularity,$(HOST))),)
+	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(LIBDIR) -L$(DBLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 else
-	$(COMPILER) $(COMPILE_OPTIONS) -Wl,-rpath,$(BUILDDIR) $(RUNPATH) $(MYSQLRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(BUILDDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -lmysql -lmysqlclient -lgatherxml -lio -lutils -lutilsthread -ldatetime -lmetautils -lmetahelpers -lbufr -lobs -lbitmap -lgridutils -lsearch -lxml -lz -lpthread -o $(BUILDDIR)/$@.$(NEW_VERSION)
+	$(COMPILER) $(COMPILE_OPTIONS) -Wl,-rpath,$(BUILDDIR) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(BUILDDIR) -L$(LIBDIR) -L$(DBLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 endif
 	$(MAKE) NEW_VERSION=$(NEW_VERSION) TARGET=$@ INSTALLDIR=$(BINDIR) install
 endif
 #
-cmd_util: $(SOURCEDIR)/cmd_util.cpp builddir
+cmd_util_pg: CHECKDIR=$(LOCALBINDIR)
+cmd_util_pg: CHECK_TARGET=cmd_util_pg
+cmd_util_pg: $(SOURCEDIR)/cmd_util_pg.cpp builddir get_version
 ifeq ($(OKAY_TO_MAKE),1)
-ifeq ($(strip $(VERSION)),)
-	$(error no version number given)
-else
-	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -lmysql -lmysqlclient -lutils -lutilsthread -ldatetime -lmetautils -lmetahelpers -lgridutils -lbitmap -lsearch -lxml -lz -lcurl -o $(BUILDDIR)/$@.$(VERSION)
+	$(eval LINK_LIBS = $(DBLIBS) -lutils -lutilsthread -ldatetime -lmetautils_pg -lmetahelpers_pg -lgridutils -lbitmap -lsearch_pg -lxml -lz -lcurl)
+	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(LIBDIR) -L$(DBLIBDIR) $(DBLIBS) -lutils -lutilsthread -ldatetime -lmetautils_pg -lmetahelpers_pg -lgridutils -lbitmap -lsearch_pg -lxml -lz -lcurl -o $(BUILDDIR)/$@.$(NEW_VERSION)
 ifneq ($(VERSION),TEST)
-	$(RDADATARUN) cp $(BUILDDIR)/$@.$(VERSION) $(LOCALBINDIR)/$@.$(VERSION) \
+	$(RDADATARUN) cp $(BUILDDIR)/$@.$(NEW_VERSION) $(LOCALBINDIR)/$@.$(NEW_VERSION) \
           && cd $(LOCALBINDIR) \
-	  && $(RDADATARUN) chmod 4710 $@.$(VERSION) \
-	  && ln -s -f $@.$(VERSION) $@
+	  && $(RDADATARUN) chmod 4710 $@.$(NEW_VERSION) \
+	  && ln -s -f $@.$(NEW_VERSION) $@
+ifneq ($(findstring rda-web-test01,$(HOST)),)
+	$(RDADATARUN) rsync -a $(LOCALBINDIR)/$@.$(NEW_VERSION) rdadata@rda-web-prod01.ucar.edu:$(LOCALBINDIR)/
+	$(RDADATARUN) rsync -a $(LOCALBINDIR)/$@ rdadata@rda-web-prod01.ucar.edu:$(LOCALBINDIR)/
 endif
 endif
 endif
@@ -180,11 +226,11 @@ _dcm: CHECKDIR=$(BINDIR)
 _dcm: CHECK_TARGET=_dcm
 _dcm: $(SOURCEDIR)/_dcm.cpp builddir get_version
 ifeq ($(OKAY_TO_MAKE),1)
-	$(eval LINK_LIBS = -lmysqlclient -lmysql -lgatherxml -lutils -lutilsthread -ldatetime -lmetautils -lmetahelpers -lgridutils -lsearch -lxml -lbitmap -lmyssl -ls3 -lz -lcurl -lpthread)
+	$(eval LINK_LIBS = $(DBLIBS) -lgatherxml -lutils -lutilsthread -ldatetime -lmetautils_pg -lmetahelpers_pg -lgridutils -lsearch_pg -lxml -lbitmap -ls3 -lmyssl -lz -lcurl -lpthread)
 ifneq ($(or $(findstring BUG,$(VERSION)),$(findstring MINOR,$(VERSION)),$(findstring MAJOR,$(VERSION))),)
-	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
+	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(LIBDIR) -L$(DBLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 else
-	$(COMPILER) $(COMPILE_OPTIONS) -Wl,-rpath,$(BUILDDIR) $(RUNPATH) $(MYSQLRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(BUILDDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
+	$(COMPILER) $(COMPILE_OPTIONS) -Wl,-rpath,$(BUILDDIR) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(BUILDDIR) -L$(LIBDIR) -L$(DBLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 endif
 	$(MAKE) NEW_VERSION=$(NEW_VERSION) TARGET=$@ INSTALLDIR=$(BINDIR) install
 endif
@@ -193,16 +239,16 @@ _dsgen: CHECKDIR=$(BINDIR)
 _dsgen: CHECK_TARGET=_dsgen
 _dsgen: $(SOURCEDIR)/_dsgen.cpp builddir get_version
 ifeq ($(OKAY_TO_MAKE),1)
-	$(eval LINK_LIBS = -lmysqlclient -lmysql -lutils -lutilsthread -ldatetime -lmetautils -lmetahelpers -lmetaexport -lmetaexporthelpers -lgridutils -lsearch -lxml -lbitmap -lcitation -lz -lpthread -lcurl)
+	$(eval LINK_LIBS = $(DBLIBS) -lutils -lutilsthread -ldatetime -lmetautils_pg -lmetahelpers_pg -lmetaexport_pg -lmetaexporthelpers_pg -lgridutils -lsearch_pg -lxml -lbitmap -lcitation_pg -lz -lpthread -lcurl)
 ifneq ($(or $(findstring BUG,$(VERSION)),$(findstring MINOR,$(VERSION)),$(findstring MAJOR,$(VERSION))),)
-	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
+	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(LIBDIR) -L$(DBLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 else
-	$(COMPILER) $(COMPILE_OPTIONS) -Wl,-rpath,$(BUILDDIR) $(RUNPATH) $(MYSQLRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(BUILDDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
+	$(COMPILER) $(COMPILE_OPTIONS) -Wl,-rpath,$(BUILDDIR) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(BUILDDIR) -L$(LIBDIR) -L$(DBLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 endif
 	$(MAKE) NEW_VERSION=$(NEW_VERSION) TARGET=$@ INSTALLDIR=$(BINDIR) install
-ifneq ($(findstring rda-web-test,$(HOST)),)
-	$(RDADATARUN) rsync -a $(BINDIR)/$@.$(NEW_VERSION) rdadata@rda-web-prod.ucar.edu:$(BINDIR)/
-	$(RDADATARUN) rsync -a $(BINDIR)/$@ rdadata@rda-web-prod.ucar.edu:$(BINDIR)/
+ifneq ($(findstring rda-web-test01,$(HOST)),)
+	$(RDADATARUN) rsync -a $(BINDIR)/$@.$(NEW_VERSION) rdadata@rda-web-prod01.ucar.edu:$(BINDIR)/
+	$(RDADATARUN) rsync -a $(BINDIR)/$@ rdadata@rda-web-prod01.ucar.edu:$(BINDIR)/
 endif
 endif
 #
@@ -210,10 +256,11 @@ _fix2xml: CHECKDIR=$(BINDIR)
 _fix2xml: CHECK_TARGET=_fix2xml
 _fix2xml: $(SOURCEDIR)/_fix2xml.cpp builddir get_version
 ifeq ($(OKAY_TO_MAKE),1)
+	$(eval LINK_LIBS = -lgatherxml $(DBLIBS) -lcyclone -lutils -lutilsthread -ldatetime -lio -lmetautils_pg -lmetahelpers_pg -lgridutils -lbitmap -lsearch_pg -lxml -ls3 -lmyssl -lssl -lcurl -lz -lpthread)
 ifneq ($(or $(findstring BUG,$(VERSION)),$(findstring MINOR,$(VERSION)),$(findstring MAJOR,$(VERSION))),)
-	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(JASPERRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(JASPERLIBDIR) -lmysql -lmysqlclient -lgatherxml -lcyclone -lutils -lutilsthread -ldatetime -lio -lmetautils -lmetahelpers -lgridutils -lbitmap -lsearch -lxml -lz -lpthread -o $(BUILDDIR)/$@.$(NEW_VERSION)
+	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(DBRUNPATH) $(JASPERRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(LIBDIR) -L$(DBLIBDIR) -L$(JASPERLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 else
-	$(COMPILER) $(COMPILE_OPTIONS) -Wl,-rpath,$(BUILDDIR) $(RUNPATH) $(MYSQLRUNPATH) $(JASPERRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(JASPERLIBDIR) -lmysql -lmysqlclient -lgatherxml -lcyclone -lutils -lutilsthread -ldatetime -lio -lmetautils -lmetahelpers -lgridutils -lbitmap -lsearch -lxml -lz -lpthread -o $(BUILDDIR)/$@.$(NEW_VERSION)
+	$(COMPILER) $(COMPILE_OPTIONS) -Wl,-rpath,$(BUILDDIR) $(RUNPATH) $(DBRUNPATH) $(JASPERRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(LIBDIR) -L$(DBLIBDIR) -L$(JASPERLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 endif
 	$(MAKE) NEW_VERSION=$(NEW_VERSION) TARGET=$@ INSTALLDIR=$(BINDIR) install
 endif
@@ -222,11 +269,11 @@ _gatherxml: CHECKDIR=$(BINDIR)
 _gatherxml: CHECK_TARGET=_gatherxml
 _gatherxml: $(SOURCEDIR)/_gatherxml.cpp builddir get_version
 ifeq ($(OKAY_TO_MAKE),1)
-	$(eval LINK_LIBS = -lmysqlclient -lmysql -lgatherxml -lutils -lutilsthread -ldatetime -lmetautils -lmetahelpers -lgridutils -lbitmap -lsearch -lxml -lmyssl -ls3 -lz -lpthread -lcurl)
+	$(eval LINK_LIBS = $(DBLIBS) -lgatherxml -lutils -lutilsthread -ldatetime -lmetautils_pg -lmetahelpers_pg -lgridutils -lbitmap -lsearch_pg -lxml -lmyssl -ls3 -lz -lpthread -lcurl)
 ifneq ($(or $(findstring BUG,$(VERSION)),$(findstring MINOR,$(VERSION)),$(findstring MAJOR,$(VERSION))),)
-	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
+	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(LIBDIR) -L$(DBLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 else
-	$(COMPILER) $(COMPILE_OPTIONS) -Wl,-rpath,$(BUILDDIR) $(RUNPATH) $(MYSQLRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(BUILDDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
+	$(COMPILER) $(COMPILE_OPTIONS) -Wl,-rpath,$(BUILDDIR) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(BUILDDIR) -L$(LIBDIR) -L$(DBLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 endif
 	$(MAKE) NEW_VERSION=$(NEW_VERSION) TARGET=$@ INSTALLDIR=$(BINDIR) install
 endif
@@ -235,11 +282,11 @@ _grid2xml: CHECKDIR=$(BINDIR)
 _grid2xml: CHECK_TARGET=_grid2xml
 _grid2xml: $(SOURCEDIR)/_grid2xml.cpp builddir get_version
 ifeq ($(OKAY_TO_MAKE),1)
-	$(eval LINK_LIBS = -lgatherxml -lmysqlclient -lmysql -lgrids -ljasper -lutils -lutilsthread -ldatetime -lbitmap -lio -lmetautils -lmetahelpers -lgridutils -lsearch -lxml -ls3 -lmyssl -lerror -lcurl -lpthread -lz)
+	$(eval LINK_LIBS = -lgatherxml $(DBLIBS) -lgrids -ljasper -lutils -lutilsthread -ldatetime -lbitmap -lio -lmetautils_pg -lmetahelpers_pg -lgridutils -lsearch_pg -lxml -ls3 -lmyssl -lerror -lcurl -lpthread -lz)
 ifneq ($(or $(findstring BUG,$(VERSION)),$(findstring MINOR,$(VERSION)),$(findstring MAJOR,$(VERSION)),$(findstring singularity,$(HOST))),)
-	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(JASPERRUNPATH) $(SOURCEDIR)/$@.cpp -D__JASPER -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(JASPERLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
+	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(DBRUNPATH) $(JASPERRUNPATH) $(SOURCEDIR)/$@.cpp -D__JASPER -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -I$(JASPERINCLUDEDIR) -L$(LIBDIR) -L$(DBLIBDIR) -L$(JASPERLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 else
-	$(COMPILER) $(COMPILE_OPTIONS) -Wl,-rpath,$(BUILDDIR) $(RUNPATH) $(MYSQLRUNPATH) $(JASPERRUNPATH) $(SOURCEDIR)/$@.cpp -D__JASPER -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(BUILDDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(JASPERLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
+	$(COMPILER) $(COMPILE_OPTIONS) -Wl,-rpath,$(BUILDDIR) $(RUNPATH) $(DBRUNPATH) $(JASPERRUNPATH) $(SOURCEDIR)/$@.cpp -D__JASPER -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -I$(JASPERINCLUDEDIR) -L$(BUILDDIR) -L$(LIBDIR) -L$(DBLIBDIR) -L$(JASPERLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 endif
 	$(MAKE) NEW_VERSION=$(NEW_VERSION) TARGET=$@ INSTALLDIR=$(BINDIR) install
 endif
@@ -248,10 +295,11 @@ _gsi: CHECKDIR=$(BINDIR)
 _gsi: CHECK_TARGET=_gsi
 _gsi: $(SOURCEDIR)/_gsi.cpp builddir get_version
 ifeq ($(OKAY_TO_MAKE),1)
+	$(eval LINK_LIBS = $(DBLIBS) -lutils -lutilsthread -ldatetime -lmetautils_pg -lmetahelpers_pg -lgridutils -lbitmap -lxml -lsearch_pg -lcurl -lpthread -lz)
 ifneq ($(or $(findstring BUG,$(VERSION)),$(findstring MINOR,$(VERSION)),$(findstring MAJOR,$(VERSION))),)
-	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -lmysql -lmysqlclient -lutils -lutilsthread -ldatetime -lmetautils -lmetahelpers -lgridutils -lbitmap -lxml -lsearch -lpthread -lz -o $(BUILDDIR)/$@.$(NEW_VERSION)
+	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(LIBDIR) -L$(DBLIBDIR) $(LINK_LIBS) -lz -o $(BUILDDIR)/$@.$(NEW_VERSION)
 else
-	$(COMPILER) $(COMPILE_OPTIONS) -Wl,-rpath,$(BUILDDIR) $(RUNPATH) $(MYSQLRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(BUILDDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -lmysql -lmysqlclient -lutils -lutilsthread -ldatetime -lmetautils -lmetahelpers -lgridutils -lbitmap -lxml -lsearch -lpthread -lz -o $(BUILDDIR)/$@.$(NEW_VERSION)
+	$(COMPILER) $(COMPILE_OPTIONS) -Wl,-rpath,$(BUILDDIR) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(BUILDDIR) -L$(LIBDIR) -L$(DBLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 endif
 	$(MAKE) NEW_VERSION=$(NEW_VERSION) TARGET=$@ INSTALLDIR=$(BINDIR) install
 endif
@@ -259,64 +307,71 @@ endif
 _hdf2xml: CHECKDIR=$(BINDIR)
 _hdf2xml: CHECK_TARGET=_hdf2xml
 _hdf2xml: $(SOURCEDIR)/_hdf2xml.cpp builddir get_version
-	$(eval LINK_LIBS = -lmysqlclient -lmysql -lgatherxml -lio -lutils -lutilsthread -ldatetime -lbitmap -lhdf -lmetautils -lmetahelpers -lgridutils -lxml -lsearch -lmyssl -ls3 -lcurl -lpthread -lz)
+	$(eval LINK_LIBS = $(DBLIBS) -lgatherxml -lio -lutils -lutilsthread -ldatetime -lbitmap -lhdf -lmetautils_pg -lmetahelpers_pg -lgridutils -lxml -lsearch_pg -ls3 -lmyssl -lcurl -lpthread -lz)
 ifneq ($(or $(findstring BUG,$(VERSION)),$(findstring MINOR,$(VERSION)),$(findstring MAJOR,$(VERSION))),)
-	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
+	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(LIBDIR) -L$(DBLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 else
-	$(COMPILER) $(COMPILE_OPTIONS) -Wl,-rpath,$(BUILDDIR) $(RUNPATH) $(MYSQLRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(BUILDDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
+	$(COMPILER) $(COMPILE_OPTIONS) -Wl,-rpath,$(BUILDDIR) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(BUILDDIR) -L$(LIBDIR) -L$(DBLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 endif
 	$(MAKE) NEW_VERSION=$(NEW_VERSION) TARGET=$@ INSTALLDIR=$(BINDIR) install
 #
 _iinv: CHECKDIR=$(BINDIR)
 _iinv: CHECK_TARGET=_iinv
 _iinv: $(SOURCEDIR)/_iinv.cpp builddir get_version
-	$(eval LINK_LIBS = -lmysqlclient -lmysql -lgatherxml -lutils -lutilsthread -ldatetime -lbitmap -lmetautils -lmetahelpers -lsearch -lxml -lgridutils -ls3 -lmyssl -lcurl -lpthread -lz)
+	$(eval LINK_LIBS = $(DBLIBS) -lgatherxml -lutils -lutilsthread -ldatetime -lbitmap -lmetautils_pg -lmetahelpers_pg -lsearch_pg -lxml -lgridutils -ls3 -lmyssl -lcurl -lpthread -lz)
 ifneq ($(or $(findstring BUG,$(VERSION)),$(findstring MINOR,$(VERSION)),$(findstring MAJOR,$(VERSION))),)
-	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
+	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(LIBDIR) -L$(DBLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 else
-	$(COMPILER) $(COMPILE_OPTIONS) -Wl,-rpath,$(BUILDDIR) $(RUNPATH) $(MYSQLRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(BUILDDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
+	$(COMPILER) $(COMPILE_OPTIONS) -Wl,-rpath,$(BUILDDIR) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(BUILDDIR) -L$(LIBDIR) -L$(DBLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 endif
 	$(MAKE) NEW_VERSION=$(NEW_VERSION) TARGET=$@ INSTALLDIR=$(BINDIR) install
 #
 _nc2xml: CHECKDIR=$(BINDIR)
 _nc2xml: CHECK_TARGET=_nc2xml
 _nc2xml: $(SOURCEDIR)/_nc2xml.cpp builddir get_version
-	$(eval LINK_LIBS = -lmysqlclient -lmysql -lgatherxml -lio -lutils -lutilsthread -ldatetime -lmetautils -lmetahelpers -lgridutils -lsearch -lxml -lbufr -lbitmap -ls3 -lmyssl -lerror -lpthread -lz -lcurl)
+	$(eval LINK_LIBS = $(DBLIBS) -lgatherxml -lio -lutils -lutilsthread -ldatetime -lmetautils_pg -lmetahelpers_pg -lgridutils -lsearch_pg -lxml -lbufr -lbitmap -ls3 -lmyssl -lerror -lpthread -lz -lcurl)
 ifneq ($(or $(findstring BUG,$(VERSION)),$(findstring MINOR,$(VERSION)),$(findstring MAJOR,$(VERSION)),$(findstring singularity,$(HOST))),)
-	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(JASPERRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(JASPERLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
+	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(DBRUNPATH) $(JASPERRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(LIBDIR) -L$(DBLIBDIR) -L$(JASPERLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 else
-	$(COMPILER) $(COMPILE_OPTIONS) -Wl,-rpath,$(BUILDDIR) $(RUNPATH) $(MYSQLRUNPATH) $(JASPERRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(BUILDDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(JASPERLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
+	$(COMPILER) $(COMPILE_OPTIONS) -Wl,-rpath,$(BUILDDIR) $(RUNPATH) $(DBRUNPATH) $(JASPERRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(BUILDDIR) -L$(LIBDIR) -L$(DBLIBDIR) -L$(JASPERLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 endif
 	$(MAKE) NEW_VERSION=$(NEW_VERSION) TARGET=$@ INSTALLDIR=$(BINDIR) install
 #
 _obs2xml: CHECKDIR=$(BINDIR)
 _obs2xml: CHECK_TARGET=_obs2xml
 _obs2xml: $(SOURCEDIR)/_obs2xml.cpp builddir get_version
-	$(eval LINK_LIBS = -lmysqlclient -lmysql -lgatherxml -lio -lobs -lutils -lutilsthread -ldatetime -lbitmap -lmetautils -lmetahelpers -lsearch -lxml -lgridutils -ls3 -lmyssl -lssl -lcurl -lz -lpthread)
+ifeq ($(OKAY_TO_MAKE),1)
+	$(eval LINK_LIBS = -lgatherxml $(DBLIBS) -lio -lobs -lutils -lutilsthread -ldatetime -lbitmap -lmetautils_pg -lmetahelpers_pg -lsearch_pg -lxml -lgridutils -ls3 -lmyssl -lssl -lcurl -lz -lpthread)
 ifneq ($(or $(findstring BUG,$(VERSION)),$(findstring MINOR,$(VERSION)),$(findstring MAJOR,$(VERSION))),)
-	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(JASPERLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
+	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(LIBDIR) -L$(DBLIBDIR) -L$(JASPERLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 else
-	$(COMPILER) $(COMPILE_OPTIONS) -Wl,-rpath,$(BUILDDIR) $(RUNPATH) $(MYSQLRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(BUILDDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -L$(JASPERLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
+	$(COMPILER) $(COMPILE_OPTIONS) -Wl,-rpath,$(BUILDDIR) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(BUILDDIR) -L$(LIBDIR) -L$(DBLIBDIR) -L$(JASPERLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 endif
 	$(MAKE) NEW_VERSION=$(NEW_VERSION) TARGET=$@ INSTALLDIR=$(BINDIR) install
-#
-_prop2xml: $(SOURCEDIR)/_prop2xml.cpp builddir
-ifeq ($(OKAY_TO_MAKE),1)
-ifeq ($(strip $(VERSION)),)
-	$(error no version number given)
-else
-	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(SOURCEDIR)/_prop2xml.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -lmysql -lmysqlclient -lgatherxml -lutils -lutilsthread -ldatetime -lmetautils -lmetahelpers -lbitmap -lgridutils -lsearch -lxml -lz -lpthread -o $(BUILDDIR)/_prop2xml.$(VERSION)
 endif
+#
+_prop2xml: CHECKDIR=$(BINDIR)
+_prop2xml: CHECK_TARGET=_prop2xml
+_prop2xml: $(SOURCEDIR)/_prop2xml.cpp builddir get_version
+ifeq ($(OKAY_TO_MAKE),1)
+	$(eval LINK_LIBS = $(DBLIBS) -lgatherxml -lutils -lutilsthread -ldatetime -lmetautils_pg -lmetahelpers_pg -lbitmap -lgridutils -lsearch_pg -lxml -ls3 -lmyssl -lssl -lcurl -lz -lpthread)
+ifneq ($(or $(findstring BUG,$(VERSION)),$(findstring MINOR,$(VERSION)),$(findstring MAJOR,$(VERSION))),)
+	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(LIBDIR) -L$(DBLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
+else
+	$(COMPILER) $(COMPILE_OPTIONS) -Wl,-rpath,$(BUILDDIR) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(BUILDDIR) -L$(LIBDIR) -L$(DBLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
+endif
+	$(MAKE) NEW_VERSION=$(NEW_VERSION) TARGET=$@ INSTALLDIR=$(BINDIR) install
 endif
 #
 _rcm: CHECKDIR=$(BINDIR)
 _rcm: CHECK_TARGET=_rcm
 _rcm: $(SOURCEDIR)/_rcm.cpp builddir get_version
 ifeq ($(OKAY_TO_MAKE),1)
+	$(eval LINK_LIBS = $(DBLIBS) -lgatherxml -lutils -lutilsthread -ldatetime -lmetautils_pg -lmetahelpers_pg -lgridutils -lsearch_pg -lxml -lbitmap -ls3 -lmyssl -lssl -lcurl -lz -lpthread)
 ifneq ($(or $(findstring BUG,$(VERSION)),$(findstring MINOR,$(VERSION)),$(findstring MAJOR,$(VERSION))),)
-	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -lmysql -lmysqlclient -lgatherxml -lutils -lutilsthread -ldatetime -lmetautils -lmetahelpers -lgridutils -lsearch -lxml -lbitmap -lz -lpthread -o $(BUILDDIR)/$@.$(NEW_VERSION)
+	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(LIBDIR) -L$(DBLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 else
-	$(COMPILER) $(COMPILE_OPTIONS) -Wl,-rpath,$(BUILDDIR) $(RUNPATH) $(MYSQLRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(BUILDDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -lmysql -lmysqlclient -lgatherxml -lutils -lutilsthread -ldatetime -lmetautils -lmetahelpers -lgridutils -lsearch -lxml -lbitmap -lz -lpthread -o $(BUILDDIR)/$@.$(NEW_VERSION)
+	$(COMPILER) $(COMPILE_OPTIONS) -Wl,-rpath,$(BUILDDIR) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(BUILDDIR) -L$(LIBDIR) -L$(DBLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 endif
 	$(MAKE) NEW_VERSION=$(NEW_VERSION) TARGET=$@ INSTALLDIR=$(BINDIR) install
 endif
@@ -325,127 +380,106 @@ _scm: CHECKDIR=$(BINDIR)
 _scm: CHECK_TARGET=_scm
 _scm: $(SOURCEDIR)/_scm.cpp builddir get_version
 ifeq ($(OKAY_TO_MAKE),1)
-	$(eval LINK_LIBS = -lmysqlclient -lmysql -lgatherxml -lutils -lutilsthread -ldatetime -lgridutils -lmetautils -lmetahelpers -lsearch -lxml -lbitmap -ls3 -lmyssl -lz -lcurl -lpthread)
+	$(eval LINK_LIBS = $(DBLIBS) -lgatherxml -lutils -lutilsthread -ldatetime -lgridutils -lmetautils_pg -lmetahelpers_pg -lsearch_pg -lxml -lbitmap -ls3 -lmyssl -lz -lcurl -lpthread)
 ifneq ($(or $(findstring BUG,$(VERSION)),$(findstring MINOR,$(VERSION)),$(findstring MAJOR,$(VERSION))),)
-	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
+	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(LIBDIR) -L$(DBLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 else
-	$(COMPILER) $(COMPILE_OPTIONS) -Wl,-rpath,$(BUILDDIR) $(RUNPATH) $(MYSQLRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(BUILDDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
+	$(COMPILER) $(COMPILE_OPTIONS) -Wl,-rpath,$(PWD)/$(BUILDDIR) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(BUILDDIR) -L$(LIBDIR) -L$(DBLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 endif
 	$(MAKE) NEW_VERSION=$(NEW_VERSION) TARGET=$@ INSTALLDIR=$(BINDIR) install
 endif
 #
-_sdp: $(SOURCEDIR)/_sdp.cpp builddir
+_sdp: CHECKDIR=$(BINDIR)
+_sdp: CHECK_TARGET=_sdp
+_sdp: $(SOURCEDIR)/_sdp.cpp builddir get_version
 ifeq ($(OKAY_TO_MAKE),1)
-ifeq ($(strip $(VERSION)),)
-	$(error no version number given)
+	$(eval LINK_LIBS = $(DBLIBS) -lutils -lutilsthread -ldatetime -lgridutils -lbitmap -lmetautils_pg -lmetahelpers_pg -lsearch_pg -lxml -lcurl -lz -lpthread)
+ifneq ($(or $(findstring BUG,$(VERSION)),$(findstring MINOR,$(VERSION)),$(findstring MAJOR,$(VERSION))),)
+	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(LIBDIR) -L$(DBLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 else
-	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -lmysql -lmysqlclient -lutils -lutilsthread -ldatetime -lgridutils -lbitmap -lmetautils -lmetahelpers -lsearch -lxml -lz -lpthread -o $(BUILDDIR)/$@.$(VERSION)
+	$(COMPILER) $(COMPILE_OPTIONS) -Wl,-rpath,$(BUILDDIR) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(BUILDDIR) -L$(LIBDIR) -L$(DBLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 endif
+	$(MAKE) NEW_VERSION=$(NEW_VERSION) TARGET=$@ INSTALLDIR=$(BINDIR) install
 endif
 #
 _sml: CHECKDIR=$(BINDIR)
 _sml: CHECK_TARGET=_sml
 _sml: $(SOURCEDIR)/_sml.cpp builddir get_version
 ifeq ($(OKAY_TO_MAKE),1)
+	$(eval LINK_LIBS = $(DBLIBS) -lmetautils_pg -lutils -lutilsthread -ldatetime -lgridutils -lbitmap -lmetahelpers_pg -lsearch_pg -lxml -lcurl -lz -lpthread)
 ifneq ($(or $(findstring BUG,$(VERSION)),$(findstring MINOR,$(VERSION)),$(findstring MAJOR,$(VERSION))),)
-	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(MYSQLRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -lmysql -lmysqlclient -lutils -lutilsthread -ldatetime -lgridutils -lbitmap -lmetautils -lmetahelpers -lsearch -lxml -lz -lpthread -o $(BUILDDIR)/$@.$(NEW_VERSION)
+	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(LIBDIR) -L$(DBLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 else
-	$(COMPILER) $(COMPILE_OPTIONS) -Wl,-rpath,$(BUILDDIR) $(RUNPATH) $(MYSQLRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(MYSQLINCLUDEDIR) -L$(BUILDDIR) -L$(LIBDIR) -L$(MYSQLLIBDIR) -lmysql -lmysqlclient -lutils -lutilsthread -ldatetime -lgridutils -lbitmap -lmetautils -lmetahelpers -lsearch -lxml -lz -lpthread -o $(BUILDDIR)/$@.$(NEW_VERSION)
+	$(COMPILER) $(COMPILE_OPTIONS) -Wl,-rpath,$(BUILDDIR) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(BUILDDIR) -L$(LIBDIR) -L$(DBLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 endif
 	$(MAKE) NEW_VERSION=$(NEW_VERSION) TARGET=$@ INSTALLDIR=$(BINDIR) install
 endif
 #
-gatherxml-base.sif:
-ifneq ($(findstring rda-web-dev,$(HOST)),)
-ifneq ($(findstring ubuntu,$(VERSION)),)
+gatherxml_pg-1-os.sif gatherxml_pg-2-pkgs.sif gatherxml_pg-3-python.sif gatherxml_pg-4-libs.sif:
+ifneq ($(or $(findstring rda-web-dev,$(HOST)),$(findstring rda-work,$(HOST))),)
 	cd /data/ptmp \
-	  && sudo /usr/local/bin/singularity build --force $(basename $@)-$(VERSION).sif /glade/u/home/dattore/gatherxml/singularity/$(basename $@)-$(VERSION).def \
-	  && mv -f $(basename $@)-$(VERSION).sif /glade/u/home/rdadata/lib/singularity/
+	  && export SINGULARITY_TMPDIR=/data/ptmp \
+	  && sudo -E /usr/local/bin/singularity build --force $@ /glade/u/home/dattore/gatherxml_pg/singularity/$(basename $@).def \
+	  && mv -f $@ /glade/u/home/rdadata/lib/singularity/
 else
-	$(error missing or undefined OS version (VERSION=))
-endif
-else
-	$(error make on rda-web-dev.ucar.edu)
+	$(error make on rda-web-dev.ucar.edu or rda-work.ucar.edu)
 endif
 #
-gatherxml-libs.sif:
-ifneq ($(findstring rda-web-dev,$(HOST)),)
-ifneq ($(findstring ubuntu,$(VERSION)),)
+gatherxml_pg-4-libs-update.sif:
+ifneq ($(or $(findstring rda-web-dev,$(HOST)),$(findstring rda-work,$(HOST))),)
 	cd /data/ptmp \
-	  && sudo /usr/local/bin/singularity build --force $(basename $@)-$(VERSION).sif /glade/u/home/dattore/gatherxml/singularity/$(basename $@)-$(VERSION).def \
-	  && mv -f $(basename $@)-$(VERSION).sif /glade/u/home/rdadata/lib/singularity/
+	  && export SINGULARITY_TMPDIR=/data/ptmp \
+	  && sudo -E /usr/local/bin/singularity build --force $@ /glade/u/home/dattore/gatherxml_pg/singularity/$(basename $@).def \
+	  && mv -f $@ /glade/u/home/rdadata/lib/singularity/$(subst -update,,$(basename $@).sif)
 else
-	$(error missing or undefined version (VERSION=))
-endif
-else
-	$(error make on rda-web-dev.ucar.edu)
+	$(error make on rda-web-dev.ucar.edu or rda-work.ucar.edu)
 endif
 #
-gatherxml-libs-update.sif:
-ifneq ($(findstring rda-web-dev,$(HOST)),)
-ifneq ($(findstring ubuntu,$(VERSION)),)
-	cd /data/ptmp \
-	  && sudo /usr/local/bin/singularity build --force $(basename $@)-$(VERSION).sif /glade/u/home/dattore/gatherxml/singularity/$(basename $@)-$(VERSION).def \
-	  && mv -f $(basename $@)-$(VERSION).sif /glade/u/home/rdadata/lib/singularity/$(subst -update,,$(basename $@)-$(VERSION).sif)
-else
-	$(error missing or undefined version (VERSION=))
-endif
-else
-	$(error make on rda-web-dev.ucar.edu)
-endif
-#
-gatherxml-utils.sif:
-ifneq ($(findstring rda-web-dev,$(HOST)),)
+gatherxml_pg-5-utils.sif:
+ifneq ($(or $(findstring rda-web-dev,$(HOST)),$(findstring rda-work,$(HOST))),)
 ifeq ($(strip $(UTILITY)),)
-ifneq ($(findstring ubuntu,$(VERSION)),)
 	$(eval GO_BACK = $(shell pwd))
 	cd /data/ptmp \
-	  && sudo /usr/local/bin/singularity build --force $(basename $@)-$(VERSION).sif /glade/u/home/dattore/gatherxml/singularity/$(basename $@)-$(VERSION).def \
-	  && mv -f $(basename $@)-$(VERSION).sif /glade/u/home/rdadata/lib/singularity/ \
+	  && export SINGULARITY_TMPDIR=/data/ptmp \
+	  && sudo -E /usr/local/bin/singularity build --force $@ /glade/u/home/dattore/gatherxml_pg/singularity/$(basename $@).def \
+	  && mv -f $@ /glade/u/home/rdadata/lib/singularity/ \
 	  && cd $(GO_BACK) \
-	  && $(MAKE) gatherxml-exec.sif
+	  && $(MAKE) gatherxml_pg-exec.sif
 else
-	$(error missing or undefined version (VERSION=))
+	$(error found UTILITY=$(UTILITY) - did you mean to build 'gatherxml-5-utils-update.sif'?)
 endif
 else
-	$(error found UTILITY=$(UTILITY) - did you mean to build 'gatherxml-utils-update.sif'?)
-endif
-else
-	$(error make on rda-web-dev.ucar.edu)
+	$(error make on rda-web-dev.ucar.edu or rda-work.ucar.edu)
 endif
 #
-gatherxml-utils-update.sif:
-ifneq ($(findstring rda-web-dev,$(HOST)),)
+gatherxml_pg-5-utils-update.sif:
+ifneq ($(or $(findstring rda-web-dev,$(HOST)),$(findstring rda-work,$(HOST))),)
 ifneq ($(strip $(UTILITY)),)
-ifneq ($(findstring ubuntu,$(VERSION)),)
 	$(eval GO_BACK = $(shell pwd))
 	cd /data/ptmp \
+	  && export SINGULARITY_TMPDIR=/data/ptmp \
 	  && export UTILITY=$(UTILITY) \
-	  && sudo -E /usr/local/bin/singularity build --force $(basename $@)-$(VERSION).sif /glade/u/home/dattore/gatherxml/singularity/$(basename $@)-$(VERSION).def \
-	  && mv -f $(basename $@)-$(VERSION).sif /glade/u/home/rdadata/lib/singularity/$(subst -update,,$(basename $@)-$(VERSION).sif) \
+	  && sudo -E /usr/local/bin/singularity build --force $@ /glade/u/home/dattore/gatherxml_pg/singularity/$(basename $@).def \
+	  && mv -f $@ /glade/u/home/rdadata/lib/singularity/$(subst -update,,$(basename $@).sif) \
 	  && cd $(GO_BACK) \
-	  && $(MAKE) gatherxml-exec.sif
-else
-	$(error missing or undefined version (VERSION=))
-endif
+	  && $(MAKE) gatherxml_pg-exec.sif
 else
 	$(error missing or undefined utility name (UTILITY=))
 endif
 else
-	$(error make on rda-web-dev.ucar.edu)
+	$(error make on rda-web-dev.ucar.edu or rda-work.ucar.edu)
 endif
 #
-gatherxml-exec.sif:
-ifneq ($(findstring rda-web-dev,$(HOST)),)
-ifneq ($(findstring ubuntu,$(VERSION)),)
+gatherxml_pg-exec.sif:
+ifneq ($(or $(findstring rda-web-dev,$(HOST)),$(findstring rda-work,$(HOST))),)
 	cd /data/ptmp \
-	  && sudo /usr/local/bin/singularity build --force $(basename $@)-$(VERSION).sif /glade/u/home/dattore/gatherxml/singularity/$(basename $@)-$(VERSION).def \
-	  && mv -f $(basename $@)-$(VERSION).sif /glade/u/home/rdadata/bin/singularity/$(basename $@)-$(VERSION).sif
+	  && export SINGULARITY_TMPDIR=/data/ptmp \
+	  && sudo -E /usr/local/bin/singularity build --force $@.$(TIMESTAMP) /glade/u/home/dattore/gatherxml_pg/singularity/$(basename $@).def \
+	  && mv -f $@.$(TIMESTAMP) /glade/u/home/rdadata/bin/singularity/ \
+	  && cd /glade/u/home/rdadata/bin/singularity \
+	  && ln -s -f $@.$(TIMESTAMP) $@
 else
-	$(error missing or undefined version (VERSION=))
-endif
-else
-	$(error make on rda-web-dev.ucar.edu)
+	$(error make on rda-web-dev.ucar.edu or rda-work.ucar.edu)
 endif
 #
 gatherxml: gatherxml-base.sif gatherxml-libs.sif gatherxml-utils.sif
@@ -459,45 +493,42 @@ builddir:
 #
 get_version:
 	@ if [ "$(CHECKDIR)" = "" ]; then \
-	  echo "No check directory specified (use CHECKDIR=)"; \
+ 	  echo "No check directory specified (use CHECKDIR=)"; \
+ 	  exit 1; \
+ 	fi; \
+ 	if [ "$(CHECK_TARGET)" = "" ]; then \
+ 	  echo "No check target specified (use CHECK_TARGET=)"; \
+ 	  exit 1; \
+ 	fi; \
+	if [ "$(VERSION)" = "" ]; then \
+ 	  echo "Missing version number (use VERSION=)"; \
 	  exit 1; \
-	fi; \
-	if [ "$(CHECK_TARGET)" = "" ]; then \
-	  echo "No check target specified (use CHECK_TARGET=)"; \
-	  exit 1; \
-	fi;
-ifeq ($(strip $(VERSION)),BUG)
+ 	fi;
 	$(eval NEW_VERSION = $(shell \
-	  version=`ls -l $(CHECKDIR)/$(CHECK_TARGET) |awk '{print $$11}' |sed "s|$(CHECKDIR)/||" |sed "s|$(CHECK_TARGET).||"`; \
+	  version="1.0.0"; \
+	  if [ -e $(CHECKDIR)/$(CHECK_TARGET) ]; then \
+	    version=`ls -l $(CHECKDIR)/$(CHECK_TARGET) |awk '{print $$11}' |sed "s|$(CHECKDIR)/||" |sed "s|$(CHECK_TARGET).||"`; \
+	  fi; \
 	  major=`echo $$version |awk -F. '{print $$1}'`; \
-	  minor=`echo $$version |awk -F. '{print $$2}'`; \
-	  bug=`echo $$version |awk -F. '{print $$3}'`; \
-	  bug=$$(( $$bug + 1 )); \
-	  echo "$$major.$$minor.$$bug"))
-else
-ifeq ($(strip $(VERSION)),MINOR)
-	$(eval NEW_VERSION = $(shell \
-	  version=`ls -l $(CHECKDIR)/$(CHECK_TARGET) |awk '{print $$11}' |sed "s|$(CHECKDIR)/||" |sed "s|$(CHECK_TARGET).||"`; \
-	  major=`echo $$version |awk -F. '{print $$1}'`; \
-	  minor=`echo $$version |awk -F. '{print $$2}'`; \
-	  minor=$$(( $$minor + 1 )); \
-	  echo "$$major.$$minor.0"))
-else
-ifeq ($(strip $(VERSION)),MAJOR)
-	$(eval NEW_VERSION = $(shell \
-	  version=`ls -l $(CHECKDIR)/$(CHECK_TARGET) |awk '{print $$11}' |sed "s|$(CHECKDIR)/||" |sed "s|$(CHECK_TARGET).||"`; \
-	  major=`echo $$version |awk -F. '{print $$1}'`; \
-	  major=$$(( $$major + 1 )); \
-	  echo "$$major.0.0"))
-else
-ifneq ($(strip $(VERSION)),)
-	$(eval NEW_VERSION = $(VERSION))
-else
-	$(error missing version number (VERSION=))
-endif
-endif
-endif
-endif
+	  if [ "$(VERSION)" = "MAJOR" ]; then \
+	    major=$$(( $$major + 1 )); \
+	    echo "$$major.0.0"; \
+	  else \
+	    minor=`echo $$version |awk -F. '{print $$2}'`; \
+	    if [ "$(VERSION)" = "MINOR" ]; then \
+	      minor=$$(( $$minor + 1 )); \
+	      echo "$$major.$$minor.0"; \
+	    else \
+	      bug=`echo $$version |awk -F. '{print $$3}'`; \
+	      if [ "$(VERSION)" = "BUG" ]; then \
+	        bug=$$(( $$bug + 1 )); \
+	        echo "$$major.$$minor.$$bug"; \
+	      else \
+	        echo "$(VERSION)"; \
+	      fi; \
+	    fi; \
+	  fi; \
+	))
 #
 # Install the executable and link to the latest version
 #
