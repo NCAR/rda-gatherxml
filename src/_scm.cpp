@@ -309,9 +309,10 @@ void initialize_web_file(MarkupParameters *markup_parameters) {
   markup_parameters->database = "W" + markup_parameters->markup_type;
   markup_parameters->file_type = "web";
   local_args.summarized_web_file = true;
-  if (mysrv_d.update("wfile", "meta_link = '" + substitute(markup_parameters->
-      markup_type, "ML", "") + "'", "dsid = 'ds" + metautils::args.dsnum +
-      "' and wfile = '" + markup_parameters->filename + "'") < 0) {
+  if (mysrv_d.update("dssdb.wfile", "meta_link = '" + substitute(
+      markup_parameters->markup_type, "ML", "") + "'", "dsid = 'ds" +
+      metautils::args.dsnum + "' and wfile = '" + markup_parameters->filename +
+      "'") < 0) {
     log_error2("error: '" + mysrv_d.error() + "' while trying to update "
         "'dssdb.wfile'", F, "scm", USER);
   }
@@ -346,10 +347,13 @@ void process_data_format(MarkupParameters *markup_parameters) {
     log_error2("missing " + markup_parameters->database + " format attribute",
         F, "scm", USER);
   }
-  if (markup_parameters->server.insert("search.formats", "keyword, vocabulary, "
-      "dsid", "'" + markup_parameters->format + "', '" + markup_parameters->
-      database + "', '" + metautils::args.dsnum + "'", "update dsid = values("
-      "dsid)") < 0) {
+  if (markup_parameters->server.insert(
+        "search.formats",
+        "keyword, vocabulary, dsid",
+        "'" + markup_parameters->format + "', '" + markup_parameters->database +
+            "', '" + metautils::args.dsnum + "'",
+        "update dsid=dsid"
+        ) < 0) {
     log_error2("error: '" + markup_parameters->server.error() + "' while "
         "inserting into search.formats", F, "scm", USER);
   }
@@ -706,13 +710,11 @@ void process_grml_markup(void *markup_parameters) {
               gp->database + ".ds" + local_args.dsnum2 + "_levels",
               "format_code, level_type_code",
               gp->format_map[gp->format] + ", " + lev_map[ltyp],
-              ""
+              "update format_code=format_code"
               ) < 0) {
-          if (gp->server.error().find("Duplicate entry") == string::npos) {
-            log_error2("error: '" + gp->server.error() + "' while inserting "
-                "into " + gp->database + ".ds" + local_args.dsnum2 + "_levels",
-                F, "scm", USER);
-          }
+          log_error2("error: '" + gp->server.error() + "' while inserting into "
+              + gp->database + ".ds" + local_args.dsnum2 + "_levels", F, "scm",
+              USER);
         } else {
           gp->summ_lev = true;
         }
@@ -739,12 +741,14 @@ void process_grml_markup(void *markup_parameters) {
           if (p_set.find(p) == p_set.end()) {
             auto d = PMAP.description(gp->format, p);
             replace_all(d, "'", "\\'");
-            if (gp->server.insert("search.variables", "'" + d + "', 'CMDMAP', "
-                "'" + metautils::args.dsnum + "'") < 0) {
-              if (gp->server.error().find("Duplicate entry") == string::npos) {
-                log_error2("error: '" + gp->server.error() + "' while "
-                "inserting into search.variables", F, "scm", USER);
-              }
+            if (gp->server.insert(
+                  "search.variables",
+                  "keyword, vocabulary, dsid",
+                  "'" + d + "', 'CMDMAP', '" + metautils::args.dsnum + "'",
+                  "update keyword=keyword"
+                  ) < 0) {
+              log_error2("error: '" + gp->server.error() + "' while inserting "
+                  "into search.variables", F, "scm", USER);
             } else {
               local_args.added_variable = true;
             }
@@ -770,6 +774,7 @@ void process_grml_markup(void *markup_parameters) {
         }
       }
     }
+    auto tbl = gp->database + ".ds" + local_args.dsnum2 + "_grids2";
     for (auto& e : pdmap) {
       sort(e.second->level_code_list.begin(), e.second->level_code_list.end(),
       [](const size_t& left, const size_t& right) -> bool {
@@ -780,7 +785,6 @@ void process_grml_markup(void *markup_parameters) {
       });
       string s;
       bitmap::compress_values(e.second->level_code_list, s);
-      auto tbl = gp->database + ".ds" + local_args.dsnum2 + "_grids2";
       auto sp = split(e.first, "<!>");
       auto inserts = gp->file_map[gp->filename] + ", " + tr_map[tr] + ", " +
           gd_map[gdef] + ", '" + sp[0] + "', '" + s + "', " + sp[1] + ", " + sp[
@@ -1863,27 +1867,45 @@ void summarize_markup(string markup_type, unordered_map<string, vector<
     if (t == "GrML") {
       auto gp = reinterpret_cast<GrMLParameters *>(mp);
       for (const auto& p : gp->prod_set) {
-        if (gp->server.insert("search.data_types", "'grid', '" + p + "', '" +
-            gp->database + "', '" + metautils::args.dsnum + "'") < 0) {
-          if (gp->server.error().find("Duplicate entry") == string::npos) {
-            err = gp->server.error();
-            break;
-          }
+        if (gp->server.insert(
+              "search.data_types",
+              "keyword, process, vocabulary, dsid",
+              "'grid', '" + p + "', '" + gp->database + "', '" + metautils::
+                  args.dsnum + "'",
+              "update keyword=keyword"
+              ) < 0) {
+          err = gp->server.error();
+          break;
         }
       }
     } else if (t == "ObML") {
-      if (mp->server.insert("search.data_types", "'platform_observation', '', '"
-          + mp->database + "', '" + metautils::args.dsnum + "'") < 0) {
+      if (mp->server.insert(
+            "search.data_types",
+            "keyword, process, vocabulary, dsid",
+            "'platform_observation', '', '" + mp->database + "', '" +
+                metautils::args.dsnum + "'",
+            "update keyword=keyword"
+            ) < 0) {
         err = mp->server.error();
       }
     } else if (t == "SatML") {
-      if (mp->server.insert("search.data_types", "'satellite', '', '" +
-          mp->database + "', '" + metautils::args.dsnum + "'") < 0) {
+      if (mp->server.insert(
+            "search.data_types",
+            "keyword, process, vocabulary, dsid",
+            "'satellite', '', '" + mp->database + "', '" + metautils::args.dsnum
+                + "'",
+            "update keyword=keyword"
+            ) < 0) {
         err = mp->server.error();
       }
     } else if (t == "FixML") {
-      if (mp->server.insert("search.data_types", "'cyclone_fix', '', '" + mp->
-          database + "', '" + metautils::args.dsnum + "'") < 0) {
+      if (mp->server.insert(
+            "search.data_types",
+            "keyword, process, vocabulary, dsid",
+            "'cyclone_fix', '', '" + mp->database + "', '" + metautils::args.
+                dsnum + "'",
+            "update keyword=keyword"
+            ) < 0) {
         err = mp->server.error();
       }
     }
