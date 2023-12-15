@@ -1,24 +1,24 @@
 BootStrap: localimage
-From: /glade/u/home/rdadata/lib/singularity/gatherxml-4-libs.sif
+From: /glade/u/home/rdadata/lib/singularity/gatherxml_pg-4-libs.sif
 
 %setup
-    cp /glade/u/home/dattore/gatherxml/Makefile ${SINGULARITY_ROOTFS}/gatherxml/
-    cp -p /glade/u/home/dattore/gatherxml/src/_ascii2xml.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
-    cp -p /glade/u/home/dattore/gatherxml/src/_bufr2xml.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
-    cp -p /glade/u/home/dattore/gatherxml/src/_dcm.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
-    cp -p /glade/u/home/dattore/gatherxml/src/_dsgen.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
-    cp -p /glade/u/home/dattore/gatherxml/src/_fix2xml.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
-    cp -p /glade/u/home/dattore/gatherxml/src/_grid2xml.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
-    cp -p /glade/u/home/dattore/gatherxml/src/_gsi.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
-    cp -p /glade/u/home/dattore/gatherxml/src/_hdf2xml.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
-    cp -p /glade/u/home/dattore/gatherxml/src/_iinv.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
-    cp -p /glade/u/home/dattore/gatherxml/src/_nc2xml.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
-    cp -p /glade/u/home/dattore/gatherxml/src/_obs2xml.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
-    cp -p /glade/u/home/dattore/gatherxml/src/_prop2xml.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
-    cp -p /glade/u/home/dattore/gatherxml/src/_rcm.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
-    cp -p /glade/u/home/dattore/gatherxml/src/_scm.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
-    cp -p /glade/u/home/dattore/gatherxml/src/_sdp.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
-    cp -p /glade/u/home/dattore/gatherxml/src/_sml.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
+    cp /glade/u/home/dattore/gatherxml_pg/Makefile ${SINGULARITY_ROOTFS}/gatherxml/
+    cp -p /glade/u/home/dattore/gatherxml_pg/src/_ascii2xml.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
+    cp -p /glade/u/home/dattore/gatherxml_pg/src/_bufr2xml.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
+    cp -p /glade/u/home/dattore/gatherxml_pg/src/_dcm.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
+    cp -p /glade/u/home/dattore/gatherxml_pg/src/_dsgen.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
+    cp -p /glade/u/home/dattore/gatherxml_pg/src/_fix2xml.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
+    cp -p /glade/u/home/dattore/gatherxml_pg/src/_grid2xml.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
+    cp -p /glade/u/home/dattore/gatherxml_pg/src/_gsi.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
+    cp -p /glade/u/home/dattore/gatherxml_pg/src/_hdf2xml.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
+    cp -p /glade/u/home/dattore/gatherxml_pg/src/_iinv.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
+    cp -p /glade/u/home/dattore/gatherxml_pg/src/_nc2xml.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
+    cp -p /glade/u/home/dattore/gatherxml_pg/src/_obs2xml.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
+    cp -p /glade/u/home/dattore/gatherxml_pg/src/_prop2xml.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
+    cp -p /glade/u/home/dattore/gatherxml_pg/src/_rcm.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
+    cp -p /glade/u/home/dattore/gatherxml_pg/src/_scm.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
+    cp -p /glade/u/home/dattore/gatherxml_pg/src/_sdp.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
+    cp -p /glade/u/home/dattore/gatherxml_pg/src/_sml.cpp ${SINGULARITY_ROOTFS}/gatherxml/src/
 
 %post
     cd /gatherxml
