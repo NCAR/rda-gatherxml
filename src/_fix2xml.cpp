@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 #include <signal.h>
 #include <gatherxml.hpp>
+#include <pglocks.hpp>
 #include <cyclone.hpp>
 #include <strutils.hpp>
 #include <utils.hpp>

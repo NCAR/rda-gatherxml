@@ -11,10 +11,10 @@
 #include <strutils.hpp>
 #include <utils.hpp>
 #include <metadata.hpp>
-#include <MySQL.hpp>
+#include <PostgreSQL.hpp>
 #include <myerror.hpp>
 
-using namespace MySQL;
+using namespace PostgreSQL;
 using metautils::log_error2;
 using std::cerr;
 using std::cout;
