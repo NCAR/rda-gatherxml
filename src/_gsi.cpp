@@ -6,14 +6,14 @@
 #include <regex>
 #include <sstream>
 #include <pthread.h>
-#include <MySQL.hpp>
+#include <PostgreSQL.hpp>
 #include <tempfile.hpp>
 #include <strutils.hpp>
 #include <utils.hpp>
 #include <metadata.hpp>
 #include <myerror.hpp>
 
-using namespace MySQL;
+using namespace PostgreSQL;
 using metautils::log_error2;
 using metautils::log_warning;
 using miscutils::this_function_label;
@@ -110,7 +110,7 @@ void *thread_plot(void *tnc) {
   const static string F = this_function_label(__func__);
   ThreadStruct *t = reinterpret_cast<ThreadStruct *>(tnc);
   Server srv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "");
+      metadb_username, metautils::directives.metadb_password, "rdadb");
   if (t->query.submit(srv) < 0) {
     log_error2(t->query.error(), F, "gsi", USER);
   }
@@ -212,17 +212,17 @@ void generate_graphics(LocalQuery& query, string type, string table, string
       }
     } else {
       if (type == "obs") {
-        tnc[nn].query.set("select distinct box1d_row, box1d_bitmap from WObML."
-            "ds" + d2 + "_webfiles2 as p left join dssdb.wfile as x on (x.dsid "
-            "= 'ds" + metautils::args.dsnum + "' and x.wfile = p.id) left join "
-            + table + " as t on t.file_code = p.code where x.gindex = " + gindex
-            + " and observation_type_code = " + row[0] + " and "
-            "platform_type_code = " + row[1] + " and p.format_code = " + row[4]
-            + " order by box1d_row");
+        tnc[nn].query.set("select distinct box1d_row, box1d_bitmap from "
+            "\"WObML\".ds" + d2 + "_webfiles2 as p left join dssdb.wfile as x "
+            "on (x.dsid = 'ds" + metautils::args.dsnum + "' and x.wfile = p."
+            "id) left join " + table + " as t on t.file_code = p.code where x."
+            "gindex = " + gindex + " and observation_type_code = " + row[0] +
+            " and platform_type_code = " + row[1] + " and p.format_code = " +
+            row[4] + " order by box1d_row");
         tnc[nn].imagetag = substitute(row[5], " ", "_") + "_web_gindex_" +
             gindex + "_" + row[2] + "." + row[3];
       } else if (type == "fix") {
-        tnc[nn].query.set("select box1d_row, box1d_bitmap from WFixML.ds" +
+        tnc[nn].query.set("select box1d_row, box1d_bitmap from \"WFixML\".ds" +
             d2 + "_webfiles2 as p left join dssdb.wfile as x on x.wfile = p."
             "id left join " + table + " as t on t.file_code = p.code where x."
             "gindex = " + gindex + " and classification_code = " + row[0] +
@@ -301,7 +301,7 @@ int main(int argc, char **argv) {
   metautils::args.dsnum = sp.back();
   sp.pop_back();
   server.connect(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "");
+      metadb_username, metautils::directives.metadb_password, "rdadb");
   if (!server) {
     log_error2("unable to connect to database server on startup", F, "gsi",
         USER);
@@ -318,25 +318,27 @@ int main(int argc, char **argv) {
     string t;
     if (g.empty()) {
       q2.set("select distinct l.observation_type_code, l.platform_type_code, "
-          "o.obs_type, pf.platform_type, p.format_code, f.format from WObML.ds"
-          + dsid + "_webfiles2 as p left join WObML.ds" + dsid + "_data_types "
-          "as d on d.file_code = p.code left join WObML.ds" + dsid +
-          "_data_types_list as l on l.code = d.data_type_code left join WObML."
-          "obs_types as o on l.observation_type_code = o.code left join WObML."
-          "platform_types as pf on l.platform_type_code = pf.code left join "
-          "WObML.formats as f on f.code = p.format_code");
+          "o.obs_type, pf.platform_type, p.format_code, f.format from "
+          "\"WObML\".ds" + dsid + "_webfiles2 as p left join \"WObML\".ds" +
+          dsid + "_data_types as d on d.file_code = p.code left join \"WObML\"."
+          "ds" + dsid + "_data_types_list as l on l.code = d.data_type_code "
+          "left join \"WObML\".obs_types as o on l.observation_type_code = o."
+          "code left join \"WObML\".platform_types as pf on l."
+          "platform_type_code = pf.code left join \"WObML\".formats as f on f."
+          "code = p.format_code");
       t = "search.obs_data";
     } else {
       q2.set("select distinct l.observation_type_code, l.platform_type_code, "
-          "o.obs_type, pf.platform_type, p.format_code, f.format from WObML.ds"
-          + dsid + "_webfiles2 as p left join dssdb.wfile as x on x.wfile = p."
-          "id left join WObML.ds" + dsid + "_data_types as d on d.file_code = "
-          "p.code left join WObML.ds" + dsid + "_data_types_list as l on l."
-          "code = d.data_type_code left join WObML.obs_types as o on l."
-          "observation_type_code = o.code left join WObML.platform_types as pf "
-          "on l.platform_type_code = pf.code left join WObML.formats as f on f."
-          "code = p.format_code where x.gindex = " + g);
-      t = "WObML.ds" + dsid + "_locations";
+          "o.obs_type, pf.platform_type, p.format_code, f.format from "
+          "\"WObML\".ds" + dsid + "_webfiles2 as p left join dssdb.wfile as x "
+          "on x.wfile = p.id left join \"WObML\".ds" + dsid + "_data_types as "
+          "d on d.file_code = p.code left join \"WObML\".ds" + dsid +
+          "_data_types_list as l on l.code = d.data_type_code left join "
+          "\"WObML\".obs_types as o on l.observation_type_code = o.code left "
+          "join \"WObML\".platform_types as pf on l.platform_type_code = pf."
+          "code left join \"WObML\".formats as f on f.code = p.format_code "
+          "where x.gindex = " + g);
+      t = "\"WObML\".ds" + dsid + "_locations";
     }
     generate_graphics(q2, "obs", t, g);
   }
@@ -345,20 +347,21 @@ int main(int argc, char **argv) {
     string t;
     if (g.empty()) {
       q2.set("select distinct d.classification_code, c.classification, p."
-          "format_code, f.format from WFixML.ds" + dsid + "_webfiles2 as p "
-          "left join WFixML.ds" + dsid + "_locations as d on d.file_code = p."
-          "code left join WFixML.classifications as c on d.classification_code "
-          "= c.code left join WFixML.formats as f on f.format = p.format_code");
+          "format_code, f.format from \"WFixML\".ds" + dsid + "_webfiles2 as p "
+          "left join \"WFixML\".ds" + dsid + "_locations as d on d.file_code = "
+          "p.code left join \"WFixML\".classifications as c on d."
+          "classification_code = c.code left join \"WFixML\".formats as f on f."
+          "code = p.format_code where d.classification_code is not null");
       t = "search.fix_data";
     } else {
       q2.set("select distinct d.classification_code, c.classification, p."
-          "format_code, f.format from WFixML.ds" + dsid + "_webfiles2 as p "
-          "left join dssdb.wfile as x on x.wfile = p.id left join WFixML.ds" +
-          dsid + "_locations as d on d.file_code = p.code left join WFixML."
-          "classifications as c on d.classification_code = c.code left join "
-          "WFixML.formats as f on f.format = p.format_code where x.gindex = " +
-          g);
-      t = "WFixML.ds" + dsid + "_locations";
+          "format_code, f.format from \"WFixML\".ds" + dsid + "_webfiles2 as p "
+          "left join dssdb.wfile as x on x.wfile = p.id left join \"WFixML\".ds"
+          + dsid + "_locations as d on d.file_code = p.code left join "
+          "\"WFixML\".classifications as c on d.classification_code = c.code "
+          "left join \"WFixML\".formats as f on f.code = p.format_code where "
+          "x.gindex = " + g + " and d.classification_code is not null");
+      t = "\"WFixML\".ds" + dsid + "_locations";
     }
     generate_graphics(q2, "fix", t, g);
   }
