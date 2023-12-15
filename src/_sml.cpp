@@ -3,14 +3,14 @@
 #include <string>
 #include <deque>
 #include <list>
-#include <MySQL.hpp>
+#include <PostgreSQL.hpp>
 #include <metadata.hpp>
 #include <mymap.hpp>
 #include <strutils.hpp>
 #include <utils.hpp>
 #include <myerror.hpp>
 
-using namespace MySQL;
+using namespace PostgreSQL;
 
 metautils::Directives metautils::directives;
 metautils::Args metautils::args;
@@ -155,8 +155,8 @@ int main(int argc,char **argv)
   }
   dsnum2=strutils::substitute(metautils::args.dsnum,".","");
   metautils::read_config("sml",user,false);
-  server_m.connect(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
-  server_d.connect(metautils::directives.database_server,metautils::directives.rdadb_username,metautils::directives.rdadb_password,"dssdb");
+  server_m.connect(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"rdadb");
+  server_d.connect(metautils::directives.database_server,metautils::directives.rdadb_username,metautils::directives.rdadb_password,"rdadb");
   if (file_list.size() == 0) {
     fill_files_with_metadata();
     set_file_meta_links();
