@@ -8,12 +8,12 @@
 #include <gatherxml.hpp>
 #include <metahelpers.hpp>
 #include <datetime.hpp>
-#include <MySQL.hpp>
+#include <PostgreSQL.hpp>
 #include <bsort.hpp>
 #include <strutils.hpp>
 #include <utils.hpp>
 #include <bitmap.hpp>
-#include <search.hpp>
+#include <search_pg.hpp>
 #include <xml.hpp>
 #include <gridutils.hpp>
 #include <myerror.hpp>
@@ -21,7 +21,7 @@
 #include <timer.hpp>
 #endif
 
-using namespace MySQL;
+using namespace PostgreSQL;
 using metautils::log_error2;
 using miscutils::this_function_label;
 using std::cerr;
@@ -213,7 +213,7 @@ void fill_level_code_map(unordered_map<size_t, tuple<string, string, string>>&
     level_code_map) {
   static const string F = this_function_label(__func__);
   Server mysrv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "");
+      metadb_username, metautils::directives.metadb_password, "rdadb");
   LocalQuery q("code, map, type, value", "WGrML.levels");
 #ifdef DUMP_QUERIES
   {
@@ -251,9 +251,9 @@ void generate_parameter_cross_reference(string format, string title, string
     log_error2("unable to create temporary directory tree", F, caller, user);
   }
   Server mysrv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "");
-  LocalQuery q("select distinct parameter from WGrML.summary as s left join "
-      "WGrML.formats as f on f.code = s.format_code where s.dsid = '" +
+      metadb_username, metautils::directives.metadb_password, "rdadb");
+  LocalQuery q("select distinct parameter from \"WGrML\".summary as s left "
+      "join \"WGrML\".formats as f on f.code = s.format_code where s.dsid = '" +
       metautils::args.dsnum + "' and f.format = '" + format + "'");
 #ifdef DUMP_QUERIES
   {
@@ -420,10 +420,10 @@ void generate_level_cross_reference(string format, string title, string
   unordered_map<size_t, tuple<string, string, string>> lcmap;
   fill_level_code_map(lcmap);
   Server mysrv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "");
-  LocalQuery q("select distinct level_type_codes from WGrML.summary as s left "
-      "join WGrML.formats as f on f.code = s.format_code where s.dsid = '" +
-      metautils::args.dsnum + "' and f.format = '" + format + "'");
+      metadb_username, metautils::directives.metadb_password, "rdadb");
+  LocalQuery q("select distinct level_type_codes from \"WGrML\".summary as s "
+      "left join \"WGrML\".formats as f on f.code = s.format_code where s.dsid "
+      "= '" + metautils::args.dsnum + "' and f.format = '" + format + "'");
 #ifdef DUMP_QUERIES
   {
   Timer tm;
@@ -566,13 +566,14 @@ void add_to_formats(XMLDocument& xdoc, string database, string primaries_table,
     string user) {
   static const string F = this_function_label(__func__);
   Server mysrv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "");
+      metadb_username, metautils::directives.metadb_password, "rdadb");
   if (!mysrv) {
     log_error2("unable to connect to metadata server", F, caller, user);
   }
-  LocalQuery q("select distinct f.format, f.code from " + database + ".formats "
-      "as f left join " + primaries_table + " as p on p.format_code = f.code "
-      "where p.format_code is not null");
+  LocalQuery q("select distinct f.format, f.code from " + postgres_ready(
+      database) + ".formats as f left join " + postgres_ready(database) + "." +
+      primaries_table + " as p on p.format_code = f.code where p.format_code "
+      "is not null");
 #ifdef DUMP_QUERIES
   {
   Timer tm;
@@ -613,21 +614,22 @@ string parameter_query(Server& mysrv, string format_code, size_t
   auto d2 = substitute(metautils::args.dsnum, ".", "");
   if (format_query_result_size > 1) {
     return "select a.parameter, a.level_type_codes, min(a.start_date), max(a."
-        "end_date) from WGrML.ds" + d2 + "_agrids2 as a left join WGrML.ds" + d2
-        + "_webfiles2 as p on p.code = a.file_code where p.format_code = " +
-        format_code + " group by a.parameter, a.level_type_codes";
+        "end_date) from \"WGrML\".ds" + d2 + "_agrids2 as a left join "
+        "\"WGrML\".ds" + d2 + "_webfiles2 as p on p.code = a.file_code where p."
+        "format_code = " + format_code + " group by a.parameter, a."
+        "level_type_codes";
   }
   return "select parameter, level_type_codes, min(start_date), max(end_date) "
-      "from WGrML.ds" + d2 + "_agrids2 group by parameter, level_type_codes";
+      "from \"WGrML\".ds" + d2 + "_agrids2 group by parameter, "
+      "level_type_codes";
 }
 
 string time_range_query(Server& mysrv, string format_code) {
   auto d2 = substitute(metautils::args.dsnum, ".", "");
-  return "select distinct t.time_range, d.definition, d.def_params from WGrML."
-      "summary as s left join WGrML.time_ranges as t on t.code = s."
-      "time_range_code left join WGrML.grid_definitions as d on d.code = s."
-      "grid_definition_code where s.dsid = '" + metautils::args.dsnum + "' and "
-      "format_code = " + format_code;
+  return "select distinct t.time_range, d.definition, d.def_params from "
+      "\"WGrML\".summary as s left join \"WGrML\".time_ranges as t on t.code = "
+      "s.time_range_code left join \"WGrML\".grid_definitions as d on d.code = "      "s.grid_definition_code where s.dsid = '" + metautils::args.dsnum + "' "
+      "and format_code = " + format_code;
 }
 
 void write_grid_html(ofstream& ofs, size_t num_products) {
@@ -799,13 +801,13 @@ void generate_gridded_product_detail(Server& mysrv, string file_type, const
     auto d2 = substitute(metautils::args.dsnum, ".", "");
     if (format_list.size() > 1) {
       qs.set("select a.time_range_codes, a.grid_definition_codes, min(a."
-          "start_date), max(a.end_date) from WGrML.ds" + d2 + "_agrids2 as a "
-          "left join WGrML.ds" + d2 + "_webfiles2 as p on p.code = a.file_code "
-          "where p.format_code = " + fp.second + " group by a."
+          "start_date), max(a.end_date) from \"WGrML\".ds" + d2 + "_agrids2 as "
+          "a left join \"WGrML\".ds" + d2 + "_webfiles2 as p on p.code = a."
+          "file_code where p.format_code = " + fp.second + " group by a."
           "time_range_codes, a.grid_definition_codes");
     } else {
       qs.set("select time_range_codes, grid_definition_codes, min(start_date), "
-          "max(end_date) from WGrML.ds" + d2 + "_agrids2 group by "
+          "max(end_date) from \"WGrML\".ds" + d2 + "_agrids2 group by "
           "time_range_codes, grid_definition_codes");
     }
 #ifdef DUMP_QUERIES
@@ -874,7 +876,7 @@ void generate_gridded_product_detail(Server& mysrv, string file_type, const
         "cellpadding=\"5\" border=\"0\"><tr><th class=\"headerRow\" colspan="
         "\"2\" align=\"center\">Summary for Grids in " << to_capital(f) <<
         " Format</th></tr>" << endl;
-    q.set("select distinct parameter, level_type_codes from WGrML.summary "
+    q.set("select distinct parameter, level_type_codes from \"WGrML\".summary "
         "where dsid = '" + metautils::args.dsnum + "' and format_code = " + fp.
         second);
 #ifdef DUMP_QUERIES
@@ -1008,7 +1010,7 @@ void generate_detailed_grid_summary(string file_type, ofstream& ofs, const
   unordered_map<size_t, tuple<string, string, string>> lcmap;
   fill_level_code_map(lcmap);
   Server mysrv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "");
+      metadb_username, metautils::directives.metadb_password, "rdadb");
   LocalQuery q;
   for (const auto& fp : format_list) {
     q.set(parameter_query(mysrv, fp.second, format_list.size()));
@@ -1433,7 +1435,7 @@ void generate_detailed_observation_summary(string file_type, ofstream& ofs,
     log_error2("unable to open output for observation detail", F, caller, user);
   }
   Server mysrv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "");
+      metadb_username, metautils::directives.metadb_password, "rdadb");
   string d2 = substitute(metautils::args.dsnum, ".", "");
   xmlutils::DataTypeMapper data_type_mapper(metautils::directives.
       parameter_map_path);
@@ -1454,12 +1456,12 @@ void generate_detailed_observation_summary(string file_type, ofstream& ofs,
         "Coverage</b><br>(each dot represents a 3&deg; box containing one or "
         "more observations)</td></tr>" << endl;
     Query query("select distinct t.platform_type, o.obs_type, l.data_type, min("
-        "start_date),max(end_date) from WObML.ds" + d2 + "_data_types as d "
-        "left join WObML.ds" + d2 + "_data_types_list as l on l.code = d."
-        "data_type_code left join WObML.ds" + d2 + "_webfiles2 as p on p.code "
-        "= d.file_code left join WObML.platform_types as t on t.code = l."
-        "platform_type_code left join WObML.obs_types as o on o.code = l."
-        "observation_type_code where p.format_code = " + fp.second + " group "
+        "start_date),max(end_date) from \"WObML\".ds" + d2 + "_data_types as d "
+        "left join \"WObML\".ds" + d2 + "_data_types_list as l on l.code = d."
+        "data_type_code left join \"WObML\".ds" + d2 + "_webfiles2 as p on p."
+        "code = d.file_code left join \"WObML\".platform_types as t on t.code "
+        "= l.platform_type_code left join \"WObML\".obs_types as o on o.code = "
+        "l.observation_type_code where p.format_code = " + fp.second + " group "
         "by t.platform_type, o.obs_type, l.data_type order by t.platform_type, "
         "o.obs_type, l.data_type");
     if (query.submit(mysrv) < 0) {
@@ -1515,24 +1517,24 @@ void generate_detailed_observation_summary(string file_type, ofstream& ofs,
     }
     if (field_exists(mysrv, "WObML.ds" + d2 + "_webfiles2", "min_obs_per")) {
       query.set("select any_value(l.platform_type), any_value(o.obs_type), min("
-          "f.min_obs_per), max(f.max_obs_per), f.unit from WObML.ds" + d2 +
-          "_webfiles2 as p join WObML.ds" + d2 + "_frequencies as f on p.code "
-          "= f.file_code left join WObML.obs_types as o on o.code = f."
-          "observation_type_code left join WObML.platform_types as l on l.code "
-          "= f.platform_type_code left join WObML.frequency_sort as s on s."
-          "keyword = f.unit where p.format_code = " + fp.second + " group by f."
-          "observation_type_code, f.platform_type_code, f.unit, s.idx order by "
-          "s.idx");
+          "f.min_obs_per), max(f.max_obs_per), f.unit from \"WObML\".ds" + d2 +
+          "_webfiles2 as p join \"WObML\".ds" + d2 + "_frequencies as f on p."
+          "code = f.file_code left join \"WObML\".obs_types as o on o.code = f."
+          "observation_type_code left join \"WObML\".platform_types as l on l."
+          "code = f.platform_type_code left join \"WObML\".frequency_sort as s "
+          "on s.keyword = f.unit where p.format_code = " + fp.second + " group "
+          "by f.observation_type_code, f.platform_type_code, f.unit, s.idx "
+          "order by s.idx");
     } else {
       query.set("select any_value(l.platform_type), any_value(o.obs_type), min("
-          "f.avg_obs_per), max(f.avg_obs_per), f.unit from WObML.ds" + d2 +
-          "_webfiles2 as p join WObML.ds" + d2 + "_frequencies as f on p.code "
-          "= f.file_code left join WObML.obs_types as o on o.code = f."
-          "observation_type_code left join WObML.platform_types as l on l.code "
-          "= f.platform_type_code left join WObML.frequency_sort as s on s."
-          "keyword = f.unit where p.format_code = " + fp.second + " group by f."
-          "observation_type_code, f.platform_type_code, f.unit, s.idx order by "
-          "s.idx");
+          "f.avg_obs_per), max(f.avg_obs_per), f.unit from \"WObML\".ds" + d2 +
+          "_webfiles2 as p join \"WObML\".ds" + d2 + "_frequencies as f on p."
+          "code = f.file_code left join \"WObML\".obs_types as o on o.code = f."
+          "observation_type_code left join \"WObML\".platform_types as l on l."
+          "code = f.platform_type_code left join \"WObML\".frequency_sort as s "
+          "on s.keyword = f.unit where p.format_code = " + fp.second + " group "
+          "by f.observation_type_code, f.platform_type_code, f.unit, s.idx "
+          "order by s.idx");
     }
     if (query.submit(mysrv) < 0)
       log_error2("'" + query.error() + "' for '" + query.show() + "'", F,
@@ -1626,7 +1628,7 @@ void generate_detailed_observation_summary(string file_type, ofstream& ofs,
 void generate_detailed_fix_summary(string file_type, ofstream& ofs, const
     vector<pair<string, string>>& format_list, string caller, string user) {
   static const string F = this_function_label(__func__);
-  Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
+  Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"rdadb");
   string d2 = substitute(metautils::args.dsnum, ".", "");
   my::map<TypeEntry> platform_table;
   for (const auto& fp : format_list) {
@@ -1660,7 +1662,7 @@ void generate_detailed_fix_summary(string file_type, ofstream& ofs, const
         platform_table.replace(te);
       }
     }
-    query.set("select any_value(c.classification),min(f.min_obs_per),max(f.max_obs_per),f.unit from WFixML.ds"+d2+"_webfiles2 as p left join WFixML.ds"+d2+"_frequencies as f on p.code = f.file_code left join WFixML.classifications as c on c.code = f.classification_code left join WObML.frequency_sort as s on s.keyword = f.unit where p.format_code = "+fp.second+" group by f.classification_code,f.unit,s.idx order by s.idx");
+    query.set("select any_value(c.classification),min(f.min_obs_per),max(f.max_obs_per),f.unit from \"WFixML\".ds"+d2+"_webfiles2 as p left join \"WFixML\".ds"+d2+"_frequencies as f on p.code = f.file_code left join \"WFixML\".classifications as c on c.code = f.classification_code left join \"WObML\".frequency_sort as s on s.keyword = f.unit where p.format_code = "+fp.second+" group by f.classification_code,f.unit,s.idx order by s.idx");
     if (query.submit(server) < 0) {
       log_error2("'" + query.error() + "' for '" + query.show() + "'", F,
           caller, user);
@@ -1715,7 +1717,7 @@ void generate_detailed_metadata_view(string caller, string user) {
     log_error2("unable to open FormatReferences.xml", F, caller, user);
   }
   Server mysrv_m(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "");
+      metadb_username, metautils::directives.metadb_password, "rdadb");
   string fmts, dtyps;
   auto b = false;
 
@@ -1730,9 +1732,8 @@ void generate_detailed_metadata_view(string caller, string user) {
   };
   vector<vector<pair<string, string>>> vv(svec.size());
   for (size_t n = 0; n < svec.size(); ++n) {
-    auto tbl = get<0>(svec[n]) + ".ds" + substitute(metautils::args.dsnum, ".",
-        "") + "_webfiles2";
-    if (table_exists(mysrv_m, tbl)) {
+    auto tbl = "ds" + substitute(metautils::args.dsnum, ".", "") + "_webfiles2";
+    if (table_exists(mysrv_m, get<0>(svec[n]) + "." + tbl)) {
       b = true;
       dtyps += "<li>" + get<1>(svec[n]) + " </li>";
       add_to_formats(xdoc, get<0>(svec[n]), tbl, vv[n], fmts, caller, user);
@@ -1753,7 +1754,7 @@ void generate_detailed_metadata_view(string caller, string user) {
     }
   } else {
     auto e=xdoc.element("dsOverview/title");
-    Server server_d(metautils::directives.database_server,metautils::directives.rdadb_username,metautils::directives.rdadb_password,"dssdb");
+    Server server_d(metautils::directives.database_server,metautils::directives.rdadb_username,metautils::directives.rdadb_password,"rdadb");
     if (!b) {
       auto elist=xdoc.element_list("dsOverview/contentMetadata/dataType");
       for (const auto& element : elist) {
@@ -1836,7 +1837,7 @@ void generate_detailed_metadata_view(string caller, string user) {
     ofs << "    print \"</ul></td></tr>\\n\";" << endl;
     ofs << "  }" << endl;
     ofs << "?>" << endl;
-    LocalQuery query("dweb_size","dataset","dsid = 'ds"+metautils::args.dsnum+"'");
+    LocalQuery query("dweb_size","dssdb.dataset","dsid = 'ds"+metautils::args.dsnum+"'");
     if (query.submit(server_d) < 0) {
       myerror = query.error();
       exit(1);
@@ -1924,8 +1925,8 @@ void generate_group_detailed_metadata_view(string group_index,string file_type,s
 //  list<string> formatList;
 //  bool foundDetail=false;
 
-  Server server_m(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
-  Server server_d(metautils::directives.database_server,metautils::directives.rdadb_username,metautils::directives.rdadb_password,"dssdb");
+  Server server_m(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"rdadb");
+  Server server_d(metautils::directives.database_server,metautils::directives.rdadb_username,metautils::directives.rdadb_password,"rdadb");
   if (!group_index.empty() || group_index == "0") {
     return;
   }
