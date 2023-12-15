@@ -28,6 +28,7 @@ using std::vector;
 using strutils::chop;
 using strutils::replace_all;
 using strutils::split;
+using strutils::strand;
 using strutils::substitute;
 using unixutils::exists_on_server;
 using unixutils::mysystem2;
@@ -168,17 +169,27 @@ void clear_grid_cache(Server& server, string db) {
     log_error2("error: '" + query.error() + "' while trying to rebuild grid "
         "cache", F, "dcm", USER);
   }
-  if (server._delete(db + ".ds" + g_dsnum2 + "_agrids_cache") < 0) {
-    log_error2("error: '" + server.error() + "' while clearing " + db + ".ds" +
-        g_dsnum2 + "_agrids_cache", F, "dcm", USER);
-  }
+  auto tbl = db + ".ds" + g_dsnum2 + "_agrids_cache";
+  Transaction tx;
+  tx.start(server);
+  tx.lock_rows(tbl);
+  auto uflg = strand(3);
   for (const auto& row : query) {
-    if (server.insert(db + ".ds" + g_dsnum2 + "_agrids_cache", "'" + row[0] +
-        "', '" + row[1] + "', " + row[2] + ", " + row[3]) < 0) {
+    if (server.insert(
+          tbl,
+          "parameter, level_type_codes, min_start_date, max_end_date, uflg",
+          "'" + row[0] + "', '" + row[1] + "', " + row[2] + ", " + row[3] +
+              ", '" + uflg + "'",
+          "update min_start_date = if(" + row[2] + " < min_start_date, " + row[
+              2] + ", min_start_date), max_end_date = if(" + row[3] + " > "
+              "max_end_date, " + row[3] + ", max_end_date), uflg = values(uflg)"
+          ) < 0) {
       log_error2("error: '" + server.error() + "' while inserting into " + db +
           ".ds" + g_dsnum2 + "_agrids_cache", F, "dcm", USER);
     }
   }
+  server._delete(tbl, "uflg != '" + uflg + "'");
+  tx.commit();
 }
 
 bool remove_from(string database, string table_ext, string file_field_name,
