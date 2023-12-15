@@ -8,20 +8,20 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <gatherxml.hpp>
-#include <MySQL.hpp>
+#include <PostgreSQL.hpp>
 #include <metadata.hpp>
 #include <metahelpers.hpp>
-#include <metadata_export.hpp>
-#include <citation.hpp>
+#include <metadata_export_pg.hpp>
+#include <citation_pg.hpp>
 #include <strutils.hpp>
 #include <gridutils.hpp>
 #include <utils.hpp>
 #include <bitmap.hpp>
 #include <tempfile.hpp>
-#include <search.hpp>
+#include <search_pg.hpp>
 #include <tokendoc.hpp>
 
-using namespace MySQL;
+using namespace PostgreSQL;
 using metautils::log_error2;
 using miscutils::this_function_label;
 using std::cerr;
@@ -70,7 +70,7 @@ extern const string USER = getenv("USER");
 
 TempDir temp_dir;
 XMLDocument g_xdoc;
-Server server;
+Server g_metadata_server, g_wagtail_server;
 string g_dataset_type;
 bool no_dset_waf = false;
 
@@ -105,12 +105,12 @@ void update_wagtail(string column, string insert_value, string caller) {
     log_error2("unknown wagtail column '" + column + "'", caller, "dsgen",
         USER);
   }
-  if (server.update("wagtail." + wagtail_db[column], column + " = '" +
+  if (g_wagtail_server.update("wagtail." + wagtail_db[column], column + " = '" +
       sql_ready(insert_value) + "'", "dsid = '" + metautils::args.dsnum + "'") <
       0) {
     log_error2("failed to update wagtail." + wagtail_db[column] + " " + column +
-        ": error '" + server.error() + "'  insert value: '" + insert_value +
-        "'", caller, "dsgen", USER);
+        ": error '" + g_wagtail_server.error() + "'  insert value: '" +
+        insert_value + "'", caller, "dsgen", USER);
   }
 }
 
@@ -221,7 +221,8 @@ void generate_index(string tdir_name) {
         + "' and status = 'A'");
     Row row;
     string ds;
-    if (query.submit(server) == 0 && query.fetch_row(row) && !row[0].empty()) {
+    if (query.submit(g_metadata_server) == 0 && query.fetch_row(row) && !row[0].
+        empty()) {
       ds = "&nbsp;|&nbsp;<span class=\"blue\">DOI: " + row[0] + "</span>";
       update_wagtail("dsdoi", row[0], F);
     }
@@ -495,12 +496,12 @@ void initialize(string dsnum2, vector<string>& formats, vector<string>&
   for (const auto& db : dblist) {
     string nm, dt;
     std::tie(nm, dt) = db;
-    if (nm[0] != 'V' && table_exists(server, nm + ".ds" + dsnum2 +
+    if (nm[0] != 'V' && table_exists(g_metadata_server, nm + ".ds" + dsnum2 +
         "_webfiles2")) {
-      LocalQuery q("select distinct format from " + nm + ".formats as f left "
-          "join " + nm + ".ds" + dsnum2 + "_webfiles2 as d on d.format_code = "
-          "f.code where !isnull(d.format_code)");
-      if (q.submit(server) < 0) {
+      LocalQuery q("select distinct format from \"" + nm + "\".formats as f "
+          "left join \"" + nm + "\".ds" + dsnum2 + "_webfiles2 as d on d."
+          "format_code = f.code where d.format_code is not null");
+      if (q.submit(g_metadata_server) < 0) {
         log_error2("query: " + q.show() + " returned error: " + q.error(), F,
             "dsgen", USER);
       }
@@ -574,7 +575,7 @@ void add_journal_to_publication(const XMLElement& e, stringstream& ss, string&
   auto ti = e.element("title").content();
   if (!url.empty()) {
     ss << "<a href=\"" << url << "\">" << ti << "</a>";
-    json += "<a href=\\\\\"" + url + "\\\\\">" + ti + "</a>";
+    json += "<a href=\\\"" + url + "\\\">" + ti + "</a>";
   } else {
     ss << ti;
     json += ti;
@@ -608,7 +609,7 @@ void add_preprint_to_publication(const XMLElement& e, stringstream& ss, string&
   if (!url.empty()) {
     ss << "<a href=\"" << url << "\">" << e.element("title").content() <<
         "</a>";
-    json += "<a href=\\\\\"" + url + "\\\\\">" + e.element("title").
+    json += "<a href=\\\"" + url + "\\\">" + e.element("title").
         content() + "</a>";
   } else {
     ss << e.element("title").content();
@@ -640,7 +641,7 @@ void add_tech_paper_to_publication(const XMLElement& e, stringstream& ss,
   if (!url.empty()) {
     ss << "<i><a href=\"" << url << "\">" << e.element("title").content()
         << "</a>.</i>";
-    json += "<i><a href=\\\\\"" + url + "\\\\\">" + e.element("title").
+    json += "<i><a href=\\\"" + url + "\\\">" + e.element("title").
         content() + "</a>.</i>";
   } else {
     ss << "<i>" << e.element("title").content() << ".</i>";
@@ -691,7 +692,7 @@ void add_book_chapter_to_publication(const XMLElement& e, stringstream& ss,
   ss << "\"" << e.element("title").content() << "\", in " << bk.content()
       << ". Ed. " << bk.attribute_value("editor") << ", " << bk.
       attribute_value("publisher") << ", ";
-  json += "\\\\\"" + e.element("title").content() + "\\\\\", in " + bk.
+  json += "\\\"" + e.element("title").content() + "\\\", in " + bk.
       content() + ". Ed. " + bk.attribute_value("editor") + ", " + bk.
       attribute_value("publisher") + ", ";
   if (bk.attribute_value("pages") == "0-0") {
@@ -833,14 +834,14 @@ void append_book_chapter_to_citation(string& citation, string doi) {
   LocalQuery qcw("select pages, isbn from citation.book_chapter_works where "
       "doi = '" + doi + "'");
   Row rcw;
-  if (qcw.submit(server) != 0 || !qcw.fetch_row(rcw)) {
+  if (qcw.submit(g_metadata_server) != 0 || !qcw.fetch_row(rcw)) {
     citation = "";
     return;
   }
   LocalQuery qbw("select title, publisher from citation.book_works where isbn "
       "= '" + rcw[1] + "'");
   Row rbw;
-  if (qbw.submit(server) != 0 || !qbw.fetch_row(rbw)) {
+  if (qbw.submit(g_metadata_server) != 0 || !qbw.fetch_row(rbw)) {
     citation = "";
     return;
   }
@@ -848,7 +849,7 @@ void append_book_chapter_to_citation(string& citation, string doi) {
   LocalQuery qwa("select first_name, middle_name, last_name from citation."
       "works_authors where id = '" + rcw[1] + "' and id_type = 'ISBN' order by "
       "sequence");
-  if (qwa.submit(server) != 0) {
+  if (qwa.submit(g_metadata_server) != 0) {
     citation = "";
     return;
   }
@@ -876,7 +877,7 @@ void append_journal_to_citation(string& citation, string doi) {
   LocalQuery q("select pub_name, volume, pages from citation.journal_works "
       "where doi = '" + doi + "'");
   Row row;
-  if (q.submit(server) != 0 || !q.fetch_row(row)) {
+  if (q.submit(g_metadata_server) != 0 || !q.fetch_row(row)) {
     citation = "";
     return;
   }
@@ -897,7 +898,7 @@ void append_proceedings_to_citation(string& citation, string doi, string
   LocalQuery q("select pub_name, pages from citation.proceedings_works where "
       "doi = '" + doi + "'");
   Row row;
-  if (q.submit(server) != 0 || !q.fetch_row(row)) {
+  if (q.submit(g_metadata_server) != 0 || !q.fetch_row(row)) {
     citation = "";
     return;
   }
@@ -917,7 +918,7 @@ void add_data_citations(TokenDocument& tdoc) {
   LocalQuery qc("select distinct d.doi_work from citation.data_citations as d "
       "left join dssdb.dsvrsn as v on v.doi = d.doi_data where v.dsid = 'ds" +
        metautils::args.dsnum + "'");
-  if (qc.submit(server) < 0) {
+  if (qc.submit(g_metadata_server) < 0) {
     return;
   }
   vector<tuple<string, string>> clist;
@@ -926,14 +927,14 @@ void add_data_citations(TokenDocument& tdoc) {
     LocalQuery qw("select title, pub_year, type, publisher from citation.works "
         "where doi = '" + doi + "'");
     Row rw;
-    if (qw.submit(server) == 0 && qw.fetch_row(rw)) {
+    if (qw.submit(g_metadata_server) == 0 && qw.fetch_row(rw)) {
       auto ti = htmlutils::unicode_escape_to_html(rw[0]);
       auto yr = rw[1];
       auto typ = rw[2];
       LocalQuery qwa("select last_name, first_name, middle_name, orcid_id from "
           "citation.works_authors where id = '" + doi + "' and id_type = 'DOI' "
           "order by sequence");
-      if (qwa.submit(server) == 0) {
+      if (qwa.submit(g_metadata_server) == 0) {
         string cit;
         size_t n = 1;
         for (const auto& rwa : qwa) {
@@ -1034,11 +1035,11 @@ void add_data_citations(TokenDocument& tdoc) {
         tdoc.add_repeat("__DATA_CITER__", "CITATION[!]" + get<1>(c) +
             "<!>YEAR[!]" + pub_year);
         append(json, "{\"year\": " + pub_year + ", \"publications\": [\"" +
-            substitute(get<1>(c), "\"", "\\\\\"") + "\"", "]}, ");
+            substitute(get<1>(c), "\"", "\\\"") + "\"", "]}, ");
         yrs.emplace(pub_year);
       } else {
         tdoc.add_repeat("__DATA_CITER__", "CITATION[!]" + get<1>(c));
-        append(json, "\"" + substitute(get<1>(c), "\"", "\\\\\"") + "\"", ", ");
+        append(json, "\"" + substitute(get<1>(c), "\"", "\\\"") + "\"", ", ");
       }
     }
     update_wagtail("num_citations", to_string(clist.size()), F);
@@ -1054,7 +1055,7 @@ bool add_temporal_range(TokenDocument& tdoc, string dsnum2, size_t& swp_cnt) {
   bool grouped_periods = false; // return value
   LocalQuery q("select dsid from dssdb.dsgroup where dsid = 'ds" + metautils::
       args.dsnum + "'");
-  if (q.submit(server) < 0) {
+  if (q.submit(g_metadata_server) < 0) {
     log_error2("query: " + q.show() + " returned error: " + q.error(), F,
         "dsgen", USER);
   }
@@ -1072,7 +1073,7 @@ bool add_temporal_range(TokenDocument& tdoc, string dsnum2, size_t& swp_cnt) {
         ".dsid and g.pindex = g2.gindex) where p.dsid = 'ds" + metautils::
         args.dsnum + "' and date_start > '0001-01-01' and date_start < '3000-01"
         "-01' and date_end > '0001-01-01' and date_end < '3000-01-01' and "
-        "!isnull(g2.title) order by title");
+        "g2.title is not null order by title");
   } else {
     q.set("select date_start, time_start, start_flag, date_end, time_end, "
         "end_flag, time_zone, NULL, NULL from dssdb.dsperiod where dsid = 'ds" +
@@ -1080,7 +1081,7 @@ bool add_temporal_range(TokenDocument& tdoc, string dsnum2, size_t& swp_cnt) {
         "date_start < '3000-01-01' and date_end > '0001-01-01' and date_end < "
         "'3000-01-01'");
   }
-  if (q.submit(server) < 0) {
+  if (q.submit(g_metadata_server) < 0) {
     log_error2("query: " + q.show() + " returned error: " + q.error(), F,
         "dsgen", USER);
   }
@@ -1090,7 +1091,7 @@ bool add_temporal_range(TokenDocument& tdoc, string dsnum2, size_t& swp_cnt) {
         "'ds" + metautils::args.dsnum + "' and date_start > '0001-01-01' and "
         "date_start < '3000-01-01' and date_end > '0001-01-01' and date_end < "
         "'3000-01-01'");
-    if (q.submit(server) < 0) {
+    if (q.submit(g_metadata_server) < 0) {
       log_error2("query: " + q.show() + " returned error: " + q.error(), F,
           "dsgen", USER);
     }
@@ -1101,7 +1102,7 @@ bool add_temporal_range(TokenDocument& tdoc, string dsnum2, size_t& swp_cnt) {
     if (q.num_rows() > 1) {
       LocalQuery qgp("distinct gindex", "dssdb.dsperiod", "dsid = 'ds" +
           metautils::args.dsnum + "'");
-      if (qgp.submit(server) < 0) {
+      if (qgp.submit(g_metadata_server) < 0) {
         log_error2("query: " + qgp.show() + " returned error: " + qgp.error(),
             F, "dsgen", USER);
       }
@@ -1110,11 +1111,11 @@ bool add_temporal_range(TokenDocument& tdoc, string dsnum2, size_t& swp_cnt) {
         tdoc.add_if("__HAS_TEMPORAL_BY_GROUP1__");
         LocalQuery qdt("select min(concat(date_start, ' ', time_start)), min("
             "start_flag), max(concat(date_end, ' ', time_end)), min(end_flag), "
-            "any_value(time_zone) from dssdb.dsperiod where dsid = 'ds" +
-            metautils::args.dsnum + "' and date_start > '0001-01-01' and "
-            "date_start < '3000-01-01' and date_end > '0001-01-01' and "
-            "date_end < '3000-01-01' group by dsid");
-        if (qdt.submit(server) < 0) {
+            "time_zone from dssdb.dsperiod where dsid = 'ds" + metautils::args.
+            dsnum + "' and date_start > '0001-01-01' and date_start < "
+            "'3000-01-01' and date_end > '0001-01-01' and date_end < "
+            "'3000-01-01' group by dsid, time_zone");
+        if (qdt.submit(g_metadata_server) < 0) {
           log_error2("query: " + qdt.show() + " returned error: " + qdt.error(),
               F, "dsgen", USER);
         }
@@ -1266,7 +1267,7 @@ void add_variable_table(string data_format, TokenDocument& tdoc, string& json) {
 void add_grouped_variables(TokenDocument& tdoc, size_t& swp_cnt) {
   LocalQuery q("gindex, title", "dssdb.dsgroup", "dsid = 'ds" + metautils::args.
       dsnum + "' and pindex = 0 and dwebcnt > 0");
-  if (q.submit(server) != 0) {
+  if (q.submit(g_metadata_server) != 0) {
     return;
   }
   stringstream ss;
@@ -1338,11 +1339,11 @@ void add_grouped_variables(TokenDocument& tdoc, size_t& swp_cnt) {
 
 void add_variables(TokenDocument& tdoc, size_t& swp_cnt) {
   static const string F = this_function_label(__func__);
-  LocalQuery q("select substring_index(path, ' > ', -1) as var from search."
+  LocalQuery q("select split_part(path, ' > ', -1) as var from search."
       "variables as v left join search.gcmd_sciencekeywords as g on g.uuid = v."
       "keyword where v.vocabulary = 'GCMD' and v.dsid = '" + metautils::args.
       dsnum + "' order by var");
-  if (q.submit(server) < 0) {
+  if (q.submit(g_metadata_server) < 0) {
     log_error2("query: " + q.show() + " returned error: " + q.error(), F,
         "dsgen", USER);
   }
@@ -1558,7 +1559,7 @@ void fill_map(unordered_map<string, string>& map, string query) {
   static const string F = this_function_label(__func__);
   LocalQuery q("select gindex, title from dssdb.dsgroup where dsid = 'ds" +
        metautils::args.dsnum + "'");
-  if (q.submit(server) < 0) {
+  if (q.submit(g_metadata_server) < 0) {
     log_error2("error: " + q.error() + " while getting groups data", F, "dsgen",
         USER);
   }
@@ -1579,7 +1580,7 @@ void add_spatial_coverage(TokenDocument& tdoc, string dsnum2, const vector<
     s = "select wfile, tindex from dssdb.wfile where dsid = 'ds" + metautils::
         args.dsnum + "' and type = 'D' and " "status = 'P'";
     fill_map(rfils, s);
-    s = "select code, id from WGrML.ds" + dsnum2 + "_webfiles2";
+    s = "select code, id from \"WGrML\".ds" + dsnum2 + "_webfiles2";
     fill_map(mfils, s);
   }
   unordered_map<string, shared_ptr<unordered_set<string>>> udefs;
@@ -1589,13 +1590,13 @@ void add_spatial_coverage(TokenDocument& tdoc, string dsnum2, const vector<
       if (dt == "grid") {
         LocalQuery qgc;
         if (grouped_periods) {
-          qgc.set("select grid_definition_codes, file_code from WGrML.ds" +
-              dsnum2 + "_grid_definitions");
+          qgc.set("grid_definition_codes, file_code", "WGrML.ds" + dsnum2 +
+              "_grid_definitions");
         } else {
-          qgc.set("select distinct grid_definition_codes from WGrML.ds" + dsnum2
-              + "_agrids2");
+          qgc.set("select distinct grid_definition_codes from \"WGrML\".ds" +
+              dsnum2 + "_agrids2");
         }
-        if (qgc.submit(server) < 0) {
+        if (qgc.submit(g_metadata_server) < 0) {
           log_error2("error: " + qgc.error() + " while getting grid "
               "definitions", F, "dsgen", USER);
         }
@@ -1607,7 +1608,7 @@ void add_spatial_coverage(TokenDocument& tdoc, string dsnum2, const vector<
             if (gdefs.find(v) == gdefs.end()) {
               LocalQuery qgd("definition, def_params", "WGrML.grid_definitions",
                   "code = " + itos(v));
-              if (qgd.submit(server) < 0) {
+              if (qgd.submit(g_metadata_server) < 0) {
                 log_error2("query: " + qgd.show() + " returned error: " + qgd.
                     error(), F, "dsgen", USER);
               }
@@ -1814,7 +1815,7 @@ void add_contributors(TokenDocument& tdoc) {
   LocalQuery q("select g.path from search.contributors_new as c left join "
       "search.gcmd_providers as g on g.uuid = c.keyword where c.dsid = '" +
       metautils::args.dsnum + "' and c.vocabulary = 'GCMD'");
-  if (q.submit(server) < 0) {
+  if (q.submit(g_metadata_server) < 0) {
     log_error2("query: " + q.show() + " returned error: " + q.error(), F,
         "dsgen", USER);
   }
@@ -1852,13 +1853,13 @@ void add_data_volume(TokenDocument& tdoc, size_t& swp_cnt) {
   static const string F = this_function_label(__func__);
   LocalQuery q("dweb_size", "dssdb.dataset", "dsid = 'ds" + metautils::args.
       dsnum + "'");
-  if (q.submit(server) < 0) {
+  if (q.submit(g_metadata_server) < 0) {
     log_error2("query: " + q.show() + " returned error: " + q.error(), F,
         "dsgen", USER);
   }
   LocalQuery q2("select dweb_size, title, grpid from dssdb.dsgroup where dsid "
       "= 'ds" + metautils::args.dsnum + "' and pindex = 0 and dweb_size > 0");
-  if (q2.submit(server) < 0) {
+  if (q2.submit(g_metadata_server) < 0) {
     log_error2("query: " + q2.show() + " returned error: " + q2.error(), F,
         "dsgen", USER);
   }
@@ -1894,7 +1895,7 @@ void add_data_volume(TokenDocument& tdoc, size_t& swp_cnt) {
     string j;
     for (const auto& r2: q2) {
       auto g = r2[1].empty() ? r2[2] : r2[1];
-      replace_all(g, "\"", "\\\\\"");
+      replace_all(g, "\"", "\\\"");
       auto v = stof(r2[0]) / 1000000.;
       auto n = 0;
       while (v > 1000. && n < VOLUME_LEN) {
@@ -1979,7 +1980,7 @@ void add_related_datasets(TokenDocument& tdoc) {
     for (const auto& ele : elist) {
       LocalQuery q("dsid, title", "search.datasets", "dsid = '" + ele.
           attribute_value("ID") + "' and (type = 'P' or type = 'H')");
-      if (q.submit(server) < 0) {
+      if (q.submit(g_metadata_server) < 0) {
         log_error2("query: " + q.show() + " returned error: " + q.error(), F,
             "dsgen", USER);
       }
@@ -1990,7 +1991,7 @@ void add_related_datasets(TokenDocument& tdoc) {
             "</td></tr>";
       }
       auto title = row[1];
-      replace_all(title, "\"", "\\\\\"");
+      replace_all(title, "\"", "\\\"");
       append(json, "{\"dsid\": \"" + row[0] + "\", \"title\": \"" + title +
           "\"}", ", ");
     }
@@ -2017,9 +2018,9 @@ void add_data_license() {
   }
   LocalQuery q("name, url, img_url", "wagtail.home_datalicense", "id = '" + id +
       "'");
-  if (q.submit(server) < 0) {
-    log_error2("unable to retrieve data license - error: '" + server.error() +
-        "'", F, "dsgen", USER);
+  if (q.submit(g_wagtail_server) < 0) {
+    log_error2("unable to retrieve data license - error: '" + g_wagtail_server.
+        error() + "'", F, "dsgen", USER);
   }
   if (q.num_rows() == 0) {
     log_error2("no data license for id: '" + id + "'", F, "dsgen", USER);
@@ -2089,12 +2090,12 @@ void generate_description(string type, string tdir_name) {
      grouped_periods, swp_cnt); // wagtail
   add_contributors(tdoc); // wagtail
   add_related_websites(tdoc); // wagtail
-  add_publications(tdoc, g_xdoc); // wgtail
+  add_publications(tdoc, g_xdoc); // wagtail
   add_data_volume(tdoc, swp_cnt); // wagtail
   add_data_formats(tdoc, formats, found_content_metadata); // wagtail
   add_related_datasets(tdoc); // wagtail
   add_more_details(tdoc);
-  add_data_citations(tdoc); // wagtail
+//  add_data_citations(tdoc); // wagtail
   add_data_license();
   ofs << tdoc;
   ofs.close();
@@ -2134,12 +2135,16 @@ int main(int argc, char **argv) {
   if (!temp_dir.create(metautils::directives.temp_path)) {
     log_error2("unable to create temporary directory", F, "dsgen", USER);
   }
-  server.connect(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "");
+  g_metadata_server.connect(metautils::directives.database_server, metautils::
+      directives.metadb_username, metautils::directives.metadb_password,
+      "rdadb");
+  g_wagtail_server.connect(metautils::directives.database_server, metautils::
+      directives.wagtail_username, metautils::directives.wagtail_password,
+      "rdadb");
   LocalQuery q("select type from search.datasets where dsid = '" + metautils::
       args.dsnum + "'");
   Row row;
-  if (q.submit(server) < 0 || !q.fetch_row(row)) {
+  if (q.submit(g_metadata_server) < 0 || !q.fetch_row(row)) {
     log_error2("unable to determine dataset type", F, "dsgen", USER);
   }
   g_dataset_type = row[0];
@@ -2159,11 +2164,16 @@ int main(int argc, char **argv) {
     g_xdoc.close();
   }
   if (!no_dset_waf) {
-    if (server.insert("metautil.dset_waf", "'" + metautils::args.dsnum +
-        "', ''", "update dsid = values(dsid)") < 0) {
+    if (g_metadata_server.insert(
+          "metautil.dset_waf",
+          "dsid, uflag",
+          "'" + metautils::args.dsnum + "', ''",
+          "(dsid, uflag) do update set uflag = excluded.uflag"
+          ) < 0) {
       metautils::log_warning("not marked for DSET WAF update", "dsgen", USER);
     }
   }
-  server.disconnect();
+  g_wagtail_server.disconnect();
+  g_metadata_server.disconnect();
   sync_dataset_files(d.name());
 }
