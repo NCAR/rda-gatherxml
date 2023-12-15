@@ -11,6 +11,7 @@
 #include <regex>
 #include <unordered_map>
 #include <gatherxml.hpp>
+#include <pglocks.hpp>
 #include <grid.hpp>
 #include <mymap.hpp>
 #include <strutils.hpp>
