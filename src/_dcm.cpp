@@ -6,13 +6,14 @@
 #include <regex>
 #include <unordered_set>
 #include <gatherxml.hpp>
-#include <MySQL.hpp>
+#include <PostgreSQL.hpp>
+#include <pglocks.hpp>
 #include <strutils.hpp>
 #include <utils.hpp>
-#include <search.hpp>
+#include <search_pg.hpp>
 #include <myerror.hpp>
 
-using namespace MySQL;
+using namespace PostgreSQL;
 using metautils::log_error2;
 using miscutils::this_function_label;
 using std::cerr;
@@ -122,14 +123,13 @@ void copy_version_controlled_data(Server& server, string db, string
         t = t.substr(1);
       }
       if (!table_exists(server, "V" + t)) {
-        if (server.command("create table V" + t + " like " + t, error) < 0) {
+        if (server.command("create table V" + t + " like " + t) < 0) {
           log_error2("error: '" + server.error() + "' while trying to create V"
               + t, "copy_version_controlled_data()", "dcm", USER);
         }
       }
-      string res;
       server.command("insert into V" + t + " select * from " + t + " where "
-          "file_code = " + file_id_code, res);
+          "file_code = " + file_id_code);
     }
   }
 }
@@ -170,9 +170,14 @@ void clear_grid_cache(Server& server, string db) {
         "cache", F, "dcm", USER);
   }
   auto tbl = db + ".ds" + g_dsnum2 + "_agrids_cache";
+  auto lock_it = gatherxml::pglocks::pglocks.find(substitute(tbl, g_dsnum2,
+      "nnnn"));
+  if (lock_it == gatherxml::pglocks::pglocks.end()) {
+    log_error2("can't find lock ID for '" + tbl + "'", F, "dcm", USER);
+  }
   Transaction tx;
   tx.start(server);
-  tx.lock_rows(tbl);
+  tx.get_lock(lock_it->second + stof(metautils::args.dsnum) * 10);
   auto uflg = strand(3);
   for (const auto& row : query) {
     if (server.insert(
@@ -180,9 +185,10 @@ void clear_grid_cache(Server& server, string db) {
           "parameter, level_type_codes, min_start_date, max_end_date, uflg",
           "'" + row[0] + "', '" + row[1] + "', " + row[2] + ", " + row[3] +
               ", '" + uflg + "'",
-          "update min_start_date = if(" + row[2] + " < min_start_date, " + row[
-              2] + ", min_start_date), max_end_date = if(" + row[3] + " > "
-              "max_end_date, " + row[3] + ", max_end_date), uflg = values(uflg)"
+          "(parameter, level_type_code) do update set min_start_date = least("
+              "excluded.min_start_date, " + tbl + ".min_start_date), "
+              "max_end_date = greatest(excluded.max_end_date, " + tbl +
+              ".max_end_date), uflg = excluded.uflg"
           ) < 0) {
       log_error2("error: '" + server.error() + "' while inserting into " + db +
           ".ds" + g_dsnum2 + "_agrids_cache", F, "dcm", USER);
@@ -223,16 +229,15 @@ bool remove_from(string database, string table_ext, string file_field_name,
         is_version_controlled = true;
       }
       if (is_version_controlled) {
-        string res;
         if (!table_exists(local_server, "V" + file_table)) {
           if (local_server.command("create table V" + file_table + " like " +
-              file_table, error) < 0) {
+              file_table) < 0) {
             log_error2("error: '" + local_server.error() + "' while trying to "
                 "create V" + file_table, F, "dcm", USER);
           }
         }
         local_server.command("insert into V" + file_table + " select * from " +
-            file_table + " where code = " + file_id_code, res);
+            file_table + " where code = " + file_id_code);
       }
       if (local_server._delete(file_table, "code = " + file_id_code) < 0) {
         log_error2("error: '" + local_server.error() + "'", F, "dcm", USER);
@@ -745,7 +750,7 @@ int main(int argc, char **argv) {
   }
   server.disconnect();
   server.connect(metautils::directives.database_server, metautils::directives.
-      rdadb_username, metautils::directives.rdadb_password, "");
+      rdadb_username, metautils::directives.rdadb_password, "rdadb");
   if (server) {
     server.update("dataset", "version = version + 1", "dsid = 'ds" +
         metautils::args.dsnum + "'");
