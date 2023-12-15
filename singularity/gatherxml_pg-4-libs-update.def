@@ -1,5 +1,5 @@
 BootStrap: localimage
-From: /glade/u/home/rdadata/lib/singularity/gatherxml-4-libs.sif
+From: /glade/u/home/rdadata/lib/singularity/gatherxml_pg-4-libs.sif
 
 %setup
     mkdir -p ${SINGULARITY_ROOTFS}/usr/include/jasper
@@ -10,8 +10,8 @@ From: /glade/u/home/rdadata/lib/singularity/gatherxml-4-libs.sif
     cp -p /glade/u/home/dattore/cpp/lib/source/libbitmap/*.cpp ${SINGULARITY_ROOTFS}/src/libbitmap/
     mkdir -p ${SINGULARITY_ROOTFS}/src/libbufr/singularity
     cp -p /glade/u/home/dattore/cpp/lib/source/libbufr/*.cpp ${SINGULARITY_ROOTFS}/src/libbufr/
-    mkdir -p ${SINGULARITY_ROOTFS}/src/libcitation/singularity
-    cp -p /glade/u/home/dattore/cpp/lib/source/libcitation/*.cpp ${SINGULARITY_ROOTFS}/src/libcitation/
+    mkdir -p ${SINGULARITY_ROOTFS}/src/libcitation_pg/singularity
+    cp -p /glade/u/home/dattore/cpp/lib/source/libcitation_pg/*.cpp ${SINGULARITY_ROOTFS}/src/libcitation_pg/
     mkdir -p ${SINGULARITY_ROOTFS}/src/libcyclone/singularity
     cp -p /glade/u/home/dattore/cpp/lib/source/libcyclone/*.cpp ${SINGULARITY_ROOTFS}/src/libcyclone/
     mkdir -p ${SINGULARITY_ROOTFS}/src/libdatetime/singularity
@@ -26,24 +26,23 @@ From: /glade/u/home/rdadata/lib/singularity/gatherxml-4-libs.sif
     cp -p /glade/u/home/dattore/cpp/lib/source/libhdf/*.cpp ${SINGULARITY_ROOTFS}/src/libhdf/
     mkdir -p ${SINGULARITY_ROOTFS}/src/libio/singularity
     cp -p /glade/u/home/dattore/cpp/lib/source/libio/*.cpp ${SINGULARITY_ROOTFS}/src/libio/
-    mkdir -p ${SINGULARITY_ROOTFS}/src/libmetautils/singularity
-    cp -p /glade/u/home/dattore/cpp/lib/source/libmetautils/*.cpp ${SINGULARITY_ROOTFS}/src/libmetautils/
-    mkdir -p ${SINGULARITY_ROOTFS}/src/libmetaexport/singularity
-    cp -p /glade/u/home/dattore/cpp/lib/source/libmetaexport/*.cpp ${SINGULARITY_ROOTFS}/src/libmetaexport/
-    mkdir -p ${SINGULARITY_ROOTFS}/src/libmetaexporthelpers/singularity
-    cp -p /glade/u/home/dattore/cpp/lib/source/libmetaexporthelpers/*.cpp ${SINGULARITY_ROOTFS}/src/libmetaexporthelpers/
-    mkdir -p ${SINGULARITY_ROOTFS}/src/libmetahelpers/singularity
-    cp -p /glade/u/home/dattore/cpp/lib/source/libmetahelpers/*.cpp ${SINGULARITY_ROOTFS}/src/libmetahelpers/
-    mkdir -p ${SINGULARITY_ROOTFS}/src/libmysql/singularity
-    cp -p /glade/u/home/dattore/cpp/lib/source/libmysql/*.cpp ${SINGULARITY_ROOTFS}/src/libmysql/
-    mkdir -p ${SINGULARITY_ROOTFS}/src/libmyssl/singularity
+    mkdir -p ${SINGULARITY_ROOTFS}/src/libmetautils_pg/singularity
+    cp -p /glade/u/home/dattore/cpp/lib/source/libmetautils_pg/*.cpp ${SINGULARITY_ROOTFS}/src/libmetautils_pg/
+    mkdir -p ${SINGULARITY_ROOTFS}/src/libmetaexport_pg/singularity
+    cp -p /glade/u/home/dattore/cpp/lib/source/libmetaexport_pg/*.cpp ${SINGULARITY_ROOTFS}/src/libmetaexport_pg/
+    mkdir -p ${SINGULARITY_ROOTFS}/src/libmetaexporthelpers_pg/singularity
+    cp -p /glade/u/home/dattore/cpp/lib/source/libmetaexporthelpers_pg/*.cpp ${SINGULARITY_ROOTFS}/src/libmetaexporthelpers_pg/
+    mkdir -p ${SINGULARITY_ROOTFS}/src/libmetahelpers_pg/singularity
+    cp -p /glade/u/home/dattore/cpp/lib/source/libmetahelpers_pg/*.cpp ${SINGULARITY_ROOTFS}/src/libmetahelpers_pg/
     cp -p /glade/u/home/dattore/cpp/lib/source/libmyssl/*.cpp ${SINGULARITY_ROOTFS}/src/libmyssl/
     mkdir -p ${SINGULARITY_ROOTFS}/src/libobs/singularity
     cp -p /glade/u/home/dattore/cpp/lib/source/libobs/*.cpp ${SINGULARITY_ROOTFS}/src/libobs/
+    mkdir -p ${SINGULARITY_ROOTFS}/src/libpostgresql/singularity
+    cp -p /glade/u/home/dattore/cpp/lib/source/libpostgresql/*.cpp ${SINGULARITY_ROOTFS}/src/libpostgresql/
     mkdir -p ${SINGULARITY_ROOTFS}/src/libs3/singularity
     cp -p /glade/u/home/dattore/cpp/lib/source/libs3/*.cpp ${SINGULARITY_ROOTFS}/src/libs3/
-    mkdir -p ${SINGULARITY_ROOTFS}/src/libsearch/singularity
-    cp -p /glade/u/home/dattore/cpp/lib/source/libsearch/*.cpp ${SINGULARITY_ROOTFS}/src/libsearch/
+    mkdir -p ${SINGULARITY_ROOTFS}/src/libsearch_pg/singularity
+    cp -p /glade/u/home/dattore/cpp/lib/source/libsearch_pg/*.cpp ${SINGULARITY_ROOTFS}/src/libsearch_pg/
     mkdir -p ${SINGULARITY_ROOTFS}/src/libutils/singularity
     cp -p /glade/u/home/dattore/cpp/lib/source/libutils/*.cpp ${SINGULARITY_ROOTFS}/src/libutils/
     mkdir -p ${SINGULARITY_ROOTFS}/src/libutilsthread/singularity
@@ -53,9 +52,9 @@ From: /glade/u/home/rdadata/lib/singularity/gatherxml-4-libs.sif
     cp /glade/u/home/dattore/cpp/lib/singularity/Makefile ${SINGULARITY_ROOTFS}/
     mkdir -p ${SINGULARITY_ROOTFS}/gatherxml/include
     mkdir -p ${SINGULARITY_ROOTFS}/gatherxml/src/libgatherxml
-    cp /glade/u/home/dattore/gatherxml/Makefile ${SINGULARITY_ROOTFS}/gatherxml/
-    cp -p -r /glade/u/home/dattore/gatherxml/include/* ${SINGULARITY_ROOTFS}/gatherxml/include/
-    cp -p -r /glade/u/home/dattore/gatherxml/src/libgatherxml/* ${SINGULARITY_ROOTFS}/gatherxml/src/libgatherxml/
+    cp /glade/u/home/dattore/gatherxml_pg/Makefile ${SINGULARITY_ROOTFS}/gatherxml/
+    cp -p -r /glade/u/home/dattore/gatherxml_pg/include/* ${SINGULARITY_ROOTFS}/gatherxml/include/
+    cp -p -r /glade/u/home/dattore/gatherxml_pg/src/libgatherxml/* ${SINGULARITY_ROOTFS}/gatherxml/src/libgatherxml/
     cp -p /glade/u/home/dattore/util/cosfile.cpp ${SINGULARITY_ROOTFS}/src/
     cp -p /glade/u/home/dattore/util/cosconvert.cpp ${SINGULARITY_ROOTFS}/src/
 
@@ -64,7 +63,7 @@ From: /glade/u/home/rdadata/lib/singularity/gatherxml-4-libs.sif
     cd /
     make HOST=singularity libbitmap.so
     make HOST=singularity libbufr.so
-    make HOST=singularity libcitation.so
+    make HOST=singularity libcitation_pg.so
     make HOST=singularity libcyclone.so
     make HOST=singularity libdatetime.so
     make HOST=singularity liberror.so
@@ -72,14 +71,14 @@ From: /glade/u/home/rdadata/lib/singularity/gatherxml-4-libs.sif
     make HOST=singularity libgridutils.so
     make HOST=singularity libhdf.so
     make HOST=singularity libio.so
-    make HOST=singularity libmetaexport.so
-    make HOST=singularity libmetaexporthelpers.so
-    make HOST=singularity libmetahelpers.so
-    make HOST=singularity libmetautils.so
-    make HOST=singularity libmysql.so
+    make HOST=singularity libmetaexport_pg.so
+    make HOST=singularity libmetaexporthelpers_pg.so
+    make HOST=singularity libmetahelpers_pg.so
+    make HOST=singularity libmetautils_pg.so
     make HOST=singularity libmyssl.so
     make HOST=singularity libobs.so
-    make HOST=singularity libsearch.so
+    make HOST=singularity libpostgresql.so
+    make HOST=singularity libsearch_pg.so
     make HOST=singularity libutils.so
     make HOST=singularity libutilsthread.so
     make HOST=singularity libs3.so
