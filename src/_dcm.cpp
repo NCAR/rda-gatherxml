@@ -177,7 +177,7 @@ void clear_grid_cache(Server& server, string db) {
   }
   Transaction tx;
   tx.start(server);
-  tx.get_lock(lock_it->second + stof(metautils::args.dsnum) * 10);
+  tx.get_lock(lock_it->second + stof(metautils::args.dsnum) * 10, 120);
   auto uflg = strand(3);
   for (const auto& row : query) {
     if (server.insert(
