@@ -227,6 +227,9 @@ void summarize_dates(string caller, string user) {
       for (n = v.size() - 1; n >= 0; --n, ++m) {
         DateTime sdt(stoll(v2[n].start));
         DateTime edt(stoll(v2[n].end));
+        if (edt.time() > 240000) {
+          edt.set_time(240000);
+        }
         string s = "'ds" + metautils::args.dsnum + "', 0, " + to_string(m) +
             ", '" + sdt.to_string("%Y-%m-%d") + "', '" + sdt.to_string("%T") +
             "', " + to_string(precision) + ", '" + edt.to_string("%Y-%m-%d") +
