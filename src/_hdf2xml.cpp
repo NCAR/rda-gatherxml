@@ -19,6 +19,7 @@
 #include <myerror.hpp>
 
 using namespace PostgreSQL;
+using floatutils::myequalf;
 using metautils::NcTime::TimeBounds;
 using metautils::NcTime::TimeData;
 using metautils::NcTime::TimeRange;
@@ -325,43 +326,43 @@ bool found_missing(const double& time, HDF5::DataArray::Type time_type,
   if (time_missing_value != nullptr && time_missing_value->_class_ != -1) {
     switch (time_type) {
        case (HDF5::DataArray::Type::BYTE): {
-         if (floatutils::myequalf(time, *(reinterpret_cast<unsigned char *>(
+         if (myequalf(time, *(reinterpret_cast<unsigned char *>(
              time_missing_value->array)))) {
            missing = true;
          }
          break;
        }
        case (HDF5::DataArray::Type::SHORT): {
-         if (floatutils::myequalf(time, *(reinterpret_cast<short *>(
-             time_missing_value->array)))) {
+         if (myequalf(time, *(reinterpret_cast<short *>(time_missing_value->
+             array)))) {
            missing = true;
          }
          break;
        }
        case (HDF5::DataArray::Type::INT): {
-         if (floatutils::myequalf(time, *(reinterpret_cast<int *>(
-             time_missing_value->array)))) {
+         if (myequalf(time, *(reinterpret_cast<int *>(time_missing_value->
+             array)))) {
            missing = true;
          }
          break;
        }
        case (HDF5::DataArray::Type::LONG_LONG): {
-         if (floatutils::myequalf(time, *(reinterpret_cast<long long *>(
-             time_missing_value->array)))) {
+         if (myequalf(time, *(reinterpret_cast<long long *>(time_missing_value->
+             array)))) {
            missing = true;
          }
          break;
        }
        case (HDF5::DataArray::Type::FLOAT): {
-         if (floatutils::myequalf(time, *(reinterpret_cast<float *>(
-             time_missing_value->array)))) {
+         if (myequalf(time, *(reinterpret_cast<float *>(time_missing_value->
+             array)))) {
            missing = true;
          }
          break;
        }
        case (HDF5::DataArray::Type::DOUBLE): {
-         if (floatutils::myequalf(time, *(reinterpret_cast<double *>(
-             time_missing_value->array)))) {
+         if (myequalf(time, *(reinterpret_cast<double *>(time_missing_value->
+             array)))) {
            missing = true;
          }
          break;
@@ -1712,9 +1713,8 @@ bool added_gridded_parameters_to_netcdf_level_entry(string& grid_entry_key,
             id);
         time_method = strutils::capitalize(time_method);
         TimeRange time_range;
-        if (time_method.empty() || (floatutils::myequalf(time_bounds.t1, 0,
-            0.0001) && floatutils::myequalf(time_bounds.t1, time_bounds.t2,
-            0.0001))) {
+        if (time_method.empty() || (myequalf(time_bounds.t1, 0, 0.0001) &&
+            myequalf(time_bounds.t1, time_bounds.t2, 0.0001))) {
           time_range.first_valid_datetime = grid_data.time_range_entry.
               instantaneous.first_valid_datetime;
           time_range.last_valid_datetime = grid_data.time_range_entry.
@@ -1782,9 +1782,8 @@ void update_level_entry(const TimeBounds& time_bounds, const GridData&
         TimeRange time_range;
         if (g_grml_data->l.entry.parameter_code_table.find(g_grml_data->p.key)
             == g_grml_data->l.entry.parameter_code_table.end()) {
-          if (time_method.empty() || (floatutils::myequalf(time_bounds.t1, 0,
-              0.0001) && floatutils::myequalf(time_bounds.t1, time_bounds.t2,
-              0.0001))) {
+          if (time_method.empty() || (myequalf(time_bounds.t1, 0, 0.0001) &&
+              myequalf(time_bounds.t1, time_bounds.t2, 0.0001))) {
             time_range.first_valid_datetime = grid_data.time_range_entry.
                 instantaneous.first_valid_datetime;
             time_range.last_valid_datetime = grid_data.time_range_entry.
@@ -1815,11 +1814,10 @@ void update_level_entry(const TimeBounds& time_bounds, const GridData&
           if (regex_search(g_grml_data->g.key, regex(d + "$"))) {
             auto& pe = g_grml_data->l.entry.parameter_code_table[g_grml_data->p.
                 key];
-            if (time_method.empty() || (floatutils::myequalf(time_bounds.t1, 0,
-                0.0001) && floatutils::myequalf(time_bounds.t1, time_bounds.t2,
-                0.0001))) {
-              if (grid_data.time_range_entry.instantaneous.first_valid_datetime <
-                  pe.start_date_time) {
+            if (time_method.empty() || (myequalf(time_bounds.t1, 0, 0.0001) &&
+                myequalf(time_bounds.t1, time_bounds.t2, 0.0001))) {
+              if (grid_data.time_range_entry.instantaneous.first_valid_datetime
+                  < pe.start_date_time) {
                 pe.start_date_time = grid_data.time_range_entry.instantaneous.
                     first_valid_datetime;
               }
@@ -1873,7 +1871,7 @@ void fill_time_bounds(const HDF5::DataArray& data_array, InputHDF5Stream::
   }
   for (size_t n = 2; n < data_array.num_values; n += 2) {
     auto curr_diff = data_array.value(n + 1) - data_array.value(n);
-    if (!floatutils::myequalf(curr_diff, time_bounds.diff)) {
+    if (!myequalf(curr_diff, time_bounds.diff)) {
       if (time_data.units == "days" && is_month) {
         string e;
         auto a = actual_date_time(data_array.value(n), time_data, e);
@@ -1910,13 +1908,13 @@ DateTime compute_nc_time(const HDF5::DataArray& times, const TimeData&
   if (time_data.units == "seconds") {
     dt = time_data.reference.seconds_added(val);
   } else if (time_data.units == "hours") {
-    if (floatutils::myequalf(val, static_cast<int>(val), 0.001)) {
+    if (myequalf(val, static_cast<int>(val), 0.001)) {
       dt = time_data.reference.hours_added(val);
     } else {
       dt = time_data.reference.seconds_added(lround(val*3600.));
     }
   } else if (time_data.units == "days") {
-    if (floatutils::myequalf(val, static_cast<int>(val), 0.001)) {
+    if (myequalf(val, static_cast<int>(val), 0.001)) {
       dt = time_data.reference.days_added(val);
     } else {
       dt = time_data.reference.seconds_added(lround(val*86400.));
@@ -3142,26 +3140,21 @@ bool grid_is_polar_stereographic(const GridData& grid_data,
   auto center_y = dim.y / 2;
   auto xm = center_x - 1;
   auto ym = center_y - 1;
-  if (floatutils::myequalf(data_array_value(grid_data.lat.data_array,
-      ym * dim.x + xm, grid_data.lat.ds.get()), data_array_value(
-      grid_data.lat.data_array, center_y * dim.x + xm,
-      grid_data.lat.ds.get()), 0.00001) && floatutils::myequalf(
+  if (myequalf(data_array_value(grid_data.lat.data_array, ym * dim.x + xm,
+      grid_data.lat.ds.get()), data_array_value(grid_data.lat.data_array,
+      center_y * dim.x + xm, grid_data.lat.ds.get()), 0.00001) && myequalf(
       data_array_value(grid_data.lat.data_array, center_y * dim.x + xm,
-      grid_data.lat.ds.get()), data_array_value(
-      grid_data.lat.data_array, center_y * dim.x + center_x,
-      grid_data.lat.ds.get()), 0.00001) && floatutils::myequalf(
-      data_array_value(grid_data.lat.data_array, center_y * dim.x +
-      center_x, grid_data.lat.ds.get()), data_array_value(
-      grid_data.lat.data_array, ym * dim.x + center_x,
-      grid_data.lat.ds.get()), 0.00001) && floatutils::myequalf(
-      fabs(data_array_value(grid_data.lon.data_array, ym * dim.x + xm,
-      grid_data.lon.ds.get())) + fabs(data_array_value(
-      grid_data.lon.data_array, center_y * dim.x + xm,
-      grid_data.lon.ds.get())) + fabs(data_array_value(
-      grid_data.lon.data_array, center_y * dim.x + center_x,
-      grid_data.lon.ds.get())) + fabs(data_array_value(
-      grid_data.lon.data_array, ym * dim.x + center_x,
-      grid_data.lon.ds.get())), 360., 0.00001)) {
+      grid_data.lat.ds.get()), data_array_value(grid_data.lat.data_array,
+      center_y * dim.x + center_x, grid_data.lat.ds.get()), 0.00001) &&
+      myequalf(data_array_value(grid_data.lat.data_array, center_y * dim.x +
+      center_x, grid_data.lat.ds.get()), data_array_value(grid_data.lat.
+      data_array, ym * dim.x + center_x, grid_data.lat.ds.get()), 0.00001) &&
+      myequalf(fabs(data_array_value(grid_data.lon.data_array, ym * dim.x + xm,
+      grid_data.lon.ds.get())) + fabs(data_array_value(grid_data.lon.data_array,
+      center_y * dim.x + xm, grid_data.lon.ds.get())) + fabs(data_array_value(
+      grid_data.lon.data_array, center_y * dim.x + center_x, grid_data.lon.ds.
+      get())) + fabs(data_array_value(grid_data.lon.data_array, ym * dim.x +
+      center_x, grid_data.lon.ds.get())), 360., 0.00001)) {
     def.type = Grid::Type::polarStereographic;
     if (data_array_value(grid_data.lat.data_array, ym * dim.x + xm,
         grid_data.lat.ds.get()) >= 0.) {
@@ -3238,6 +3231,10 @@ bool grid_is_polar_stereographic(const GridData& grid_data,
 
 bool grid_is_centered_lambert_conformal(const GridData& grid_data, Grid::
     GridDimensions& dims, Grid::GridDefinition& def) {
+  if (gatherxml::verbose_operation) {
+    cout << "         ... checking for centered Lambert-Conformal projection "
+        "..." << endl;
+  }
   auto dx2 = dims.x / 2;
   auto dy2 = dims.y / 2;
   switch (dims.x % 2) {
@@ -3245,20 +3242,18 @@ bool grid_is_centered_lambert_conformal(const GridData& grid_data, Grid::
       auto xm = dx2 - 1;
       auto ym = dy2 - 1;
       auto yp = dy2 + 1;
-      if (floatutils::myequalf((data_array_value(grid_data.lon.data_array,
-          ym * grid_data.lon.data_array.dimensions[1] + xm, grid_data.
-          lon.ds.get()) + data_array_value(grid_data.lon.data_array,
-          ym * grid_data.lon.data_array.dimensions[1] + dx2, grid_data.
-          lon.ds.get())), (data_array_value(grid_data.lon.
-          data_array, yp * grid_data.lon.data_array.dimensions[1] + xm,
-          grid_data.lon.ds.get()) + data_array_value(grid_data.lon.
-          data_array, yp * grid_data.lon.data_array.dimensions[1] + dx2,
-          grid_data.lon.ds.get())), 0.0001) && floatutils::myequalf(
-          data_array_value(grid_data.lat.data_array, dy2 * grid_data.
+      if (myequalf((data_array_value(grid_data.lon.data_array, ym * grid_data.
+          lon.data_array.dimensions[1] + xm, grid_data.lon.ds.get()) +
+          data_array_value(grid_data.lon.data_array, ym * grid_data.lon.
+          data_array.dimensions[1] + dx2, grid_data.lon.ds.get())),
+          (data_array_value(grid_data.lon.data_array, yp * grid_data.lon.
+          data_array.dimensions[1] + xm, grid_data.lon.ds.get()) +
+          data_array_value(grid_data.lon.data_array, yp * grid_data.lon.
+          data_array.dimensions[1] + dx2, grid_data.lon.ds.get())), 0.0001) &&
+          myequalf(data_array_value(grid_data.lat.data_array, dy2 * grid_data.
           lon.data_array.dimensions[1] + xm, grid_data.lat.ds.get()),
-          data_array_value(grid_data.lat.data_array, dy2 * grid_data.
-          lon.data_array.dimensions[1] + dx2, grid_data.lat.ds.
-          get()))) {
+          data_array_value(grid_data.lat.data_array, dy2 * grid_data.lon.
+          data_array.dimensions[1] + dx2, grid_data.lat.ds.get()))) {
         def.type = Grid::Type::lambertConformal;
         def.llatitude = def.stdparallel1 = def.stdparallel2 = lround(
             data_array_value(grid_data.lat.data_array, dy2 * grid_data.
@@ -3292,16 +3287,14 @@ bool grid_is_centered_lambert_conformal(const GridData& grid_data, Grid::
     }
     case 1: {
       auto xp = dx2 + 1;
-      if (floatutils::myequalf(data_array_value(grid_data.lon.data_array,
-          (dy2 - 1) * grid_data.lon.data_array.dimensions[1] + dx2,
-          grid_data.lon.ds.get()), data_array_value(grid_data.lon.
-          data_array, (dy2 + 1) * grid_data.lon.data_array.dimensions[1] +
-          dx2, grid_data.lon.ds.get()), 0.0001) && floatutils::myequalf(
-          data_array_value(grid_data.lat.data_array, dy2 * grid_data.
-          lon.data_array.dimensions[1] + dx2 - 1, grid_data.lat.ds.
-          get()), data_array_value(grid_data.lat.data_array, dy2 *
-          grid_data.lon.data_array.dimensions[1] + xp, grid_data.lat.
-          ds.get()), 0.0001)) {
+      if (myequalf(data_array_value(grid_data.lon.data_array, (dy2 - 1) *
+          grid_data.lon.data_array.dimensions[1] + dx2, grid_data.lon.ds.get()),
+          data_array_value(grid_data.lon.data_array, (dy2 + 1) * grid_data.lon.
+          data_array.dimensions[1] + dx2, grid_data.lon.ds.get()), 0.0001) &&
+          myequalf(data_array_value(grid_data.lat.data_array, dy2 * grid_data.
+          lon.data_array.dimensions[1] + dx2 - 1, grid_data.lat.ds.get()),
+          data_array_value(grid_data.lat.data_array, dy2 * grid_data.lon.
+          data_array.dimensions[1] + xp, grid_data.lat.ds.get()), 0.0001)) {
         def.type = Grid::Type::lambertConformal;
         def.llatitude = def.stdparallel1 = def.stdparallel2 = lround(
             data_array_value(grid_data.lat.data_array, dy2 * grid_data.
@@ -3331,6 +3324,9 @@ bool grid_is_centered_lambert_conformal(const GridData& grid_data, Grid::
       }
       break;
     }
+  }
+  if (gatherxml::verbose_operation) {
+    cout << "         ... done." << endl;
   }
   return false;
 }
@@ -3393,7 +3389,7 @@ bool grid_is_non_centered_lambert_conformal(const HDF5::DataArray& lats, const
   def.stdparallel1 = def.stdparallel2 = -99.;
   size_t i = 0;
   for (size_t n = 0; n < v.size(); ++n) {
-    if (floatutils::myequalf(v[n], def.dx, 0.001)) {
+    if (myequalf(v[n], def.dx, 0.001)) {
       auto p = lround(lats.value(xbar + n * dims.x));
       if (def.stdparallel1 < -90.) {
         def.stdparallel1 = p;
@@ -3477,7 +3473,7 @@ void add_new_grid(GridData& gd, CoordinateVariables& cv, size_t nlev, size_t
       } else if (gd.level_bounds.ds == nullptr) {
         auto v = (gd.level.ds == nullptr) ? 0. : data_array_value(gd.level.
             data_array, l, gd.level.ds.get());
-        if (floatutils::myequalf(v, static_cast<int>(v), 0.001)) {
+        if (myequalf(v, static_cast<int>(v), 0.001)) {
           g_grml_data->l.key += itos(v);
         } else {
           g_grml_data->l.key += ftos(v, 3);
@@ -3485,7 +3481,7 @@ void add_new_grid(GridData& gd, CoordinateVariables& cv, size_t nlev, size_t
       } else {
         auto v = data_array_value(
             gd.time_bounds.data_array, l * 2, gd.level_bounds.ds.get());
-        if (floatutils::myequalf(v, static_cast<int>(v), 0.001)) {
+        if (myequalf(v, static_cast<int>(v), 0.001)) {
           g_grml_data->l.key += itos(v);
         } else {
           g_grml_data->l.key += ftos(v, 3);
@@ -3493,7 +3489,7 @@ void add_new_grid(GridData& gd, CoordinateVariables& cv, size_t nlev, size_t
         v = data_array_value(gd.time_bounds.data_array, l * 2 + 1, gd.
             level_bounds.ds.get());
         g_grml_data->l.key += ":";
-        if (floatutils::myequalf(v, static_cast<int>(v), 0.001)) {
+        if (myequalf(v, static_cast<int>(v), 0.001)) {
           g_grml_data->l.key += itos(v);
         } else {
           g_grml_data->l.key += ftos(v, 3);
@@ -3522,7 +3518,7 @@ void update_existing_grid(GridData& gd, CoordinateVariables& cv, size_t nlev,
         l, gd.level.ds.get());
     if (gd.level.id == "sfc") {
       g_grml_data->l.key += "0";
-    } else if (floatutils::myequalf(v, static_cast<int>(v), 0.001)) {
+    } else if (myequalf(v, static_cast<int>(v), 0.001)) {
       g_grml_data->l.key += itos(v);
     } else {
       g_grml_data->l.key += ftos(v, 3);
