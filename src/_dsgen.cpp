@@ -22,6 +22,7 @@
 #include <tokendoc.hpp>
 
 using namespace PostgreSQL;
+using htmlutils::unicode_escape_to_html;
 using metautils::log_error2;
 using miscutils::this_function_label;
 using std::cerr;
@@ -845,7 +846,7 @@ void append_book_chapter_to_citation(string& citation, string doi) {
     citation = "";
     return;
   }
-  citation += htmlutils::unicode_escape_to_html(rbw[0]) + ". Ed. ";
+  citation += unicode_escape_to_html(rbw[0]) + ". Ed. ";
   LocalQuery qwa("select first_name, middle_name, last_name from citation."
       "works_authors where id = '" + rcw[1] + "' and id_type = 'ISBN' order by "
       "sequence");
@@ -861,15 +862,28 @@ void append_book_chapter_to_citation(string& citation, string doi) {
         citation += "and ";
       }
     }
-    citation += rwa[0].substr(0, 1) +" . ";
-    if (!rwa[1].empty()) {
-      citation += rwa[1].substr(0, 1) + ". ";
+    auto fnam = unicode_escape_to_html(rwa[0]);
+    string fi;
+    if (fnam.find("&") == 0 && fnam.find(";") != string::npos) {
+      fi = fnam.substr(0, fnam.find(";")+1);
+    } else {
+      fi = fnam.substr(0, 1);
     }
-    citation += htmlutils::unicode_escape_to_html(rwa[2]);
+    citation += fi + ". ";
+    if (!rwa[1].empty()) {
+      auto mnam = unicode_escape_to_html(rwa[1]);
+      string mi;
+      if (mnam.find("&") == 0 && mnam.find(";") != string::npos) {
+        mi = mnam.substr(0, mnam.find(";")+1);
+      } else {
+        mi = mnam.substr(0, 1);
+      }
+      citation += mi + ". ";
+    }
+    citation += unicode_escape_to_html(rwa[2]);
     ++n;
   }
-  citation += ", " + htmlutils::unicode_escape_to_html(rbw[1]) + ", " + rcw[0] +
-      ".";
+  citation += ", " + unicode_escape_to_html(rbw[1]) + ", " + rcw[0] + ".";
 }
 
 void append_journal_to_citation(string& citation, string doi) {
@@ -881,7 +895,7 @@ void append_journal_to_citation(string& citation, string doi) {
     citation = "";
     return;
   }
-  citation += "<em>" + htmlutils::unicode_escape_to_html(row[0]) + "</em>";
+  citation += "<em>" + unicode_escape_to_html(row[0]) + "</em>";
   if (!row[1].empty()) {
     citation += ", <strong>" + row[1] + "</strong>";
   }
@@ -902,7 +916,7 @@ void append_proceedings_to_citation(string& citation, string doi, string
     citation = "";
     return;
   }
-  auto d = htmlutils::unicode_escape_to_html(row[0]) + "</em>";
+  auto d = unicode_escape_to_html(row[0]) + "</em>";
   if (!publisher.empty()) {
     d += ", " + publisher;
   }
@@ -928,7 +942,7 @@ void add_data_citations(TokenDocument& tdoc) {
         "where doi = '" + doi + "'");
     Row rw;
     if (qw.submit(g_metadata_server) == 0 && qw.fetch_row(rw)) {
-      auto ti = htmlutils::unicode_escape_to_html(rw[0]);
+      auto ti = unicode_escape_to_html(rw[0]);
       auto yr = rw[1];
       auto typ = rw[2];
       LocalQuery qwa("select last_name, first_name, middle_name, orcid_id from "
@@ -938,46 +952,58 @@ void add_data_citations(TokenDocument& tdoc) {
         string cit;
         size_t n = 1;
         for (const auto& rwa : qwa) {
+          auto fnam = unicode_escape_to_html(rwa[1]);
+          string fi;
+          if (fnam.find("&") == 0 && fnam.find(";") != string::npos) {
+            fi = fnam.substr(0, fnam.find(";")+1);
+          } else {
+            fi = fnam.substr(0, 1);
+          }
+          auto mnam = unicode_escape_to_html(rwa[2]);
+          string mi;
+          if (mnam.find("&") == 0 && mnam.find(";") != string::npos) {
+            mi = mnam.substr(0, mnam.find(";")+1);
+          } else {
+            mi = mnam.substr(0, 1);
+          }
           if (cit.empty()) {
-/*
-            if (!rwa[3].empty()) {
-              cit += "<a href=\"https://orcid.org/" + rwa[3] + "\">";
+
+            // first author
+            if (!rwa[3].empty() && rwa[3] != "NULL") {
+              cit += "<a href=\"https://orcid.org/" + rwa[3] + "\" target=\""
+                  "_orcid\">";
             }
-*/
-            cit += htmlutils::unicode_escape_to_html(rwa[0]);
+            cit += unicode_escape_to_html(rwa[0]);
             if (!rwa[1].empty()) {
-              cit += ", " + rwa[1].substr(0, 1) + ".";
+              cit += ", " + fi + ".";
             }
             if (!rwa[2].empty()) {
-              cit += " " + rwa[2].substr(0, 1) + ".";
+              cit += " " + mi + ".";
             }
-/*
             if (!rwa[3].empty()) {
               cit += "</a>";
             }
-*/
           } else {
+
+            // co-authors
             cit += ", ";
             if (n == qwa.num_rows()) {
               cit += "and ";
             }
-/*
-            if (!rwa[3].empty()) {
-              cit += "<a href=\"https://orcid.org/" + rwa[3] + "\">";
+            if (!rwa[3].empty() && rwa[3] != "NULL") {
+              cit += "<a href=\"https://orcid.org/" + rwa[3] + "\" target=\""
+                  "_orcid\">";
             }
-*/
             if (!rwa[1].empty()) {
-              cit += rwa[1].substr(0, 1) + ". ";
+              cit += fi + ". ";
             }
             if (!rwa[2].empty()) {
-              cit += rwa[2].substr(0, 1) + ". ";
+              cit += mi + ". ";
             }
-            cit += htmlutils::unicode_escape_to_html(rwa[0]);
-/*
+            cit += unicode_escape_to_html(rwa[0]);
             if (!rwa[3].empty()) {
               cit += "</a>";
             }
-*/
           }
           ++n;
         }
@@ -2095,7 +2121,7 @@ void generate_description(string type, string tdir_name) {
   add_data_formats(tdoc, formats, found_content_metadata); // wagtail
   add_related_datasets(tdoc); // wagtail
   add_more_details(tdoc);
-//  add_data_citations(tdoc); // wagtail
+  add_data_citations(tdoc); // wagtail
   add_data_license();
   ofs << tdoc;
   ofs.close();
