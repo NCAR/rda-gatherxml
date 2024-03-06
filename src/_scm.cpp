@@ -1034,7 +1034,9 @@ void *thread_summarize_IDs(void *args) {
     ifs.getline(l, 32768);
   }
   ifs.close();
-  srv._delete(tbl, "file_code = " + a[2] + " and uflg != '" + uflg + "'");
+  srv._delete(tbl, "file_code = " + a[2] + " and uflg != '" + uflg + "' and "
+      "observation_type_code != " + a[3] + " and platform_type_code != " + a[
+      4]);
   if (navgd > 0.) {
     avgd /= navgd;
   }
