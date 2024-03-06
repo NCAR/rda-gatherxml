@@ -281,7 +281,7 @@ void summarize_grids(string database, string caller, string user, string
   }
   Transaction tx;
   tx.start(srv);
-  tx.get_lock(lock_it->second + stof(metautils::args.dsnum) * 10);
+  tx.get_lock(lock_it->second + stof(metautils::args.dsnum) * 10, 120);
   auto uflg = strand(3);
   vector<size_t> v;
   for (const auto& key : summ_map.keys()) {
