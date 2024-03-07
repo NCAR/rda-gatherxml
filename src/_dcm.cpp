@@ -57,12 +57,12 @@ struct LocalArgs {
 } local_args;
 
 struct ThreadStruct {
-  ThreadStruct() : strings(), removed_file_index(-1), file_removed(false),
-      tid(0) { }
+  ThreadStruct() : strings(), removed_file_index(-1), still_running(true),
+      file_removed(false), tid(0) { }
 
   vector<string> strings;
   int removed_file_index;
-  bool file_removed;
+  bool still_running, file_removed;
   pthread_t tid;
 };
 
@@ -90,6 +90,8 @@ void parse_args(Server& server) {
       local_args.keep_xml = true;
     } else if (*arg == "-N") {
       local_args.notify = true;
+    } else if (*arg == "-V") {
+      gatherxml::verbose_operation = true;
     } else {
       g_files.emplace_back(*arg);
     }
@@ -138,7 +140,8 @@ void clear_tables_by_file_id(string db, string file_id_code, bool
     is_version_controlled) {
   static const string F = this_function_label(__func__);
   Server local_server(metautils::directives.database_server, metautils::
-      directives.metadb_username, metautils::directives.metadb_password, "");
+      directives.metadb_username, metautils::directives.metadb_password,
+      "rdadb");
   if (!local_server) {
     log_error2("unable to connect to database server while clearing file code "
         + file_id_code + " from " + db, F, "dcm", USER);
@@ -163,13 +166,14 @@ void clear_tables_by_file_id(string db, string file_id_code, bool
 void clear_grid_cache(Server& server, string db) {
   static const string F = this_function_label(__func__);
   LocalQuery query("select parameter, level_type_codes, min(start_date), max("
-      "end_date) from " + db + ".ds" + g_dsnum2 + "_agrids2 group by "
+      "end_date) from \"" + db + "\".ds" + g_dsnum2 + "_agrids2 group by "
       "parameter, level_type_codes");
   if (query.submit(server) < 0) {
     log_error2("error: '" + query.error() + "' while trying to rebuild grid "
         "cache", F, "dcm", USER);
   }
-  auto tbl = db + ".ds" + g_dsnum2 + "_agrids_cache";
+  auto tbl_ref = "ds" + g_dsnum2 + "_agrids_cache";
+  auto tbl = db + "." + tbl_ref;
   auto lock_it = gatherxml::pglocks::pglocks.find(substitute(tbl, g_dsnum2,
       "nnnn"));
   if (lock_it == gatherxml::pglocks::pglocks.end()) {
@@ -185,9 +189,9 @@ void clear_grid_cache(Server& server, string db) {
           "parameter, level_type_codes, min_start_date, max_end_date, uflg",
           "'" + row[0] + "', '" + row[1] + "', " + row[2] + ", " + row[3] +
               ", '" + uflg + "'",
-          "(parameter, level_type_code) do update set min_start_date = least("
-              "excluded.min_start_date, " + tbl + ".min_start_date), "
-              "max_end_date = greatest(excluded.max_end_date, " + tbl +
+          "(parameter, level_type_codes) do update set min_start_date = least("
+              "excluded.min_start_date, " + tbl_ref + ".min_start_date), "
+              "max_end_date = greatest(excluded.max_end_date, " + tbl_ref +
               ".max_end_date), uflg = excluded.uflg"
           ) < 0) {
       log_error2("error: '" + server.error() + "' while inserting into " + db +
@@ -206,7 +210,8 @@ bool remove_from(string database, string table_ext, string file_field_name,
   string error;
   auto file_table = database + ".ds" + g_dsnum2 + table_ext;
   Server local_server(metautils::directives.database_server, metautils::
-      directives.metadb_username, metautils::directives.metadb_password, "");
+      directives.metadb_username, metautils::directives.metadb_password,
+      "rdadb");
   if (!local_server) {
     log_error2("unable to connect to database server while removing  " + file,
         F, "dcm", USER);
@@ -458,14 +463,14 @@ extern "C" void *t_removed(void *ts) {
     g_removed_from_wfixml = true;
   }
   Server server_d(metautils::directives.database_server, metautils::directives.
-      rdadb_username, metautils::directives.rdadb_password, "");
-  LocalQuery query("gindex", "wfile", "wfile = '" + file + "'");
+      rdadb_username, metautils::directives.rdadb_password, "rdadb");
+  LocalQuery query("gindex", "dssdb.wfile", "wfile = '" + file + "'");
   Row row;
   if (query.submit(server_d) == 0 && query.fetch_row(row)) {
     g_web_gindex_set.emplace(row[0]);
   }
   if (file_removed) {
-    query.set("tindex", "wfile", "wfile = '" + file + "'");
+    query.set("tindex", "dssdb.wfile", "wfile = '" + file + "'");
     if (query.submit(server_d) == 0 && query.num_rows() == 1) {
       query.fetch_row(row);
       if (!row[0].empty() && row[0] != "0") {
@@ -485,6 +490,7 @@ extern "C" void *t_removed(void *ts) {
       cout << "... " << t->strings[0] << " was NOT removed." << endl;
     }
   }
+  t->still_running = false;
   return nullptr;
 }
 
@@ -502,7 +508,7 @@ void generate_dataset_home_page() {
 
 extern "C" void *t_index_variables(void *) {
   Server srv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "");
+      metadb_username, metautils::directives.metadb_password, "rdadb");
   string e;
   searchutils::indexed_variables(srv, metautils::args.dsnum, e);
   srv.disconnect();
@@ -570,7 +576,7 @@ int main(int argc, char **argv) {
   metautils::args.args_string = unixutils::unix_args_string(argc, argv, '%');
   metautils::read_config("dcm", USER);
   Server server(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "");
+      metadb_username, metautils::directives.metadb_password, "rdadb");
   if (!server) {
     log_error2("unable to connect to database server on startup", "main()",
         "dcm", USER);
@@ -588,6 +594,7 @@ int main(int argc, char **argv) {
       threads[tid_list.size()].strings.clear();
       threads[tid_list.size()].strings.emplace_back(g_files[n]);
       threads[tid_list.size()].removed_file_index = n;
+      threads[tid_list.size()].still_running = true;
       threads[tid_list.size()].file_removed = false;
       pthread_create(&threads[tid_list.size()].tid, nullptr, t_removed,
           &threads[tid_list.size()]);
@@ -605,13 +612,13 @@ int main(int argc, char **argv) {
       size_t free_tid_idx = 0xffffffffffffffff;
       while (1) {
         for (size_t m = 0; m < MAX_NUM_THREADS; ++m) {
-          if (pthread_kill(tid_list[m], 0) != 0) {
+          if (!threads[m].still_running) {
             if (threads[m].file_removed) {
-              g_files[threads[m].removed_file_index].clear();
               if (gatherxml::verbose_operation) {
-                cout << "File " << g_files[threads[m].removed_file_index] << "/"
-                    << g_files.size() << " cleared." << endl;
+                cout << "File " << g_files[threads[m].removed_file_index] <<
+                    " cleared." << endl;
               }
+              g_files[threads[m].removed_file_index].clear();
             }
             free_tid_idx = m;
             break;
@@ -624,6 +631,7 @@ int main(int argc, char **argv) {
       threads[free_tid_idx].strings.clear();
       threads[free_tid_idx].strings.emplace_back(g_files[n]);
       threads[free_tid_idx].removed_file_index = n;
+      threads[free_tid_idx].still_running = true;
       threads[free_tid_idx].file_removed = false;
       pthread_create(&threads[free_tid_idx].tid, nullptr, t_removed,
           &threads[free_tid_idx]);
@@ -640,7 +648,7 @@ int main(int argc, char **argv) {
     found_thread = false;
     for (size_t n = 0; n < tid_list.size(); ++n) {
       if (tid_list[n] < 0xffffffffffffffff) {
-        if (pthread_kill(tid_list[n], 0) != 0) {
+        if (!threads[n].still_running) {
           if (threads[n].file_removed) {
             g_files[threads[n].removed_file_index].clear();
             if (gatherxml::verbose_operation) {
@@ -752,7 +760,7 @@ int main(int argc, char **argv) {
   server.connect(metautils::directives.database_server, metautils::directives.
       rdadb_username, metautils::directives.rdadb_password, "rdadb");
   if (server) {
-    server.update("dataset", "version = version + 1", "dsid = 'ds" +
+    server.update("dssdb.dataset", "version = version + 1", "dsid = 'ds" +
         metautils::args.dsnum + "'");
     server.disconnect();
   }
