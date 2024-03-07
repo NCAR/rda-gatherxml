@@ -317,6 +317,37 @@ bool compare_levels(const string& left, const string& right) {
   }
 }
 
+string stripped_citation(string c) {
+  auto idx = c.find("target=\"_orcid\"");
+  if (idx != string::npos) {
+    replace_all(c, "</a>", "");
+    while (idx != string::npos) {
+      idx = c.find("target=\"_orcid\"");
+      if (idx != string::npos) {
+        auto idx2 = c.substr(0, idx).rfind("<a");
+        if (idx2 != string::npos) {
+          idx = c.find(">");
+          if (idx != string::npos) {
+            c = c.substr(0, idx2) + c.substr(idx+1);
+          }
+          idx = c.find("target=\"_orcid\"");
+        }
+      }
+    }
+  }
+  return c;
+}
+
+bool compare_citations(const tuple<string, string>& left, const tuple<string,
+    string>& right) {
+  if (get<0>(left) > get<0>(right)) {
+    return true;
+  } else if (get<0>(left) < get<0>(right)) {
+    return false;
+  }
+  return (stripped_citation(get<1>(left)) < stripped_citation(get<1>(right)));
+}
+
 string create_table_from_strings(vector<string> list, size_t max_columns, string
     color1, string color2) {
   stringstream ss;
@@ -1043,16 +1074,7 @@ void add_data_citations(TokenDocument& tdoc) {
       tdoc.add_replacement("__NUM_DATA_CITATIONS__", "<strong>" + itos(clist.
           size()) + "</strong> time");
     }
-    std::sort(clist.begin(), clist.end(),
-    [](const tuple<string, string>& left, const tuple<string, string>& right)
-        -> bool {
-      if (get<0>(left) > get<0>(right)) {
-        return true;
-      } else if (get<0>(left) < get<0>(right)) {
-        return false;
-      }
-      return (get<1>(left) < get<1>(right));
-    });
+    std::sort(clist.begin(), clist.end(), compare_citations);
     unordered_set<string> yrs;
     string json;
     for (const auto& c : clist) {
