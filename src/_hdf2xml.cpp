@@ -1590,12 +1590,13 @@ bool parameter_matches_dimensions(const InputHDF5Stream::DataValue&
     case 2:
     case 3: {
 
-      // data variables dimensioned [time, lat, lon] or [lat, lon] with scalar
-      //     time
+      // data variables dimensioned [time, lat, lon] / [time, lon, lat] or
+      //     [lat, lon] / [lon, lat] with scalar time
       if (grid_data.level.id == "sfc" && (dimension_list.dim_sizes[0] == 3 ||
           grid_data.valid_time.data_array.num_values == 1)) {
-        if (rtp_it[0]->second == grid_data.lat.id && rtp_it[1]->second ==
-            grid_data.lon.id) {
+        if ((rtp_it[0]->second == grid_data.lat.id && rtp_it[1]->second ==
+            grid_data.lon.id) || (rtp_it[0]->second == grid_data.lon.id &&
+            rtp_it[1]->second == grid_data.lat.id)) {
 
           // latitude and longitude are coordinate variables
           parameter_matches = true;
@@ -1626,8 +1627,10 @@ bool parameter_matches_dimensions(const InputHDF5Stream::DataValue&
     case 4:
     case 5: {
 
-      // data variables dimensioned [time, lev, lat, lon] or [reference_time,
-      //     forecast_period, lev, lat, lon]
+      // data variables dimensioned [time, lev, lat, lon] /
+      //     [time, lev, lon, lat] or
+      //     [reference_time, forecast_period, lev, lat, lon] /
+      //     [reference_time, forecast_period, lev, lon, lat]
       auto off = dimension_list.dim_sizes[0] - 4;
       auto can_continue = true;
       if (rtp_it[off]->second != grid_data.level.id) {
@@ -1645,8 +1648,9 @@ bool parameter_matches_dimensions(const InputHDF5Stream::DataValue&
         }
       }
       if (can_continue) {
-        if (rtp_it[off + 1]->second == grid_data.lat.id && rtp_it[off +
-            2]->second == grid_data.lon.id) {
+        if ((rtp_it[off+1]->second == grid_data.lat.id && rtp_it[off+2]->second
+            == grid_data.lon.id) || (rtp_it[off+1]->second == grid_data.lon.id
+            && rtp_it[off+2]->second == grid_data.lat.id)) {
 
           // latitude and longitude are coordinate variables
           parameter_matches = true;
