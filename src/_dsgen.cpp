@@ -88,6 +88,7 @@ unordered_map<string, string> wagtail_db{
     { "levels", "dataset_description_datasetdescriptionpage" },
     { "spatial_coverage", "dataset_description_datasetdescriptionpage" },
     { "dsdoi", "dataset_description_datasetdescriptionpage" },
+    { "dslogo", "dataset_description_datasetdescriptionpage" },
     { "dstype", "dataset_description_datasetdescriptionpage" },
     { "dstitle", "dataset_description_datasetdescriptionpage" },
     { "publications", "dataset_description_datasetdescriptionpage" },
@@ -214,6 +215,7 @@ void generate_index(string tdir_name) {
       auto h = stoi(sp2[sp2.size() - 1]);
       tdoc.add_replacement("__LOGO_IMAGE__", e.content());
       tdoc.add_replacement("__LOGO_WIDTH__", itos(lroundf(w * 70. / h)));
+      update_wagtail("dslogo", e.content(), F);
     } else {
       tdoc.add_replacement("__LOGO_IMAGE__", "default_200_200.png");
       tdoc.add_replacement("__LOGO_WIDTH__", "70");
