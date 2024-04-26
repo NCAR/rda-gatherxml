@@ -812,12 +812,16 @@ void process_grml_markup(void *markup_parameters) {
   gp->server._delete(gp->database + ".ds" + local_args.dsnum2 + "_grids2",
       "file_code = " + gp->file_map[gp->filename] + " and uflg != '" + uflg +
       "'");
-  gp->server._delete(gp->database + ".ds" + local_args.dsnum2 + "_processes",
-      "file_code = " + gp->file_map[gp->filename] + " and uflg != '" + uflg +
-      "'");
-  gp->server._delete(gp->database + ".ds" + local_args.dsnum2 + "_ensembles",
-      "file_code = " + gp->file_map[gp->filename] + " and uflg != '" + uflg +
-      "'");
+  auto tbl = gp->database + ".ds" + local_args.dsnum2 + "_processes";
+  if (table_exists(gp->server, tbl)) {
+    gp->server._delete(tbl, "file_code = " + gp->file_map[gp->filename] +
+        " and uflg != '" + uflg + "'");
+  }
+  tbl = gp->database + ".ds" + local_args.dsnum2 + "_ensembles";
+  if (table_exists(gp->server, tbl)) {
+    gp->server._delete(tbl, "file_code = " + gp->file_map[gp->filename] +
+        " and uflg != '" + uflg + "'");
+  }
   mndt = string_date_to_ll_string(mndt);
   replace_all(mndt, "+0000", "");
   mxdt = string_date_to_ll_string(mxdt);
