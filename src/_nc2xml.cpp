@@ -67,6 +67,7 @@ bool gatherxml::verbose_operation;
 extern const string USER = getenv("USER");
 string myerror = "";
 string mywarning = "";
+string myoutput = "";
 
 static const size_t MISSING_FLAG = 0xffffffff;
 
@@ -2207,8 +2208,10 @@ void scan_cf_orthogonal_profile_netcdf_file(InputNetCDFStream& istream, string
           }
           dte.data->vdata->units = dgd.z_units;
           dte.data->vdata->avg_nlev += nlv;
-          dte.data->vdata->avg_res += (avg / (nlv - 1));
-          ++dte.data->vdata->res_cnt;
+          if (nlv > 1) {
+            dte.data->vdata->avg_res += (avg / (nlv - 1));
+            ++dte.data->vdata->res_cnt;
+          }
           ++scan_data.num_not_missing;
         }
       }
@@ -2274,8 +2277,10 @@ void fill_vertical_resolution_data(vector<double>& lvls, string z_pos, string
   for (size_t n = 1; n < lvls.size(); ++n) {
     avg += fabs(lvls[n] - lvls[n - 1]);
   }
-  datatype_entry.data->vdata->avg_res += (avg / (lvls.size() - 1));
-  ++datatype_entry.data->vdata->res_cnt;
+  if (lvls.size() > 1) {
+    datatype_entry.data->vdata->avg_res += (avg / (lvls.size() - 1));
+    ++datatype_entry.data->vdata->res_cnt;
+  }
 }
 
 void scan_cf_non_orthogonal_profile_netcdf_file(InputNetCDFStream& istream,
@@ -2568,10 +2573,13 @@ void scan_cf_non_orthogonal_time_series_profile_netcdf_file(InputNetCDFStream&
      scan_data, gatherxml::markup::ObML::ObservationData& obs_data, string
      obs_type) {
   static const string F = this_function_label(__func__);
+  if (gatherxml::verbose_operation) {
+    cout << "   ...beginning function " << F << " ..." << endl;
+  }
   NetCDF::VariableData tvd, yvd, xvd, lvd;
-  unique_ptr<NetCDF::VariableData> ivd;
-  fill_coordinate_data(istream, dgd, &tvd, nullptr, &yvd, &xvd, &ivd, nullptr,
-      nullptr, F);
+  unique_ptr<NetCDF::VariableData> ivd, nvd, pvd;
+  fill_coordinate_data(istream, dgd, &tvd, nullptr, &yvd, &xvd, &ivd, &nvd,
+      &pvd, F);
   size_t ilen = 1;
   vector<string> pfms, ityps, ids;
   if (ivd->type() == NetCDF::DataType::INT || ivd->type() == NetCDF::DataType::
@@ -2588,11 +2596,32 @@ ityps.emplace_back("unknown");
     }
   } else if (ivd->type() == NetCDF::DataType::CHAR) {
     ilen = dims[vars[dgd.indexes.stn_id_var].dimids.back()].length;
+    size_t num_ids = ivd->size() / ilen;
+    size_t nlen = 0, num_nets = 0;
+    if (dgd.indexes.network_var != MISSING_FLAG) {
+      nlen = dims[vars[dgd.indexes.network_var].dimids.back()].length;
+      num_nets = nvd->size() / nlen;
+    }
+    size_t plen = 0, num_plats = 0;
+    if (dgd.indexes.platform_var != MISSING_FLAG) {
+      plen = dims[vars[dgd.indexes.platform_var].dimids.back()].length;
+      num_plats = pvd->size() / plen;
+    }
     char *i = reinterpret_cast<char *>(ivd->get());
-    for (size_t n = 0; n < ivd->size() / ilen; ++n) {
+    for (size_t n = 0; n < num_ids; ++n) {
       ids.emplace_back(&i[n * ilen], ilen);
-pfms.emplace_back("unknown");
-ityps.emplace_back("unknown");
+      if (num_plats == num_ids) {
+        pfms.emplace_back(&(reinterpret_cast<char *>(pvd->get()))[n * plen],
+            plen);
+      } else {
+        pfms.emplace_back("unknown");
+      }
+      if (num_nets == num_ids) {
+        ityps.emplace_back(&(reinterpret_cast<char *>(nvd->get()))[n * nlen],
+            nlen);
+      } else {
+        ityps.emplace_back("unknown");
+      }
       if (!obs_data.added_to_platforms(obs_type, pfms[n], yvd[n], xvd[n])) {
         auto e = move(myerror);
         log_error2(e + "' when adding platform " + obs_type + " " + pfms[n], F,
@@ -2733,6 +2762,9 @@ ityps.emplace_back("unknown");
         }
       }
     }
+  }
+  if (gatherxml::verbose_operation) {
+    cout << "   ...function " << F << " done." << endl;
   }
 }
 
@@ -3097,7 +3129,7 @@ bool grid_is_centered_lambert_conformal(const unique_ptr<double[]>& lats,
         def.olongitude = lround(lons[dy2 * dims.x + dx2]);
         def.dx = def.dy = lround(111.1 * cos(lats[dy2 * dims.x + dx2] *
             3.141592654 / 180.) * (lons[dy2 * dims.x + dx2 + 1] - lons[dy2 *
-                dims.x + dx2]));
+            dims.x + dx2]));
         if (gatherxml::verbose_operation) {
           cout << "            ... confirmed a centered Lambert-Conformal "
               "projection." << endl;
