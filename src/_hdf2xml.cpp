@@ -213,10 +213,16 @@ extern "C" void clean_up() {
     if (!g_warn_ss.str().empty()) {
       metautils::log_warning(g_warn_ss.str(), "hdf2xml", USER);
     }
-    if (!myerror.empty()) log_error2(myerror, "clean_up()", g_util_ident);
+    if (!myerror.empty()) {
+      log_error2(myerror, "clean_up()", g_util_ident);
+    }
   } else {
-    if (!g_warn_ss.str().empty()) cerr << g_warn_ss.str() << endl;
-    if (!myerror.empty()) cerr << myerror << endl;
+    if (!g_warn_ss.str().empty()) {
+      cerr << g_warn_ss.str() << endl;
+    }
+    if (!myerror.empty()) {
+      cerr << myerror << endl;
+    }
   }
 }
 
@@ -1870,6 +1876,7 @@ void add_new_time_range_entry(const TimeBounds2& time_bounds, const TimeData&
     log_error2(err, F, g_util_ident);
   }
   e.bounded.first_valid_datetime = e.instantaneous.first_valid_datetime;
+  e.num_steps = 1;
 }
 
 void add_time_range_entries(const TimeData& time_data, const HDF5::DataArray&
@@ -1897,8 +1904,8 @@ void add_time_range_entries(const TimeData& time_data, const HDF5::DataArray&
         auto& e = grid_data.time_range_entries[tb.diff];
         e.time_bounds.t2 = data_array.value(n-1); 
         string err;
-        e.instantaneous.last_valid_datetime = actual_date_time(data_array.value(
-            n-2), time_data, err);
+        e.instantaneous.last_valid_datetime = actual_date_time(e.time_bounds.t2,
+            time_data, err);
         if (!err.empty()) {
           log_error2(err, F, g_util_ident);
         }
@@ -1921,8 +1928,8 @@ void add_time_range_entries(const TimeData& time_data, const HDF5::DataArray&
   auto& e = grid_data.time_range_entries[tb.diff];
   e.time_bounds.t2 = data_array.value(data_array.num_values-1);
   string err;
-  e.instantaneous.last_valid_datetime = actual_date_time(data_array.value(
-      data_array.num_values-2), time_data, err);
+  e.instantaneous.last_valid_datetime = actual_date_time(e.time_bounds.t2,
+      time_data, err);
   if (!err.empty()) {
     log_error2(err, F, g_util_ident);
   }
@@ -2836,6 +2843,7 @@ void find_coordinate_variables(CoordinateVariables& coord_vars, GridData&
         if (attr_it != dse.p_ds->attributes.end()) {
           coord_vars.nc_time->calendar.assign(reinterpret_cast<char *>(attr_it->
               second.get()), attr_it->second.size);
+          trim(coord_vars.nc_time->calendar);
         }
         found_time = true;
       } else if (units_value == "degrees_north") {
@@ -3051,6 +3059,9 @@ void process_time_bounds(const TimeData& nc_time, GridData& gd) {
   static const string F = this_function_label(__func__);
   auto is = sget_hdf5();
   if (!gd.time_bounds.id.empty()) {
+    if (gatherxml::verbose_operation) {
+      cout << "...found time bounds '" << gd.time_bounds.id << "'..." << endl;
+    }
     gd.time_bounds.ds = is->dataset("/" + gd.time_bounds.id);
     if (gd.time_bounds.ds == nullptr) {
       log_error2("unable to access the /" + gd.time_bounds.id + " dataset for "
