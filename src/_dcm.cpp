@@ -119,18 +119,20 @@ void copy_version_controlled_data(Server& server, string db, string
   string error;
   auto tnames = table_names(server, db, "ds" + g_dsnum2 + "%", error);
   for (auto t : tnames) {
-    t = db + "." + t;
-    if (field_exists(server, t, "file_code")) {
-      if (t.front() == 'W') {
-        t = t.substr(1);
+    auto tbl = "\"" + db + "\"." + t;
+    if (field_exists(server, tbl, "file_code")) {
+      auto vtable = db;
+      if (vtable.front() == 'W') {
+        vtable = vtable.substr(1);
       }
-      if (!table_exists(server, "V" + t)) {
-        if (server.command("create table V" + t + " like " + t) < 0) {
-          log_error2("error: '" + server.error() + "' while trying to create V"
-              + t, "copy_version_controlled_data()", "dcm", USER);
+      vtable = "\"V" + db + "\"." + t;
+      if (!table_exists(server, vtable)) {
+        if (server.command("create table " + vtable + " like " + tbl) < 0) {
+          log_error2("error: '" + server.error() + "' while trying to create " +
+              vtable, "copy_version_controlled_data()", "dcm", USER);
         }
       }
-      server.command("insert into V" + t + " select * from " + t + " where "
+      server.command("insert into " + vtable + " select * from " + tbl + " where "
           "file_code = " + file_id_code);
     }
   }
@@ -208,7 +210,7 @@ bool remove_from(string database, string table_ext, string file_field_name,
   static const string F = this_function_label(__func__);
   is_version_controlled = false;
   string error;
-  auto file_table = database + ".ds" + g_dsnum2 + table_ext;
+  auto file_table = "\"" + database + "\".ds" + g_dsnum2 + table_ext;
   Server local_server(metautils::directives.database_server, metautils::
       directives.metadb_username, metautils::directives.metadb_password,
       "rdadb");
@@ -234,14 +236,19 @@ bool remove_from(string database, string table_ext, string file_field_name,
         is_version_controlled = true;
       }
       if (is_version_controlled) {
-        if (!table_exists(local_server, "V" + file_table)) {
-          if (local_server.command("create table V" + file_table + " like " +
+        auto vtable = database;
+        if (vtable.front() == 'W') {
+          vtable = vtable.substr(1);
+        }
+        vtable = "\"V" + vtable + "\".ds" + g_dsnum2 + table_ext;
+        if (!table_exists(local_server, vtable)) {
+          if (local_server.command("create table " + vtable + " like " +
               file_table) < 0) {
             log_error2("error: '" + local_server.error() + "' while trying to "
-                "create V" + file_table, F, "dcm", USER);
+                "create " + vtable, F, "dcm", USER);
           }
         }
-        local_server.command("insert into V" + file_table + " select * from " +
+        local_server.command("insert into " + vtable + " select * from " +
             file_table + " where code = " + file_id_code);
       }
       if (local_server._delete(file_table, "code = " + file_id_code) < 0) {
