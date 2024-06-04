@@ -2188,14 +2188,17 @@ int main(int argc, char **argv) {
   g_metadata_server.connect(metautils::directives.database_server, metautils::
       directives.metadb_username, metautils::directives.metadb_password,
       "rdadb");
-  g_wagtail_server.connect(metautils::directives.database_server, metautils::
-      directives.wagtail_username, metautils::directives.wagtail_password,
-      "rdadb");
   LocalQuery q("select type from search.datasets where dsid = '" + metautils::
       args.dsnum + "'");
   Row row;
   if (q.submit(g_metadata_server) < 0 || !q.fetch_row(row)) {
     log_error2("unable to determine dataset type", F, "dsgen", USER);
+  }
+  if (row[0] == "W") {
+
+    // dataset is a work in progress, so do nothing
+    g_metadata_server.disconnect();
+    exit(0);
   }
   g_dataset_type = row[0];
   if (!no_dset_waf) {
@@ -2208,6 +2211,9 @@ int main(int argc, char **argv) {
     log_error2("unable to create temporary document directory", F, "dsgen",
         USER);
   }
+  g_wagtail_server.connect(metautils::directives.database_server, metautils::
+      directives.wagtail_username, metautils::directives.wagtail_password,
+      "rdadb");
   generate_index(d.name());
   if (g_dataset_type != "I") {
     generate_description(g_dataset_type, d.name());
