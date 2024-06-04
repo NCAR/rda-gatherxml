@@ -8,6 +8,7 @@
 #include <sstream>
 #include <deque>
 #include <gatherxml.hpp>
+#include <pglocks.hpp>
 #include <strutils.hpp>
 #include <utils.hpp>
 #include <metadata.hpp>
@@ -66,7 +67,7 @@ void inventory_all() {
         "' files", F, "gatherxml", USER);
   }
   Server srv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "");
+      metadb_username, metautils::directives.metadb_password, "rdadb");
   if (!srv) {
     log_error2("unable to connected to RDA metadata database server", F,
         "gatherxml", USER);
@@ -74,21 +75,21 @@ void inventory_all() {
   string ds = substitute(metautils::args.dsnum, ".", "");
   LocalQuery q;
   if (table_exists(srv, "IGrML.ds" + ds + "_inventory_summary")) {
-    q.set("select w.id, f.format from WGrML.ds" + ds + "_webfiles2 as w "
-        "left join IGrML.ds" + ds + "_inventory_summary as i on i.file_code = "
-        "w.code left join WGrML.formats as f on f.code = w.format_code where "
-        "i.file_code is null or inv is null");
+    q.set("select w.id, f.format from \"WGrML\".ds" + ds + "_webfiles2 as w "
+        "left join \"IGrML\".ds" + ds + "_inventory_summary as i on i.file_code "
+        "= w.code left join \"WGrML\".formats as f on f.code = w.format_code "
+        "where i.file_code is null or inv is null");
   } else if (table_exists(srv, "WGrML.ds" + ds + "_webfiles2")) {
-    q.set("select w.id, f.format from WGrML.ds" + ds + "_webfiles2 as w left "
-        "join WGrML.formats as f on f.code = w.format_code");
+    q.set("select w.id, f.format from \"WGrML\".ds" + ds + "_webfiles2 as w "
+        "left join \"WGrML\".formats as f on f.code = w.format_code");
   } else if (table_exists(srv, "IObML.ds" + ds + "_inventory_summary")) {
-    q.set("select w.id, f.format from WObML.ds" + ds + "_webfiles2 as w "
+    q.set("select w.id, f.format from \"WObML\".ds" + ds + "_webfiles2 as w "
         "left join IObML.ds" + ds + "_inventory_summary as i on i.file_code = "
-        "w.code left join WObML.formats as f on f.code = w.format_code where "
-        "i.file_code is null or inv is null");
+        "w.code left join \"WObML\".formats as f on f.code = w.format_code "
+        "where i.file_code is null or inv is null");
   } else if (table_exists(srv, "WObML.ds" + ds + "_webfiles2")) {
-    q.set("select w.id, f.format from WObML.ds" + ds + "_webfiles2 as w left "
-        "join WObML.formats as f on f.code = w.format_code");
+    q.set("select w.id, f.format from \"WObML\".ds" + ds + "_webfiles2 as w "
+        "left join \"WObML\".formats as f on f.code = w.format_code");
   }
   if (q.submit(srv) < 0) {
     log_error2("'" + q.error() + "'", F, "gatherxml", USER);
