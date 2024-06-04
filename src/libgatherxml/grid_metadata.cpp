@@ -325,10 +325,9 @@ void summarize_grids(string database, string caller, string user, string
               "parameter, level_type_codes, start_date, end_date, uflg",
           "'" + metautils::args.dsnum + "', " + gse.key + ", '" + b + "', " + d1
               + ", " + d2 + ", '" + uflg + "'",
-          "(dsid, format_code, time_range_code, grid_definition_code, "
-              "parameter) do update set level_type_codes = excluded."
-              "level_type_codes, start_date = excluded.start_date, end_date = "
-              "excluded.end_date, uflg = excluded.uflg"
+          "on constraint summary_pkey do update set level_type_codes = "
+              "excluded.level_type_codes, start_date = excluded.start_date, "
+              "end_date = excluded.end_date, uflg = excluded.uflg"
           ) < 0) {
       log_error2(srv.error() + " while trying to insert ('" + metautils::args.
           dsnum + "', " + gse.key + ", '" + b + "', " + d1 + ", " + d2 + ")", F,
