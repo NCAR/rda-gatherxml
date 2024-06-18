@@ -111,11 +111,16 @@ void parse_args(const char arg_delimiter) {
         local_args.cmd_directory = "wfmd";
       }
     } else if (args[n] == "-d") {
-      metautils::args.dsnum = args[++n];
-      if (metautils::args.dsnum.find("ds") == 0) {
-        metautils::args.dsnum = metautils::args.dsnum.substr(2);
-      }
-      local_args.dsnum2 = strutils::substitute(metautils::args.dsnum, ".", "");
+      metautils::args.dsid = args[++n];
+
+// remove the next 6 lines after dsid conversion
+metautils::args.dsnum = args[n];
+if (metautils::args.dsnum.find("ds") == 0) {
+metautils::args.dsnum = metautils::args.dsnum.substr(2);
+}
+metautils::args.dsid = strutils::converted_dsid(metautils::args.dsnum);
+local_args.dsnum2 = strutils::substitute(metautils::args.dsnum, ".", "");
+
     } else if (args[n] == "-wf") {
       if (local_args.summarize_all) {
         cerr << "scm: specify only one of -wa or -wf" << endl;
@@ -156,8 +161,8 @@ void parse_args(const char arg_delimiter) {
       exit(1);
     }
   }
-  if (metautils::args.dsnum.empty()) {
-    cerr << "scm: no dataset number specified" << endl;
+  if (metautils::args.dsid.empty()) {
+    cerr << "scm: no dataset ID specified" << endl;
     exit(1);
   }
   if (!local_args.summarize_all && !local_args.is_web_file && !local_args.
@@ -363,7 +368,7 @@ void process_data_format(MarkupParameters *markup_parameters) {
         "keyword, vocabulary, dsid",
         "'" + markup_parameters->format + "', '" + markup_parameters->database +
             "', '" + metautils::args.dsnum + "'",
-        "(keyword, vocabulary, dsid) do nothing"
+        "on constraint formats_pkey do nothing"
         ) < 0) {
     log_error2("error: '" + markup_parameters->server.error() + "' while "
         "inserting into search.formats", F, "scm", USER);
@@ -386,7 +391,11 @@ void process_data_format(MarkupParameters *markup_parameters) {
 
 void create_grml_tables(MarkupParameters *markup_parameters) {
   static const string F = this_function_label(__func__);
-  auto tb_base = markup_parameters->database + ".ds" + local_args.dsnum2;
+  auto tb_base = markup_parameters->database + "." + metautils::args.dsid;
+
+// remove the next line after dsid conversion
+tb_base = markup_parameters->database + ".ds" + local_args.dsnum2;
+
   if (markup_parameters->server.duplicate_table(markup_parameters->database +
       ".template_" + markup_parameters->file_type + "files2", tb_base + "_" +
       markup_parameters->file_type + "files2") < 0) {
@@ -408,7 +417,11 @@ void create_grml_tables(MarkupParameters *markup_parameters) {
 
 void create_obml_tables(MarkupParameters *markup_parameters) {
   static const string F = this_function_label(__func__);
-  auto tb_base = "WObML.ds" + local_args.dsnum2;
+  auto tb_base = markup_parameters->database + "." + metautils::args.dsid;
+
+// remove the next line after dsid conversion
+tb_base = markup_parameters->database + ".ds" + local_args.dsnum2;
+
   if (markup_parameters->server.duplicate_table(markup_parameters->database +
       ".template_" + markup_parameters->file_type + "files2", tb_base + "_" +
       markup_parameters->file_type + "files2") < 0) {
@@ -460,7 +473,11 @@ void create_obml_tables(MarkupParameters *markup_parameters) {
 
 void create_fixml_tables(MarkupParameters *markup_parameters) {
   static const string F = this_function_label(__func__);
-  auto tb_base = markup_parameters->database + ".ds" + local_args.dsnum2;
+  auto tb_base = markup_parameters->database + "." + metautils::args.dsid;
+
+// remove the next line after dsid conversion
+tb_base = markup_parameters->database + ".ds" + local_args.dsnum2;
+
   if (markup_parameters->server.duplicate_table(markup_parameters->database +
       "template_" + markup_parameters->file_type + "files2", tb_base + "_" +
       markup_parameters->file_type + "files2") < 0) {
@@ -504,7 +521,7 @@ void insert_filename(MarkupParameters *markup_parameters) {
   const static string F = this_function_label(__func__);
   if (markup_parameters->file_map.find(markup_parameters->filename) ==
       markup_parameters->file_map.end()) {
-    auto tb_nam = markup_parameters->database + "." + metautils::args.dsnum +
+    auto tb_nam = markup_parameters->database + "." + metautils::args.dsid +
         "_webfiles2";
 
 // remove the next line after the dsid conversion
@@ -515,7 +532,7 @@ tb_nam = markup_parameters->database + ".ds" + local_args.dsnum2 + "_webfiles2";
     }
 
 // remove the next line after the dsid conversion
-tb_nam = markup_parameters->database + "." + strutils::converted_dsid(metautils::args.dsnum) + "_webfiles2";
+tb_nam = markup_parameters->database + "." + metautils::args.dsid + "_webfiles2";
 
     auto c = table_code(markup_parameters->server, tb_nam, "id = '" +
         markup_parameters->filename + "'", false);
@@ -550,15 +567,15 @@ tb_nam = markup_parameters->database + "." + strutils::converted_dsid(metautils:
 }
 
 void clear_satml_tables(MarkupParameters *markup_parameters) {
-  markup_parameters->server._delete(markup_parameters->database + ".ds" +
-      local_args.dsnum2 + "_products", "file_code = " + markup_parameters->
+  markup_parameters->server._delete(markup_parameters->database + "." +
+      metautils::args.dsid + "_products", "file_code = " + markup_parameters->
       file_map[markup_parameters->filename]);
 }
 
 void clear_fixml_tables(MarkupParameters *markup_parameters) {
-  markup_parameters->server._delete(markup_parameters->database + ".ds" +
-      local_args.dsnum2 + "_frequencies", "file_code = " + markup_parameters->
-      file_map[markup_parameters->filename]);
+  markup_parameters->server._delete(markup_parameters->database + "." +
+      metautils::args.dsid + "_frequencies", "file_code = " +
+      markup_parameters->file_map[markup_parameters->filename]);
 }
 
 void clear_tables(MarkupParameters *markup_parameters) {
@@ -724,7 +741,7 @@ void process_grml_markup(void *markup_parameters) {
           }
           lev_map.emplace(ltyp, c);
         }
-        auto tbl = gp->database + "." + metautils::args.dsnum + "_levels";
+        auto tbl = gp->database + "." + metautils::args.dsid + "_levels";
 
 // remove the next line after dsid conversion
 tbl = gp->database + "." + strutils::converted_dsid(metautils::args.dsnum) + "_levels";
@@ -796,13 +813,8 @@ tbl = gp->database + "." + strutils::converted_dsid(metautils::args.dsnum) + "_l
         }
       }
     }
-    auto tbl = gp->database + "." + metautils::args.dsnum + "_grids2";
-    auto pkey = metautils::args.dsnum + "_grids2_pkey";
-
-// remove the next two lines after dsid conversion
-tbl = gp->database + "." + strutils::converted_dsid(metautils::args.dsnum) + "_grids2";
-pkey = strutils::converted_dsid(metautils::args.dsnum) + "_grids2_pkey";
-
+    auto tbl = gp->database + "." + metautils::args.dsid + "_grids2";
+    auto pkey = metautils::args.dsid + "_grids2_pkey";
     for (auto& e : pdmap) {
       sort(e.second->level_code_list.begin(), e.second->level_code_list.end(),
       [](const size_t& left, const size_t& right) -> bool {
@@ -833,27 +845,15 @@ pkey = strutils::converted_dsid(metautils::args.dsnum) + "_grids2_pkey";
       e.second.reset();
     }
   }
-  auto tbl = gp->database + "." + metautils::args.dsnum + "_grids2";
-
-// remove the next line after dsid conversion
-tbl = gp->database + "." + strutils::converted_dsid(metautils::args.dsnum) + "_grids2";
-
+  auto tbl = gp->database + "." + metautils::args.dsid + "_grids2";
   gp->server._delete(tbl, "file_code = " + gp->file_map[gp->filename] + " and "
       "uflg != '" + uflg + "'");
-  tbl = gp->database + "." + metautils::args.dsnum + "_processes";
-
-// remove the next line after dsid conversion
-tbl = gp->database + "." + strutils::converted_dsid(metautils::args.dsnum) + "_processes";
-
+  tbl = gp->database + "." + metautils::args.dsid + "_processes";
   if (table_exists(gp->server, tbl)) {
     gp->server._delete(tbl, "file_code = " + gp->file_map[gp->filename] +
         " and uflg != '" + uflg + "'");
   }
-  tbl = gp->database + "." + metautils::args.dsnum + "_ensembles";
-
-// remove the next line after dsid conversion
-tbl = gp->database + "." + strutils::converted_dsid(metautils::args.dsnum) + "_ensembles";
-
+  tbl = gp->database + "." + metautils::args.dsid + "_ensembles";
   if (table_exists(gp->server, tbl)) {
     gp->server._delete(tbl, "file_code = " + gp->file_map[gp->filename] +
         " and uflg != '" + uflg + "'");
@@ -864,18 +864,14 @@ tbl = gp->database + "." + strutils::converted_dsid(metautils::args.dsnum) + "_e
   replace_all(mxdt, "+0000", "");
   auto s = "num_grids = " + itos(cnt) + ", start_date = " + mndt + ", end_date "
       "= " + mxdt;
-  tbl = gp->database + "." + metautils::args.dsnum + "_" + gp->file_type +
+  tbl = gp->database + "." + metautils::args.dsid + "_" + gp->file_type +
       "files2";
-
-// remove the next line after dsid conversion
-tbl = gp->database + "." + strutils::converted_dsid(metautils::args.dsnum) + "_" + gp->file_type + "files2";
-
   if (gp->server.update(tbl, s + ", uflag = '" + strand(5) + "'", "code = " +
        gp->file_map[gp->filename]) < 0) {
     log_error2("error: '" + gp->server.error() + " while updating " + tbl, F,
         "scm", USER);
   }
-  tbl = gp->database + "." + metautils::args.dsnum + "_agrids2";
+  tbl = gp->database + "." + metautils::args.dsid + "_agrids2";
 
 // remove the next line after dsid conversion
 tbl = gp->database + ".ds" + local_args.dsnum2 + "_agrids2";
@@ -887,7 +883,7 @@ tbl = gp->database + ".ds" + local_args.dsnum2 + "_agrids2";
           tbl, F, "scm", USER);
     }
   }
-  tbl = gp->database + "." + metautils::args.dsnum + "_agrids_cache";
+  tbl = gp->database + "." + metautils::args.dsid + "_agrids_cache";
 
 // remove the next line after dsid conversion
 tbl = gp->database + ".ds" + local_args.dsnum2 + "_agrids_cache";
@@ -899,7 +895,7 @@ tbl = gp->database + ".ds" + local_args.dsnum2 + "_agrids_cache";
           tbl, F, "scm", USER);
     }
   }
-  tbl = gp->database + "." + metautils::args.dsnum + "_grid_definitions";
+  tbl = gp->database + "." + metautils::args.dsid + "_grid_definitions";
 
 // remove the next line after dsid conversion
 tbl = gp->database + ".ds" + local_args.dsnum2 + "_grid_definitions";
@@ -1146,7 +1142,8 @@ void *thread_summarize_IDs(void *args) {
     k = searchutils::time_resolution_keyword("irregular", lround(avgm), u, "");
   }
   if (i != "0") {
-    auto tbl = a[5] + ".ds" + local_args.dsnum2 + "_frequencies";
+    auto tbl = a[5] + "." + metautils::args.dsid + "_frequencies";
+    auto pkey = metautils::args.dsid + "_frequencies_pkey";
     auto inserts = a[2] + ", " + a[3] + ", " + a[4] + ", " + i + ", " + itos(
         obs_count) + ", '" + u + "', '" + a[7] + "'";
     if (srv.insert(
@@ -1154,7 +1151,11 @@ void *thread_summarize_IDs(void *args) {
           "file_code, observation_type_code, platform_type_code, avg_obs_per, "
               "total_obs, unit, uflag",
           inserts,
+
+// remove next line and uncomment following line after dsid conversion
           "(file_code, observation_type_code, platform_type_code, unit) do "
+//          "on constraint " + pkey + " do "
+
               "update set avg_obs_per = excluded.avg_obs_per, total_obs = "
               "excluded.total_obs, uflag = excluded.uflag"
           ) < 0) {
@@ -1163,18 +1164,19 @@ void *thread_summarize_IDs(void *args) {
     }
   }
   if (a[5] == "WObML") {
-    auto tbl = "\"" + a[5] + "\".ds" + local_args.dsnum2 + "_geobounds";
-    auto pkey = metautils::args.dsnum + "_geobounds_pkey";
+    auto tbl = "\"" + a[5] + "\"." + metautils::args.dsid + "_geobounds";
+    auto pkey = metautils::args.dsid + "_geobounds_pkey";
 
-// remove next line after dsid conversion
+// remove next 2 lines after dsid conversion
+tbl = "\"" + a[5] + "\".ds" + local_args.dsnum2 + "_geobounds";
 pkey = strutils::converted_dsid(metautils::args.dsnum) + "_geobounds_pkey";
 
     auto uflg = strand(3);
     if (srv.command("insert into " + tbl + " (file_code, min_lat, min_lon, "
         "max_lat, max_lon, uflg) select " + a[2] + " as file_code, min(i."
         "sw_lat), min(i.sw_lon), max(i.ne_lat), max(i.ne_lon), '" + uflg +
-        "' from \"" + a[5] + "\".ds" + local_args.dsnum2 + "_id_list as i2 "
-        "left join \"" + a[5] + "\".ds" + local_args.dsnum2 + "_ids as i on i."
+        "' from \"" + a[5] + "\"." + metautils::args.dsid + "_id_list as i2 "
+        "left join \"" + a[5] + "\"." + metautils::args.dsid + "_ids as i on i."
         "code = i2.id_code where i2.file_code = " + a[2] + " and i.sw_lat > "
         "-990000 and i.sw_lon > -1810000 and i.ne_lat < 990000 and i.ne_lon < "
         "1810000 on conflict on constraint " + pkey + " do update set min_lat "
@@ -1219,12 +1221,8 @@ void *thread_summarize_file_ID_locations(void *args) {
     unordered_set<string> lset;
     size_t min = 999;
     size_t max = 0;
-    auto tbl = a[7] + ".ds" + local_args.dsnum2 + "_locations";
-    auto pkey = metautils::args.dsnum + "_locations_pkey";
-
-// remove next line after dsid conversion
-pkey = strutils::converted_dsid(metautils::args.dsnum) + "_locations_pkey";
-
+    auto tbl = a[7] + "." + metautils::args.dsid + "_locations";
+    auto pkey = metautils::args.dsid + "_locations_pkey";
     string cols = "file_code";
     auto istart = a[2];
     if (!a[4].empty()) {
@@ -1268,7 +1266,11 @@ pkey = strutils::converted_dsid(metautils::args.dsnum) + "_locations_pkey";
             tbl,
             cols,
             inserts,
-            "on constraint " + pkey + " do update set uflg = excluded.uflg"
+
+// remove next line and uncomment following line after dsid conversion
+            "(platform_type_code, box1d_row, observation_type_code, file_code) do update set uflg = excluded.uflg"
+//            "on constraint " + pkey + " do update set uflg = excluded.uflg"
+
             ) < 0) {
         log_error2("'" + srv.error() + "' while trying to insert into " + tbl +
             " (" + inserts + ")", F, "scm", USER);
@@ -2393,7 +2395,7 @@ int main(int argc, char **argv) {
   }
 
   // if this is not a test run, then clean up the temporary directory
-  if (metautils::args.dsnum != "test" && !local_args.temp_directory.empty()) {
+  if (metautils::args.dsid != "test" && !local_args.temp_directory.empty()) {
     delete_temporary_directory();
   }
 
