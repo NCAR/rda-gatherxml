@@ -17,6 +17,7 @@
 #include <strutils.hpp>
 #include <utils.hpp>
 #include <timer.hpp>
+#include <gridutils.hpp>
 #include <myerror.hpp>
 
 using namespace PostgreSQL;
@@ -31,9 +32,11 @@ using metautils::NcTime::actual_date_time;
 using metautils::log_error2;
 using miscutils::this_function_label;
 using std::accumulate;
+using std::ceil;
 using std::cerr;
 using std::cout;
 using std::endl;
+using std::floor;
 using std::make_pair;
 using std::move;
 using std::pair;
@@ -3283,8 +3286,8 @@ bool grid_is_polar_stereographic(const GridData& grid_data,
 bool grid_is_centered_lambert_conformal(const GridData& grid_data, Grid::
     GridDimensions& dims, Grid::GridDefinition& def) {
   if (gatherxml::verbose_operation) {
-    cout << "         ... checking for centered Lambert-Conformal projection "
-        "..." << endl;
+    cout << "    ...checking for a centered Lambert-Conformal projection..." <<
+        endl;
   }
   auto dx2 = dims.x / 2;
   auto dy2 = dims.y / 2;
@@ -3329,7 +3332,7 @@ bool grid_is_centered_lambert_conformal(const GridData& grid_data, Grid::
             data_array, dy2 * grid_data.lon.data_array.dimensions[1] + dx2
             - 1, grid_data.lon.ds.get())));
         if (gatherxml::verbose_operation) {
-          cout << "...confirmed a centered Lambert-Conformal projection." <<
+          cout << "    ...confirmed a centered Lambert-Conformal projection." <<
               endl;
         }
         return true;
@@ -3368,7 +3371,7 @@ bool grid_is_centered_lambert_conformal(const GridData& grid_data, Grid::
             grid_data.lon.data_array.dimensions[1] + dx2, grid_data.
             lon.ds.get())));
         if (gatherxml::verbose_operation) {
-          cout << "...confirmed a centered Lambert-Conformal projection." <<
+          cout << "    ...confirmed a centered Lambert-Conformal projection." <<
               endl;
         }
         return true;
@@ -3377,7 +3380,7 @@ bool grid_is_centered_lambert_conformal(const GridData& grid_data, Grid::
     }
   }
   if (gatherxml::verbose_operation) {
-    cout << "         ... done." << endl;
+    cout << "    ...projection is not centered Lambert-Conformal." << endl;
   }
   return false;
 }
@@ -3386,8 +3389,8 @@ bool grid_is_non_centered_lambert_conformal(const HDF5::DataArray& lats, const
     HDF5::DataArray& lons, Grid::GridDimensions& dims, Grid::GridDefinition&
     def) {
   if (gatherxml::verbose_operation) {
-    cout << "... checking for non-centered Lambert-Conformal projection ..." <<
-        endl;
+    cout << "    ...checking for non-centered Lambert-Conformal projection..."
+        << endl;
   }
   def.type = Grid::Type::not_set;
 
@@ -3416,7 +3419,10 @@ bool grid_is_non_centered_lambert_conformal(const HDF5::DataArray& lats, const
     ss += diff*diff;
   }
   auto var = ss / (v.size() - 1);
-  if (var >= 1.) return false;
+  if (var >= 1.) {
+    return false;
+  }
+  size_t ybar = dims.y / 2;
 
   // if the variance is low, confident that we found the orientation longitude
   def.type = Grid::Type::lambertConformal;
@@ -3427,30 +3433,31 @@ bool grid_is_non_centered_lambert_conformal(const HDF5::DataArray& lats, const
   const double DEGRAD = PI / 180.;
   const double KMDEG = 111.1;
   v.clear();
-  for (auto n = xbar; n < dims.x * dims.y; n +=  dims.x) {
+  for (auto n = xbar; n < dims.x * dims.y; n += dims.x) {
     auto x1 = lons.value(n);
     auto x2 = lons.value(n + 1);
-    auto dx = (x2 - x1) * KMDEG * cos(x1 * DEGRAD);
-    auto y1 = lats.value(n);
-    auto y2 = lats.value(n + 1);
-    auto dy = (y2 - y1) * KMDEG;
-    v.emplace_back(sqrt(dx * dx + dy * dy));
+    auto dx = fabs(x2 - x1) * KMDEG * cos((lats.value(n) + lats.value(n + 1)) /
+        2. * DEGRAD);
+    v.emplace_back(dx);
   }
-  def.dx = lround(accumulate(v.begin(), v.end(), 0.) / v.size());
+  auto dx_avg = accumulate(v.begin(), v.end(), 0.) / v.size();
+  def.dx = lround(dx_avg);
+  def.dy = lround(fabs(lats.value(xbar + ybar * dims.x) - lats.value(xbar +
+      (ybar-1) * dims.x)) * KMDEG);
   def.stdparallel1 = def.stdparallel2 = -99.;
-  size_t i = 0;
   for (size_t n = 0; n < v.size(); ++n) {
     if (myequalf(v[n], def.dx, 0.001)) {
       auto p = lround(lats.value(xbar + n * dims.x));
       if (def.stdparallel1 < -90.) {
         def.stdparallel1 = p;
-        i = xbar + n * dims.x;
       } else if (def.stdparallel2 < -90.) {
-        if (p != def.stdparallel1) def.stdparallel2 = p;
+        if (p != def.stdparallel1) {
+          def.stdparallel2 = p;
+        }
       } else if (p != def.stdparallel2) {
         if (gatherxml::verbose_operation) {
-          cout << "...check for a non-centered projection failed. Too "
-              "many tangent latitudes." << endl;
+          cout << "...check for a non-centered Lambert-Conformal projection "
+              "failed. Too many tangent latitudes." << endl;
         }
         def.type = Grid::Type::not_set;
         return false;
@@ -3459,8 +3466,43 @@ bool grid_is_non_centered_lambert_conformal(const HDF5::DataArray& lats, const
   }
   if (def.stdparallel1 < -90.) {
     if (gatherxml::verbose_operation) {
-      cout << "...check for a non-centered projection failed. No tangent "
-          "latitude could be identified." << endl;
+      cout << "    ...tangent latitudes not identified - now testing "
+          "gridpoints..." << endl;
+    }
+    auto min_lat = ceil(lats.value(xbar));
+    auto max_lat = floor(lats.value(xbar + (dims.y - 1) * dims.x));
+    auto slat = lats.value(0);
+    auto slon = lons.value(0);
+    if (slon < 0.) {
+      slon += 360.;
+    }
+    auto olon = def.olongitude;
+    if (olon < 0.) {
+      olon += 360.;
+    }
+    auto comp_lat = lats.value(xbar + ybar * dims.x);
+    auto comp_lon = lons.value(xbar + ybar * dims.x);
+    if (comp_lon < 0.) {
+      comp_lon += 360.;
+    }
+    auto min_dist = dx_avg * 0.75;
+    for (auto n = min_lat; n <= max_lat; ++n) {
+      double lat, elon;
+      gridutils::fill_lat_lon_from_lambert_conformal_gridpoint(xbar, ybar, slat,
+          slon, dx_avg, olon, n, lat, elon);
+      auto dx = (comp_lon - elon) * KMDEG * cos((comp_lat + lat) / 2. * DEGRAD);
+      auto dy = (comp_lat - lat) * KMDEG;
+      auto dist = sqrt(dx * dx + dy * dy);
+      if (dist < min_dist) {
+        min_dist = dist;
+        def.stdparallel1 = n;
+      }
+    }
+  }
+  if (def.stdparallel1 < -90.) {
+    if (gatherxml::verbose_operation) {
+      cout << "    ...check for a non-centered Lambert-Conformal projection "
+          "failed. No tangent latitude could be identified." << endl;
     }
     def.type = Grid::Type::not_set;
     return false;
@@ -3469,17 +3511,9 @@ bool grid_is_non_centered_lambert_conformal(const HDF5::DataArray& lats, const
   }
   def.llatitude = def.stdparallel1;
   def.projection_flag = def.llatitude >= 0. ? 0 : 1;
-  auto x1 = lons.value(i - dims.x);
-  auto x2 = lons.value(i);
-  auto dx = (x2 - x1) * KMDEG * cos(x1 * DEGRAD);
-  auto y1 = lats.value(i - dims.x);
-  auto y2 = lats.value(i);
-  auto dy = (y2 - y1) * KMDEG;
-  def.dy = lround(sqrt(dx * dx + dy * dy));
   if (gatherxml::verbose_operation) {
     cout << "...confirmed a non-centered Lambert-Conformal projection." <<
         endl;
-    cout << "... done." << endl;
   }
   return true;
 }
@@ -3493,17 +3527,13 @@ bool grid_is_lambert_conformal(const GridData& grid_data,
   if (grid_is_centered_lambert_conformal(grid_data, dim, def)) {
     return true;
   }
-  if (gatherxml::verbose_operation) {
-    cout << "...check for a centered Lambert-Conformal projection failed, "
-        "checking for a non-centered projection..." << endl;
-  }
   if (grid_is_non_centered_lambert_conformal(grid_data.lat.data_array,
       grid_data.lon.data_array, dim, def)) {
     return true;
   }
   if (gatherxml::verbose_operation) {
-    cout << "...check for a Lambert-Conformal projection finished. Not an LC "
-        "projection." << endl;
+    cout << "...check for a Lambert-Conformal projection finished. Not a "
+        "Lambert-Conformal projection." << endl;
   }
   return false;
 }
