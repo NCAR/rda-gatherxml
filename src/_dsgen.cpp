@@ -50,14 +50,17 @@ using std::vector;
 using strutils::append;
 using strutils::capitalize;
 using strutils::chop;
+using strutils::ds_aliases;
 using strutils::ftos;
 using strutils::has_beginning;
 using strutils::itos;
+using strutils::ng_gdex_id;
 using strutils::replace_all;
 using strutils::split;
 using strutils::sql_ready;
 using strutils::substitute;
 using strutils::to_capital;
+using strutils::to_sql_tuple_string;
 using strutils::to_upper;
 using strutils::trim;
 using unixutils::exists_on_server;
@@ -72,7 +75,7 @@ extern const string USER = getenv("USER");
 TempDir temp_dir;
 XMLDocument g_xdoc;
 Server g_metadata_server, g_wagtail_server;
-string g_dataset_type;
+string g_ds_set, g_dataset_type;
 bool no_dset_waf = false;
 
 unordered_map<string, string> wagtail_db{
@@ -108,8 +111,7 @@ void update_wagtail(string column, string insert_value, string caller) {
         USER);
   }
   if (g_wagtail_server.update("wagtail." + wagtail_db[column], column + " = '" +
-      sql_ready(insert_value) + "'", "dsid = '" + metautils::args.dsnum + "'") <
-      0) {
+      sql_ready(insert_value) + "'", "dsid in " + g_ds_set) < 0) {
     log_error2("failed to update wagtail." + wagtail_db[column] + " " + column +
         ": error '" + g_wagtail_server.error() + "'  insert value: '" +
         insert_value + "'", caller, "dsgen", USER);
@@ -121,7 +123,7 @@ void sync_dataset_files(string tdir_name) {
   if (g_dataset_type == "W") {
     p += "/internal";
   }
-  p += "/datasets/ds" + metautils::args.dsnum;
+  p += "/datasets/" + metautils::args.dsid;
   string e;
   if (unixutils::rdadata_sync(tdir_name, ".", p, metautils::directives.
       rdadata_home, e) < 0) {
@@ -151,30 +153,30 @@ void generate_index(string tdir_name) {
     }
   }
   auto &tdoc = *t;
-  tdoc.add_replacement("__DSNUM__", metautils::args.dsnum);
+  tdoc.add_replacement("__DSNUM__", metautils::args.dsid);
   if (g_dataset_type == "I") {
     tdoc.add_if("__IS_INTERNAL_DATASET__");
   } else {
     struct stat st;
     string xf;
-    if (stat(("/data/web/datasets/ds" + metautils::args.dsnum + "/metadata/"
+    if (stat(("/data/web/datasets/" + metautils::args.dsid + "/metadata/"
         "dsOverview.xml").c_str(), &st) == 0) {
-      xf = "/data/web/datasets/ds" + metautils::args.dsnum + "/metadata/"
+      xf = "/data/web/datasets/" + metautils::args.dsid + "/metadata/"
           "dsOverview.xml";
     } else {
-      xf = unixutils::remote_web_file("https://rda.ucar.edu/datasets/ds" +
-          metautils::args.dsnum + "/metadata/dsOverview.xml", temp_dir.name());
+      xf = unixutils::remote_web_file("https://rda.ucar.edu/datasets/" +
+          metautils::args.dsid + "/metadata/dsOverview.xml", temp_dir.name());
       if (xf.empty()) {
-        log_error2("dsOverview.xml does not exist for " + metautils::args.dsnum,
+        log_error2("dsOverview.xml does not exist for " + metautils::args.dsid,
             F, "dsgen", USER);
       }
     }
     if (!g_xdoc.open(xf)) {
-      log_error2("unable to open dsOverview.xml for " + metautils::args.dsnum +
+      log_error2("unable to open dsOverview.xml for " + metautils::args.dsid +
           "; parse error: '" + g_xdoc.parse_error() + "'", F, "dsgen", USER);
     }
     stringstream ss;
-    if (!metadataExport::export_to_dc_meta_tags(ss, metautils::args.dsnum,
+    if (!metadataExport::export_to_dc_meta_tags(ss, metautils::args.dsid,
         g_xdoc, 0)) {
       log_error2("unable to export DC meta tags: '" + myerror + "'", F, "dsgen",
           USER);
@@ -189,12 +191,12 @@ void generate_index(string tdir_name) {
       log_error2("unable to create temporary JSON-LD directory", F, "dsgen",
           USER);
     }
-    if (!metadataExport::export_to_json_ld(ss, metautils::args.dsnum, g_xdoc,
+    if (!metadataExport::export_to_json_ld(ss, metautils::args.dsid, g_xdoc,
         0)) {
       log_error2("unable to export JSON-LD metadata", F, "dsgen", USER);
     }
     std::ofstream ofs_j;
-    open_output(ofs_j, d.name() + "/ds" + metautils::args.dsnum + ".jsonld");
+    open_output(ofs_j, d.name() + "/" + metautils::args.dsid + ".jsonld");
     if (!ofs_j.is_open()) {
       log_error2("unable to open output for JSON-LD", F, "dsgen", USER);
     }
@@ -220,8 +222,8 @@ void generate_index(string tdir_name) {
       tdoc.add_replacement("__LOGO_IMAGE__", "default_200_200.png");
       tdoc.add_replacement("__LOGO_WIDTH__", "70");
     }
-    LocalQuery query("doi", "dssdb.dsvrsn", "dsid = 'ds" + metautils::args.dsnum
-        + "' and status = 'A'");
+    LocalQuery query("doi", "dssdb.dsvrsn", "dsid in " + g_ds_set + " and "
+        "status = 'A'");
     Row row;
     string ds;
     if (query.submit(g_metadata_server) == 0 && query.fetch_row(row) && !row[0].
@@ -520,8 +522,8 @@ void exit_if_dead_dataset(TokenDocument& tdoc, string tdir_name, std::ofstream&
   }
 }
 
-void initialize(string dsnum2, vector<string>& formats, vector<string>&
-    data_types, bool& found_content_metadata) {
+void initialize(vector<string>& formats, vector<string>& data_types, bool&
+    found_content_metadata) {
   static const string F = this_function_label(__func__);
   auto dblist = metautils::cmd_databases("dsgen", "x");
   if (dblist.size() == 0) {
@@ -530,11 +532,11 @@ void initialize(string dsnum2, vector<string>& formats, vector<string>&
   for (const auto& db : dblist) {
     string nm, dt;
     std::tie(nm, dt) = db;
-    if (nm[0] != 'V' && table_exists(g_metadata_server, nm + ".ds" + dsnum2 +
-        "_webfiles2")) {
+    if (nm[0] != 'V' && table_exists(g_metadata_server, nm + "." + metautils::
+        args.dsid + "_webfiles2")) {
       LocalQuery q("select distinct format from \"" + nm + "\".formats as f "
-          "left join \"" + nm + "\".ds" + dsnum2 + "_webfiles2 as d on d."
-          "format_code = f.code where d.format_code is not null");
+          "left join \"" + nm + "\"." + metautils::args.dsid + "_webfiles2 as "
+          "d on d.format_code = f.code where d.format_code is not null");
       if (q.submit(g_metadata_server) < 0) {
         log_error2("query: " + q.show() + " returned error: " + q.error(), F,
             "dsgen", USER);
@@ -963,8 +965,8 @@ void append_proceedings_to_citation(string& citation, string doi, string
 void add_data_citations(TokenDocument& tdoc) {
   static const string F = this_function_label(__func__);
   LocalQuery qc("select distinct d.doi_work from citation.data_citations as d "
-      "left join dssdb.dsvrsn as v on v.doi = d.doi_data where v.dsid = 'ds" +
-       metautils::args.dsnum + "'");
+      "left join dssdb.dsvrsn as v on v.doi = d.doi_data where v.dsid in " +
+       g_ds_set);
   if (qc.submit(g_metadata_server) < 0) {
     return;
   }
@@ -1099,12 +1101,11 @@ void add_data_citations(TokenDocument& tdoc) {
   }
 }
 
-bool add_temporal_range(TokenDocument& tdoc, string dsnum2, size_t& swp_cnt) {
+bool add_temporal_range(TokenDocument& tdoc, size_t& swp_cnt) {
   static const string F = this_function_label(__func__);
 
   bool grouped_periods = false; // return value
-  LocalQuery q("select dsid from dssdb.dsgroup where dsid = 'ds" + metautils::
-      args.dsnum + "'");
+  LocalQuery q("select dsid from dssdb.dsgroup where dsid in " + g_ds_set);
   if (q.submit(g_metadata_server) < 0) {
     log_error2("query: " + q.show() + " returned error: " + q.error(), F,
         "dsgen", USER);
@@ -1113,23 +1114,22 @@ bool add_temporal_range(TokenDocument& tdoc, string dsnum2, size_t& swp_cnt) {
     q.set("select p.date_start, p.time_start, p.start_flag, p.date_end, "
         "p.time_end, p.end_flag, p.time_zone, g.title, g.grpid from dssdb"
         ".dsperiod as p left join dssdb.dsgroup as g on (p.dsid = g.dsid and p"
-        ".gindex = g.gindex) where p.dsid = 'ds" + metautils::args.dsnum +
-        "' and g.pindex = 0 and date_start > '0001-01-01' and date_start < "
-        "'3000-01-01' and date_end > '0001-01-01' and date_end < '3000-01-01' "
-        "union select p.date_start, p.time_start, p.start_flag, p.date_end, p"
-        ".time_end, p.end_flag, p.time_zone, g2.title, g.grpid from dssdb"
-        ".dsperiod as p left join dssdb.dsgroup as g on (p.dsid = g.dsid and p"
-        ".gindex = g.gindex) left join dssdb.dsgroup as g2 on (p.dsid = g2"
-        ".dsid and g.pindex = g2.gindex) where p.dsid = 'ds" + metautils::
-        args.dsnum + "' and date_start > '0001-01-01' and date_start < '3000-01"
-        "-01' and date_end > '0001-01-01' and date_end < '3000-01-01' and "
-        "g2.title is not null order by title");
+        ".gindex = g.gindex) where p.dsid in " + g_ds_set + " and g.pindex = 0 "
+        "and date_start > '0001-01-01' and date_start < '3000-01-01' and "
+        "date_end > '0001-01-01' and date_end < '3000-01-01' union select p."
+        "date_start, p.time_start, p.start_flag, p.date_end, p.time_end, p."
+        "end_flag, p.time_zone, g2.title, g.grpid from dssdb.dsperiod as p "
+        "left join dssdb.dsgroup as g on (p.dsid = g.dsid and p.gindex = g."
+        "gindex) left join dssdb.dsgroup as g2 on (p.dsid = g2.dsid and g."
+        "pindex = g2.gindex) where p.dsid in " + g_ds_set + " and date_start > "
+        "'0001-01-01' and date_start < '3000-01-01' and date_end > "
+        "'0001-01-01' and date_end < '3000-01-01' and g2.title is not null "
+        "order by title");
   } else {
     q.set("select date_start, time_start, start_flag, date_end, time_end, "
-        "end_flag, time_zone, NULL, NULL from dssdb.dsperiod where dsid = 'ds" +
-        metautils::args.dsnum + "' and date_start > '0001-01-01' and "
-        "date_start < '3000-01-01' and date_end > '0001-01-01' and date_end < "
-        "'3000-01-01'");
+        "end_flag, time_zone, NULL, NULL from dssdb.dsperiod where dsid in " +
+        g_ds_set + " and date_start > '0001-01-01' and date_start < "
+        "'3000-01-01' and date_end > '0001-01-01' and date_end < '3000-01-01'");
   }
   if (q.submit(g_metadata_server) < 0) {
     log_error2("query: " + q.show() + " returned error: " + q.error(), F,
@@ -1137,10 +1137,9 @@ bool add_temporal_range(TokenDocument& tdoc, string dsnum2, size_t& swp_cnt) {
   }
   if (q.num_rows() == 0) {
     q.set("select date_start, time_start, start_flag, date_end, time_end, "
-        "end_flag, time_zone, NULL, NULL from dssdb.dsperiod where dsid = "
-        "'ds" + metautils::args.dsnum + "' and date_start > '0001-01-01' and "
-        "date_start < '3000-01-01' and date_end > '0001-01-01' and date_end < "
-        "'3000-01-01'");
+        "end_flag, time_zone, NULL, NULL from dssdb.dsperiod where dsid in "
+        + g_ds_set + " and date_start > '0001-01-01' and date_start < "
+        "'3000-01-01' and date_end > '0001-01-01' and date_end < '3000-01-01'");
     if (q.submit(g_metadata_server) < 0) {
       log_error2("query: " + q.show() + " returned error: " + q.error(), F,
           "dsgen", USER);
@@ -1150,8 +1149,8 @@ bool add_temporal_range(TokenDocument& tdoc, string dsnum2, size_t& swp_cnt) {
   if (q.num_rows() > 0) {
     tdoc.add_if("__HAS_TEMPORAL_RANGE__");
     if (q.num_rows() > 1) {
-      LocalQuery qgp("distinct gindex", "dssdb.dsperiod", "dsid = 'ds" +
-          metautils::args.dsnum + "'");
+      LocalQuery qgp("distinct gindex", "dssdb.dsperiod", "dsid in " +
+          g_ds_set);
       if (qgp.submit(g_metadata_server) < 0) {
         log_error2("query: " + qgp.show() + " returned error: " + qgp.error(),
             F, "dsgen", USER);
@@ -1161,10 +1160,10 @@ bool add_temporal_range(TokenDocument& tdoc, string dsnum2, size_t& swp_cnt) {
         tdoc.add_if("__HAS_TEMPORAL_BY_GROUP1__");
         LocalQuery qdt("select min(concat(date_start, ' ', time_start)), min("
             "start_flag), max(concat(date_end, ' ', time_end)), min(end_flag), "
-            "time_zone from dssdb.dsperiod where dsid = 'ds" + metautils::args.
-            dsnum + "' and date_start > '0001-01-01' and date_start < "
-            "'3000-01-01' and date_end > '0001-01-01' and date_end < "
-            "'3000-01-01' group by dsid, time_zone");
+            "time_zone from dssdb.dsperiod where dsid in " + g_ds_set + " and "
+            "date_start > '0001-01-01' and date_start < '3000-01-01' and "
+            "date_end > '0001-01-01' and date_end < '3000-01-01' group by "
+            "dsid, time_zone");
         if (qdt.submit(g_metadata_server) < 0) {
           log_error2("query: " + qdt.show() + " returned error: " + qdt.error(),
               F, "dsgen", USER);
@@ -1291,20 +1290,20 @@ void add_usage_restrictions(TokenDocument& tdoc) {
 }
 
 void add_variable_table(string data_format, TokenDocument& tdoc, string& json) {
-  if (exists_on_server(metautils::directives.web_server, "/data/web/datasets/ds"
-      + metautils::args.dsnum + "/metadata/" + data_format + ".html",
+  if (exists_on_server(metautils::directives.web_server, "/data/web/datasets/"
+      + metautils::args.dsid + "/metadata/" + data_format + ".html",
       metautils::directives.rdadata_home)) {
     auto token = to_upper(data_format);
     append(json, "{\"format\": \"" + token + "\", \"html\": \"metadata/" +
         data_format + ".html?_do=y\"", ", ");
     tdoc.add_if("__FOUND_" + token + "_TABLE__");
-    auto tb = "<div>" + token + " parameter table:  <a href=\"/datasets/ds" +
-        metautils::args.dsnum + "/#metadata/" + data_format + ".html?_do=y\">"
+    auto tb = "<div>" + token + " parameter table:  <a href=\"/datasets/" +
+        metautils::args.dsid + "/#metadata/" + data_format + ".html?_do=y\">"
         "HTML</a>";
     if (exists_on_server(metautils::directives.web_server, "/data/web/datasets/"
-        "ds" + metautils::args.dsnum + "/metadata/" + data_format + ".xml",
+        + metautils::args.dsid + "/metadata/" + data_format + ".xml",
         metautils::directives.rdadata_home)) {
-      tb += " | <a href=\"/datasets/ds" + metautils::args.dsnum + "/metadata/" +
+      tb += " | <a href=\"/datasets/" + metautils::args.dsid + "/metadata/" +
           data_format + ".xml\">XML</a></div>";
       append(json, "\"xml\": \"metadata/" + data_format + ".xml?_do=y\"",
           ", ");
@@ -1315,18 +1314,18 @@ void add_variable_table(string data_format, TokenDocument& tdoc, string& json) {
 }
 
 void add_grouped_variables(TokenDocument& tdoc, size_t& swp_cnt) {
-  LocalQuery q("gindex, title", "dssdb.dsgroup", "dsid = 'ds" + metautils::args.
-      dsnum + "' and pindex = 0 and dwebcnt > 0");
+  LocalQuery q("gindex, title", "dssdb.dsgroup", "dsid in " + g_ds_set + "and "
+      "pindex = 0 and dwebcnt > 0");
   if (q.submit(g_metadata_server) != 0) {
     return;
   }
   stringstream ss;
   for (const auto& r : q) {
     if (exists_on_server(metautils::directives.web_server, "/data/web/datasets/"
-        "ds" + metautils::args.dsnum + "/metadata/customize.WGrML." + r[0],
+        + metautils::args.dsid + "/metadata/customize.WGrML." + r[0],
         metautils::directives.rdadata_home)) {
-      auto f = unixutils::remote_web_file("https://rda.ucar.edu/datasets/ds" +
-          metautils::args.dsnum + "/metadata/customize.WGrML." + r[0], temp_dir.
+      auto f = unixutils::remote_web_file("https://rda.ucar.edu/datasets/" +
+          metautils::args.dsid + "/metadata/customize.WGrML." + r[0], temp_dir.
           name());
       if (!f.empty()) {
         std::ifstream ifs;
@@ -1391,8 +1390,8 @@ void add_variables(TokenDocument& tdoc, size_t& swp_cnt) {
   static const string F = this_function_label(__func__);
   LocalQuery q("select split_part(path, ' > ', -1) as var from search."
       "variables as v left join search.gcmd_sciencekeywords as g on g.uuid = v."
-      "keyword where v.vocabulary = 'GCMD' and v.dsid = '" + metautils::args.
-      dsnum + "' order by var");
+      "keyword where v.vocabulary = 'GCMD' and v.dsid in " + g_ds_set +
+      " order by var");
   if (q.submit(g_metadata_server) < 0) {
     log_error2("query: " + q.show() + " returned error: " + q.error(), F,
         "dsgen", USER);
@@ -1441,9 +1440,9 @@ void add_vertical_levels(TokenDocument& tdoc, const vector<string>& data_types,
         string v = "See the <a href=\"#metadata/detailed.html?_do=y&view=level"
             "\">detailed metadata</a> for level information";
         if (exists_on_server(metautils::directives.web_server,
-            "/data/web/datasets/ds" + metautils::args.dsnum + "/metadata/"
+            "/data/web/datasets/" + metautils::args.dsid + "/metadata/"
             "grib2_levels.html", metautils::directives.rdadata_home)) {
-          v += "<br /><a href=\"/datasets/ds" + metautils::args.dsnum +
+          v += "<br /><a href=\"/datasets/" + metautils::args.dsid +
               "/#metadata/grib2_levels.html?_do=y\">GRIB2 level table</a>"; 
         }
         tdoc.add_replacement("__VERTICAL_LEVELS__", v);
@@ -1607,8 +1606,8 @@ void add_data_types(TokenDocument& tdoc, const vector<string>& data_types,
 
 void fill_map(unordered_map<string, string>& map, string query) {
   static const string F = this_function_label(__func__);
-  LocalQuery q("select gindex, title from dssdb.dsgroup where dsid = 'ds" +
-       metautils::args.dsnum + "'");
+  LocalQuery q("select gindex, title from dssdb.dsgroup where dsid in " +
+       g_ds_set);
   if (q.submit(g_metadata_server) < 0) {
     log_error2("error: " + q.error() + " while getting groups data", F, "dsgen",
         USER);
@@ -1618,19 +1617,18 @@ void fill_map(unordered_map<string, string>& map, string query) {
   }
 }
 
-void add_spatial_coverage(TokenDocument& tdoc, string dsnum2, const vector<
-    string>& data_types, bool found_content_metadata, bool grouped_periods,
-    size_t& swp_cnt) {
+void add_spatial_coverage(TokenDocument& tdoc, const vector<string>& data_types,
+    bool found_content_metadata, bool grouped_periods, size_t& swp_cnt) {
   static const string F = this_function_label(__func__);
   unordered_map<string, string> grps, rfils, mfils;
   if (grouped_periods) {
-    string s = "select gindex, title from dssdb.dsgroup where dsid = 'ds" +
-        metautils::args.dsnum + "'";
+    string s = "select gindex, title from dssdb.dsgroup where dsid in " +
+        g_ds_set;
     fill_map(grps, s);
-    s = "select wfile, tindex from dssdb.wfile where dsid = 'ds" + metautils::
-        args.dsnum + "' and type = 'D' and " "status = 'P'";
+    s = "select wfile, tindex from dssdb.wfile where dsid in " + g_ds_set +
+        " and type = 'D' and " "status = 'P'";
     fill_map(rfils, s);
-    s = "select code, id from \"WGrML\".ds" + dsnum2 + "_webfiles2";
+    s = "select code, id from \"WGrML\"." + metautils::args.dsid + "_webfiles2";
     fill_map(mfils, s);
   }
   unordered_map<string, shared_ptr<unordered_set<string>>> udefs;
@@ -1640,11 +1638,11 @@ void add_spatial_coverage(TokenDocument& tdoc, string dsnum2, const vector<
       if (dt == "grid") {
         LocalQuery qgc;
         if (grouped_periods) {
-          qgc.set("grid_definition_codes, file_code", "WGrML.ds" + dsnum2 +
-              "_grid_definitions");
+          qgc.set("grid_definition_codes, file_code", "WGrML." + metautils::
+              args.dsid + "_grid_definitions");
         } else {
-          qgc.set("select distinct grid_definition_codes from \"WGrML\".ds" +
-              dsnum2 + "_agrids2");
+          qgc.set("select distinct grid_definition_codes from \"WGrML\"." +
+              metautils::args.dsid + "_agrids2");
         }
         if (qgc.submit(g_metadata_server) < 0) {
           log_error2("error: " + qgc.error() + " while getting grid "
@@ -1863,8 +1861,8 @@ void add_spatial_coverage(TokenDocument& tdoc, string dsnum2, const vector<
 void add_contributors(TokenDocument& tdoc) {
   static const string F = this_function_label(__func__);
   LocalQuery q("select g.path from search.contributors_new as c left join "
-      "search.gcmd_providers as g on g.uuid = c.keyword where c.dsid = '" +
-      metautils::args.dsnum + "' and c.vocabulary = 'GCMD'");
+      "search.gcmd_providers as g on g.uuid = c.keyword where c.dsid in " +
+      g_ds_set + " and c.vocabulary = 'GCMD'");
   if (q.submit(g_metadata_server) < 0) {
     log_error2("query: " + q.show() + " returned error: " + q.error(), F,
         "dsgen", USER);
@@ -1901,14 +1899,13 @@ void add_contributors(TokenDocument& tdoc) {
 
 void add_data_volume(TokenDocument& tdoc, size_t& swp_cnt) {
   static const string F = this_function_label(__func__);
-  LocalQuery q("dweb_size", "dssdb.dataset", "dsid = 'ds" + metautils::args.
-      dsnum + "'");
+  LocalQuery q("dweb_size", "dssdb.dataset", "dsid in " + g_ds_set);
   if (q.submit(g_metadata_server) < 0) {
     log_error2("query: " + q.show() + " returned error: " + q.error(), F,
         "dsgen", USER);
   }
   LocalQuery q2("select dweb_size, title, grpid from dssdb.dsgroup where dsid "
-      "= 'ds" + metautils::args.dsnum + "' and pindex = 0 and dweb_size > 0");
+      "in " + g_ds_set + " and pindex = 0 and dweb_size > 0");
   if (q2.submit(g_metadata_server) < 0) {
     log_error2("query: " + q2.show() + " returned error: " + q2.error(), F,
         "dsgen", USER);
@@ -2054,7 +2051,7 @@ void add_related_datasets(TokenDocument& tdoc) {
 void add_more_details(TokenDocument& tdoc) {
   static const string F = this_function_label(__func__);
   if (exists_on_server(metautils::directives.web_server, "/data/web/"
-      "datasets/ds" + metautils::args.dsnum + "/metadata/detailed.html",
+      "datasets/" + metautils::args.dsid + "/metadata/detailed.html",
       metautils::directives.rdadata_home)) {
     tdoc.add_if("__HAS_MORE_DETAILS__");
   }
@@ -2086,7 +2083,6 @@ void add_data_license() {
 
 void generate_description(string type, string tdir_name) {
   static const string F = this_function_label(__func__);
-  string dsnum2 = substitute(metautils::args.dsnum, ".", "");
   ofstream ofs;
   if (g_dataset_type == "W") {
     open_output(ofs, tdir_name + "/test_description.html");
@@ -2122,11 +2118,11 @@ void generate_description(string type, string tdir_name) {
   size_t swp_cnt = 0; // count for swapped divs
   vector<string> formats, data_types;
   auto found_content_metadata = false;
-  initialize(dsnum2, formats, data_types, found_content_metadata);
-  tdoc.add_replacement("__DSNUM__", metautils::args.dsnum);
+  initialize(formats, data_types, found_content_metadata);
+  tdoc.add_replacement("__DSNUM__", metautils::args.dsid);
 
   add_acknowledgement(tdoc); //wagtail
-  auto grouped_periods = add_temporal_range(tdoc, dsnum2, swp_cnt); // wagtail
+  auto grouped_periods = add_temporal_range(tdoc,swp_cnt); // wagtail
   add_update_frequency(tdoc); // wagtail
   add_access_restrictions(tdoc); // wagtail
   add_usage_restrictions(tdoc); // wagtail
@@ -2136,7 +2132,7 @@ void generate_description(string type, string tdir_name) {
     add_temporal_frequency(tdoc);
   }
   add_data_types(tdoc, data_types, found_content_metadata); // wagtail
-  add_spatial_coverage(tdoc, dsnum2, data_types, found_content_metadata,
+  add_spatial_coverage(tdoc, data_types, found_content_metadata,
      grouped_periods, swp_cnt); // wagtail
   add_contributors(tdoc); // wagtail
   add_related_websites(tdoc); // wagtail
@@ -2169,17 +2165,16 @@ int main(int argc, char **argv) {
     no_dset_waf = true;
     ++next;
   }
-  metautils::args.dsnum = argv[next];
-  if (metautils::args.dsnum == "--help") {
+  metautils::args.dsid = argv[next];
+  if (metautils::args.dsid == "--help") {
     show_usage();
     exit(0);
   }
-  if (has_beginning(metautils::args.dsnum, "^ds")) {
-    metautils::args.dsnum = metautils::args.dsnum.substr(2);
-  }
-  if (metautils::args.dsnum >= "999.0") {
+  metautils::args.dsid = ng_gdex_id(metautils::args.dsid);
+  if (metautils::args.dsid >= "d999000") {
     no_dset_waf = true;
   }
+  g_ds_set = to_sql_tuple_string(ds_aliases(metautils::args.dsid));
   metautils::args.args_string = unixutils::unix_args_string(argc, argv);
   metautils::read_config("dsgen", USER);
   if (!temp_dir.create(metautils::directives.temp_path)) {
@@ -2188,8 +2183,7 @@ int main(int argc, char **argv) {
   g_metadata_server.connect(metautils::directives.database_server, metautils::
       directives.metadb_username, metautils::directives.metadb_password,
       "rdadb");
-  LocalQuery q("select type from search.datasets where dsid = '" + metautils::
-      args.dsnum + "'");
+  LocalQuery q("select type from search.datasets where dsid in " + g_ds_set);
   Row row;
   if (q.submit(g_metadata_server) < 0 || !q.fetch_row(row)) {
     log_error2("unable to determine dataset type", F, "dsgen", USER);
@@ -2223,7 +2217,7 @@ int main(int argc, char **argv) {
     if (g_metadata_server.insert(
           "metautil.dset_waf",
           "dsid, uflag",
-          "'" + metautils::args.dsnum + "', ''",
+          "'" + metautils::args.dsid + "', ''",
           "(dsid, uflag) do update set uflag = excluded.uflag"
           ) < 0) {
       metautils::log_warning("not marked for DSET WAF update", "dsgen", USER);
