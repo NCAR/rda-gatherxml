@@ -7,6 +7,7 @@ using miscutils::this_function_label;
 using std::cerr;
 using std::endl;
 using std::string;
+using strutils::ng_gdex_id;
 using strutils::to_lower;
 
 extern const string USER;
@@ -21,10 +22,14 @@ void parse_args(char arg_delimiter) {
       arg_delimiter));
   for (size_t n = 0; n < sp.size()-1; ++n) {
     if (sp[n] == "-d") {
-      metautils::args.dsnum = sp[++n];
-      if (metautils::args.dsnum.substr(0, 2) == "ds") {
-        metautils::args.dsnum = metautils::args.dsnum.substr(2);
-      }
+      metautils::args.dsid = ng_gdex_id(sp[++n]);
+
+// remove the next 4 lines after dsid conversion
+metautils::args.dsnum = sp[n];
+if (metautils::args.dsnum.substr(0, 2) == "ds") {
+metautils::args.dsnum = metautils::args.dsnum.substr(2);
+}
+
     } else if (sp[n] == "-f") {
       metautils::args.data_format = sp[++n];
     } else if (sp[n] == "-G") {
