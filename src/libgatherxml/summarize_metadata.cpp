@@ -440,9 +440,8 @@ unordered_set<string> summarize_frequencies_from_wgrml_by_dataset(Server&
     server, string caller, string user) {
   static const string F = this_function_label(__func__);
   unordered_set<string> sfreq; // return value
-  auto ds = substitute(metautils::args.dsnum, ".", "");
   LocalQuery q("select distinct frequency_type, nsteps_per, unit from "
-      "\"WGrML\".ds" + ds + "_frequencies where nsteps_per > 0");
+      "\"WGrML\"." + metautils::args.dsid + "_frequencies where nsteps_per > 0");
 #ifdef DUMP_QUERIES
   {
   Timer tm;
@@ -462,7 +461,7 @@ unordered_set<string> summarize_frequencies_from_wgrml_by_dataset(Server&
     if (server.insert(
           "WGrML.frequencies",
           "dsid, nsteps_per, unit, uflg",
-          "'" + metautils::args.dsnum + "', " + r[1] + ", '" + r[2] + "', '" +
+          "'" + metautils::args.dsid + "', " + r[1] + ", '" + r[2] + "', '" +
               uflg + "'",
           "(dsid, nsteps_per, unit) do update set uflg = excluded.uflg"
           ) < 0) {
@@ -476,8 +475,8 @@ unordered_set<string> summarize_frequencies_from_wgrml_by_dataset(Server&
     }
   }
   q.set("select min(distinct frequency_type), max(distinct frequency_type), "
-      "count(distinct frequency_type) from \"WGrML\".ds" + ds + "_frequencies "
-      "where nsteps_per = 0");
+      "count(distinct frequency_type) from \"WGrML\"." + metautils::args.dsid +
+      "_frequencies where nsteps_per = 0");
 #ifdef DUMP_QUERIES
   {
   Timer tm;
@@ -502,7 +501,7 @@ unordered_set<string> summarize_frequencies_from_wgrml_by_dataset(Server&
         if (server.insert(
               "WGrML.frequencies",
               "dsid, nsteps_per, unit, uflg",
-              "'" + metautils::args.dsnum + "', " + to_string(l) + ", '" + u +
+              "'" + metautils::args.dsid + "', " + to_string(l) + ", '" + u +
                   "', '" + uflg + "'",
               "(dsid, nsteps_per, unit) do update set uflg = excluded.uflg"
               ) < 0) {
@@ -518,7 +517,7 @@ unordered_set<string> summarize_frequencies_from_wgrml_by_dataset(Server&
       }
     }
   }
-  server._delete("WGrML.frequencies", "dsid =  '" + metautils::args.dsnum +
+  server._delete("WGrML.frequencies", "dsid =  '" + metautils::args.dsid +
       "' and uflg != '" + uflg + "'");
   server._delete("search.time_resolutions", "dsid = '" + metautils::args.dsnum +
       "' and origin = 'WGrML'");
@@ -529,12 +528,11 @@ unordered_set<string> summarize_frequencies_from_wgrml_by_data_file(Server&
     server, string file_id_code, string caller, string user) {
   static const string F = this_function_label(__func__);
   unordered_set<string> sfreq; // return value
-  auto ds = substitute(metautils::args.dsnum, ".", "");
 
   // get all of the time ranges for the given file id
   LocalQuery qt("select time_range_code, min(start_date), max(end_date), sum("
-      "nsteps) from \"WGrML\".ds" + ds + "_grids2 where file_code = " +
-      file_id_code + " group by time_range_code, parameter");
+      "nsteps) from \"WGrML\"." + metautils::args.dsid + "_grids2 where "
+      "file_code = " + file_id_code + " group by time_range_code, parameter");
 #ifdef DUMP_QUERIES
   {
   Timer tm;
@@ -685,16 +683,16 @@ unordered_set<string> summarize_frequencies_from_wgrml_by_data_file(Server&
       }
     }
   }
-  if (!table_exists(server, "WGrML.ds" + ds + "_frequencies")) {
+  if (!table_exists(server, "WGrML." + metautils::args.dsid + "_frequencies")) {
     string e;
-    if (server.duplicate_table("WGrML.template_frequencies", "WGrML.ds" + ds +
-        "_frequencies") < 0) {
-      log_error2("'" + server.error() + "' while creating table WGrML.ds" + ds +
-          "_frequencies", F, caller, user);
+    if (server.duplicate_table("WGrML.template_frequencies", "WGrML." +
+        metautils::args.dsid + "_frequencies") < 0) {
+      log_error2("'" + server.error() + "' while creating table WGrML." +
+          metautils::args.dsid + "_frequencies", F, caller, user);
     }
   } else {
-    server._delete("WGrML.ds" + ds + "_frequencies", "file_code = " +
-        file_id_code);
+    server._delete("WGrML." + metautils::args.dsid + "_frequencies",
+        "file_code = " + file_id_code);
   }
   if (!fset.empty()) {
     auto uflg = strand(3);
@@ -703,7 +701,7 @@ unordered_set<string> summarize_frequencies_from_wgrml_by_data_file(Server&
       if (server.insert(
             "WGrML.frequencies",
             "dsid, nsteps_per, unit, uflg",
-            "'" + metautils::args.dsnum + "', " + sp[1] + ", '" + sp[2] + "', '"
+            "'" + metautils::args.dsid + "', " + sp[1] + ", '" + sp[2] + "', '"
                 + uflg + "'",
             "(dsid, nsteps_per, unit) do update set uflg = excluded.uflg"
             ) < 0) {
@@ -712,7 +710,7 @@ unordered_set<string> summarize_frequencies_from_wgrml_by_data_file(Server&
             caller, user);
       }
       if (server.insert(
-            "WGrML.ds" + ds + "_frequencies",
+            "WGrML." + metautils::args.dsid + "_frequencies",
             "file_code, frequency_type, nsteps_per, unit",
             file_id_code + ", '" + sp[0] + "', " + sp[1] + ", '" + sp[2] + "'",
             ""
@@ -722,11 +720,11 @@ unordered_set<string> summarize_frequencies_from_wgrml_by_data_file(Server&
             F, caller, user);
       }
     }
-    server._delete("WGrML.frequencies", "dsid =  '" + metautils::args.dsnum
+    server._delete("WGrML.frequencies", "dsid =  '" + metautils::args.dsid
         + "' and uflg != '" + uflg + "'");
   } else {
     if (server.insert(
-          "WGrML.ds" + ds + "_frequencies",
+          "WGrML." + metautils::args.dsid + "_frequencies",
           "file_code, frequency_type, nsteps_per, unit",
           file_id_code + ", '" + smin + "', 0, ''",
           ""
@@ -757,9 +755,8 @@ unordered_set<string> summarize_frequencies_from_wobml(Server& server, string
     file_id_code, string caller, string user) {
   static const string F = this_function_label(__func__);
   unordered_set<string> fset;
-  LocalQuery q("select min(min_obs_per), max(max_obs_per), unit from ObML.ds" +
-      substitute(metautils::args.dsnum, ".", "") + "_frequencies group by "
-      "unit");
+  LocalQuery q("select min(min_obs_per), max(max_obs_per), unit from ObML." +
+      metautils::args.dsid + "_frequencies group by unit");
 #ifdef DUMP_QUERIES
   {
   Timer tm;
@@ -821,8 +818,7 @@ void summarize_frequencies(string caller, string user, string file_id_code) {
   Server mysrv(metautils::directives.database_server, metautils::directives.
       metadb_username, metautils::directives.metadb_password, "rdadb");
   for (const auto& e : v) {
-    auto t = e.first + ".ds" + substitute(metautils::args.dsnum, ".", "") +
-        "_frequencies";
+    auto t = e.first + "." + metautils::args.dsid + "_frequencies";
     if (table_exists(mysrv, t)) {
       auto e2 = e.second(mysrv, file_id_code, caller, user);
 
