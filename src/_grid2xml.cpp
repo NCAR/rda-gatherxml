@@ -947,7 +947,7 @@ int main(int argc, char **argv) {
         trim(e);
         log_error2(e, "main(): running scm", "grid2xml", USER);
       }
-    } else if (metautils::args.dsnum == "test") {
+    } else if (metautils::args.dsid == "test") {
       cout << "Output is in:" << endl;
       cout << "  " << tdir << "/" << metautils::args.filename << ".GrML" <<
           endl;
