@@ -47,6 +47,7 @@ using strutils::chop;
 using strutils::ftos;
 using strutils::itos;
 using strutils::lltos;
+using strutils::ng_gdex_id;
 using strutils::replace_all;
 using strutils::split;
 using strutils::strand;
@@ -123,11 +124,15 @@ void parse_args(int argc, char **argv) {
   auto sp = split(metautils::args.args_string, "`");
   for (size_t n = 0; n < sp.size(); ++n) {
     if (sp[n] == "-d") {
-      metautils::args.dsnum = sp[++n];
-      if (regex_search(metautils::args.dsnum, regex("^ds"))) {
-        metautils::args.dsnum = metautils::args.dsnum.substr(2);
-      }
-      local_args.dsnum2 = substitute(metautils::args.dsnum, ".", "");
+      metautils::args.dsid = ng_gdex_id(sp[++n]);
+
+// remove the next 5 lines after dsid conversion
+metautils::args.dsnum = sp[n];
+if (regex_search(metautils::args.dsnum, regex("^ds"))) {
+metautils::args.dsnum = metautils::args.dsnum.substr(2);
+}
+local_args.dsnum2 = substitute(metautils::args.dsnum, ".", "");
+
     } else if (sp[n] == "-f") {
       metautils::args.filename = sp[++n];
     } else if (sp[n] == "-C") {
@@ -245,9 +250,9 @@ void build_wms_capabilities() {
     log_error2("query '" + q.show() + "' failed", F, "iinv", USER);
   }
   string e;
-  auto t = table_names(server, "IGrML", "%ds%" + local_args.dsnum2 +
-      "_inventory_" + fcod + "!%", e);
-  if (t.size() == 0) {
+  auto tbls = table_names(server, "IGrML", metautils::args.dsid + "_inventory_"
+      + fcod + "!%", e);
+  if (tbls.empty()) {
     return;
   }
   auto dfil = gfil.substr(0, gfil.rfind("."));
@@ -342,9 +347,9 @@ void build_wms_capabilities() {
           ofs << "            <Title>" << pmapper.description(dfmt, pcod) <<
               "</Title>" << endl;
 
-          q.set("select distinct valid_date from \"IGrML\".ds" + local_args.
-              dsnum2 + "_inventory_" + fcod + "!" + pcod + " as i left join "
-              "\"WGrML\".ds" + local_args.dsnum2 + "_webfiles2 as w on w.code "
+          q.set("select distinct valid_date from \"IGrML\"." + metautils::args.
+              dsid + "_inventory_" + fcod + "!" + pcod + " as i left join "
+              "\"WGrML\"." + metautils::args.dsid + "_webfiles2 as w on w.code "
               "= i.webID_code where timeRange_code = " + tcod + " and "
               "gridDefinition_code = " + gcod + " and level_code = " +
               level_code + " and w.id = '" + dfil + "' order by valid_date");
@@ -413,9 +418,9 @@ void build_wms_capabilities() {
           ofs << "          <Layer>" << endl;
           ofs << "            <Title>" << pmapper.description(dfmt, pcod) <<
               "</Title>" << endl;
-          q.set("select distinct valid_date from \"IGrML\".ds" + local_args.
-              dsnum2 + "_inventory_" + fcod + "!" + pcod + " as i left join "
-              "\"WGrML\".ds" + local_args.dsnum2 + "_webfiles2 as w on w.code "
+          q.set("select distinct valid_date from \"IGrML\"." + metautils::args.
+              dsid + "_inventory_" + fcod + "!" + pcod + " as i left join "
+              "\"WGrML\"." + metautils::args.dsid + "_webfiles2 as w on w.code "
               "= i.webID_code where timeRange_code = " + tcod + " and "
               "gridDefinition_code = " + gcod + " and level_code = " + lcod +
               " and w.id = '" + dfil + "' order by valid_date");
@@ -916,7 +921,7 @@ long long process_grml_inventory_entry(Server& server, int line_number, string
     wss << " and ensemble = ''";
   }
   auto param = inv_data.format_code + "!" + inv_data.plst[sp[6]];
-  auto tbl = "IGrML.ds" + local_args.dsnum2 + "_inventory_" + inv_data.pclst[
+  auto tbl = "IGrML." + metautils::args.dsid + "_inventory_" + inv_data.pclst[
       param];
   insert_into_db(server, line_number, iss, tbl, uflg, wss, inv_data);
   return stoll(inv_data.byte_length);
@@ -933,16 +938,16 @@ void insert_grml_inventory() {
   }
   auto wid = substitute(metautils::args.filename, ".GrML_inv", "");
   replace_all(wid, "%", "/");
-  LocalQuery q("select code, format_code, tindex from \"WGrML\".ds" +
-      local_args.dsnum2 + "_webfiles2 as w left join dssdb.wfile as x on (x."
-      "dsid = 'ds" + metautils::args.dsnum + "' and x.type = 'D' and x.wfile = "
-      "w.id) where w.id = '" + wid + "'");
+  LocalQuery q("select code, format_code, tindex from \"WGrML\"." + metautils::
+      args.dsid + "_webfiles2 as w left join dssdb.wfile as x on (x.dsid = 'ds"
+      + metautils::args.dsnum + "' and x.type = 'D' and x.wfile = w.id) where "
+      "w.id = '" + wid + "'");
   if (q.submit(server) < 0) {
     log_error2("error: '" + q.error() + "' while looking for code from "
         "webfiles", F, "iinv", USER);
   }
   if (q.num_rows() == 0) {
-    log_error2("did not find " + wid + " in WGrML.ds" + local_args.dsnum2 +
+    log_error2("did not find " + wid + " in WGrML." + metautils::args.dsid +
         "_webfiles2", F, "iinv", USER);
   }
   Row row;
@@ -976,7 +981,7 @@ void insert_grml_inventory() {
   }
   ifs.close();
   for (const auto& pc : inv_data.pclst) {
-    server._delete("IGrML.ds" + local_args.dsnum2 + "_inventory_" + pc.second,
+    server._delete("IGrML." + metautils::args.dsid + "_inventory_" + pc.second,
         "file_code = " + inv_data.file_code + " and uflag != '" + uflg + "'");
   }
   if (!table_exists(server, "IGrML.ds" + local_args.dsnum2 +
@@ -988,7 +993,7 @@ void insert_grml_inventory() {
     }
   }
   if (server.insert(
-        "IGrML.ds" + local_args.dsnum2 + "_inventory_summary",
+        "IGrML." + metautils::args.dsid + "_inventory_summary",
         "file_code, byte_length, dupe_vdates",
         inv_data.file_code + ", " + lltos(tbyts) + ", '" + dup + "'",
         "(file_code) do update set byte_length = excluded.byte_length, "
@@ -1023,9 +1028,9 @@ void process_IDs(string type, Server& server, string ID_index, string ID_data,
     unordered_map<string, string>& id_table) {
   static const string F = this_function_label(__func__);
   auto sp = split(ID_data, "[!]");
-  string qs = "select i.code from WObML.ds" + local_args.dsnum2 + "_ids as i "
-      "left join WObML.id_types as t on t.code = i.id_type_code where i.id = "
-      "'" + sp[1] + "' and t.id_type = '" + sp[0] + "' and i.sw_lat = " +
+  string qs = "select i.code from \"WObML\"." + metautils::args.dsid + "_ids "
+      "as i left join \"WObML\".id_types as t on t.code = i.id_type_code where "
+      "i.id = '" + sp[1] + "' and t.id_type = '" + sp[0] + "' and i.sw_lat = " +
       metatranslations::string_coordinate_to_db(sp[2]) + " and i.sw_lon = " +
       metatranslations::string_coordinate_to_db(sp[3]);
   if (sp.size() > 4) {
@@ -1103,11 +1108,11 @@ void insert_obml_netcdf_time_series_inventory(std::ifstream& ifs, Server&
           local_args.dsnum2 + "_data_types'", F, "iinv", USER);
     }
   } else {
-    if (server._delete("IObML.ds" + local_args.dsnum2 + "_inventory_summary",
+    if (server._delete("IObML." + metautils::args.dsid + "_inventory_summary",
         "file_code = " + file_code) < 0) {
       log_error2("error: '" + server.error() + "' while trying to delete from "
-          "'ds" + local_args.dsnum2 + "_inventory_summary' where file_code = " +
-          file_code, F, "iinv", USER);
+          "'" + metautils::args.dsid + "_inventory_summary' where file_code = "
+          + file_code, F, "iinv", USER);
     }
   }
   stringstream tss;
@@ -1168,15 +1173,15 @@ void insert_obml_netcdf_time_series_inventory(std::ifstream& ifs, Server&
           if (dec != l_dec) {
             if (tss.tellp() > 0) {
               check_for_times_table(server, "time_series", l_dec);
-              if (server.command("insert into IObML.ds" + local_args.dsnum2 +
-                  "_time_series_times_" + l_dec + "0 values " + tss.str().
+              if (server.command("insert into \"IObML\"." + metautils::args.dsid
+                  + "_time_series_times_" + l_dec + "0 values " + tss.str().
                   substr(1) + " on duplicate key update time_index = values("
                   "time_index), uflag = values(uflag)") < 0) {
                 log_error2("error: '" + server.error() + "' while trying to "
-                    "insert list of times into IObML.ds" + local_args.dsnum2 +
+                    "insert list of times into IObML." + metautils::args.dsid +
                     "_time_series_times_" + l_dec + "0", F, "iinv", USER);
               }
-              server._delete("IObML.ds" + local_args.dsnum2 +
+              server._delete("IObML." + metautils::args.dsid +
                   "_time_series_times_" + l_dec + "0", "file_code = " +
                   file_code + " and uflag != '" + uflg + "'");
             }
@@ -1204,15 +1209,15 @@ void insert_obml_netcdf_time_series_inventory(std::ifstream& ifs, Server&
   ifs.close();
   if (tss.tellp() > 0) {
     check_for_times_table(server, "time_series", l_dec);
-    if (server.command("insert into IObML.ds" + local_args.dsnum2 +
+    if (server.command("insert into \"IObML\"." + metautils::args.dsid +
         "_time_series_times_" + l_dec + "0 values " + tss.str().substr(1) +
         " on duplicate key update time_index = values(time_index), uflag = "
         "values(uflag)") < 0) {
       log_error2("error: '" + server.error() + "' while trying to insert list "
-          "of times into IObML.ds" + local_args.dsnum2 + "_time_series_times_" +
-          l_dec + "0", F, "iinv", USER);
+          "of times into IObML." + metautils::args.dsid + "_time_series_times_"
+          + l_dec + "0", F, "iinv", USER);
     }
-    server._delete("IObML.ds" + local_args.dsnum2 + "_time_series_times_" +
+    server._delete("IObML." + metautils::args.dsid + "_time_series_times_" +
         l_dec + "0", "file_code = " + file_code + " and uflag != '" + uflg +
         "'");
   }
@@ -1245,7 +1250,7 @@ void insert_obml_netcdf_time_series_inventory(std::ifstream& ifs, Server&
         for (const auto& p : pmap) {
           auto k = o.first + "|" + p.first + "|" + dve.data->var_name;
           if (dmap.find(k) == dmap.end()) {
-            LocalQuery q("code", "WObML.ds" + local_args.dsnum2 +
+            LocalQuery q("code", "WObML." + metautils::args.dsid +
                 "_data_types_list", "observation_type_code = " + o.second +
                 " and platform_type_code = " + p.second + " and data_type = 'ds"
                 + metautils::args.dsnum + ":" + dve.data->var_name + "'");
@@ -1257,16 +1262,18 @@ void insert_obml_netcdf_time_series_inventory(std::ifstream& ifs, Server&
             }
             dmap.emplace(k, row[0]);
             if (server.insert(
-                  "IObML.ds" + local_args.dsnum2 + "_data_types",
-                "file_code, id_code, data_type_code, value_type, byte_offset, "
-                    "byte_length, missing_ind, uflag",
-                file_code + ", " + sp_i[0] + ", " + row[0] + ", '" + dve.data->
-                    value_type + "', " + itos(dve.data->offset) + ", " + itos(
-                    dve.data->byte_len) + ", " + miss + ", '" + uflg + "'",
-                "(file_code, id_code, data_type_code) do update set value_type "
-                "= excluded.value_type, byte_offset = excluded.byte_offset, "
-                    "byte_length = excluded.byte_length, missing_ind = "
-                    "excluded.missing_ind, uflag = excluded.uflag"
+                  "IObML." + metautils::args.dsid + "_data_types",
+                  "file_code, id_code, data_type_code, value_type, "
+                      "byte_offset, byte_length, missing_ind, uflag",
+                  file_code + ", " + sp_i[0] + ", " + row[0] + ", '" + dve.
+                      data->value_type + "', " + itos(dve.data->offset) + ", " +
+                      itos(dve.data->byte_len) + ", " + miss + ", '" + uflg +
+                      "'",
+                  "(file_code, id_code, data_type_code) do update set "
+                      "value_type = excluded.value_type, byte_offset = "
+                      "excluded.byte_offset, byte_length = excluded."
+                      "byte_length, missing_ind = excluded.missing_ind, uflag "
+                      "= excluded.uflag"
                 ) < 0) {
               log_error2("error: '" + server.error() + "' while trying to "
                   "insert dataType information for '" + row[0] + "'", F, "iinv",
@@ -1309,9 +1316,9 @@ void insert_obml_netcdf_time_series_inventory(std::ifstream& ifs, Server&
     server._delete(ifil, "file_code = " + file_code + " and uflag != '" + uflg +
         "'");
   }
-  server._delete("IObML.ds" + local_args.dsnum2 + "_data_types", "file_code = "
+  server._delete("IObML." + metautils::args.dsid + "_data_types", "file_code = "
       + file_code + " and uflag != '" + uflg + "'");
-  if (server.command("insert into IObML.ds" + local_args.dsnum2 +
+  if (server.command("insert into \"IObML\"." + metautils::args.dsid +
       "_inventory_summary values (" + file_code + ", " + itos(nbyts) + ", " +
       itos(ndbyts) + ", '" + uflg + "') on duplicate key update byte_length = "
       "values(byte_length), data_type_length = values(data_type_length), uflag "
@@ -1319,7 +1326,7 @@ void insert_obml_netcdf_time_series_inventory(std::ifstream& ifs, Server&
     log_error2("error: '" + server.error() + "' while trying to insert file "
         "size data for '" + file_code + "'", F, "iinv", USER);
   }
-  server._delete("IObML.ds" + local_args.dsnum2 + "_inventory_summary",
+  server._delete("IObML." + metautils::args.dsid + "_inventory_summary",
       "file_code = " + file_code + " and uflag != '" + uflg + "'");
 }
 
@@ -1403,16 +1410,16 @@ void insert_obml_netcdf_point_inventory(std::ifstream& ifs, Server& server,
           if (dec != l_dec) {
             if (tss.tellp() > 0) {
               check_for_times_table(server, "point", l_dec);
-              if (server.command("insert into IObML.ds" + local_args.dsnum2 +
-                  "_point_times_" + l_dec + "0 values " + tss.str().substr(1) +
-                  " on duplicate key update time_index = values(time_index), "
+              if (server.command("insert into \"IObML\"." + metautils::args.dsid 
+                  + "_point_times_" + l_dec + "0 values " + tss.str().substr(1)
+                  + " on duplicate key update time_index = values(time_index), "
                   "lat = values(lat), lon = values(lon), uflag = values(uflag)")
                   < 0) {
                 log_error2("error: '" + server.error() + "' while trying to "
-                    "insert list of times into IObML.ds" + local_args.dsnum2 +
+                    "insert list of times into IObML." + metautils::args.dsid +
                     "_point_times_" + l_dec + "0", F, "iinv", USER);
               }
-              server._delete("IObML.ds" + local_args.dsnum2 + "_point_times_" +
+              server._delete("IObML." + metautils::args.dsid + "_point_times_" +
                   l_dec + "0", "file_code = " + file_code + " and uflag != '" +
                   uflg + "'");
             }
@@ -1443,15 +1450,15 @@ void insert_obml_netcdf_point_inventory(std::ifstream& ifs, Server& server,
   ifs.close();
   if (tss.tellp() > 0) {
     check_for_times_table(server, "point", l_dec);
-    if (server.command("insert into IObML.ds" + local_args.dsnum2 +
+    if (server.command("insert into \"IObML\"." + metautils::args.dsid +
         "_point_times_" + l_dec + "0 values " + tss.str().substr(1) + " on "
         "duplicate key update time_index = values(time_index), lat = values("
         "lat), lon = values(lon), uflag = values(uflag)") < 0) {
       log_error2("error: '" + server.error() + "' while trying to insert list "
-          "of times into IObML.ds" + local_args.dsnum2 + "_point_times_" + l_dec
-          + "0", F, "iinv", USER);
+          "of times into IObML." + metautils::args.dsid + "_point_times_" +
+          l_dec + "0", F, "iinv", USER);
     }
-    server._delete("IObML.ds" + local_args.dsnum2 + "_point_times_" + l_dec +
+    server._delete("IObML." + metautils::args.dsid + "_point_times_" + l_dec +
         "0", "file_code = " + file_code + " and uflag != '" + uflg + "'");
   }
   stringstream dss;
@@ -1481,7 +1488,7 @@ void insert_obml_netcdf_point_inventory(std::ifstream& ifs, Server& server,
         for (const auto& p : pmap) {
           auto k = o.first + "|" + p.first + "|" + dve.data->var_name;
           if (dmap.find(k) == dmap.end()) {
-            LocalQuery q("code", "WObML.ds" + local_args.dsnum2 +
+            LocalQuery q("code", "WObML." + metautils::args.dsid +
                 "_data_types_list", "observation_type_code = " + o.second +
                 " and platform_type_code = " + p.second + " and data_type = 'ds"
                 + metautils::args.dsnum + ":" + dve.data->var_name + "'");
@@ -1513,8 +1520,8 @@ void insert_obml_netcdf_point_inventory(std::ifstream& ifs, Server& server,
               auto f = miss_set.find(itos(n) + s) != miss_set.end();
               if ((miss == "1" && !f) || (miss == "2" && f)) {
                 if (ie.data->num_inserts >= 10000) {
-                  if (server.command("insert into IObML.ds" + local_args.
-                      dsnum2 + "_inventory_" + ie.key + " values " + ie.data->
+                  if (server.command("insert into \"IObML\"." + metautils::args.
+                      dsid + "_inventory_" + ie.key + " values " + ie.data->
                       inv_insert.substr(1) + " on duplicate key update uflag = "
                       "values(uflag)") < 0) {
                     log_error2("error: '" + server.error() + "' while trying "
@@ -1538,27 +1545,27 @@ void insert_obml_netcdf_point_inventory(std::ifstream& ifs, Server& server,
       InsertEntry ie;
       insert_table.found(key, ie);
       if (!ie.data->inv_insert.empty() && server.command("insert into "
-          "IObML.ds" + local_args.dsnum2 + "_inventory_" + key + " values " +
-          ie.data->inv_insert.substr(1) + " on duplicate key update uflag = "
+          "\"IObML\"." + metautils::args.dsid + "_inventory_" + key + " values "
+          + ie.data->inv_insert.substr(1) + " on duplicate key update uflag = "
           "values(uflag)") < 0) {
         log_error2("error: '" + server.error() + "' while trying to insert "
             "inventory data", F, "iinv", USER);
       }
-      server._delete("IObML.ds" + local_args.dsnum2 + "_inventory_" + key,
+      server._delete("IObML." + metautils::args.dsid + "_inventory_" + key,
           "file_code = " + file_code + " and uflag != '" + uflg + "'");
     }
   }
-  if (server.command("insert into IObML.ds" + local_args.dsnum2 + "_data_types "
-      "values " + dss.str().substr(1) + " on duplicate key update value_type = "
-      "values(value_type), byte_offset = values(byte_offset), byte_length = "
-      "values(byte_length), missing_ind = values(missing_ind), uflag = values("
-      "uflag)") < 0) {
+  if (server.command("insert into \"IObML\"." + metautils::args.dsid +
+      "_data_types values " + dss.str().substr(1) + " on duplicate key update "
+      "value_type = values(value_type), byte_offset = values(byte_offset), "
+      "byte_length = values(byte_length), missing_ind = values(missing_ind), "
+      "uflag = values(uflag)") < 0) {
     log_error2("error: '" + server.error() + "' while trying to insert "
         "dataType information '" + dss.str() + "'", F, "iinv", USER);
   }
-  server._delete("IObML.ds" + local_args.dsnum2 + "_data_types", "file_code = "
+  server._delete("IObML." + metautils::args.dsid + "_data_types", "file_code = "
       + file_code + " and uflag != '" + uflg + "'");
-  if (server.command("insert into IObML.ds" + local_args.dsnum2 +
+  if (server.command("insert into \"IObML\"." + metautils::args.dsid +
       "_inventory_summary values (" + file_code + ", " + itos(nbyts) + ", " +
       itos(ndbyts) + ", '" + uflg + "') on duplicate key update byte_length = "
       "values(byte_length), data_type_length = values(data_type_length), uflag "
@@ -1566,7 +1573,7 @@ void insert_obml_netcdf_point_inventory(std::ifstream& ifs, Server& server,
     log_error2("error: '" + server.error() + "' while trying to insert file "
         "size data for '" + file_code + "'", F, "iinv", USER);
   }
-  server._delete("IObML.ds" + local_args.dsnum2 + "_inventory_summary",
+  server._delete("IObML." + metautils::args.dsid + "_inventory_summary",
       "file_code = " + file_code + " and uflag != '" + uflg + "'");
 }
 
@@ -1636,7 +1643,7 @@ void insert_generic_point_inventory(std::ifstream& ifs ,Server& server, string
         case 'D': {
           if (sp.size() > 2) {
             auto sp2 = split(sp[2], "[!]");
-            LocalQuery q("code", "WObML.ds" + local_args.dsnum2 +
+            LocalQuery q("code", "WObML." + metautils::args.dsid +
                 "_data_types_list", "observation_type_code = " + omap[sp2[0]] +
                 " and platform_type_code = " + pmap[sp2[1]] + " and data_type "
                 "= '" + sp2[2] + "'");
@@ -1669,7 +1676,7 @@ void insert_generic_point_inventory(std::ifstream& ifs ,Server& server, string
               scl = "1";
             }
             if (server.insert(
-                  "IObML.ds" + local_args.dsnum2 + "_data_types_list_b",
+                  "IObML." + metautils::args.dsid + "_data_types_list_b",
                   "data_type_code, value_type, scale, field_length, code",
                   row[0] + ", '" + typ + "', " + scl + ", " + sp2[3].substr(1) +
                       ", NULL",
@@ -1730,8 +1737,8 @@ void insert_generic_point_inventory(std::ifstream& ifs ,Server& server, string
       for (int n = nlat; n <= xlat; ++n) {
         for (int m = nlon; m <= xlon; ++m) {
           if (server.insert(
-                "IObML.ds" + local_args.dsnum2 + "_inventory_" + itos(n) + "_" +
-                    itos(m) + "_b",
+                "IObML." + metautils::args.dsid + "_inventory_" + itos(n) + "_"
+                    + itos(m) + "_b",
                 "file_code, observation_time, id_code, data_type_codes, "
                     "first_data_type_code, last_data_type_code, byte_offsets, "
                     "uflag",
@@ -1746,7 +1753,7 @@ void insert_generic_point_inventory(std::ifstream& ifs ,Server& server, string
             log_error2("error: '" + server.error() + "' for insert: '" +
                 file_code + ", " + tmap.at(sp[1]) + ", " + sp2[0] + ", '" +
                 bmap + "', " + itos(mn) + ", " + itos(mx) + ", '" + sp[0] +
-                "'' into table IObML.ds" + local_args.dsnum2 + "_inventory_" +
+                "'' into table IObML." + metautils::args.dsid + "_inventory_" +
                 itos(n) + "_" + itos(m) + "_b", F, "iinv", USER);
           }
         }
@@ -1757,28 +1764,28 @@ void insert_generic_point_inventory(std::ifstream& ifs ,Server& server, string
   ifs.close();
   for (int n = mnlat; n <= mxlat; ++n) {
     for (int m = mnlon; m <= mxlon; ++m) {
-      server._delete("IObML.ds" + local_args.dsnum2 + "_inventory_" + itos(n) +
+      server._delete("IObML." + metautils::args.dsid + "_inventory_" + itos(n) +
           "_" + itos(m) + "_b","file_code = " + file_code + " and uflag != '" +
           uflg + "'");
     }
   }
   if (server.insert(
-        "IObML.ds" + local_args.dsnum2 + "_inventory_summary",
+        "IObML." + metautils::args.dsid + "_inventory_summary",
         "file_code, byte_length, data_type_length, uflag",
         file_code + ", " + itos(nbyts) + ", 0, '" + uflg + "'",
         "(file_code) do update set byte_length = excluded.byte_length, uflag = "
             "excluded.uflag"
         ) < 0) {
     log_error2("error: '" + server.error() + "' for insert: '" + file_code +
-        ", " + itos(nbyts) + "' into table IObML.ds" + local_args.dsnum2 +
+        ", " + itos(nbyts) + "' into table IObML." + metautils::args.dsid +
         "_inventory_summary", F, "iinv", USER);
   }
-  server._delete("IObML.ds" + local_args.dsnum2 + "_inventory_summary",
+  server._delete("IObML." + metautils::args.dsid + "_inventory_summary",
       "file_code = " + file_code + " and uflag != '" + uflg + "'");
   for (const auto& e : dtyps) {
     for (const auto& e2 : *e.second) {
       if (server.insert(
-            "IObML.ds" + local_args.dsnum2 + "_data_types",
+            "IObML." + metautils::args.dsid + "_data_types",
             "file_code, id_code, data_type_code, value_type, byte_offset, "
                 "byte_length, missing_ind, uflag",
             file_code + ", " + e.first + ", " + itos(e2.first) + ", '', 0, " +
@@ -1794,7 +1801,7 @@ void insert_generic_point_inventory(std::ifstream& ifs ,Server& server, string
       }
     }
   }
-  server._delete("IObML.ds" + local_args.dsnum2 + "_data_types", "file_code = "
+  server._delete("IObML." + metautils::args.dsid + "_data_types", "file_code = "
       + file_code + " and uflag != '" + uflg + "'");
 }
 
@@ -1822,7 +1829,7 @@ void insert_obml_inventory() {
   }
   fil = substitute(metautils::args.filename, ".ObML_inv", "");
   replace_all(fil, "%", "/");
-  LocalQuery q("select code, tindex from WObML.ds" + local_args.dsnum2 +
+  LocalQuery q("select code, tindex from \"WObML\"." + metautils::args.dsid +
       "_webfiles2 as w left join dssdb.wfile as x on (x.dsid = 'ds" +
       metautils::args.dsnum + "' and x.type = 'D' and x.wfile = w.id) where w."
       "id = '" + fil + "'");
