@@ -2321,15 +2321,15 @@ void scan_cf_orthogonal_time_series_hdf5nc4_file(const DiscreteGeometriesData&
     log_error2("longitude could not be identified", F, g_util_ident);
   }
   vector<string> platform_types, id_types, id_cache;
-  size_t num_stns = 0;
+  auto root_ds = is->dataset("/");
+  size_t known_sources = 0xffffffff;
+  if (root_ds == nullptr) {
+    log_error2("unable to get root dataset", F, g_util_ident);
+  }
   if (dgd.indexes.stn_id_var.empty()) {
-    auto root_ds = is->dataset("/");
-    size_t known_sources = 0xffffffff;
-    if (root_ds == nullptr) {
-      log_error2("unable to get root dataset", F, g_util_ident);
-    }
     for (const auto& attr_entry : root_ds->attributes) {
-      if (to_lower(attr_entry.first) == "title") {
+      auto a = to_lower(attr_entry.first);
+      if (a == "title") {
         stringstream title_ss;
         attr_entry.second.print(title_ss, nullptr);
         if (to_lower(title_ss.str()) == "\"hadisd\"") {
@@ -2337,41 +2337,65 @@ void scan_cf_orthogonal_time_series_hdf5nc4_file(const DiscreteGeometriesData&
         }
       }
     }
-    switch (known_sources) {
-      case 0x1: {
-        auto attr_it = root_ds->attributes.find("station_id");
-        if (attr_it != root_ds->attributes.end()) {
-          stringstream id_ss;
-          attr_it->second.print(id_ss, nullptr);
-          auto id = id_ss.str();
-          strutils::replace_all(id, "\"", "");
-          auto id_parts = split(id, "-");
-          if (id_parts.front() != "999999") {
-            id_types.emplace_back("WMO+6");
-            id_cache.emplace_back(id_parts.front());
-            if (id_parts.front() >= "990000" && id_parts.front() < "991000") {
-              platform_types.emplace_back("fixed_ship");
-            } else if ((id_parts.front() >= "992000" && id_parts.front() <
-                "993000") || (id_parts.front() >= "995000" && id_parts.front() <
-                "998000")) {
-              platform_types.emplace_back("drifting_buoy");
-            } else {
-              platform_types.emplace_back("land_station");
-            }
-          } else {
-            id_types.emplace_back("WBAN");
-            id_cache.emplace_back(id_parts.back());
-            platform_types.emplace_back("land_station");
-          }
-          num_stns = 1;
+  } else {
+    for (const auto& attr_entry : root_ds->attributes) {
+      auto a = to_lower(attr_entry.first);
+      if (a == "source") {
+        stringstream source_ss;
+        attr_entry.second.print(source_ss, nullptr);
+        if (to_lower(source_ss.str()) == "\"3d-paws weather station data\"") {
+          known_sources = 0x2;
         }
-        break;
       }
     }
-    if (id_cache.size() == 0) {
-      log_error2("timeseries_id role could not be resolved because source is "
-          "unknown", F, g_util_ident);
+  }
+  switch (known_sources) {
+    case 0x1: {
+      auto attr_it = root_ds->attributes.find("station_id");
+      if (attr_it != root_ds->attributes.end()) {
+        stringstream id_ss;
+        attr_it->second.print(id_ss, nullptr);
+        auto id = id_ss.str();
+        strutils::replace_all(id, "\"", "");
+        auto id_parts = split(id, "-");
+        if (id_parts.front() != "999999") {
+          id_types.emplace_back("WMO+6");
+          id_cache.emplace_back(id_parts.front());
+          if (id_parts.front() >= "990000" && id_parts.front() < "991000") {
+            platform_types.emplace_back("fixed_ship");
+          } else if ((id_parts.front() >= "992000" && id_parts.front() <
+              "993000") || (id_parts.front() >= "995000" && id_parts.front() <
+              "998000")) {
+            platform_types.emplace_back("drifting_buoy");
+          } else {
+            platform_types.emplace_back("land_station");
+          }
+        } else {
+          id_types.emplace_back("WBAN");
+          id_cache.emplace_back(id_parts.back());
+          platform_types.emplace_back("land_station");
+        }
+      }
+      break;
     }
+    case 0x2: {
+      auto stn_id_ds = is->dataset("/" + dgd.indexes.stn_id_var);
+      if (stn_id_ds == nullptr) {
+        log_error2("unable to get station ID dataset", F, g_util_ident);
+      }
+      HDF5::DataArray stn_ids;
+      stn_ids.fill(*is, *stn_id_ds);
+      for (size_t n = 0; n < stn_ids.num_values; ++n) {
+        id_types.emplace_back("3D-PAWS");
+        id_cache.emplace_back(stn_ids.string_value(n));
+        platform_types.emplace_back("land_station");
+      }
+      break;
+    }
+  }
+  if (id_cache.size() == 0) {
+    log_error2("timeseries_id role could not be resolved because source is "
+        "unknown", F, g_util_ident);
   }
   auto times_ds = is->dataset("/" + dgd.indexes.time_var);
   if (times_ds == nullptr) {
@@ -2387,7 +2411,7 @@ void scan_cf_orthogonal_time_series_hdf5nc4_file(const DiscreteGeometriesData&
   }
   HDF5::DataArray lat_vals;
   lat_vals.fill(*is, *lats_ds);
-  if (lat_vals.num_values != num_stns) {
+  if (lat_vals.num_values != id_cache.size()) {
     log_error2("number of stations does not match number of latitudes", F,
         g_util_ident);
   }
@@ -2397,14 +2421,14 @@ void scan_cf_orthogonal_time_series_hdf5nc4_file(const DiscreteGeometriesData&
   }
   HDF5::DataArray lon_vals;
   lon_vals.fill(*is, *lons_ds);
-  if (lon_vals.num_values != num_stns) {
+  if (lon_vals.num_values != id_cache.size()) {
     log_error2("number of stations does not match number of longitudes", F,
         g_util_ident);
   }
   if (platform_types.size() == 0) {
 log_error2("determining platforms is not implemented", F, g_util_ident);
   }
-  for (size_t n = 0; n < num_stns; ++n) {
+  for (size_t n = 0; n < id_cache.size(); ++n) {
     if (!obs_data.added_to_platforms("surface", platform_types[n],
         lat_vals.value(n), lon_vals.value(n))) {
       auto error = move(myerror);
@@ -2441,7 +2465,7 @@ log_error2("determining platforms is not implemented", F, g_util_ident);
       var_vals.fill(*is, *var_ds);
       datatypes_list.emplace_back(var_name + "<!>" + nc_va_data.long_name +
           "<!>" + nc_va_data.units + "<!>" + nc_va_data.cf_keyword);
-      for (size_t n = 0; n < num_stns; ++n) {
+      for (size_t n = 0; n < id_cache.size(); ++n) {
         gatherxml::markup::ObML::IDEntry ientry;
         ientry.key = platform_types[n] + "[!]" + id_types[n] + "[!]" +
             id_cache[n];
@@ -2487,6 +2511,9 @@ void scan_cf_time_series_hdf5nc4_file(ScanData& scan_data, gatherxml::markup::
     log_error2("unable to determine time variable", F, g_util_ident);
   }
   fill_dgd_index("cf_role", "profile_id", dgd.indexes.stn_id_var);
+  if (dgd.indexes.stn_id_var.empty()) {
+    fill_dgd_index("cf_role", "timeseries_id", dgd.indexes.stn_id_var);
+  }
   fill_dgd_index("sample_dimension", dgd.indexes.sample_dim_vars);
   fill_dgd_index("instance_dimension", "",
       dgd.indexes.instance_dim_var);
