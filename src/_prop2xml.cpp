@@ -11,6 +11,8 @@
 #include <myerror.hpp>
 
 using namespace PostgreSQL;
+using strutils::ds_aliases;
+using strutils::to_sql_tuple_string;
 
 metautils::Directives metautils::directives;
 metautils::Args metautils::args;
@@ -258,7 +260,7 @@ void scan_input_file(gatherxml::markup::ObML::ObservationData& obs_data)
   if (!tdir.create(metautils::directives.temp_path) || unixutils::mysystem2("/bin/mkdir -m 0755 -p "+tdir.name()+"/metadata/ParameterTables",oss,ess) < 0) {
     metautils::log_error("can't create temporary directory for data type map","prop2xml",USER);
   }
-  auto existing_datatype_map=unixutils::remote_web_file("https://rda.ucar.edu/metadata/ParameterTables/"+metautils::args.data_format+".ds"+metautils::args.dsnum+".xml",tdir.name());
+  auto existing_datatype_map=unixutils::remote_web_file("https://rda.ucar.edu/metadata/ParameterTables/"+metautils::args.data_format+"."+metautils::args.dsid+".xml",tdir.name());
   std::vector<std::string> existing_map_contents;
   if (!existing_datatype_map.empty()) {
     std::ifstream ifs(existing_datatype_map.c_str());
@@ -274,7 +276,7 @@ void scan_input_file(gatherxml::markup::ObML::ObservationData& obs_data)
   if (gatherxml::verbose_operation) {
     std::cout << "Writing parameter map ..." << std::endl;
   }
-  std::string datatype_map=tdir.name()+"/metadata/ParameterTables/"+metautils::args.data_format+".ds"+metautils::args.dsnum+".xml";
+  std::string datatype_map=tdir.name()+"/metadata/ParameterTables/"+metautils::args.data_format+"."+metautils::args.dsid+".xml";
   std::ofstream ofs;
   unixutils::open_output(ofs, datatype_map);
   if (!ofs.is_open()) {
@@ -356,6 +358,7 @@ int main(int argc,char **argv)
   }
   signal(SIGSEGV,segv_handler);
   signal(SIGINT,int_handler);
+  atexit(clean_up);
   auto arg_delimiter='!';
   metautils::args.args_string=unixutils::unix_args_string(argc,argv,arg_delimiter);
   metautils::read_config("prop2xml",USER);
@@ -373,32 +376,32 @@ int main(int argc,char **argv)
     }
     metautils::args.data_format.insert(0,"proprietary_");
   }
-  atexit(clean_up);
   metautils::cmd_register("prop2xml",USER);
-  if (metautils::args.dsnum != "999.9") {
+  if (metautils::args.dsid < "d999000") {
     auto verified_file=false;
     Server server(metautils::directives.database_server,metautils::directives.rdadb_username,metautils::directives.rdadb_password,"dssdb");
     std::string file_type;
     LocalQuery query;
+    auto ds_set = to_sql_tuple_string(ds_aliases(metautils::args.dsid));
     if (std::regex_search(metautils::args.path,std::regex("^/FS/DECS"))) {
-	query.set("dsid","mssfile","mssfile = '"+metautils::args.path+"/"+metautils::args.filename+"' and dsid = 'ds"+metautils::args.dsnum+"'");
+	query.set("dsid","mssfile","mssfile = '"+metautils::args.path+"/"+metautils::args.filename+"' and dsid in "+ds_set);
     }
     else {
 	auto path=metautils::args.path;
-	strutils::replace_all(path,"https://rda.ucar.edu/data/ds"+metautils::args.dsnum,"");
+	strutils::replace_all(path,"https://rda.ucar.edu/data/"+metautils::args.dsid,"");
 	if (!path.empty()) {
 	  path=path.substr(1)+"/"+metautils::args.filename;
 	}
 	else {
 	  path=metautils::args.filename;
 	}
-	query.set("dsid","wfile","wfile = '"+path+"' and dsid = 'ds"+metautils::args.dsnum+"'");
+	query.set("dsid","wfile","wfile = '"+path+"' and dsid in "+ds_set);
     }
     if (query.submit(server) == 0) {
 	if (query.num_rows() > 0) {
 	  Row row;
 	  if (query.fetch_row(row)) {
-	    if (row[0] == "ds"+metautils::args.dsnum) {
+	    if (row[0] == metautils::args.dsid) {
 		verified_file=true;
 	    }
 	  }
@@ -437,7 +440,7 @@ int main(int argc,char **argv)
     if (gatherxml::verbose_operation) {
 	std::cout << "Calling 'scm' ..." << std::endl;
     }
-    if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" "+flags+" "+metautils::args.filename+".ObML",oss,ess) < 0) {
+    if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsid+" "+flags+" "+metautils::args.filename+".ObML",oss,ess) < 0) {
 	std::cerr << ess.str() << std::endl;
     }
     if (gatherxml::verbose_operation) {
