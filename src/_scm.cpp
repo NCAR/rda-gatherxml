@@ -51,8 +51,10 @@ using std::unique_ptr;
 using std::unordered_map;
 using std::unordered_set;
 using std::vector;
+using strutils::append;
 using strutils::ftos;
 using strutils::chop;
+using strutils::ds_aliases;
 using strutils::itos;
 using strutils::lltos;
 using strutils::ng_gdex_id;
@@ -62,6 +64,7 @@ using strutils::sql_ready;
 using strutils::strand;
 using strutils::substitute;
 using strutils::to_lower;
+using strutils::to_sql_tuple_string;
 using strutils::trim;
 using strutils::trimmed;
 using unixutils::mysystem2;
@@ -75,14 +78,13 @@ string myerror = "";
 string mywarning = "";
 
 struct LocalArgs {
-  LocalArgs() : dsnum2(), summ_type(), file(), temp_directory(),
+  LocalArgs() : ds_set(), summ_type(), file(), temp_directory(),
       cmd_directory(), data_format(), gindex_list(), summarize_all(false),
       added_variable(false), verbose(false), notify(false), update_graphics(
       true), update_db(true), refresh_web(false), refresh_inv(false),
-      is_web_file(false), summarized_hpss_file(false), summarized_web_file(
-      false) { }
+      is_web_file(false), summarized_web_file(false) { }
 
-  string dsnum2;
+  string ds_set;
   string summ_type;
   string file, temp_directory, cmd_directory, data_format;
   vector<string> gindex_list;
@@ -90,7 +92,7 @@ struct LocalArgs {
   bool added_variable, verbose, notify;
   bool update_graphics, update_db;
   bool refresh_web, refresh_inv, is_web_file;
-  bool summarized_hpss_file, summarized_web_file;
+  bool summarized_web_file;
 } local_args;
 
 TempDir g_temp_dir;
@@ -112,15 +114,12 @@ void parse_args(const char arg_delimiter) {
         local_args.cmd_directory = "wfmd";
       }
     } else if (args[n] == "-d") {
-      metautils::args.dsid = ng_gdex_id(args[++n]);
-
-// remove the next 5 lines after dsid conversion
-metautils::args.dsnum = args[n];
-if (metautils::args.dsnum.find("ds") == 0) {
-metautils::args.dsnum = metautils::args.dsnum.substr(2);
-}
-local_args.dsnum2 = strutils::substitute(metautils::args.dsnum, ".", "");
-
+      metautils::args.dsid = args[++n];
+      if (metautils::args.dsid != "test") {
+        metautils::args.dsid = ng_gdex_id(metautils::args.dsid);
+        local_args.ds_set = to_sql_tuple_string(ds_aliases(metautils::args.
+            dsid));
+      }
     } else if (args[n] == "-wf") {
       if (local_args.summarize_all) {
         cerr << "scm: specify only one of -wa or -wf" << endl;
@@ -162,7 +161,7 @@ local_args.dsnum2 = strutils::substitute(metautils::args.dsnum, ".", "");
     }
   }
   if (metautils::args.dsid.empty()) {
-    cerr << "scm: no dataset ID specified" << endl;
+    cerr << "scm: no or invalid dataset ID specified" << endl;
     exit(1);
   }
   if (!local_args.summarize_all && !local_args.is_web_file && !local_args.
@@ -205,12 +204,6 @@ string table_code(Server& srv, string table_name, string where_conditions, bool
       return "";
     }
     auto pkey = split_tablename(table_name).second + "_pkey";
-
-// remove next 3 lines after dsid conversion
-if (pkey.find("ds") == 0 && pkey[6] == '_') {
-pkey = metautils::args.dsid + split_tablename(table_name).second.substr(6) + "_pkey";
-}
-
     string cols, vals;
     auto sp = split(where_conditions, " AND ");
     for (size_t n = 0; n < sp.size(); ++n) {
@@ -221,17 +214,11 @@ pkey = metautils::args.dsid + split_tablename(table_name).second.substr(6) + "_p
       }
       auto s = sp2[0];
       trim(s);
-      if (!cols.empty()) {
-        cols += ", ";
-      }
-      cols += s;
+      append(cols, s, ", ");
       s = sp2[1];
       trim(s);
       replace_all(s, " &eq; ", " = ");
-      if (!vals.empty()) {
-        vals += ", ";
-      }
-      vals += s;
+      append(vals, s, ", ");
     }
     string r;
     if (srv.insert(
@@ -328,13 +315,8 @@ void initialize_web_file(MarkupParameters *markup_parameters) {
   markup_parameters->file_type = "web";
   local_args.summarized_web_file = true;
   if (mysrv_d.update("dssdb.wfile", "meta_link = '" + substitute(
-
-// remove next line and uncomment following 2 lines after dsid conversion
-markup_parameters->markup_type, "ML", "") + "'", "dsid = 'ds" + metautils::args.dsnum + "' and wfile = '" + markup_parameters->filename +
-//      markup_parameters->markup_type, "ML", "") + "'", "dsid = '" +
-//      metautils::args.dsid + "' and wfile = '" + markup_parameters->filename +
-
-      "'") < 0) {
+      markup_parameters->markup_type, "ML", "") + "'", "dsid = '" + metautils::
+      args.dsid + "' and wfile = '" + markup_parameters->filename + "'") < 0) {
     log_error2("error: '" + mysrv_d.error() + "' while trying to update "
         "'dssdb.wfile'", F, "scm", USER);
   }
@@ -373,11 +355,7 @@ void process_data_format(MarkupParameters *markup_parameters) {
         "search.formats",
         "keyword, vocabulary, dsid",
         "'" + markup_parameters->format + "', '" + markup_parameters->database +
-
-// remove next line and uncomment following line after dsid conversion
-"', '" + metautils::args.dsnum + "'",
-//            "', '" + metautils::args.dsid + "'",
-
+            "', '" + metautils::args.dsid + "'",
         "on constraint formats_pkey do nothing"
         ) < 0) {
     log_error2("error: '" + markup_parameters->server.error() + "' while "
@@ -402,10 +380,6 @@ void process_data_format(MarkupParameters *markup_parameters) {
 void create_grml_tables(MarkupParameters *markup_parameters) {
   static const string F = this_function_label(__func__);
   auto tb_base = markup_parameters->database + "." + metautils::args.dsid;
-
-// remove the next line after dsid conversion
-tb_base = markup_parameters->database + ".ds" + local_args.dsnum2;
-
   if (markup_parameters->server.duplicate_table(markup_parameters->database +
       ".template_" + markup_parameters->file_type + "files2", tb_base + "_" +
       markup_parameters->file_type + "files2") < 0) {
@@ -428,10 +402,6 @@ tb_base = markup_parameters->database + ".ds" + local_args.dsnum2;
 void create_obml_tables(MarkupParameters *markup_parameters) {
   static const string F = this_function_label(__func__);
   auto tb_base = markup_parameters->database + "." + metautils::args.dsid;
-
-// remove the next line after dsid conversion
-tb_base = markup_parameters->database + ".ds" + local_args.dsnum2;
-
   if (markup_parameters->server.duplicate_table(markup_parameters->database +
       ".template_" + markup_parameters->file_type + "files2", tb_base + "_" +
       markup_parameters->file_type + "files2") < 0) {
@@ -484,10 +454,6 @@ tb_base = markup_parameters->database + ".ds" + local_args.dsnum2;
 void create_fixml_tables(MarkupParameters *markup_parameters) {
   static const string F = this_function_label(__func__);
   auto tb_base = markup_parameters->database + "." + metautils::args.dsid;
-
-// remove the next line after dsid conversion
-tb_base = markup_parameters->database + ".ds" + local_args.dsnum2;
-
   if (markup_parameters->server.duplicate_table(markup_parameters->database +
       "template_" + markup_parameters->file_type + "files2", tb_base + "_" +
       markup_parameters->file_type + "files2") < 0) {
@@ -642,10 +608,7 @@ void process_grml_markup(void *markup_parameters) {
         if (n == "isCell") {
           def += "Cell";
         } else {
-          if (!defp.empty()) {
-            defp += ":";
-          }
-          defp += g.attribute_value(n);
+          append(defp, g.attribute_value(n), ":");
         }
       }
     }
@@ -781,11 +744,7 @@ void process_grml_markup(void *markup_parameters) {
             if (gp->server.insert(
                   "search.variables",
                   "keyword, vocabulary, dsid",
-
-// remove next line and uncomment following line after dsid conversion
-"'" + sql_ready(d) + "', 'CMDMAP', '" + metautils::args.dsnum
-//                  "'" + sql_ready(d) + "', 'CMDMAP', '" + metautils::args.dsid
-
+                  "'" + sql_ready(d) + "', 'CMDMAP', '" + metautils::args.dsid
                       + "'",
                   "on constraint variables_pkey do nothing"
                   ) < 0) {
@@ -872,10 +831,6 @@ void process_grml_markup(void *markup_parameters) {
         "scm", USER);
   }
   tbl = gp->database + "." + metautils::args.dsid + "_agrids2";
-
-// remove the next line after dsid conversion
-tbl = gp->database + ".ds" + local_args.dsnum2 + "_agrids2";
-
   if (!table_exists(gp->server, tbl)) {
     if (gp->server.duplicate_table(gp->database + ".template_agrids2", tbl) <
         0) {
@@ -884,10 +839,6 @@ tbl = gp->database + ".ds" + local_args.dsnum2 + "_agrids2";
     }
   }
   tbl = gp->database + "." + metautils::args.dsid + "_agrids_cache";
-
-// remove the next line after dsid conversion
-tbl = gp->database + ".ds" + local_args.dsnum2 + "_agrids_cache";
-
   if (!table_exists(gp->server, tbl)) {
     if (gp->server.duplicate_table(gp->database + ".template_agrids_cache", tbl)
         < 0) {
@@ -896,10 +847,6 @@ tbl = gp->database + ".ds" + local_args.dsnum2 + "_agrids_cache";
     }
   }
   tbl = gp->database + "." + metautils::args.dsid + "_grid_definitions";
-
-// remove the next line after dsid conversion
-tbl = gp->database + ".ds" + local_args.dsnum2 + "_grid_definitions";
-
   if (!table_exists(gp->server, tbl)) {
     if (gp->server.duplicate_table(gp->database + ".template_grid_definitions",
         tbl) < 0) {
@@ -1162,10 +1109,6 @@ void *thread_summarize_IDs(void *args) {
   if (a[5] == "WObML") {
     auto tbl = "\"" + a[5] + "\"." + metautils::args.dsid + "_geobounds";
     auto pkey = metautils::args.dsid + "_geobounds_pkey";
-
-// remove next line after dsid conversion
-tbl = "\"" + a[5] + "\".ds" + local_args.dsnum2 + "_geobounds";
-
     auto uflg = strand(3);
     if (srv.command("insert into " + tbl + " (file_code, min_lat, min_lon, "
         "max_lat, max_lon, uflg) select " + a[2] + " as file_code, min(i."
@@ -1414,10 +1357,7 @@ void process_obml_markup(void *markup_parameters) {
       }
       for (const auto& e : (platform.p)->element_list("dataType")) {
         auto dtyp = e.attribute_value("map");
-        if (!dtyp.empty()) {
-          dtyp += ":";
-        }
-        dtyp += e.attribute_value("value");
+        append(dtyp, e.attribute_value("value"), ":");
         auto dtyp_k = obs_map[obs] + "|" + plat_map[plat] + "|" + dtyp;
         if (dtyp_map.find(dtyp_k) == dtyp_map.end()) {
           auto c = table_code(op->server, "WObML." + metautils::args.dsid +
@@ -1808,12 +1748,12 @@ void update_fixml_database(FixMLParameters& fixml_parameters) {
       if (fixml_parameters.server.insert(
             "search.time_resolutions",
             "keyword, vocabulary, dsid, origin",
-            "'" + s + "', 'GCMD', '" + metautils::args.dsnum + "', 'WFixML'",
+            "'" + s + "', 'GCMD', '" + metautils::args.dsid + "', 'WFixML'",
             "(keyword, vocabulary, dsid, origin) do nothing"
             ) < 0) {
         log_error2("error: '" + fixml_parameters.server.error() + "' while "
             "trying to insert into search.time_resolutions ''" + s + "', "
-            "'GCMD', '" + metautils::args.dsnum + "', 'WFixML''", F, "scm",
+            "'GCMD', '" + metautils::args.dsid + "', 'WFixML''", F, "scm",
             USER);
       }
       s = searchutils::time_resolution_keyword("irregular", e.second.second, sp[
@@ -1821,12 +1761,12 @@ void update_fixml_database(FixMLParameters& fixml_parameters) {
       if (fixml_parameters.server.insert(
             "search.time_resolutions",
             "keyword, vocabulary, dsid, origin",
-            "'" + s + "', 'GCMD', '" + metautils::args.dsnum + "', 'WFixML'",
+            "'" + s + "', 'GCMD', '" + metautils::args.dsid + "', 'WFixML'",
             "(keyword, vocabulary, dsid, origin) do nothing"
             ) < 0) {
         log_error2("error: '" + fixml_parameters.server.error() + "' while "
             "trying to insert into search.time_resolutions ''" + s + "', "
-            "'GCMD', '" + metautils::args.dsnum + "', 'WFixML''", F, "scm",
+            "'GCMD', '" + metautils::args.dsid + "', 'WFixML''", F, "scm",
             USER);
       }
     }
@@ -1904,8 +1844,8 @@ void summarize_markup(string markup_type, unordered_map<string, vector<
             " seconds" << endl;
       }
     }
-    mp->server._delete("search.data_types", "dsid = '" + metautils::args.dsnum +
-        "' and vocabulary = 'dssmm'");
+    mp->server._delete("search.data_types", "dsid in " + local_args.ds_set +
+        " and vocabulary = 'dssmm'");
     string err;
     if (t == "GrML") {
       auto gp = reinterpret_cast<GrMLParameters *>(mp);
@@ -1914,7 +1854,7 @@ void summarize_markup(string markup_type, unordered_map<string, vector<
               "search.data_types",
               "keyword, process, vocabulary, dsid",
               "'grid', '" + p + "', '" + gp->database + "', '" + metautils::
-                  args.dsnum + "'",
+                  args.dsid + "'",
               "(keyword, process, vocabulary, dsid) do nothing"
               ) < 0) {
           err = gp->server.error();
@@ -1926,7 +1866,7 @@ void summarize_markup(string markup_type, unordered_map<string, vector<
             "search.data_types",
             "keyword, process, vocabulary, dsid",
             "'platform_observation', '', '" + mp->database + "', '" +
-                metautils::args.dsnum + "'",
+                metautils::args.dsid + "'",
             "(keyword, process, vocabulary, dsid) do nothing"
             ) < 0) {
         err = mp->server.error();
@@ -1935,7 +1875,7 @@ void summarize_markup(string markup_type, unordered_map<string, vector<
       if (mp->server.insert(
             "search.data_types",
             "keyword, process, vocabulary, dsid",
-            "'satellite', '', '" + mp->database + "', '" + metautils::args.dsnum
+            "'satellite', '', '" + mp->database + "', '" + metautils::args.dsid
                 + "'",
             "(keyword, process, vocabulary, dsid) do nothing"
             ) < 0) {
@@ -1946,7 +1886,7 @@ void summarize_markup(string markup_type, unordered_map<string, vector<
             "search.data_types",
             "keyword, process, vocabulary, dsid",
             "'cyclone_fix', '', '" + mp->database + "', '" + metautils::args.
-                dsnum + "'",
+                dsid + "'",
             "(keyword, process, vocabulary, dsid) do nothing"
             ) < 0) {
         err = mp->server.error();
@@ -1986,7 +1926,7 @@ void *thread_summarize_obs_data(void *) {
   if (b && local_args.update_graphics) {
     stringstream oss, ess;
     mysystem2(metautils::directives.local_root + "/bin/gsi " + metautils::args.
-        dsnum, oss, ess);
+        dsid, oss, ess);
   }
   return nullptr;
 }
@@ -1996,7 +1936,7 @@ void *thread_summarize_fix_data(void *) {
   if (local_args.update_graphics) {
     stringstream oss, ess;
     mysystem2(metautils::directives.local_root + "/bin/gsi " + metautils::args.
-        dsnum, oss, ess);
+        dsid, oss, ess);
   }
   return nullptr;
 }
@@ -2005,7 +1945,7 @@ void *thread_index_variables(void *) {
   Server srv(metautils::directives.database_server, metautils::directives.
       metadb_username, metautils::directives.metadb_password, "rdadb");
   string e;
-  if (!searchutils::indexed_variables(srv, metautils::args.dsnum, e)) {
+  if (!searchutils::indexed_variables(srv, metautils::args.dsid, e)) {
     log_error2(e, "thread_index_variables()", "scm", USER);
   }
   srv.disconnect();
@@ -2016,7 +1956,7 @@ void *thread_index_locations(void *) {
   Server srv(metautils::directives.database_server, metautils::directives.
       metadb_username, metautils::directives.metadb_password, "rdadb");
   string e;
-  if (!searchutils::indexed_locations(srv, metautils::args.dsnum, e)) {
+  if (!searchutils::indexed_locations(srv, metautils::args.dsid, e)) {
     log_error2(e, "thread_index_locations()", "scm", USER);
   }
   srv.disconnect();
@@ -2166,8 +2106,8 @@ int main(int argc, char **argv) {
   if (local_args.summarize_all) {
     stringstream oss, ess;
     if (mysystem2("/bin/tcsh -c \"wget -q -O - --post-data='authKey="
-        "qGNlKijgo9DJ7MN&cmd=listfiles&value=/SERVER_ROOT/web/datasets/ds" +
-        metautils::args.dsnum + "/metadata/" + local_args.cmd_directory +
+        "qGNlKijgo9DJ7MN&cmd=listfiles&value=/SERVER_ROOT/web/datasets/" +
+        metautils::args.dsid + "/metadata/" + local_args.cmd_directory +
         "' https://rda.ucar.edu/cgi-bin/dss/remoteRDAServerUtils\"", oss, ess)
         != 0) {
       log_error2("unable to get metadata file listing", F, "scm", USER);
@@ -2212,8 +2152,8 @@ int main(int argc, char **argv) {
     if (!local_args.temp_directory.empty()) {
       s = local_args.temp_directory + "/" + local_args.file;
     } else {
-      s = "/datasets/ds" + metautils::args.dsnum + "/metadata/wfmd/" +
-          local_args.file;
+      s = "/datasets/" + metautils::args.dsid + "/metadata/wfmd/" + local_args.
+          file;
     }
     auto idx = local_args.file.rfind(".");
     if (idx != string::npos) {
@@ -2237,7 +2177,7 @@ int main(int argc, char **argv) {
       summarize_markup("SatML", mmap);
     } else if (!mmap["FixML"].empty()) {
       summarize_markup("FixML", mmap);
-      if (local_args.summarized_hpss_file && local_args.update_db) {
+      if (local_args.summarized_web_file && local_args.update_db) {
         pthread_t t;
         pthread_create(&t, nullptr, thread_summarize_fix_data, nullptr);
         tv.emplace_back(t);
@@ -2251,9 +2191,9 @@ int main(int argc, char **argv) {
   } else if (local_args.refresh_web) {
     if (local_args.gindex_list.size() > 0 && local_args.gindex_list.front() !=
         "all") {
-      LocalQuery q("gidx", "dssdb.dsgroup", "dsid = 'ds" + metautils::args.dsnum
-          + "' and gindex = " + local_args.gindex_list.front() + " and pindex "
-          "= 0");
+      LocalQuery q("gidx", "dssdb.dsgroup", "dsid in " + local_args.ds_set +
+          " and gindex = " + local_args.gindex_list.front() + " and pindex = "
+          "0");
       if (q.submit(mysrv) < 0) {
         log_error2("group check failed", F, "scm", USER);
       }
@@ -2295,9 +2235,8 @@ int main(int argc, char **argv) {
         if (local_args.gindex_list.size() == 1) {
           if (local_args.gindex_list.front() == "all") {
             local_args.gindex_list.clear();
-            LocalQuery q("select distinct tindex from dssdb.wfile where dsid = "
-                "'ds" + metautils::args.dsnum + "' and type = 'D' and status = "
-                "'P'");
+            LocalQuery q("select distinct tindex from dssdb.wfile where dsid "
+                "in " + local_args.ds_set + " and type = 'D' and status = 'P'");
             if (q.submit(mysrv) < 0) {
               log_error2("error getting group indexes: '" + q.error() + "'", F,
                   "scm", USER);
@@ -2312,13 +2251,13 @@ int main(int argc, char **argv) {
         stringstream oss, ess;
         for (const auto& g : local_args.gindex_list) {
           if (mysystem2(metautils::directives.local_root + "/bin/gsi -g " + g +
-              " " + metautils::args.dsnum, oss, ess) != 0) {
+              " " + metautils::args.dsid, oss, ess) != 0) {
             log_warning("scm: main(): gsi -g failed with error '" + trimmed(ess.
                 str()) + "'", "scm", USER);
           }
         }
         if (mysystem2(metautils::directives.local_root + "/bin/gsi " +
-            metautils::args.dsnum, oss, ess) != 0) {
+            metautils::args.dsid, oss, ess) != 0) {
           log_warning("scm: main(): gsi failed with error '" + trimmed(ess.
               str()) + "'", "scm", USER);
         }
@@ -2358,9 +2297,8 @@ int main(int argc, char **argv) {
       if (local_args.refresh_inv && local_args.gindex_list.size() == 1) {
         if (local_args.gindex_list.front() == "all") {
           local_args.gindex_list.clear();
-          LocalQuery q("select distinct tindex from dssdb.wfile where dsid = "
-              "'ds" + metautils::args.dsnum + "' and type = 'D' and status = "
-              "'P'");
+          LocalQuery q("select distinct tindex from dssdb.wfile where dsid in "
+              + local_args.ds_set + " and type = 'D' and status = 'P'");
           if (q.submit(mysrv) < 0) {
             log_error2("error getting group indexes: '" + q.error() + "'", F,
                 "scm", USER);
