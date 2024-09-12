@@ -13,9 +13,11 @@ using metautils::log_error2;
 using miscutils::this_function_label;
 using std::string;
 using std::unordered_map;
+using strutils::ds_aliases;
 using strutils::split;
 using strutils::strand;
 using strutils::substitute;
+using strutils::to_sql_tuple_string;
 
 namespace gatherxml {
 
@@ -23,10 +25,10 @@ namespace summarizeMetadata {
 
 void summarize_fix_data(string caller, string user) {
   static const string F = this_function_label(__func__);
-  string dsnum2 = substitute(metautils::args.dsnum, ".", "");
   Server server(metautils::directives.database_server, metautils::directives.
       metadb_username, metautils::directives.metadb_password, "rdadb");
-  Query formats_query("code, format_code", "WFixML.ds" + dsnum2 + "_webfiles2");
+  Query formats_query("code, format_code", "WFixML." + metautils::args.dsid +
+      "_webfiles2");
   if (formats_query.submit(server) < 0) {
     log_error2(formats_query.error(), F, caller, user);
   }
@@ -36,7 +38,8 @@ void summarize_fix_data(string caller, string user) {
   }
   string error;
   LocalQuery locations_query("file_code, classification_code, start_date, "
-      "end_date, box1d_row, box1d_bitmap", "WFixML.ds" + dsnum2 + "_locations");
+      "end_date, box1d_row, box1d_bitmap", "WFixML." + metautils::args.dsid +
+      "_locations");
   if (locations_query.submit(server) < 0) {
     log_error2(locations_query.error(), F, caller, user);
   }
@@ -44,9 +47,9 @@ void summarize_fix_data(string caller, string user) {
   for (const auto& location_row : locations_query) {
     if (data_file_formats_map.find(location_row[0]) == data_file_formats_map.
         end()) {
-      log_error2("found a webID (" + location_row[0] + ") in WFixML.ds" + dsnum2
-          + "_locations that doesn't exist in WFixML.ds" + dsnum2 +
-          "_webfiles2", F, caller, user);
+      log_error2("found a webID (" + location_row[0] + ") in WFixML." +
+          metautils::args.dsid + "_locations that doesn't exist in WFixML." +
+          metautils::args.dsid + "_webfiles2", F, caller, user);
     }
     SummaryEntry se;
     se.key = data_file_formats_map[location_row[0]] + "<!>" + location_row[1] +
@@ -79,7 +82,7 @@ void summarize_fix_data(string caller, string user) {
           "search.fix_data",
           "dsid, format_code, classification_code, start_date, end_date, "
               "box1d_row, box1d_bitmap, uflg",
-          "'" + metautils::args.dsnum + "', " + parts[0] + ", " + parts[1] +
+          "'" + metautils::args.dsid + "', " + parts[0] + ", " + parts[1] +
               ", '" + se.start_date + "', '" + se.  end_date + "', " + parts[2]
               + ", '" + se.box1d_bitmap + "', '" + uflg + "'",
           "(dsid, format_code, classification_code, box1d_row) do update set "
@@ -90,8 +93,8 @@ void summarize_fix_data(string caller, string user) {
       }
     }
   }
-  server._delete("search.fix_data", "dsid = '" + metautils::args.dsnum + "' "
-      "and uflg != '" + uflg + "'");
+  server._delete("search.fix_data", "dsid in " + to_sql_tuple_string(ds_aliases(
+      metautils::args.dsid)) + " and uflg != '" + uflg + "'");
   summarize_locations("WFixML", error);
   if (!error.empty()) {
     log_error2("summarize_locations() returned '" + error + "'", F, caller,
