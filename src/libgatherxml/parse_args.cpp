@@ -22,14 +22,10 @@ void parse_args(char arg_delimiter) {
       arg_delimiter));
   for (size_t n = 0; n < sp.size()-1; ++n) {
     if (sp[n] == "-d") {
-      metautils::args.dsid = ng_gdex_id(sp[++n]);
-
-// remove the next 4 lines after dsid conversion
-metautils::args.dsnum = sp[n];
-if (metautils::args.dsnum.substr(0, 2) == "ds") {
-metautils::args.dsnum = metautils::args.dsnum.substr(2);
-}
-
+      metautils::args.dsid = sp[++n];
+      if (metautils::args.dsid != "test") {
+        metautils::args.dsid = ng_gdex_id(metautils::args.dsid);
+      }
     } else if (sp[n] == "-f") {
       metautils::args.data_format = sp[++n];
     } else if (sp[n] == "-G") {
@@ -74,15 +70,15 @@ metautils::args.dsnum = metautils::args.dsnum.substr(2);
   if (metautils::args.data_format == "grib1") {
     metautils::args.data_format = "grib";
   }
-  if (metautils::args.dsnum.empty()) {
-    myerror = "Terminating - fatal error: " + F + ": no dataset number "
+  if (metautils::args.dsid.empty()) {
+    myerror = "Terminating - fatal error: " + F + ": no or invalid dataset ID "
         "specified";
     exit(1);
   }
   auto idx = sp.back().rfind("/");
   metautils::args.path = sp.back().substr(0, idx);
   metautils::args.filename = sp.back().substr(idx + 1);
-  if (metautils::args.dsnum == "test") {
+  if (metautils::args.dsid == "test") {
     if (metautils::args.path[0] != '/') {
       myerror = "Terminating - fatal error: " + F + ": full path of test files "
           "must be specified";
