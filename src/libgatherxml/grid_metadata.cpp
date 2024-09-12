@@ -38,12 +38,14 @@ using std::tie;
 using std::unordered_map;
 using std::unordered_set;
 using std::vector;
+using strutils::ds_aliases;
 using strutils::itos;
 using strutils::lltos;
 using strutils::split;
 using strutils::sql_ready;
 using strutils::strand;
 using strutils::substitute;
+using strutils::to_sql_tuple_string;
 
 namespace gatherxml {
 
@@ -51,7 +53,6 @@ namespace summarizeMetadata {
 
 void summarize_grid_levels(string database, string caller, string user) {
   const static string F = this_function_label(__func__);
-  string d = substitute(metautils::args.dsnum, ".", "");
   string t, i;
   if (database == "WGrML") {
     t = "_webfiles2";
@@ -61,9 +62,9 @@ void summarize_grid_levels(string database, string caller, string user) {
   Server srv(metautils::directives.database_server, metautils::directives.
       metadb_username, metautils::directives.metadb_password, "rdadb");
   LocalQuery q("select distinct p.format_code, g.level_type_codes from " +
-      postgres_ready(database) + ".ds" + d + "_agrids2 as g left join " +
-      postgres_ready(database) + ".ds" + d + t + " as p on p.code = g."
-      "file_code where p.format_code is not null");
+      postgres_ready(database) + "." + metautils::args.dsid + "_agrids2 as g "
+      "left join " + postgres_ready(database) + "." + metautils::args.dsid + t +
+      " as p on p.code = g.file_code where p.format_code is not null");
 #ifdef DUMP_QUERIES
   {
   Timer tm;
@@ -89,7 +90,7 @@ void summarize_grid_levels(string database, string caller, string user) {
       }
     }
   }
-  auto tbl = database + ".ds" + d + "_levels";
+  auto tbl = database + "." + metautils::args.dsid + "_levels";
   auto uflg = strand(3);
   for (const auto& e : uset) {
     if (srv.insert(
@@ -123,7 +124,6 @@ struct GridSummaryEntry {
 void summarize_grids(string database, string caller, string user, string
     file_id_code) {
   const static string F = this_function_label(__func__);
-  string d = substitute(metautils::args.dsnum, ".", "");
   string t, i;
   if (database == "WGrML") {
     t = "_webfiles2";
@@ -132,9 +132,9 @@ void summarize_grids(string database, string caller, string user, string
   }
   Server srv(metautils::directives.database_server, metautils::directives.
       metadb_username, metautils::directives.metadb_password, "rdadb");
-  LocalQuery q("select distinct f.code from " + postgres_ready(database) + ".ds"
-      + d + t + " as p left join " + postgres_ready(database) + ".formats as f "
-      "on f.code = p.format_code");
+  LocalQuery q("select distinct f.code from " + postgres_ready(database) + "." +
+      metautils::args.dsid + t + " as p left join " + postgres_ready(database) +
+      ".formats as f on f.code = p.format_code");
 #ifdef DUMP_QUERIES
   {
   Timer tm;
@@ -156,9 +156,9 @@ void summarize_grids(string database, string caller, string user, string
     q.fetch_row(r);
     fc = r[0];
   } else {
-    q.set("select p.code, f.code from " + postgres_ready(database) + ".ds" + d +
-        t + " as p left join " + postgres_ready(database) + ".formats as f on "
-        "f.code = p.format_code where f.code is not null");
+    q.set("select p.code, f.code from " + postgres_ready(database) + "." +
+        metautils::args.dsid + t + " as p left join " + postgres_ready(database)
+        + ".formats as f on f.code = p.format_code where f.code is not null");
 #ifdef DUMP_QUERIES
     {
     Timer tm;
@@ -181,11 +181,12 @@ void summarize_grids(string database, string caller, string user, string
   if (!file_id_code.empty()) {
     s = "select file_code, time_range_code, grid_definition_code, parameter, "
         "level_type_codes, start_date, end_date from " + postgres_ready(
-        database) + ".ds" + d + "_grids2 where file_code = " + file_id_code;
+        database) + "." + metautils::args.dsid + "_grids2 where file_code = " +
+        file_id_code;
   } else {
     s = "select file_code, time_range_codes, grid_definition_codes, "
         "parameter, level_type_codes, start_date, end_date from " +
-        postgres_ready(database) + ".ds" + d + "_agrids2";
+        postgres_ready(database) + "." + metautils::args.dsid + "_agrids2";
   }
   Query sq(s);
 #ifdef DUMP_QUERIES
@@ -281,17 +282,17 @@ void summarize_grids(string database, string caller, string user, string
   }
   Transaction tx;
   tx.start(srv);
-  tx.get_lock(lock_it->second + stof(metautils::args.dsnum) * 10, 120);
+  tx.get_lock(lock_it->second + stoi(metautils::args.dsid.substr(1)), 120);
   auto uflg = strand(3);
+  auto ds_set = to_sql_tuple_string(ds_aliases(metautils::args.dsid));
   vector<size_t> v;
   for (const auto& key : summ_map.keys()) {
     GridSummaryEntry gse;
     summ_map.found(key, gse);
     auto sp = split(gse.key, ",");
-    q.set("level_type_codes, start_date, end_date", tbl, "dsid = '" +
-        metautils::args.dsnum + "' and format_code = " + sp[0] + " and "
-        "time_range_code = " + sp[1] + " and grid_definition_code = " + sp[2] +
-        " and parameter = " + sp[3]);
+    q.set("level_type_codes, start_date, end_date", tbl, "dsid in " + ds_set +
+        " and format_code = " + sp[0] + " and time_range_code = " + sp[1] +
+        " and grid_definition_code = " + sp[2] + " and parameter = " + sp[3]);
     if (q.submit(srv) < 0) {
       log_error2(q.error(), F, caller, user);
     }
@@ -323,22 +324,21 @@ void summarize_grids(string database, string caller, string user, string
           tbl,
           "dsid, format_code, time_range_code, grid_definition_code, "
               "parameter, level_type_codes, start_date, end_date, uflg",
-          "'" + metautils::args.dsnum + "', " + gse.key + ", '" + b + "', " + d1
+          "'" + metautils::args.dsid + "', " + gse.key + ", '" + b + "', " + d1
               + ", " + d2 + ", '" + uflg + "'",
           "on constraint summary_pkey do update set level_type_codes = "
               "excluded.level_type_codes, start_date = excluded.start_date, "
               "end_date = excluded.end_date, uflg = excluded.uflg"
           ) < 0) {
       log_error2(srv.error() + " while trying to insert ('" + metautils::args.
-          dsnum + "', " + gse.key + ", '" + b + "', " + d1 + ", " + d2 + ")", F,
+          dsid + "', " + gse.key + ", '" + b + "', " + d1 + ", " + d2 + ")", F,
           caller, user);
     }
     gse.data->level_code_set.clear();
     gse.data.reset();
   }
   if (file_id_code.empty()) {
-    srv._delete(tbl, "dsid = '" + metautils::args.dsnum + "' and uflg != '" +
-        uflg + "'");
+    srv._delete(tbl, "dsid in " + ds_set + " and uflg != '" + uflg + "'");
   }
   tx.commit();
   srv.disconnect();
@@ -376,14 +376,13 @@ void summarize_grid_resolutions(string caller, string user, string
     gd_map.emplace(r[0], make_pair(r[1], r[2]));
   }
   if (!file_id_code.empty()) {
-    q.set("select distinct grid_definition_codes from \"WGrML\".ds" +
-        substitute(metautils::args.dsnum, ".", "") + "_agrids2 where file_code "
-        "= " + file_id_code);
+    q.set("select distinct grid_definition_codes from \"WGrML\"." + metautils::
+        args.dsid + "_agrids2 where file_code = " + file_id_code);
   } else {
-    srv._delete("search.grid_resolutions", "dsid = '" + metautils::args.dsnum +
-        "'");
-    q.set("select distinct grid_definition_codes from \"WGrML\".ds" +
-        substitute(metautils::args.dsnum, ".", "") + "_agrids2");
+    srv._delete("search.grid_resolutions", "dsid in " + to_sql_tuple_string(
+        ds_aliases(metautils::args.dsid)));
+    q.set("select distinct grid_definition_codes from \"WGrML\"." + metautils::
+        args.dsid + "_agrids2");
   }
 #ifdef DUMP_QUERIES
   {
@@ -460,7 +459,7 @@ void summarize_grid_resolutions(string caller, string user, string
         if (srv.insert(
              "search.grid_resolutions",
              "keyword, vocabulary, dsid, origin",
-             "'" + k + "', 'GCMD', '" + metautils::args.dsnum+"', 'WGrML'",
+             "'" + k + "', 'GCMD', '" + metautils::args.dsid+"', 'WGrML'",
              "(keyword, vocabulary, dsid, origin) do nothing"
              ) < 0) {
           log_error2(srv.error(), F, caller, user);
@@ -504,23 +503,24 @@ void add_bitmap(string bitmap, vector<size_t> values, stringstream& ss) {
 void aggregate_grids(string database, string caller, string user, string
     file_id_code) {
   static const string F = this_function_label(__func__);
-  string d = substitute(metautils::args.dsnum, ".", "");
   Server srv(metautils::directives.database_server, metautils::directives.
       metadb_username, metautils::directives.metadb_password, "rdadb");
   LocalQuery q;
   if (database == "WGrML") {
     if (!file_id_code.empty()) {
       q.set("select time_range_code, grid_definition_code, parameter, "
-          "level_type_codes, min(start_date), max(end_date) from \"WGrML\".ds" +
-          d + "_grids2 where file_code = " + file_id_code + " group by "
-          "time_range_code, grid_definition_code, parameter, level_type_codes "
-          "order by parameter, level_type_codes, time_range_code");
+          "level_type_codes, min(start_date), max(end_date) from \"WGrML\"." +
+          metautils::args.dsid + "_grids2 where file_code = " + file_id_code +
+          " group by time_range_code, grid_definition_code, parameter, "
+          "level_type_codes order by parameter, level_type_codes, "
+          "time_range_code");
     } else {
       q.set("select time_range_code, grid_definition_code, parameter, "
           "level_type_codes, min(start_date), max(end_date) from \"WGrML\"."
-          "summary where dsid = '" + metautils::args.dsnum + "' group by "
-          "time_range_code, grid_definition_code, parameter, level_type_codes "
-          "order by parameter, level_type_codes, time_range_code");
+          "summary where dsid in " + to_sql_tuple_string(ds_aliases(metautils::
+          args.dsid)) + " group by time_range_code, grid_definition_code, "
+          "parameter, level_type_codes order by parameter, level_type_codes, "
+          "time_range_code");
     }
   } else {
     q.set("");
@@ -583,7 +583,7 @@ void aggregate_grids(string database, string caller, string user, string
           add_bitmap(sp[1], lv, ss);
           ss << ", " << d1 << ", " << d2 << ", '" << uflg << "'";
           if (srv.insert(
-                database + ".ds" + d + "_agrids2",
+                database + "." + metautils::args.dsid + "_agrids2",
                 "file_code, time_range_first, time_range_last, "
                     "time_range_codes, grid_definition_first, "
                     "grid_definition_last, grid_definition_codes, parameter, "
@@ -594,10 +594,12 @@ void aggregate_grids(string database, string caller, string user, string
                     "excluded.uflg"
                 ) < 0) {
             log_error2(srv.error() + " while trying to insert '" + ss.str() +
-                "' into " + database + ".ds" + d + "_agrids2", F, caller, user);
+                "' into " + database + "." + metautils::args.dsid + "_agrids2",
+                F, caller, user);
           }
         }
-        auto tbl = postgres_ready(database) + ".ds" + d + "_agrids_cache";
+        auto tbl = postgres_ready(database) + "." + metautils::args.dsid +
+            "_agrids_cache";
         if (srv.insert(
               tbl,
               "parameter, level_type_codes, min_start_date, max_end_date, uflg",
@@ -664,7 +666,7 @@ void aggregate_grids(string database, string caller, string user, string
       add_bitmap(sp[1], lv, ss);
       ss << ", " << d1 << ", " << d2 << ", '" << uflg << "'";
       if (srv.insert(
-            database + ".ds" + d + "_agrids2",
+            database + "." + metautils::args.dsid + "_agrids2",
             "file_code, time_range_first, time_range_last, time_range_codes, "
                 "grid_definition_first, grid_definition_last, "
                 "grid_definition_codes, parameter, level_type_first, "
@@ -674,22 +676,25 @@ void aggregate_grids(string database, string caller, string user, string
                 "excluded.uflg"
             ) < 0) {
         log_error2(srv.error() + " while trying to insert '" + ss.str() +
-            "' into " + database + ".ds" + d + "_agrids2", F, caller, user);
+            "' into " + database + "." + metautils::args.dsid + "_agrids2", F,
+            caller, user);
       }
       std::sort(dsv.begin(), dsv.end(), std::less<size_t>());
       string dsb;
       bitmap::compress_values(dsv, dsb);
       if (srv.insert(
-            database + ".ds" + d + "_grid_definitions",
+            database + "." + metautils::args.dsid + "_grid_definitions",
             "file_code, grid_definition_codes, uflg",
             file_id_code + ", '" + sql_ready(dsb) + "', '" + uflg + "'",
-            "(file_code) do update set uflg = excluded.uflg"
+            "(file_code) do update set grid_definition_codes = excluded."
+                "grid_definition_codes, uflg = excluded.uflg"
             ) < 0) {
         log_error2(srv.error() + " while trying to insert (" + file_id_code +
             ", '" + dsb + "')", F, caller, user);
       }
     }
-    auto tbl = postgres_ready(database) + ".ds" + d + "_agrids_cache";
+    auto tbl = postgres_ready(database) + "." + metautils::args.dsid +
+        "_agrids_cache";
     if (srv.insert(
           tbl,
           "parameter, level_type_codes, min_start_date, max_end_date, uflg",
@@ -704,12 +709,13 @@ void aggregate_grids(string database, string caller, string user, string
     }
   }
   if (!file_id_code.empty()) {
-    srv._delete("WGrML.ds" + d + "_agrids2", "file_code = " + file_id_code +
-        " and uflg != '" + uflg + "'");
-    srv._delete("WGrML.ds" + d + "_grid_definitions", "file_code = " +
+    srv._delete("WGrML." + metautils::args.dsid + "_agrids2", "file_code = " +
         file_id_code + " and uflg != '" + uflg + "'");
+    srv._delete("WGrML." + metautils::args.dsid + "_grid_definitions",
+        "file_code = " + file_id_code + " and uflg != '" + uflg + "'");
   } else {
-    srv._delete("WGrML.ds" + d + "_agrids_cache", "uflg != '" + uflg + "'");
+    srv._delete("WGrML." + metautils::args.dsid + "_agrids_cache", "uflg != '" +
+        uflg + "'");
   }
   srv.disconnect();
 }
