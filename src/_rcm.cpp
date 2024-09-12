@@ -24,10 +24,13 @@ using std::regex_search;
 using std::string;
 using std::stringstream;
 using strutils::chop;
+using strutils::ds_aliases;
+using strutils::ng_gdex_id;
 using strutils::replace_all;
 using strutils::split;
 using strutils::substitute;
 using strutils::to_lower;
+using strutils::to_sql_tuple_string;
 using unixutils::exists_on_server;
 using unixutils::mysystem2;
 using unixutils::open_output;
@@ -40,11 +43,11 @@ string myerror = "";
 string mywarning = "";
 
 string g_old_web_home;
-string g_old_name, g_new_name, g_new_dsnum;
+string g_old_name, g_new_name, g_new_dsid;
 
 bool verified_new_file_is_archived(string& error) {
   const string F = this_function_label(__func__);
-  if (metautils::args.dsnum > "998.9" || metautils::args.dsnum == "test") {
+  if (metautils::args.dsid > "d998999" || metautils::args.dsid == "test") {
     return true;
   }
   Server server(metautils::directives.database_server, metautils::directives.
@@ -53,9 +56,9 @@ bool verified_new_file_is_archived(string& error) {
   if (regex_search(g_old_name, regex(
       "^http(s){0,1}://(rda|dss)\\.ucar\\.edu/"))) {
     col = "wfile";
-    qs = "select wfile from wfile where dsid = 'ds" + g_new_dsnum + "' and "
-        "wfile = '" + metautils::relative_web_filename(g_new_name) + "' and "
-        "type = 'D' and status = 'P'";
+    qs = "select wfile from wfile where dsid in " + to_sql_tuple_string(
+        ds_aliases(g_new_dsid)) + " and wfile = '" + metautils::
+        relative_web_filename(g_new_name) + "' and type = 'D' and status = 'P'";
   }
   LocalQuery q(qs);
   if (q.submit(server) < 0) {
@@ -64,8 +67,8 @@ bool verified_new_file_is_archived(string& error) {
   server.disconnect();
   if (q.num_rows() == 0) {
     if (col == "wfile") {
-      error = "Error: " + g_new_name + " is not an active web file for ds" +
-          g_new_dsnum;
+      error = "Error: " + g_new_name + " is not an active web file for " +
+          g_new_dsid;
     }
     return false;
   }
@@ -133,20 +136,20 @@ void rewrite_uri_in_cmd_file(string db) {
   file_list.emplace_back(oname + "<!>" + nname);
   if (db == (db_prefix + "ObML")) {
     string f = "";
-    if (exists_on_server("rda-web-prod.ucar.edu", "/data/web/datasets/ds" +
-        metautils::args.dsnum + "/metadata/" + cmdir + "/" + oname + ".ObML.gz",
+    if (exists_on_server("rda-web-prod.ucar.edu", "/data/web/datasets/" +
+        metautils::args.dsid + "/metadata/" + cmdir + "/" + oname + ".ObML.gz",
         metautils::directives.rdadata_home)) {
-      f = unixutils::remote_web_file("https://rda.ucar.edu/datasets/ds" +
-          metautils::args.dsnum + "/metadata/" + cmdir + "/" + oname +
+      f = unixutils::remote_web_file("https://rda.ucar.edu/datasets/" +
+          metautils::args.dsid + "/metadata/" + cmdir + "/" + oname +
           ".ObML.gz", tdir.name());
       system(("gunzip " + f).c_str());
       chop(f, 3);
       old_is_gzipped = true;
-    } else if (exists_on_server("rda-web-prod.ucar.edu", "/data/web/datasets/ds"
-        + metautils::args.dsnum + "/metadata/" + cmdir + "/" + oname + ".ObML",
+    } else if (exists_on_server("rda-web-prod.ucar.edu", "/data/web/datasets/" +
+        metautils::args.dsid + "/metadata/" + cmdir + "/" + oname + ".ObML",
         metautils::directives.rdadata_home)) {
-      f = unixutils::remote_web_file("https://rda.ucar.edu/datasets/ds" +
-          metautils::args.dsnum + "/metadata/" + cmdir + "/" + oname + ".ObML",
+      f = unixutils::remote_web_file("https://rda.ucar.edu/datasets/" +
+          metautils::args.dsid + "/metadata/" + cmdir + "/" + oname + ".ObML",
           tdir.name());
     }
     if (!f.empty()) {
@@ -172,11 +175,11 @@ void rewrite_uri_in_cmd_file(string db) {
         ref_file = sline.substr(sline.find("ref=") + 5);
         ref_file = ref_file.substr(0, ref_file.find("\""));
         new_ref_file = substitute(ref_file, oname, nname);
-        if (exists_on_server("rda-web-prod.ucar.edu", "/data/web/datasets/ds" +
-            metautils::args.dsnum + "/metadata/" + cmdir + "/" + ref_file,
+        if (exists_on_server("rda-web-prod.ucar.edu", "/data/web/datasets/" +
+            metautils::args.dsid + "/metadata/" + cmdir + "/" + ref_file,
             metautils::directives.rdadata_home)) {
           std::ifstream ifs2(unixutils::remote_web_file(
-              "https://rda.ucar.edu/datasets/ds" + metautils::args.dsnum +
+              "https://rda.ucar.edu/datasets/" + metautils::args.dsid +
               "/metadata/" + cmdir + "/" + ref_file, tdir.name()).c_str());
           if (ifs2.is_open()) {
             std::ofstream ofs2;
@@ -201,8 +204,8 @@ void rewrite_uri_in_cmd_file(string db) {
             ofs2.close();
 
             // remove the old ref file
-            if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds" +
-                metautils::args.dsnum + "/metadata/" + cmdir + "/" + ref_file,
+            if (unixutils::rdadata_unsync("/__HOST__/web/datasets/" +
+                metautils::args.dsid + "/metadata/" + cmdir + "/" + ref_file,
                 tdir.name(), metautils::directives.rdadata_home, error) < 0) {
               metautils::log_warning("rewrite_uri_in_cmd_file() could not "
                   "remove old reference file '" + ref_file + "'", "rcm", USER);
@@ -225,16 +228,16 @@ void rewrite_uri_in_cmd_file(string db) {
 
        // remove the old file
        if (old_is_gzipped) {
-         if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds" + metautils::
-             args.dsnum + "/metadata/" + cmdir + "/" + oname + ".ObML.gz", tdir.
+         if (unixutils::rdadata_unsync("/__HOST__/web/datasets/" + metautils::
+             args.dsid + "/metadata/" + cmdir + "/" + oname + ".ObML.gz", tdir.
              name(), metautils::directives.rdadata_home, error) < 0) {
           metautils::log_warning("rewrite_uri_in_cmd_file() could not remove " +
               oname + ".ObML - unixutils::rdadata_unsync error(s): '" + error +
               "'", "rcm", USER);
         }
       } else {
-         if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds" + metautils::
-             args.dsnum + "/metadata/" + cmdir + "/" + oname + ".ObML", tdir.
+         if (unixutils::rdadata_unsync("/__HOST__/web/datasets/" + metautils::
+             args.dsid + "/metadata/" + cmdir + "/" + oname + ".ObML", tdir.
              name(), metautils::directives.rdadata_home, error) < 0) {
           metautils::log_warning("rewrite_uri_in_cmd_file() could not remove " +
               oname + ".ObML - unixutils::rdadata_unsync error(s): '" + error +
@@ -244,12 +247,12 @@ void rewrite_uri_in_cmd_file(string db) {
     }
   } else if (db == (db_prefix + "FixML")) {
     auto fixml_filename = unixutils::remote_web_file(
-        "https://rda.ucar.edu/datasets/ds" + metautils::args.dsnum +
-        "/metadata/" + cmdir + "/" + oname + ".FixML.gz", tdir.name());
+        "https://rda.ucar.edu/datasets/" + metautils::args.dsid + "/metadata/" +
+        cmdir + "/" + oname + ".FixML.gz", tdir.name());
     if (fixml_filename.empty()) {
       fixml_filename = unixutils::remote_web_file(
-          "https://rda.ucar.edu/datasets/ds" + metautils::args.dsnum +
-          "/metadata/" + cmdir + "/" + oname + ".FixML", tdir.name()).c_str();
+          "https://rda.ucar.edu/datasets/" + metautils::args.dsid + "/metadata/"
+          + cmdir + "/" + oname + ".FixML", tdir.name()).c_str();
     } else {
       system(("gunzip " + fixml_filename).c_str());
       chop(fixml_filename, 3);
@@ -288,8 +291,8 @@ void rewrite_uri_in_cmd_file(string db) {
     if (oname != nname) {
 
        // remove the old file
-       if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds" + metautils::
-           args.dsnum + "/metadata/" + cmdir + "/" + oname + ".FixML", tdir.
+       if (unixutils::rdadata_unsync("/__HOST__/web/datasets/" + metautils::
+           args.dsid + "/metadata/" + cmdir + "/" + oname + ".FixML", tdir.
            name(), metautils::directives.rdadata_home, error) < 0) {
         metautils::log_warning("rewrite_uri_in_cmd_file() could not remove " +
             oname + ".FixML - unixutils::rdadata_unsync error(s): '" + error +
@@ -302,8 +305,8 @@ void rewrite_uri_in_cmd_file(string db) {
   }
 
   // sync all of the new files
-  if (unixutils::rdadata_sync(tdir.name(), "metadata/", "/data/web/datasets/ds"
-      + g_new_dsnum,metautils::directives.rdadata_home,error) < 0) {
+  if (unixutils::rdadata_sync(tdir.name(), "metadata/", "/data/web/datasets/" +
+      g_new_dsid, metautils::directives.rdadata_home, error) < 0) {
     log_error2("could not sync new file(s) - rdadata_sync error(s): '" + error +
         "'", F, "rcm", USER);
   }
@@ -311,8 +314,6 @@ void rewrite_uri_in_cmd_file(string db) {
 
 bool renamed_cmd() {
   const string F = this_function_label(__func__);
-  string dsnum2 = substitute(metautils::args.dsnum,".","");
-  string new_dsnum2 = substitute(g_new_dsnum,".","");
   string error;
   LocalQuery query,query2;
   Row row;
@@ -335,11 +336,11 @@ bool renamed_cmd() {
     } else {
       oname = metautils::relative_web_filename(g_old_name);
     }
-    if (metautils::args.dsnum != g_new_dsnum) {
-      auto d = metautils::args.dsnum;
-      metautils::args.dsnum = g_new_dsnum;
+    if (metautils::args.dsid != g_new_dsid) {
+      auto d = metautils::args.dsid;
+      metautils::args.dsid = g_new_dsid;
       nname = metautils::relative_web_filename(g_new_name);
-      metautils::args.dsnum = d;
+      metautils::args.dsid = d;
     } else {
       nname = metautils::relative_web_filename(g_new_name);
     }
@@ -347,15 +348,16 @@ bool renamed_cmd() {
   }
   auto schemas = server.schema_names();
   for (const auto& db : schemas) {
-    auto tbl_names = table_names(server, db, "ds" + dsnum2 + ftbl, error);
+    auto tbl_names = table_names(server, db, metautils::args.dsid + ftbl,
+        error);
     for (const auto& tbl : tbl_names) {
       query.set("code", db + "." + tbl, col + " = '" + oname + "'");
       if (query.submit(server) < 0) {
         log_error2("error: '" + query.error() + "'", F, "rcm", USER);
       }
       if (query.num_rows() > 0) {
-        query2.set("code", db + "." + substitute(tbl, dsnum2, new_dsnum2),
-            "binary " +  col  +  " = '" + nname + "'");
+        query2.set("code", db + "." + substitute(tbl, metautils::args.dsid,
+            g_new_dsid), "binary " +  col  +  " = '" + nname + "'");
         if (query2.submit(server) < 0) {
           log_error2("error: '" + query2.error() + "'", F, "rcm", USER);
         }
@@ -371,7 +373,7 @@ bool renamed_cmd() {
         if (db != "WGrML") {
           rewrite_uri_in_cmd_file(db);
         }
-        if (g_new_dsnum == metautils::args.dsnum) {
+        if (g_new_dsid == metautils::args.dsid) {
           while (query.fetch_row(row)) {
             if (server.update(db + "." + tbl, col + " = '" + nname + "'",
                 "code = " + row[0]) < 0) {
@@ -383,7 +385,7 @@ bool renamed_cmd() {
         } else {
           stringstream oss, ess;
           if (mysystem2(metautils::directives.local_root + "/bin/dcm -d " +
-              metautils::args.dsnum + " " + g_old_name, oss, ess) != 0) {
+              metautils::args.dsid + " " + g_old_name, oss, ess) != 0) {
             cerr << ess.str() << endl;
           }
           auto scm_file = nname + ".";
@@ -393,17 +395,17 @@ bool renamed_cmd() {
             scm_file += db;
           }
           if (mysystem2(metautils::directives.local_root + "/bin/scm -d " +
-              g_new_dsnum + " " + scm_flag + " " + scm_file, oss, ess) != 0) {
+              g_new_dsid + " " + scm_flag + " " + scm_file, oss, ess) != 0) {
             cerr << ess.str() << endl;
           }
           if (db == "WGrML") {
 
             // insert the inventory into the new dataset tables
             mysystem2(metautils::directives.local_root + "/bin/iinv -d " +
-                g_new_dsnum + " -f " + substitute(nname, "/", "%") +
+                g_new_dsid + " -f " + substitute(nname, "/", "%") +
                 ".GrML_inv", oss, ess);
-            server.update("WGrML.ds" + substitute(g_new_dsnum, ".", "") +
-                "_webfiles2", "inv = 'Y'", "id = '" + nname + "'");
+            server.update("WGrML." + g_new_dsid + "_webfiles2", "inv = 'Y'",
+                "id = '" + nname + "'");
           }
         }
         auto d = db;
@@ -411,9 +413,9 @@ bool renamed_cmd() {
         if (d[0] == 'W') {
           d = d.substr(1);
         }
-        if (server_d.update(dcol, "meta_link = '" + d + "'", "dsid = 'ds" +
-            metautils::args.dsnum + "' and " + dcol + " = '" + nname + "'") <
-            0) {
+        if (server_d.update(dcol, "meta_link = '" + d + "'", "dsid in " +
+            to_sql_tuple_string(ds_aliases(metautils::args.dsid)) + " and " +
+            dcol + " = '" + nname + "'") < 0) {
           metautils::log_warning("renamed_cmd() returned warning: " +
               server_d.error(), "rcm", USER);
         }
@@ -462,9 +464,12 @@ int main(int argc, char **argv) {
     if (sp[n] == "-C") {
       no_cache = true;
     } else if (sp[n] == "-d") {
-      metautils::args.dsnum = sp[++n];
+      metautils::args.dsid = sp[++n];
+      if (metautils::args.dsid != "test") {
+        metautils::args.dsid = ng_gdex_id(metautils::args.dsid);
+      }
     } else if (sp[n] == "-nd") {
-      g_new_dsnum = sp[++n];
+      g_new_dsid = ng_gdex_id(sp[++n]);
     } else if (sp[n] == "-o") {
       g_old_web_home = sp[++n];
       if (regex_search(g_old_web_home, regex("/$"))) {
@@ -472,32 +477,27 @@ int main(int argc, char **argv) {
       }
     }
   }
-  if (regex_search(metautils::args.dsnum, regex("^ds"))) {
-    metautils::args.dsnum = metautils::args.dsnum.substr(2);
-  }
-  if (g_new_dsnum.empty()) {
-    g_new_dsnum = metautils::args.dsnum;
-  } else if (regex_search(g_new_dsnum, regex("^ds"))) {
-    g_new_dsnum = g_new_dsnum.substr(2);
+  if (g_new_dsid.empty()) {
+    g_new_dsid = metautils::args.dsid;
   }
   g_old_name = sp[sp.size() - 2];
   g_new_name = sp[sp.size() - 1];
   if (!regex_search(g_old_name, regex("^https://rda.ucar.edu"))) {
     g_old_name = "https://rda.ucar.edu" + metautils::directives.data_root_alias
-        + "/ds" + metautils::args.dsnum + "/" + g_old_name;
+        + "/" + metautils::args.dsid + "/" + g_old_name;
   }
   if (!exists_on_server("rda-web-prod.ucar.edu",
-      "/data/web/datasets/ds" + metautils::args.dsnum + "/metadata/wfmd",
+      "/data/web/datasets/" + metautils::args.dsid + "/metadata/wfmd",
       metautils::directives.rdadata_home)) {
-    cerr << "Error: metadata directory not found for ds" << metautils::
-        args.dsnum << endl;
+    cerr << "Error: metadata directory not found for " << metautils::args.dsid
+        << endl;
     exit(1);
   }
   if (!regex_search(g_new_name, regex("^https://rda.ucar.edu"))) {
     g_new_name = "https://rda.ucar.edu" + metautils::directives.data_root_alias
-        + "/ds" + metautils::args.dsnum + "/" + g_new_name;
+        + "/" + metautils::args.dsid + "/" + g_new_name;
   }
-  if (g_new_name == g_old_name && g_new_dsnum == metautils::args.dsnum) {
+  if (g_new_name == g_old_name && g_new_dsid == metautils::args.dsid) {
     cerr << "Error: new_name must be different from old_name" << endl;
     exit(1);
   }
