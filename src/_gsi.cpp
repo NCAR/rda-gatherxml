@@ -25,11 +25,13 @@ using std::regex_search;
 using std::string;
 using std::stringstream;
 using std::unique_ptr;
+using strutils::ds_aliases;
 using strutils::ftos;
 using strutils::itos;
 using strutils::split;
 using strutils::strand;
 using strutils::substitute;
+using strutils::to_sql_tuple_string;
 using unixutils::mysystem2;
 
 metautils::Directives metautils::directives;
@@ -46,7 +48,6 @@ struct ThreadStruct {
 };
 
 Server server;
-string dsnum2;
 char bitmap[60][121];
 const string USER = getenv("USER");
 const string PLT_EXT = ".py";
@@ -93,7 +94,7 @@ void create_graphics(string plot_script, string image_name, string tempdir_name,
     command += "conda run -p /glade/u/home/rdadata/conda-envs/rdaviz python ";
   }
   command += plot_script + "; convert -trim +repage -resize 360x180 " +
-      image_name + " " + tempdir_name + "/datasets/ds" + metautils::args.dsnum +
+      image_name + " " + tempdir_name + "/datasets/" + metautils::args.dsid +
       "/metadata/spatial_coverage";
   if (!image_tag.empty()) {
     command += "." + image_tag;
@@ -166,15 +167,14 @@ void *thread_plot(void *tnc) {
     log_error2("can't create temporary directory", F, "gsi", USER);
   }
   stringstream oss, ess;
-  if (mysystem2("/bin/mkdir -m 0755 -p " + tdir->name() + "/datasets/ds" +
-      metautils::args.dsnum + "/metadata", oss, ess) != 0) {
+  if (mysystem2("/bin/mkdir -m 0755 -p " + tdir->name() + "/datasets/" +
+      metautils::args.dsid + "/metadata", oss, ess) != 0) {
     log_error2("can't create directory tree", F, "gsi", USER);
   }
   create_graphics(plt_p->name(), img_p->name(), tdir->name(), t->imagetag);
   string e;
-  if (unixutils::rdadata_sync(tdir->name(), "datasets/ds" + metautils::args.
-      dsnum + "/metadata/", "/data/web", metautils::directives.rdadata_home, e)
-      < 0) {
+  if (unixutils::rdadata_sync(tdir->name(), "datasets/" + metautils::args.dsid +
+      "/metadata/", "/data/web", metautils::directives.rdadata_home, e) < 0) {
     log_warning("rdadata_sync errors: '" + e + "'", "gsi", USER);
   }
   return nullptr;
@@ -192,38 +192,37 @@ void generate_graphics(LocalQuery& query, string type, string table, string
     }
   }
   auto tnc = unique_ptr<ThreadStruct[]>(new ThreadStruct[query.num_rows()]);
-  auto d2 = substitute(metautils::args.dsnum, ".", "");
+  auto ds_set = to_sql_tuple_string(ds_aliases(metautils::args.dsid));
   size_t nn = 0;
   for (const auto& row : query) {
     if (gindex.empty()) {
       if (type == "obs") {
         tnc[nn].query.set("select distinct box1d_row, box1d_bitmap from " +
-            table + " where dsid = '" + metautils::args.dsnum + "' and "
-            "observation_type_code = " + row[0] + " and platform_type_code = " +
-            row[1] + " and format_code = " + row[4] + " order by box1d_row");
+            table + " where dsid in " + ds_set + " and observation_type_code = "
+            + row[0] + " and platform_type_code = " + row[1] + " and "
+            "format_code = " + row[4] + " order by box1d_row");
         tnc[nn].imagetag = substitute(row[5], " ", "_") + "_web_" + row[2] + "."
             + row[3];
       } else if (type == "fix") {
         tnc[nn].query.set("select box1d_row, box1d_bitmap from " + table +
-            " where dsid = '" + metautils::args.dsnum + "' and "
-            "classification_code = " + row[0] + " and format_code = " + row[2] +
-            " order by box1d_row");
+            " where dsid in " + ds_set + " and classification_code = " + row[0]
+            + " and format_code = " + row[2] + " order by box1d_row");
         tnc[nn].imagetag = substitute(row[3], " ", "_") + "_web_" + row[1];
       }
     } else {
       if (type == "obs") {
         tnc[nn].query.set("select distinct box1d_row, box1d_bitmap from "
-            "\"WObML\".ds" + d2 + "_webfiles2 as p left join dssdb.wfile as x "
-            "on (x.dsid = 'ds" + metautils::args.dsnum + "' and x.wfile = p."
-            "id) left join " + table + " as t on t.file_code = p.code where x."
+            "\"WObML\"." + metautils::args.dsid + "_webfiles2 as p left join "
+            "dssdb.wfile as x on (x.dsid in " + ds_set + " and x.wfile = p.id) "
+            "left join " + table + " as t on t.file_code = p.code where x."
             "gindex = " + gindex + " and observation_type_code = " + row[0] +
             " and platform_type_code = " + row[1] + " and p.format_code = " +
             row[4] + " order by box1d_row");
         tnc[nn].imagetag = substitute(row[5], " ", "_") + "_web_gindex_" +
             gindex + "_" + row[2] + "." + row[3];
       } else if (type == "fix") {
-        tnc[nn].query.set("select box1d_row, box1d_bitmap from \"WFixML\".ds" +
-            d2 + "_webfiles2 as p left join dssdb.wfile as x on x.wfile = p."
+        tnc[nn].query.set("select box1d_row, box1d_bitmap from \"WFixML\"." +
+            metautils::args.dsid + "_webfiles2 as p left join dssdb.wfile as x on x.wfile = p."
             "id left join " + table + " as t on t.file_code = p.code where x."
             "gindex = " + gindex + " and classification_code = " + row[0] +
             " and p.format_code = " + row[2] + " order by box1d_row");
@@ -273,15 +272,14 @@ void generate_graphics(LocalQuery& query, string type, string table, string
     log_error2("can't create temporary directory", F, "gsi", USER);
   }
   stringstream oss, ess;
-  if (mysystem2("/bin/mkdir -m 0755 -p " + tdir->name() + "/datasets/ds" +
-      metautils::args.dsnum + "/metadata", oss, ess) != 0) {
+  if (mysystem2("/bin/mkdir -m 0755 -p " + tdir->name() + "/datasets/" +
+      metautils::args.dsid + "/metadata", oss, ess) != 0) {
     log_error2("can't create directory tree", F, "gsi", USER);
   }
   create_graphics(plt_p->name(), img_p->name(), tdir->name());
   string e;
-  if (unixutils::rdadata_sync(tdir->name(),"datasets/ds" + metautils::args.
-      dsnum + "/metadata/", "/data/web", metautils::directives.rdadata_home, e)
-      < 0) {
+  if (unixutils::rdadata_sync(tdir->name(),"datasets/" + metautils::args.dsid +
+      "/metadata/", "/data/web", metautils::directives.rdadata_home, e) < 0) {
     log_warning("rdadata_sync errors: '" + e + "'", "gsi", USER);
   }
 }
@@ -298,7 +296,7 @@ int main(int argc, char **argv) {
   metautils::args.args_string = unixutils::unix_args_string(argc, argv, '!');
   metautils::read_config("gsi", USER);
   auto sp = split(metautils::args.args_string, "!");
-  metautils::args.dsnum = sp.back();
+  metautils::args.dsid = sp.back();
   sp.pop_back();
   server.connect(metautils::directives.database_server, metautils::directives.
       metadb_username, metautils::directives.metadb_password, "rdadb");
@@ -312,56 +310,57 @@ int main(int argc, char **argv) {
       g = sp[++n];
     }
   }
-  auto dsid = substitute(metautils::args.dsnum, ".", "");
-  if (table_exists(server, "WObML.ds" + dsid + "_data_types")) {
+  if (table_exists(server, "WObML." + metautils::args.dsid + "_data_types")) {
     LocalQuery q2;
     string t;
     if (g.empty()) {
       q2.set("select distinct l.observation_type_code, l.platform_type_code, "
           "o.obs_type, pf.platform_type, p.format_code, f.format from "
-          "\"WObML\".ds" + dsid + "_webfiles2 as p left join \"WObML\".ds" +
-          dsid + "_data_types as d on d.file_code = p.code left join \"WObML\"."
-          "ds" + dsid + "_data_types_list as l on l.code = d.data_type_code "
-          "left join \"WObML\".obs_types as o on l.observation_type_code = o."
-          "code left join \"WObML\".platform_types as pf on l."
-          "platform_type_code = pf.code left join \"WObML\".formats as f on f."
-          "code = p.format_code");
-      t = "search.obs_data";
-    } else {
-      q2.set("select distinct l.observation_type_code, l.platform_type_code, "
-          "o.obs_type, pf.platform_type, p.format_code, f.format from "
-          "\"WObML\".ds" + dsid + "_webfiles2 as p left join dssdb.wfile as x "
-          "on x.wfile = p.id left join \"WObML\".ds" + dsid + "_data_types as "
-          "d on d.file_code = p.code left join \"WObML\".ds" + dsid +
+          "\"WObML\"." + metautils::args.dsid + "_webfiles2 as p left join "
+          "\"WObML\"." + metautils::args.dsid + "_data_types as d on d."
+          "file_code = p.code left join \"WObML\"." + metautils::args.dsid +
           "_data_types_list as l on l.code = d.data_type_code left join "
           "\"WObML\".obs_types as o on l.observation_type_code = o.code left "
           "join \"WObML\".platform_types as pf on l.platform_type_code = pf."
-          "code left join \"WObML\".formats as f on f.code = p.format_code "
-          "where x.gindex = " + g);
-      t = "\"WObML\".ds" + dsid + "_locations";
+          "code left join \"WObML\".formats as f on f.code = p.format_code");
+      t = "search.obs_data";
+    } else {
+      q2.set("select distinct l.observation_type_code, l.platform_type_code, "
+          "o.obs_type, pf.platform_type, p.format_code, f.format from " "\"WObML\"." + metautils::args.dsid + "_webfiles2 as p left join "
+          "dssdb.wfile as x on x.wfile = p.id left join \"WObML\"." +
+          metautils::args.dsid + "_data_types as d on d.file_code = p.code "
+          "left join \"WObML\"." + metautils::args.dsid + "_data_types_list as "
+          "l on l.code = d.data_type_code left join \"WObML\".obs_types as o "
+          "on l.observation_type_code = o.code left join \"WObML\"."
+          "platform_types as pf on l.platform_type_code = pf.code left join "
+          "\"WObML\".formats as f on f.code = p.format_code where x.gindex = " +
+          g);
+      t = "\"WObML\"." + metautils::args.dsid + "_locations";
     }
     generate_graphics(q2, "obs", t, g);
   }
-  if (table_exists(server, "WFixML.ds" + dsid + "_locations")) {
+  if (table_exists(server, "WFixML." + metautils::args.dsid + "_locations")) {
     LocalQuery q2;
     string t;
     if (g.empty()) {
       q2.set("select distinct d.classification_code, c.classification, p."
-          "format_code, f.format from \"WFixML\".ds" + dsid + "_webfiles2 as p "
-          "left join \"WFixML\".ds" + dsid + "_locations as d on d.file_code = "
-          "p.code left join \"WFixML\".classifications as c on d."
-          "classification_code = c.code left join \"WFixML\".formats as f on f."
-          "code = p.format_code where d.classification_code is not null");
+          "format_code, f.format from \"WFixML\"." + metautils::args.dsid +
+          "_webfiles2 as p left join \"WFixML\"." + metautils::args.dsid +
+          "_locations as d on d.file_code = p.code left join \"WFixML\"."
+          "classifications as c on d.classification_code = c.code left join "
+          "\"WFixML\".formats as f on f.code = p.format_code where d."
+          "classification_code is not null");
       t = "search.fix_data";
     } else {
       q2.set("select distinct d.classification_code, c.classification, p."
-          "format_code, f.format from \"WFixML\".ds" + dsid + "_webfiles2 as p "
-          "left join dssdb.wfile as x on x.wfile = p.id left join \"WFixML\".ds"
-          + dsid + "_locations as d on d.file_code = p.code left join "
-          "\"WFixML\".classifications as c on d.classification_code = c.code "
-          "left join \"WFixML\".formats as f on f.code = p.format_code where "
-          "x.gindex = " + g + " and d.classification_code is not null");
-      t = "\"WFixML\".ds" + dsid + "_locations";
+          "format_code, f.format from \"WFixML\"." + metautils::args.dsid +
+          "_webfiles2 as p left join dssdb.wfile as x on x.wfile = p.id left "
+          "join \"WFixML\"." + metautils::args.dsid + "_locations as d on d."
+          "file_code = p.code left join \"WFixML\".classifications as c on d."
+          "classification_code = c.code left join \"WFixML\".formats as f on f."
+          "code = p.format_code where x.gindex = " + g + " and d."
+          "classification_code is not null");
+      t = "\"WFixML\"." + metautils::args.dsid + "_locations";
     }
     generate_graphics(q2, "fix", t, g);
   }
