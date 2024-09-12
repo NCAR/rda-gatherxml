@@ -47,6 +47,7 @@ using std::tuple;
 using std::unordered_map;
 using std::unordered_set;
 using std::vector;
+using strutils::ds_aliases;
 using strutils::itos;
 using strutils::replace_all;
 using strutils::split;
@@ -54,6 +55,7 @@ using strutils::strand;
 using strutils::substitute;
 using strutils::to_capital;
 using strutils::to_lower;
+using strutils::to_sql_tuple_string;
 using unixutils::mysystem2;
 using unixutils::open_output;
 
@@ -253,8 +255,9 @@ void generate_parameter_cross_reference(string format, string title, string
   Server mysrv(metautils::directives.database_server, metautils::directives.
       metadb_username, metautils::directives.metadb_password, "rdadb");
   LocalQuery q("select distinct parameter from \"WGrML\".summary as s left "
-      "join \"WGrML\".formats as f on f.code = s.format_code where s.dsid = '" +
-      metautils::args.dsnum + "' and f.format = '" + format + "'");
+      "join \"WGrML\".formats as f on f.code = s.format_code where s.dsid in " +
+      to_sql_tuple_string(ds_aliases(metautils::args.dsid)) + " and f.format = '"
+      + format + "'");
 #ifdef DUMP_QUERIES
   {
   Timer tm;
@@ -385,8 +388,8 @@ void generate_parameter_cross_reference(string format, string title, string
     ofs.close();
     ofs2.close();
     string e;
-    if (unixutils::rdadata_sync(t.name(), "metadata/", "/data/web/datasets/ds" +
-        metautils::args.dsnum, metautils::directives.rdadata_home, e) < 0) {
+    if (unixutils::rdadata_sync(t.name(), "metadata/", "/data/web/datasets/" +
+        metautils::args.dsid, metautils::directives.rdadata_home, e) < 0) {
       metautils::log_warning("generate_parameter_cross_reference() couldn't "
           "sync cross-references - rdadata_sync error(s): '" + e  + "'", caller,
           user);
@@ -396,15 +399,15 @@ void generate_parameter_cross_reference(string format, string title, string
     // remove a parameter table if it exists and there are no parameters for
     //  this format
     string e;
-    if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds" + metautils::args.
-        dsnum + "/metadata/" + html_file, t.name(), metautils::directives.
+    if (unixutils::rdadata_unsync("/__HOST__/web/datasets/" + metautils::args.
+        dsid + "/metadata/" + html_file, t.name(), metautils::directives.
         rdadata_home, e) < 0) {
       metautils::log_warning("generate_parameter_cross_reference() tried to "
           "but couldn't delete '" + html_file + "' - error: '" + e + "'",
           caller, user);
     }
-    if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds" + metautils::args.
-        dsnum + "/metadata/" + substitute(html_file, ".html", ".xml"), t.name(),
+    if (unixutils::rdadata_unsync("/__HOST__/web/datasets/" + metautils::args.
+        dsid + "/metadata/" + substitute(html_file, ".html", ".xml"), t.name(),
         metautils::directives.rdadata_home, e) < 0) {
       metautils::log_warning("generate_parameter_cross_reference() tried to "
           "but couldn't delete '" + substitute(html_file, ".html", ".xml") +
@@ -423,7 +426,8 @@ void generate_level_cross_reference(string format, string title, string
       metadb_username, metautils::directives.metadb_password, "rdadb");
   LocalQuery q("select distinct level_type_codes from \"WGrML\".summary as s "
       "left join \"WGrML\".formats as f on f.code = s.format_code where s.dsid "
-      "= '" + metautils::args.dsnum + "' and f.format = '" + format + "'");
+      "in " + to_sql_tuple_string(ds_aliases(metautils::args.dsid)) + " and f."
+      "format = '" + format + "'");
 #ifdef DUMP_QUERIES
   {
   Timer tm;
@@ -524,8 +528,8 @@ void generate_level_cross_reference(string format, string title, string
     }
     ofs.close();
     string e;
-    if (unixutils::rdadata_sync(t.name(), "metadata/", "/data/web/datasets/ds" +
-        metautils::args.dsnum, metautils::directives.rdadata_home, e) < 0) {
+    if (unixutils::rdadata_sync(t.name(), "metadata/", "/data/web/datasets/" +
+        metautils::args.dsid, metautils::directives.rdadata_home, e) < 0) {
       metautils::log_warning(F + " couldn't sync '" + html_file + "' - "
           "rdadata_sync error(s): '" + e + "'", caller, user);
     }
@@ -534,8 +538,8 @@ void generate_level_cross_reference(string format, string title, string
     // remove the level table if it exists and there are no levels for this
     //  format
     string e;
-    if (unixutils::rdadata_unsync("/__HOST__/web/datasets/ds" + metautils::args.
-        dsnum + "/metadata/" + html_file, t.name(), metautils::directives.
+    if (unixutils::rdadata_unsync("/__HOST__/web/datasets/" + metautils::args.
+        dsid + "/metadata/" + html_file, t.name(), metautils::directives.
         rdadata_home, e) < 0) {
       metautils::log_warning(F + " tried to but couldn't delete '" + html_file +
           "' - error: '" + e + "'", caller, user);
@@ -611,25 +615,24 @@ void add_to_formats(XMLDocument& xdoc, string database, string primaries_table,
 
 string parameter_query(Server& mysrv, string format_code, size_t
     format_query_result_size) {
-  auto d2 = substitute(metautils::args.dsnum, ".", "");
   if (format_query_result_size > 1) {
     return "select a.parameter, a.level_type_codes, min(a.start_date), max(a."
-        "end_date) from \"WGrML\".ds" + d2 + "_agrids2 as a left join "
-        "\"WGrML\".ds" + d2 + "_webfiles2 as p on p.code = a.file_code where p."
-        "format_code = " + format_code + " group by a.parameter, a."
-        "level_type_codes";
+        "end_date) from \"WGrML\"." + metautils::args.dsid + "_agrids2 as a "
+        "left join \"WGrML\"." + metautils::args.dsid + "_webfiles2 as p on p."
+        "code = a.file_code where p.format_code = " + format_code + " group by "
+        "a.parameter, a.level_type_codes";
   }
   return "select parameter, level_type_codes, min(start_date), max(end_date) "
-      "from \"WGrML\".ds" + d2 + "_agrids2 group by parameter, "
+      "from \"WGrML\"." + metautils::args.dsid + "_agrids2 group by parameter, "
       "level_type_codes";
 }
 
 string time_range_query(Server& mysrv, string format_code) {
-  auto d2 = substitute(metautils::args.dsnum, ".", "");
   return "select distinct t.time_range, d.definition, d.def_params from "
       "\"WGrML\".summary as s left join \"WGrML\".time_ranges as t on t.code = "
-      "s.time_range_code left join \"WGrML\".grid_definitions as d on d.code = "      "s.grid_definition_code where s.dsid = '" + metautils::args.dsnum + "' "
-      "and format_code = " + format_code;
+      "s.time_range_code left join \"WGrML\".grid_definitions as d on d.code = "
+      "s.grid_definition_code where s.dsid in " + to_sql_tuple_string(ds_aliases(
+      metautils::args.dsid)) + " and format_code = " + format_code;
 }
 
 void write_grid_html(ofstream& ofs, size_t num_products) {
@@ -682,8 +685,8 @@ void write_grid_html(ofstream& ofs, size_t num_products) {
   ofs << "        x[n].className = 'view_button_off';" << endl;
   ofs << "    }" << endl;
   ofs << "    e.className = 'view_button_on';" << endl;
-  ofs << "    getAjaxContent('GET',null,'/datasets/ds" << metautils::args.dsnum
-      << "/metadata/'+v,'detail_content');" << endl;
+  ofs << "    getAjaxContent('GET',null,'/datasets/" << metautils::args.dsid <<
+      "/metadata/'+v,'detail_content');" << endl;
   ofs << "  }" << endl;
   ofs << "}" << endl;
   ofs << "</script>" << endl;
@@ -743,7 +746,7 @@ void write_grid_html(ofstream& ofs, size_t num_products) {
   ofs << "</td></tr>" << endl;
   ofs << "</table></center>" << endl;
   ofs << "<img src=\"/images/transpace.gif\" width=\"1\" height=\"0\" onLoad="
-      "\"getAjaxContent('GET',null,'/datasets/ds" << metautils::args.dsnum <<
+      "\"getAjaxContent('GET',null,'/datasets/" << metautils::args.dsid <<
       "/metadata/<?php echo $view; ?>-detail.html','detail_content')\" />" <<
       endl;
 }
@@ -798,17 +801,16 @@ void generate_gridded_product_detail(Server& mysrv, string file_type, const
   }
   for (const auto& fp : format_list) {
     Query qs;
-    auto d2 = substitute(metautils::args.dsnum, ".", "");
     if (format_list.size() > 1) {
       qs.set("select a.time_range_codes, a.grid_definition_codes, min(a."
-          "start_date), max(a.end_date) from \"WGrML\".ds" + d2 + "_agrids2 as "
-          "a left join \"WGrML\".ds" + d2 + "_webfiles2 as p on p.code = a."
-          "file_code where p.format_code = " + fp.second + " group by a."
-          "time_range_codes, a.grid_definition_codes");
+          "start_date), max(a.end_date) from \"WGrML\"." + metautils::args.dsid +
+          "_agrids2 as a left join \"WGrML\"." + metautils::args.dsid +
+          "_webfiles2 as p on p.code = a.file_code where p.format_code = " + fp.
+          second + " group by a.time_range_codes, a.grid_definition_codes");
     } else {
       qs.set("select time_range_codes, grid_definition_codes, min(start_date), "
-          "max(end_date) from \"WGrML\".ds" + d2 + "_agrids2 group by "
-          "time_range_codes, grid_definition_codes");
+          "max(end_date) from \"WGrML\"." + metautils::args.dsid +
+          "_agrids2 group by time_range_codes, grid_definition_codes");
     }
 #ifdef DUMP_QUERIES
     {
@@ -877,8 +879,8 @@ void generate_gridded_product_detail(Server& mysrv, string file_type, const
         "\"2\" align=\"center\">Summary for Grids in " << to_capital(f) <<
         " Format</th></tr>" << endl;
     q.set("select distinct parameter, level_type_codes from \"WGrML\".summary "
-        "where dsid = '" + metautils::args.dsnum + "' and format_code = " + fp.
-        second);
+        "where dsid in " + to_sql_tuple_string(ds_aliases(metautils::args.dsid))
+        + " and format_code = " + fp.second);
 #ifdef DUMP_QUERIES
     {
     Timer tm;
@@ -937,7 +939,7 @@ void generate_gridded_product_detail(Server& mysrv, string file_type, const
       if (q.num_rows() > 1) {
         ofs << "<a title=\"Parameters and Vertical Levels\" href=\"javascript:"
             "void(0)\" onClick=\"popModalWindowWithGetUrl(950, 600, '/cgi-bin/"
-            "transform?dsnum=" << metautils::args.dsnum << "&view=varlev&"
+            "transform?dsnum=" << metautils::args.dsid << "&view=varlev&"
             "formatCode=" << fp.second << "&ftype=" << strutils::to_lower(
             file_type);
         ofs << "&tcode=" << ps.code << "')\">" << ps.description << "</a>";
@@ -1001,7 +1003,6 @@ void generate_detailed_grid_summary(string file_type, ofstream& ofs, const
   if (!ofs_l.is_open()) {
     log_error2("unable to open output for level detail", F, caller, user);
   }
-  auto d2 = substitute(metautils::args.dsnum, ".", "");
   xmlutils::ParameterMapper pmap(metautils::directives.parameter_map_path);
   xmlutils::LevelMapper lmap(metautils::directives.level_map_path);
   vector<string> pfv;
@@ -1211,7 +1212,7 @@ void generate_detailed_grid_summary(string file_type, ofstream& ofs, const
       if (q.num_rows() > 1) {
         ofs_p << "<a title=\"Products and Coverages\" href=\"javascript:void("
             "0)\" onClick=\"popModalWindowWithGetUrl(950, 600, '/cgi-bin/"
-            "transform?dsnum=" << metautils::args.dsnum << "&view=prodcov&"
+            "transform?dsnum=" << metautils::args.dsid << "&view=prodcov&"
             "formatCode=" << fp.second << "&ftype=" << strutils::to_lower(
             file_type);
         for (const auto& e : pdmap[k].parameter_codes) {
@@ -1342,7 +1343,7 @@ void generate_detailed_grid_summary(string file_type, ofstream& ofs, const
       if (q.num_rows() > 1) {
         ofs_l << "<a title=\"Products and Coverages\" href=\"javascript:void("
             "0)\" onClick=\"popModalWindowWithGetUrl(950, 600, '/cgi-bin/"
-            "transform?dsnum=" << metautils::args.dsnum << "&view=prodcov&"
+            "transform?dsnum=" << metautils::args.dsid << "&view=prodcov&"
             "formatCode=" << fp.second << "&ftype=" << strutils::to_lower(
             file_type);
         for (auto& e : clmap[key].map_list) {
@@ -1405,8 +1406,8 @@ void generate_detailed_grid_summary(string file_type, ofstream& ofs, const
   }
   mysrv.disconnect();
   string e;
-  if (unixutils::rdadata_sync(t.name(), "metadata/", "/data/web/datasets/ds" +
-      metautils::args.dsnum, metautils::directives.rdadata_home, e) < 0) {
+  if (unixutils::rdadata_sync(t.name(), "metadata/", "/data/web/datasets/" +
+      metautils::args.dsid, metautils::directives.rdadata_home, e) < 0) {
     metautils::log_warning(F + " couldn't sync detail files - rdadata_sync "
         "error(s): '" + e + "'", caller, user);
   }
@@ -1436,7 +1437,6 @@ void generate_detailed_observation_summary(string file_type, ofstream& ofs,
   }
   Server mysrv(metautils::directives.database_server, metautils::directives.
       metadb_username, metautils::directives.metadb_password, "rdadb");
-  string d2 = substitute(metautils::args.dsnum, ".", "");
   xmlutils::DataTypeMapper data_type_mapper(metautils::directives.
       parameter_map_path);
   for (const auto& fp : format_list) {
@@ -1456,14 +1456,15 @@ void generate_detailed_observation_summary(string file_type, ofstream& ofs,
         "Coverage</b><br>(each dot represents a 3&deg; box containing one or "
         "more observations)</td></tr>" << endl;
     Query query("select distinct t.platform_type, o.obs_type, l.data_type, min("
-        "start_date),max(end_date) from \"WObML\".ds" + d2 + "_data_types as d "
-        "left join \"WObML\".ds" + d2 + "_data_types_list as l on l.code = d."
-        "data_type_code left join \"WObML\".ds" + d2 + "_webfiles2 as p on p."
-        "code = d.file_code left join \"WObML\".platform_types as t on t.code "
-        "= l.platform_type_code left join \"WObML\".obs_types as o on o.code = "
-        "l.observation_type_code where p.format_code = " + fp.second + " group "
-        "by t.platform_type, o.obs_type, l.data_type order by t.platform_type, "
-        "o.obs_type, l.data_type");
+        "start_date),max(end_date) from \"WObML\"." + metautils::args.dsid +
+        "_data_types as d left join \"WObML\"." + metautils::args.dsid +
+        "_data_types_list as l on l.code = d.data_type_code left join \"WObML\"."
+        + metautils::args.dsid + "_webfiles2 as p on p.code = d.file_code left "
+        "join \"WObML\".platform_types as t on t.code = l.platform_type_code "
+        "left join \"WObML\".obs_types as o on o.code = l.observation_type_code "
+        "where p.format_code = " + fp.second + " group by t.platform_type, o."
+        "obs_type, l.data_type order by t.platform_type, o.obs_type, l."
+        "data_type");
     if (query.submit(mysrv) < 0) {
       log_error2("'" + query.error() + "' for '" + query.show() + "'", F,
           caller, user);
@@ -1515,26 +1516,27 @@ void generate_detailed_observation_summary(string file_type, ofstream& ofs,
         }
       }
     }
-    if (field_exists(mysrv, "WObML.ds" + d2 + "_webfiles2", "min_obs_per")) {
+    if (field_exists(mysrv, "WObML." + metautils::args.dsid + "_webfiles2",
+        "min_obs_per")) {
       query.set("select any_value(l.platform_type), any_value(o.obs_type), min("
-          "f.min_obs_per), max(f.max_obs_per), f.unit from \"WObML\".ds" + d2 +
-          "_webfiles2 as p join \"WObML\".ds" + d2 + "_frequencies as f on p."
-          "code = f.file_code left join \"WObML\".obs_types as o on o.code = f."
-          "observation_type_code left join \"WObML\".platform_types as l on l."
-          "code = f.platform_type_code left join \"WObML\".frequency_sort as s "
-          "on s.keyword = f.unit where p.format_code = " + fp.second + " group "
-          "by f.observation_type_code, f.platform_type_code, f.unit, s.idx "
-          "order by s.idx");
+          "f.min_obs_per), max(f.max_obs_per), f.unit from \"WObML\"." +
+          metautils::args.dsid + "_webfiles2 as p join \"WObML\"." + metautils::
+          args.dsid + "_frequencies as f on p.code = f.file_code left join "
+          "\"WObML\".obs_types as o on o.code = f.observation_type_code left "
+          "join \"WObML\".platform_types as l on l.code = f.platform_type_code "
+          "left join \"WObML\".frequency_sort as s on s.keyword = f.unit where "
+          "p.format_code = " + fp.second + " group by f.observation_type_code, "
+          "f.platform_type_code, f.unit, s.idx order by s.idx");
     } else {
       query.set("select any_value(l.platform_type), any_value(o.obs_type), min("
-          "f.avg_obs_per), max(f.avg_obs_per), f.unit from \"WObML\".ds" + d2 +
-          "_webfiles2 as p join \"WObML\".ds" + d2 + "_frequencies as f on p."
-          "code = f.file_code left join \"WObML\".obs_types as o on o.code = f."
-          "observation_type_code left join \"WObML\".platform_types as l on l."
-          "code = f.platform_type_code left join \"WObML\".frequency_sort as s "
-          "on s.keyword = f.unit where p.format_code = " + fp.second + " group "
-          "by f.observation_type_code, f.platform_type_code, f.unit, s.idx "
-          "order by s.idx");
+          "f.avg_obs_per), max(f.avg_obs_per), f.unit from \"WObML\"." +
+          metautils::args.dsid + "_webfiles2 as p join \"WObML\"." + metautils::
+          args.dsid + "_frequencies as f on p.code = f.file_code left join "
+          "\"WObML\".obs_types as o on o.code = f.observation_type_code left "
+          "join \"WObML\".platform_types as l on l.code = f.platform_type_code "
+          "left join \"WObML\".frequency_sort as s on s.keyword = f.unit where "
+          "p.format_code = " + fp.second + " group by f.observation_type_code, "
+          "f.platform_type_code, f.unit, s.idx order by s.idx");
     }
     if (query.submit(mysrv) < 0)
       log_error2("'" + query.error() + "' for '" + query.show() + "'", F,
@@ -1589,16 +1591,16 @@ void generate_detailed_observation_summary(string file_type, ofstream& ofs,
             string_ll_to_date_string(te2.start) << " to " << dateutils::
             string_ll_to_date_string(te2.end);
         if (unixutils::exists_on_server(metautils::directives.web_server,
-            "/data/web/datasets/ds" + metautils::args.dsnum + "/metadata/" +
+            "/data/web/datasets/" + metautils::args.dsid + "/metadata/" +
             te2.key + "." + e.second.key + ".kml", metautils::directives.
             rdadata_home)) {
-          ofs_o << "&nbsp;<a href=\"/datasets/ds" << metautils::args.dsnum <<
+          ofs_o << "&nbsp;<a href=\"/datasets/" << metautils::args.dsid <<
               "/metadata/" << te2.key << "." << e.second.key << ".kml\"><img "
               "src=\"/images/kml.gif\" width=\"36\" height=\"14\" hspace=\"3\" "
               "border=\"0\" title=\"See stations plotted in Google Earth\">"
               "</a>";
         }
-        ofs_o << "<br><img src=\"/datasets/ds" << metautils::args.dsnum <<
+        ofs_o << "<br><img src=\"/datasets/" << metautils::args.dsid <<
             "/metadata/spatial_coverage." << substitute(data_format," ","_") <<
             "_web";
         ofs_o << "_" << key2 << "." << e.second.key << ".gif?" << strand(5) <<
@@ -1618,8 +1620,8 @@ void generate_detailed_observation_summary(string file_type, ofstream& ofs,
   mysrv.disconnect();
   ofs_o.close();
   string e;
-  if (unixutils::rdadata_sync(t.name(), "metadata/", "/data/web/datasets/ds" +
-      metautils::args.dsnum, metautils::directives.rdadata_home, e) < 0) {
+  if (unixutils::rdadata_sync(t.name(), "metadata/", "/data/web/datasets/" +
+      metautils::args.dsid, metautils::directives.rdadata_home, e) < 0) {
     metautils::log_warning(F + " couldn't sync detail files - rdadata_sync "
         "error(s): '" + e + "'", caller, user);
   }
@@ -1629,7 +1631,6 @@ void generate_detailed_fix_summary(string file_type, ofstream& ofs, const
     vector<pair<string, string>>& format_list, string caller, string user) {
   static const string F = this_function_label(__func__);
   Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"rdadb");
-  string d2 = substitute(metautils::args.dsnum, ".", "");
   my::map<TypeEntry> platform_table;
   for (const auto& fp : format_list) {
     platform_table.clear();
@@ -1638,7 +1639,7 @@ void generate_detailed_fix_summary(string file_type, ofstream& ofs, const
     ofs << "<br><center><table class=\"insert\" width=\"95%\" cellspacing=\"1\" cellpadding=\"5\" border=\"0\"><tr><th class=\"headerRow\" colspan=\"3\" align=\"center\">Summary for Cyclone Fixes in " << to_capital(format) << " Format</th></tr>" << endl;
     auto cindex=0;
     ofs << "<tr class=\"bg2\" valign=\"top\"><th align=\"left\">Cyclone Classification</th><td align=\"left\"><b>Average Frequency of Data</b><br>(may vary by individual cyclone ID)</td><td align=\"left\"><b>Temporal/Geographical Coverage</b><br>(each dot represents a 3&deg; box containing one or more fixes)</td></tr>" << endl;
-    Query query("select distinct classification,min(l.start_date),max(l.end_date) from WFixML.ds"+d2+"_locations as l left join WFixML.ds"+d2+"_webfiles2 as p on p.code = l.file_code left join WFixML.classifications as c on c.code = l.classification_code where p.format_code = "+fp.second+" group by classification order by classification");
+    Query query("select distinct classification,min(l.start_date),max(l.end_date) from WFixML."+metautils::args.dsid+"_locations as l left join WFixML."+metautils::args.dsid+"_webfiles2 as p on p.code = l.file_code left join WFixML.classifications as c on c.code = l.classification_code where p.format_code = "+fp.second+" group by classification order by classification");
     if (query.submit(server) < 0) {
       log_error2("'" + query.error() + "' for '" + query.show() + "'", F,
           caller, user);
@@ -1662,7 +1663,7 @@ void generate_detailed_fix_summary(string file_type, ofstream& ofs, const
         platform_table.replace(te);
       }
     }
-    query.set("select any_value(c.classification),min(f.min_obs_per),max(f.max_obs_per),f.unit from \"WFixML\".ds"+d2+"_webfiles2 as p left join \"WFixML\".ds"+d2+"_frequencies as f on p.code = f.file_code left join \"WFixML\".classifications as c on c.code = f.classification_code left join \"WObML\".frequency_sort as s on s.keyword = f.unit where p.format_code = "+fp.second+" group by f.classification_code,f.unit,s.idx order by s.idx");
+    query.set("select any_value(c.classification),min(f.min_obs_per),max(f.max_obs_per),f.unit from \"WFixML\"."+metautils::args.dsid+"_webfiles2 as p left join \"WFixML\"."+metautils::args.dsid+"_frequencies as f on p.code = f.file_code left join \"WFixML\".classifications as c on c.code = f.classification_code left join \"WObML\".frequency_sort as s on s.keyword = f.unit where p.format_code = "+fp.second+" group by f.classification_code,f.unit,s.idx order by s.idx");
     if (query.submit(server) < 0) {
       log_error2("'" + query.error() + "' for '" + query.show() + "'", F,
           caller, user);
@@ -1685,7 +1686,7 @@ void generate_detailed_fix_summary(string file_type, ofstream& ofs, const
       for (auto& key2 : *te.type_table_keys) {
         ofs << "<li>" << key2 << "</li>";
       }
-      ofs << "</ul></td><td align=\"center\">" << dateutils::string_ll_to_date_string(te.start) << " to " << dateutils::string_ll_to_date_string(te.end) << "<br><img src=\"/datasets/ds" << metautils::args.dsnum << "/metadata/spatial_coverage.web";
+      ofs << "</ul></td><td align=\"center\">" << dateutils::string_ll_to_date_string(te.start) << " to " << dateutils::string_ll_to_date_string(te.end) << "<br><img src=\"/datasets/" << metautils::args.dsid << "/metadata/spatial_coverage.web";
       ofs << "_" << te.key << ".gif?" << strand(5) << "\"></td></tr>" << endl;
       te.type_table_keys->clear();
       te.type_table_keys.reset();
@@ -1732,7 +1733,7 @@ void generate_detailed_metadata_view(string caller, string user) {
   };
   vector<vector<pair<string, string>>> vv(svec.size());
   for (size_t n = 0; n < svec.size(); ++n) {
-    auto tbl = "ds" + substitute(metautils::args.dsnum, ".", "") + "_webfiles2";
+    auto tbl = metautils::args.dsid + "_webfiles2";
     if (table_exists(mysrv_m, get<0>(svec[n]) + "." + tbl)) {
       b = true;
       dtyps += "<li>" + get<1>(svec[n]) + " </li>";
@@ -1740,10 +1741,10 @@ void generate_detailed_metadata_view(string caller, string user) {
     }
   }
   xdoc.close();
-  if (stat((metautils::directives.server_root+"/web/datasets/ds"+metautils::args.dsnum+"/metadata/dsOverview.xml").c_str(),&buf) == 0) {
-    f=metautils::directives.server_root+"/web/datasets/ds"+metautils::args.dsnum+"/metadata/dsOverview.xml";
+  if (stat((metautils::directives.server_root+"/web/datasets/"+metautils::args.dsid+"/metadata/dsOverview.xml").c_str(),&buf) == 0) {
+    f=metautils::directives.server_root+"/web/datasets/"+metautils::args.dsid+"/metadata/dsOverview.xml";
   } else {
-    f=unixutils::remote_web_file("https://rda.ucar.edu/datasets/ds"+metautils::args.dsnum+"/metadata/dsOverview.xml",t.name());
+    f=unixutils::remote_web_file("https://rda.ucar.edu/datasets/"+metautils::args.dsid+"/metadata/dsOverview.xml",t.name());
   }
   xdoc.open(f);
   if (!xdoc) {
@@ -1792,18 +1793,19 @@ void generate_detailed_metadata_view(string caller, string user) {
     ofs << "<?php" << endl;
     ofs << "  include_once(\"MyDBI.inc\");" << endl;
     ofs << "  default_dbinfo(\"\",\"metadata\",\"metadata\");" << endl;
-    ofs << "  $title=myget(\"search.datasets\",\"title\",\"dsid = '" << metautils::args.dsnum << "'\");" << endl;
-    ofs << "  $contributors=mymget(\"\",\"\",\"select g.path from search.contributors_new as c left join search.gcmd_providers as g on g.uuid = c.keyword where dsid = '" << metautils::args.dsnum << "' order by disp_order\");" << endl;
-    ofs << "  $projects=mymget(\"\",\"\",\"select g.path from search.projects_new as p left join search.gcmd_projects as g on g.uuid = p.keyword  where dsid = '" << metautils::args.dsnum << "'\");" << endl;
-    ofs << "  $supportedProjects=mymget(\"\",\"\",\"select g.path from search.supported_projects as p left join search.gcmd_projects as g on g.uuid = p.keyword where dsid = '" << metautils::args.dsnum << "'\");" << endl;
+    auto ds_set = to_sql_tuple_string(ds_aliases(metautils::args.dsid));
+    ofs << "  $title=myget(\"search.datasets\",\"title\",\"dsid in " << ds_set << "\");" << endl;
+    ofs << "  $contributors=mymget(\"\",\"\",\"select g.path from search.contributors_new as c left join search.gcmd_providers as g on g.uuid = c.keyword where dsid in " << ds_set << " order by disp_order\");" << endl;
+    ofs << "  $projects=mymget(\"\",\"\",\"select g.path from search.projects_new as p left join search.gcmd_projects as g on g.uuid = p.keyword  where dsid in " << ds_set << "\");" << endl;
+    ofs << "  $supportedProjects=mymget(\"\",\"\",\"select g.path from search.supported_projects as p left join search.gcmd_projects as g on g.uuid = p.keyword where dsid in " << ds_set << "\");" << endl;
     ofs << "?>" << endl;
-    ofs << "<p>The information presented here summarizes the data in the primary (NCAR HPSS) archive of ds"+metautils::args.dsnum+".  Some or all of these data may not be directly accessible from our web server.  If you have questions about data access, please contact the dataset specialist named above.</p>" << endl;
+    ofs << "<p>The information presented here summarizes the data in the primary (NCAR HPSS) archive of "+metautils::args.dsid+".  Some or all of these data may not be directly accessible from our web server.  If you have questions about data access, please contact the dataset specialist named above.</p>" << endl;
     ofs << "<br>" << endl;
     ofs << "<center><table class=\"insert\" width=\"95%\" cellspacing=\"1\" cellpadding=\"5\" border=\"0\">" << endl;
     ofs << "<tr><th class=\"headerRow\" align=\"center\" colspan=\"2\">Overview</th></tr>" << endl;
     ofs << "<tr><td class=\"bg0\" align=\"left\" colspan=\"2\"><b>Dataset Title:</b>&nbsp;<?php print $title[\"title\"]; ?></td></tr>" << endl;
 // citation
-    ofs << "<tr><td class=\"bg0\" align=\"left\" colspan=\"2\"><b>Dataset Citation:</b><br /><div id=\"citation\" style=\"margin-bottom: 5px\"><img src=\"/images/transpace.gif\" width=\"1\" height=\"1\" onLoad=\"getAjaxContent('GET',null,'/cgi-bin/datasets/citation?dsnum=" << metautils::args.dsnum << "&style=esip','citation')\" /></div><div style=\"display: inline; background-color: #2a70ae; color: white; padding: 1px 8px 1px 8px; font-size: 16px; font-weight: bold; border-radius: 5px 5px 5px 5px; text-align: center; cursor: pointer\" onClick=\"javascript:location='/cgi-bin/datasets/citation?dsnum=" << metautils::args.dsnum << "&style=ris'\" title=\"download citation in RIS format\">RIS</div><div style=\"display: inline; background-color: #2a70ae; color: white; width: 60px; padding: 2px 8px 1px 8px; font-size: 16px; font-weight: bold; font-family: serif; border-radius: 5px 5px 5px 5px; text-align: center; cursor: pointer; margin-left: 7px\" onClick=\"location='/cgi-bin/datasets/citation?dsnum=" << metautils::args.dsnum << "&style=bibtex'\" title=\"download citation in BibTeX format\">BibTeX</div></td></tr>" << endl;
+    ofs << "<tr><td class=\"bg0\" align=\"left\" colspan=\"2\"><b>Dataset Citation:</b><br /><div id=\"citation\" style=\"margin-bottom: 5px\"><img src=\"/images/transpace.gif\" width=\"1\" height=\"1\" onLoad=\"getAjaxContent('GET',null,'/cgi-bin/datasets/citation?dsnum=" << metautils::args.dsid << "&style=esip','citation')\" /></div><div style=\"display: inline; background-color: #2a70ae; color: white; padding: 1px 8px 1px 8px; font-size: 16px; font-weight: bold; border-radius: 5px 5px 5px 5px; text-align: center; cursor: pointer\" onClick=\"javascript:location='/cgi-bin/datasets/citation?dsnum=" << metautils::args.dsid << "&style=ris'\" title=\"download citation in RIS format\">RIS</div><div style=\"display: inline; background-color: #2a70ae; color: white; width: 60px; padding: 2px 8px 1px 8px; font-size: 16px; font-weight: bold; font-family: serif; border-radius: 5px 5px 5px 5px; text-align: center; cursor: pointer; margin-left: 7px\" onClick=\"location='/cgi-bin/datasets/citation?dsnum=" << metautils::args.dsid << "&style=bibtex'\" title=\"download citation in BibTeX format\">BibTeX</div></td></tr>" << endl;
     ofs << "<tr valign=\"top\">" << endl;
     if (!dtyps.empty()) {
       ofs << "<td width=\"50%\" class=\"bg0\" align=\"left\"><b>Types of data:</b><ul class=\"paneltext\">"+dtyps+"</ul></td>" << endl;
@@ -1837,7 +1839,7 @@ void generate_detailed_metadata_view(string caller, string user) {
     ofs << "    print \"</ul></td></tr>\\n\";" << endl;
     ofs << "  }" << endl;
     ofs << "?>" << endl;
-    LocalQuery query("dweb_size","dssdb.dataset","dsid = 'ds"+metautils::args.dsnum+"'");
+    LocalQuery query("dweb_size","dssdb.dataset","dsid in "+ds_set);
     if (query.submit(server_d) < 0) {
       myerror = query.error();
       exit(1);
@@ -1903,7 +1905,7 @@ void generate_detailed_metadata_view(string caller, string user) {
     }
     ofs.close();
     string error;
-    if (unixutils::rdadata_sync(t.name(),"metadata/","/data/web/datasets/ds"+metautils::args.dsnum,metautils::directives.rdadata_home,error) < 0) {
+    if (unixutils::rdadata_sync(t.name(),"metadata/","/data/web/datasets/"+metautils::args.dsid,metautils::directives.rdadata_home,error) < 0) {
       metautils::log_warning("generate_detailed_metadata_view() couldn't sync 'detailed.html' - rdadata_sync error(s): '"+error+"'",caller,user);
     }
     xdoc.close();
@@ -1919,7 +1921,6 @@ void generate_detailed_metadata_view(string caller, string user) {
 
 void generate_group_detailed_metadata_view(string group_index,string file_type,string caller,string user)
 {
-  string dsnum2=substitute(metautils::args.dsnum,".","");
   LocalQuery query,grml_query,obml_query,fixml_query;
   string gtitle,gsummary,output,error;
 //  list<string> formatList;
@@ -1931,7 +1932,7 @@ void generate_group_detailed_metadata_view(string group_index,string file_type,s
     return;
   }
   while (group_index != "0") {
-    if (server_d.update("dsgroup","meta_link = 'X'","dsid = 'ds"+metautils::args.dsnum+"' and gindex = "+group_index) < 0) {
+    if (server_d.update("dsgroup","meta_link = 'X'","dsid in "+to_sql_tuple_string(ds_aliases(metautils::args.dsid))+" and gindex = "+group_index) < 0) {
       metautils::log_warning("generate_group_detailed_metadata_view() returned warning: "+server_d.error()+" while trying to update dssdb.dsgroup",caller,user);
     }
     query.set("pindex","dsgroup","gindex = "+group_index);
