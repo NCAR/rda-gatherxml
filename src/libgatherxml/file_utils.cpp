@@ -17,9 +17,11 @@ using std::list;
 using std::string;
 using std::stringstream;
 using strutils::chop;
+using strutils::ds_aliases;
 using strutils::ftos;
 using strutils::replace_all;
 using strutils::split;
+using strutils::to_sql_tuple_string;
 using unixutils::mysystem2;
 
 namespace metautils {
@@ -44,29 +46,33 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile, TempDir& tdir, list<
     error = "Terminating - HPSS files are no longer supported";
     return false;
   } else if (regex_search(args.path, regex("^https://rda.ucar.edu")) || args.
-      dsnum == "test") {
+      dsid == "test") {
 
     // Web file
-    auto w = metautils::relative_web_filename(args.path + "/" + args.filename);
-    LocalQuery q("status, file_format, locflag", "dssdb.wfile", "dsid = 'ds" +
-        args.dsnum + "' and wfile = '" + w + "'");
-    if (q.submit(mys) < 0) {
-      error = q.error();
-      return false;
-    }
-    Row row;
-    q.fetch_row(row);
     auto loc = 'G';
-    if (!args.override_primary_check) {
-      if (q.num_rows() == 0 || row[0] != "P") {
-        error = "Terminating - " + args.path + "/" + args.filename + " is not "
-            "active for this dataset";
+    if (args.dsid != "test") {
+      auto w = metautils::relative_web_filename(args.path + "/" + args.
+          filename);
+      LocalQuery q("status, file_format, locflag", "dssdb.wfile", "dsid in " +
+          to_sql_tuple_string(ds_aliases(args.dsid)) + " and wfile = '" + w +
+          "'");
+      if (q.submit(mys) < 0) {
+        error = q.error();
         return false;
       }
-    }
-    if (q.num_rows() != 0) {
-      file_format = row[1];
-      loc = row[2][0];
+      Row row;
+      q.fetch_row(row);
+      if (!args.override_primary_check) {
+        if (q.num_rows() == 0 || row[0] != "P") {
+          error = "Terminating - " + args.path + "/" + args.filename + " is "
+              "not active for this dataset";
+          return false;
+        }
+      }
+      if (q.num_rows() != 0) {
+        file_format = row[1];
+        loc = row[2][0];
+      }
     }
     string lnm = args.path;
     if (!args.override_primary_check) {
@@ -82,7 +88,7 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile, TempDir& tdir, list<
     }
     lnm += "/" + args.filename;
     struct stat64 s64;
-    if (stat64(lnm.c_str(), &s64) != 0 && args.dsnum != "test") {
+    if (stat64(lnm.c_str(), &s64) != 0 && args.dsid != "test") {
 
       // file is not in local directory, so get it from it's archive location
       switch (loc) {
