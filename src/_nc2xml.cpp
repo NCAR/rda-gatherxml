@@ -512,7 +512,7 @@ void add_level_to_inventory(string lentry_key, string gentry_key, size_t
     londimid = (londimid % 10000) / 100 -1;
   }
   for (size_t n = 0; n < v.size(); ++n) {
-    auto key = "ds" + metautils::args.dsnum + ":" + v[n].name;
+    auto key = metautils::args.dsid + ":" + v[n].name;
     if (!v[n].dimids.empty() && !v[n].is_coord && v[n].dimids[0] == timedimid &&
         g_inv.maps.P.find(key) != g_inv.maps.P.end() && ((v[n].dimids.size() ==
         4 && levdimid >= 0 && static_cast<int>(v[n].dimids[1]) == levdimid && v[
@@ -583,7 +583,7 @@ void add_gridded_parameters_to_netcdf_level_entry(const vector<NetCDF::
         // check as a zonal mean grid variable
         if (regex_search(gentry_key, zre)) {
           if (is_zonal_mean_grid_variable(v, timedimid, levdimid, latdimid)) {
-            parameter_entry_key = "ds" + metautils::args.dsnum + ":" + v.name;
+            parameter_entry_key = metautils::args.dsid + ":" + v.name;
             add_gridded_netcdf_parameter(v, dt1, dt2, tre.num_steps,
                 parameter_table, scan_data);
             if (g_inv.stream.is_open()) {
@@ -595,7 +595,7 @@ void add_gridded_parameters_to_netcdf_level_entry(const vector<NetCDF::
               londimid)) {
 
             // check as a regular lat/lon grid variable
-            parameter_entry_key = "ds" + metautils::args.dsnum + ":" + v.name;
+            parameter_entry_key = metautils::args.dsid + ":" + v.name;
             add_gridded_netcdf_parameter(v, dt1, dt2, tre.num_steps,
                 parameter_table, scan_data);
             if (g_inv.stream.is_open()) {
@@ -605,7 +605,7 @@ void add_gridded_parameters_to_netcdf_level_entry(const vector<NetCDF::
               levdimid, latdimid)) {
 
             // check as a polar-stereographic grid variable
-            parameter_entry_key = "ds" + metautils::args.dsnum + ":" + v.name;
+            parameter_entry_key = metautils::args.dsid + ":" + v.name;
             add_gridded_netcdf_parameter(v, dt1, dt2, tre.num_steps,
                 parameter_table, scan_data);
             if (g_inv.stream.is_open()) {
@@ -630,7 +630,7 @@ void update_gridded_parameters_in_netcdf_level_entry(const vector<NetCDF::
         lons[y].dim) || (v.dimids.size() == 3 && grid_data.levels[z].dim < 0 &&
         v.dimids[1] == grid_data.lats[y].dim && v.dimids[2] == grid_data.lons[
         y].dim))) {
-      parameter_entry_key = "ds" + metautils::args.dsnum + ":" + v.name;
+      parameter_entry_key = metautils::args.dsid + ":" + v.name;
       auto time_method = gridded_time_method(v, grid_data.time.id);
       time_method = strutils::capitalize(time_method);
       if (level_entry_ptr->parameter_code_table.find(parameter_entry_key) == level_entry_ptr->
@@ -3467,7 +3467,7 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
   grid_initialize(scan_data);
 
   // open a file inventory unless this is a test run
-  if (metautils::args.dsnum < "999.0") {
+  if (metautils::args.dsid < "d999000") {
     gatherxml::fileInventory::open(g_inv.file, g_inv.dir, g_inv.stream, "GrML",
         "nc2xml", USER);
   }
@@ -3847,8 +3847,8 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
                 grid_data.lats[y].dim, grid_data.lons[y].dim, tre,
                 parameter_table, scan_data);
             for (size_t n = 0; n < nl; ++n) {
-              level_entry_key = "ds" + metautils::args.dsnum + "," + grid_data.
-                  levdata[z].ID + ":";
+              level_entry_key = metautils::args.dsid + "," + grid_data.levdata[
+                  z].ID + ":";
               switch (grid_data.levels[z].type) {
                 case NetCDF::DataType::INT: {
                   level_entry_key += itos(lvd[n]);
@@ -3885,8 +3885,8 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
             // existing grid - needs update
             *grid_entry_ptr = (*scan_data.grids)[grid_entry_key];
             for (size_t n = 0; n < nl; ++n) {
-              level_entry_key = "ds" + metautils::args.dsnum + "," + grid_data.
-                  levdata[z].ID + ":";
+              level_entry_key = metautils::args.dsid + "," + grid_data.levdata[
+                  z].ID + ":";
               switch (grid_data.levels[z].type) {
                 case NetCDF::DataType::INT: {
                   level_entry_key += itos(lvd[n]);
@@ -3935,7 +3935,7 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
     if (gatherxml::verbose_operation) {
       cout << "    ... done scanning time ranges." << endl;
     }
-    if (metautils::args.dsnum != "test") {
+    if (metautils::args.dsid != "test") {
       if (gatherxml::verbose_operation) {
         cout << "Writing level map..." << endl;
       }
@@ -5589,8 +5589,8 @@ void write_parameter_map(string tempdir_name, ScanData& scan_data) {
     log_error2("can't create directory tree for netCDF variables", F, "nc2xml",
         USER);
   }
-  scan_data.map_name = tempdir_name + "/metadata/ParameterTables/netCDF.ds" +
-      metautils::args.dsnum + ".xml";
+  scan_data.map_name = tempdir_name + "/metadata/ParameterTables/netCDF." +
+      metautils::args.dsid + ".xml";
   std::ofstream ofs;
   open_output(ofs, scan_data.map_name);
   if (!ofs.is_open()) {
@@ -5656,8 +5656,8 @@ void write_parameter_map(string tempdir_name, ScanData& scan_data) {
         "nc2xml", USER);
   }
   mysystem2("/bin/cp " + scan_data.map_name + " /glade/u/home/rdadata/share"
-      "/metadata/ParameterTables/netCDF.ds" + metautils::args.dsnum + ".xml",
-      oss, ess);
+      "/metadata/ParameterTables/netCDF." + metautils::args.dsid + ".xml", oss,
+      ess);
   if (gatherxml::verbose_operation) {
     cout << "...finished writing parameter map." << endl;
   }
@@ -5675,8 +5675,8 @@ void scan_file(ScanData& scan_data, gatherxml::markup::ObML::ObservationData&
         ": prepare_file_for_metadata_scanning()", "nc2xml", USER);
   }
   scan_data.map_name = unixutils::remote_web_file("https://rda.ucar.edu/"
-      "metadata/ParameterTables/netCDF.ds" + metautils::args.dsnum + ".xml",
-      tdir->name());
+      "metadata/ParameterTables/netCDF." + metautils::args.dsid + ".xml", tdir->
+      name());
   list<string> flst;
   string ff, e;
   if (!metautils::primaryMetadata::prepare_file_for_metadata_scanning(*tfile,
@@ -5732,8 +5732,8 @@ void scan_file(ScanData& scan_data, gatherxml::markup::ObML::ObservationData&
     }
   }
   metautils::args.data_format = "netcdf";
-  if (!metautils::args.inventory_only && scan_data.netcdf_variables.size() >
-      0 && metautils::args.dsnum != "test") {
+  if (!metautils::args.inventory_only && !scan_data.netcdf_variables.empty() &&
+      metautils::args.dsid != "test") {
     write_parameter_map(tdir->name(), scan_data);
   }
 }
@@ -5789,16 +5789,16 @@ int main(int argc, char **argv) {
   }
   signal(SIGSEGV, segv_handler);
   signal(SIGINT, int_handler);
+  atexit(clean_up);
   auto d = '%';
   metautils::args.args_string = unixutils::unix_args_string(argc, argv, d);
   metautils::read_config("nc2xml", USER);
   gatherxml::parse_args(d);
-  if (metautils::args.dsnum == "999.9") {
+  if (metautils::args.dsid == "d999009") {
     log_error2("Terminating - Testing has changed. Use:\n  gatherxml -d test "
         "-f " + metautils::args.data_format + " <full path to file '" +
         metautils::args.filename + "'>", "main()", "nc2xml", USER);
   }
-  atexit(clean_up);
   metautils::cmd_register("nc2xml", USER);
   if (!metautils::args.overwrite_only && !metautils::args.inventory_only) {
     metautils::check_for_existing_cmd("GrML");
@@ -5855,14 +5855,14 @@ int main(int argc, char **argv) {
     }
     stringstream oss, ess;
     auto cmd = metautils::directives.local_root + "/bin/scm -d " + metautils::
-        args.dsnum + " " + f + " " + metautils::args.filename + "." + ext;
+        args.dsid + " " + f + " " + metautils::args.filename + "." + ext;
     if (mysystem2(cmd, oss, ess) != 0) {
       log_error2(ess.str(), "main(): running scm", "nc2xml", USER);
     }
     if (gatherxml::verbose_operation) {
       cout << "...'scm' finished." << endl;
     }
-  } else if (metautils::args.dsnum == "test") {
+  } else if (metautils::args.dsid == "test") {
     cout << "Output is in:" << endl;
     cout << "  " << tdir << "/" << metautils::args.filename << ".";
     switch (sd.write_type) {
