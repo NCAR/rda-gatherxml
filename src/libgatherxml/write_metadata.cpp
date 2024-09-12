@@ -51,9 +51,8 @@ void close(string filename, unique_ptr<TempDir>& tdir, std::ofstream& ofs,
   ofs.clear();
   Server srv(metautils::directives.database_server, metautils::directives.
       metadb_username, metautils::directives.metadb_password, "rdadb");
-  srv.update("W" + cmd_type + ".ds" + substitute(metautils::args.dsnum, ".", "")
-      + "_webfiles2", "inv = 'Y'", "id = '" + substitute(filename, "%", "/") +
-      "'");
+  srv.update("W" + cmd_type + "." + metautils::args.dsid + "_webfiles2",
+      "inv = 'Y'", "id = '" + substitute(filename, "%", "/") + "'");
   if (metautils::args.inventory_only) {
     metautils::args.filename = filename;
   }
@@ -64,7 +63,7 @@ void close(string filename, unique_ptr<TempDir>& tdir, std::ofstream& ofs,
     if (!create_cache) {
       c += " -C";
     }
-    c += " -d " + metautils::args.dsnum + " -t " + tdir->name() + " -f " +
+    c += " -d " + metautils::args.dsid + " -t " + tdir->name() + " -f " +
         filename + "." + cmd_type + "_inv";
     mysystem2(c, oss, ess);
     if (!ess.str().empty()) {
@@ -106,7 +105,7 @@ void copy_ancillary_files(string file_type, string metadata_file, string
   static const string F = this_function_label(__func__);
   stringstream oss, ess;
   if (mysystem2("/bin/tcsh -c \"curl -s --data 'authKey=qGNlKijgo9DJ7MN&cmd="
-      "listfiles&value=/SERVER_ROOT/web/datasets/ds" + metautils::args.dsnum +
+      "listfiles&value=/SERVER_ROOT/web/datasets/" + metautils::args.dsid +
       "/metadata/fmd&pattern=" + metadata_file + "' http://rda.ucar.edu/"
       "cgi-bin/dss/remoteRDAServerUtils\"", oss, ess) != 0) {
     log_warning(F + ": unable to copy " + file_type + " files - error: '" + ess.
@@ -160,8 +159,8 @@ void copy_ancillary_files(string file_type, string metadata_file, string
       }
     }
     string e;
-    if (rdadata_sync(td.name(), p + "/", "/data/web/datasets/ds" + metautils::
-        args.dsnum, metautils::directives.rdadata_home, e) < 0) {
+    if (rdadata_sync(td.name(), p + "/", "/data/web/datasets/" + metautils::
+        args.dsid, metautils::directives.rdadata_home, e) < 0) {
       log_warning(F + "(): unable to sync - rdadata_sync error(s): '" + e + "'",
           caller, user);
     }
@@ -181,8 +180,8 @@ void write_finalize(string filename, string ext, string tdir_name, std::
       log_error2("unable to gzip metadata file", F, caller, user);
     }
     string e;
-    if (rdadata_sync(tdir_name, s + "/", "/data/web/datasets/ds" + metautils::
-        args.dsnum, metautils::directives.rdadata_home, e) < 0) {
+    if (rdadata_sync(tdir_name, s + "/", "/data/web/datasets/" + metautils::
+        args.dsid, metautils::directives.rdadata_home, e) < 0) {
       log_warning(F + "(): unable to sync '" + filename + "." + ext + "' - "
           "rdadata_sync error(s): '" + e + "'", caller, user);
     }
@@ -193,7 +192,7 @@ void write_finalize(string filename, string ext, string tdir_name, std::
 void write_initialize(string& filename, string ext, string tdir_name, std::
     ofstream& ofs, string caller, string user) {
   static const string F = this_function_label(__func__);
-  if (metautils::args.dsnum == "test") {
+  if (metautils::args.dsid == "test") {
     filename = metautils::args.filename;
   } else {
     filename = metautils::args.path + "/" + metautils::args.filename;
@@ -244,7 +243,7 @@ void copy(string metadata_file, string URL, string caller, string user) {
         F, caller, user);
   }
   TempFile t(metautils::directives.temp_path);
-  rdadata_sync_from("/__HOST_/web/datasets/ds" + metautils::args.dsnum + "/metadata/fmd/" + metadata_file, t.name(), metautils::directives.rdadata_home, ess);
+  rdadata_sync_from("/__HOST_/web/datasets/" + metautils::args.dsid + "/metadata/fmd/" + metadata_file, t.name(), metautils::directives.rdadata_home, ess);
   std::ifstream ifs(t.name().c_str());
   if (!ifs.is_open()) {
     log_error2("unable to open input file", F, caller, user);
@@ -270,8 +269,8 @@ void copy(string metadata_file, string URL, string caller, string user) {
   ifs.close();
   ofs.close();
   string e;
-  if (rdadata_sync(tdir.name(), s + "/", "/data/web/datasets/ds" + metautils::
-      args.dsnum, metautils::directives.rdadata_home, e) < 0) {
+  if (rdadata_sync(tdir.name(), s + "/", "/data/web/datasets/" + metautils::
+      args.dsid, metautils::directives.rdadata_home, e) < 0) {
     log_warning("copy(): unable to sync '" + f + ".FixML' - rdadata_sync error("
         "s): '" + e + "'", caller, user);
   }
@@ -779,13 +778,13 @@ string write(unordered_map<string, GridEntry>& grid_table, string caller, string
           used.emplace_back(k);
         }
       } else if (metautils::args.data_format == "jraieeemm") {
-        ofs << "    <level map=\"ds" << metautils::args.dsnum << "\" type=\"" <<
+        ofs << "    <level map=\"" << metautils::args.dsid << "\" type=\"" <<
             sp[0] << "\" value=\"" << sp[1] << "\">" << endl;
         for (const auto& e : le.parameter_code_table) {
           string code;
           ParameterEntry pe;
           tie(code, pe) = e;
-          ofs << "      <parameter map=\"ds" << metautils::args.dsnum << "\" "
+          ofs << "      <parameter map=\"" << metautils::args.dsid << "\" "
               "value=\"" << code << "\" start=\"" << pe.start_date_time.
               to_string("%Y-%m-%d %R %Z") << "\" end=\"" << pe.end_date_time.
               to_string("%Y-%m-%d %R %Z") << "\" nsteps=\"" << pe.
@@ -812,7 +811,7 @@ string write(unordered_map<string, GridEntry>& grid_table, string caller, string
           used.emplace_back(k);
         }
       } else if (metautils::args.data_format == "cgcm1") {
-        ofs << "    <level map=\"ds" << metautils::args.dsnum << "\" type=\"" <<
+        ofs << "    <level map=\"" << metautils::args.dsid << "\" type=\"" <<
             sp[0] << "\" value=\"";
         auto a = sp[0];
         if (a == "1") {
@@ -823,7 +822,7 @@ string write(unordered_map<string, GridEntry>& grid_table, string caller, string
           string code;
           ParameterEntry pe;
           tie(code, pe) = e;
-          ofs << "      <parameter map=\"ds" << metautils::args.dsnum << "\" "
+          ofs << "      <parameter map=\"" << metautils::args.dsid << "\" "
               "value=\"" << code << "\" start=\"" << pe.start_date_time.
               to_string("%Y-%m-%d %R %Z") << "\" end=\"" << pe.end_date_time.
               to_string("%Y-%m-%d %R %Z") << "\" nsteps=\"" << pe.
@@ -967,7 +966,7 @@ void copy(string metadata_file, string URL, string caller, string user) {
         F, caller, user);
   }
   TempFile tf(metautils::directives.temp_path);
-  rdadata_sync_from("/__HOST__/web/datasets/ds" + metautils::args.dsnum +
+  rdadata_sync_from("/__HOST__/web/datasets/" + metautils::args.dsid +
       "/metadata/fmd/" + metadata_file, tf.name(), metautils::directives.
       rdadata_home, ess);
   std::ifstream ifs(tf.name().c_str());
@@ -997,8 +996,8 @@ void copy(string metadata_file, string URL, string caller, string user) {
   ifs.close();
   ofs.close();
   string e;
-  if (rdadata_sync(t.name(), s + "/", "/data/web/datasets/ds" + metautils::args.
-      dsnum, metautils::directives.rdadata_home, e) < 0) {
+  if (rdadata_sync(t.name(), s + "/", "/data/web/datasets/" + metautils::args.
+      dsid, metautils::directives.rdadata_home, e) < 0) {
     log_warning("copy(): unable to sync '" + f + ".ObML' - rdadata_sync "
         "error(s): '" + e + "'", caller, user);
   }
@@ -1072,7 +1071,7 @@ void write(ObservationData& obs_data, string caller, string user) {
       data_format == "ghcnmv3" || metautils::args.data_format == "hcn" ||
       metautils::args.data_format == "proprietary_ASCII" || metautils::args.
       data_format == "proprietary_Binary") {
-    map = "ds" + metautils::args.dsnum;
+    map = metautils::args.dsid;
   }
   string s = "metadata/wfmd";
   for (size_t xx=0; xx < obs_data.num_types; ++xx) {
