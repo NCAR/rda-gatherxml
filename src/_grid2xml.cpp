@@ -53,6 +53,7 @@ unique_ptr<TempDir> tdir;
 TempDir *inv_dir = nullptr;
 string myerror = "";
 string mywarning = "";
+string myoutput = "";
 const char *grib1_time_unit[] = { "minute", "hour", "day", "month", "year",
     "year", "year", "year", "", "", "hour", "hour", "hour" };
 const int grib1_per_day[] = { 1440, 24, 1, 0, 0, 0, 0, 0, 0, 0, 24, 24, 24 };
@@ -908,11 +909,11 @@ int main(int argc, char **argv) {
   }
   signal(SIGSEGV, segv_handler);
   signal(SIGINT, int_handler);
+  atexit(clean_up);
   auto d = '!';
   metautils::args.args_string = unixutils::unix_args_string(argc, argv, d);
   metautils::read_config("grid2xml", USER);
   gatherxml::parse_args(d);
-  atexit(clean_up);
   metautils::cmd_register("grid2xml", USER);
   if (!metautils::args.overwrite_only && !metautils::args.inventory_only) {
     metautils::check_for_existing_cmd("GrML");
@@ -941,7 +942,7 @@ int main(int argc, char **argv) {
       }
       stringstream oss, ess;
       if (mysystem2(metautils::directives.local_root + "/bin/scm -d " +
-          metautils::args.dsnum + " " + flags + " " + metautils::args.filename +
+          metautils::args.dsid + " " + flags + " " + metautils::args.filename +
           ".GrML", oss, ess) != 0) {
         string e = ess.str();
         trim(e);
