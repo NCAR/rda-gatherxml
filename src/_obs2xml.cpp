@@ -1067,6 +1067,7 @@ int main(int argc,char **argv)
   }
   signal(SIGSEGV,segv_handler);
   signal(SIGINT,int_handler);
+  atexit(clean_up);
   auto arg_delimiter='!';
   metautils::args.args_string=unixutils::unix_args_string(argc,argv,arg_delimiter);
   metautils::read_config("obs2xml",USER);
@@ -1075,7 +1076,6 @@ int main(int argc,char **argv)
   if (!metautils::args.inventory_only && std::regex_search(metautils::args.path,std::regex("^https://rda.ucar.edu"))) {
     flags="-wf";
   }
-  atexit(clean_up);
   metautils::cmd_register("obs2xml",USER);
   if (!metautils::args.inventory_only) {
     metautils::check_for_existing_cmd("ObML");
@@ -1102,7 +1102,7 @@ int main(int argc,char **argv)
       flags="-S "+flags;
     }
     stringstream oss,ess;
-    if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsnum+" "+flags+" "+metautils::args.filename+".ObML",oss,ess) < 0) {
+    if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsid+" "+flags+" "+metautils::args.filename+".ObML",oss,ess) < 0) {
       std::cerr << ess.str() << std::endl;
     }
   }
