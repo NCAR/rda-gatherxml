@@ -641,6 +641,7 @@ int main(int argc, char **argv) {
   }
   signal(SIGSEGV, segv_handler);
   signal(SIGINT, int_handler);
+  atexit(clean_up);
   auto arg_delimiter = '%';
   metautils::args.args_string = unixutils::unix_args_string(argc, argv,
       arg_delimiter);
@@ -650,7 +651,6 @@ int main(int argc, char **argv) {
   if (strutils::has_beginning(metautils::args.path, "https://rda.ucar.edu")) {
     flags = "-wf";
   }
-  atexit(clean_up);
   metautils::cmd_register("fix2xml", USER);
   if (!metautils::args.overwrite_only) {
     metautils::check_for_existing_cmd("FixML");
@@ -666,7 +666,7 @@ int main(int argc, char **argv) {
     }
     stringstream oss, ess;
     if (unixutils::mysystem2(metautils::directives.local_root + "/bin/scm -d " +
-        metautils::args.dsnum + " " + flags + " " + metautils::args.filename +
+        metautils::args.dsid + " " + flags + " " + metautils::args.filename +
         ".FixML", oss, ess) < 0) {
       cerr << ess.str() << endl;
     }
