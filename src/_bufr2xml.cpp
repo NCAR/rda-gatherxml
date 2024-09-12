@@ -448,6 +448,7 @@ int main(int argc, char **argv) {
   }
   signal(SIGSEGV, segv_handler);
   signal(SIGINT, int_handler);
+  atexit(clean_up);
   auto d = '%';
   metautils::args.args_string = unixutils::unix_args_string(argc, argv, d);
   metautils::read_config("bufr2xml", USER);
@@ -469,7 +470,6 @@ int main(int argc, char **argv) {
   if (regex_search(metautils::args.path, regex("^https://rda.ucar.edu"))) {
     cflg = "-wf";
   }
-  atexit(clean_up);
   metautils::cmd_register("bufr2xml", USER);
   metautils::check_for_existing_cmd("ObML");
   Timer tmr;
@@ -494,7 +494,7 @@ int main(int argc, char **argv) {
     }
     stringstream oss, ess;
     if (mysystem2(metautils::directives.local_root + "/bin/scm -d " +
-        metautils::args.dsnum + " " + cflg + " " + metautils::args.filename +
+        metautils::args.dsid + " " + cflg + " " + metautils::args.filename +
         ".ObML", oss, ess) != 0) {
       log_error2(ess.str(), "main(): running scm", "bufr2xml", USER);
     }
