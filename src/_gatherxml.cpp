@@ -29,6 +29,7 @@ using std::unordered_set;
 using std::vector;
 using strutils::chop;
 using strutils::ftos;
+using strutils::ng_gdex_id;
 using strutils::replace_all;
 using strutils::split;
 using strutils::substitute;
@@ -46,8 +47,7 @@ bool showinfo = false;
 
 string webhome() {
   if (!metautils::directives.data_root_alias.empty()) {
-    return metautils::directives.data_root_alias + "/ds" + metautils::args.
-        dsnum;
+    return metautils::directives.data_root_alias + "/" + metautils::args.dsid;
   }
   return metautils::web_home();
 }
@@ -72,24 +72,31 @@ void inventory_all() {
     log_error2("unable to connected to RDA metadata database server", F,
         "gatherxml", USER);
   }
-  string ds = substitute(metautils::args.dsnum, ".", "");
   LocalQuery q;
-  if (table_exists(srv, "IGrML.ds" + ds + "_inventory_summary")) {
-    q.set("select w.id, f.format from \"WGrML\".ds" + ds + "_webfiles2 as w "
-        "left join \"IGrML\".ds" + ds + "_inventory_summary as i on i.file_code "
-        "= w.code left join \"WGrML\".formats as f on f.code = w.format_code "
-        "where i.file_code is null or inv is null");
-  } else if (table_exists(srv, "WGrML.ds" + ds + "_webfiles2")) {
-    q.set("select w.id, f.format from \"WGrML\".ds" + ds + "_webfiles2 as w "
-        "left join \"WGrML\".formats as f on f.code = w.format_code");
-  } else if (table_exists(srv, "IObML.ds" + ds + "_inventory_summary")) {
-    q.set("select w.id, f.format from \"WObML\".ds" + ds + "_webfiles2 as w "
-        "left join IObML.ds" + ds + "_inventory_summary as i on i.file_code = "
-        "w.code left join \"WObML\".formats as f on f.code = w.format_code "
-        "where i.file_code is null or inv is null");
-  } else if (table_exists(srv, "WObML.ds" + ds + "_webfiles2")) {
-    q.set("select w.id, f.format from \"WObML\".ds" + ds + "_webfiles2 as w "
-        "left join \"WObML\".formats as f on f.code = w.format_code");
+  if (table_exists(srv, "IGrML." + metautils::args.dsid +
+      "_inventory_summary")) {
+    q.set("select w.id, f.format from \"WGrML\"." + metautils::args.dsid +
+        "_webfiles2 as w left join \"IGrML\"." + metautils::args.dsid +
+        "_inventory_summary as i on i.file_code = w.code left join \"WGrML\"."
+        "formats as f on f.code = w.format_code where i.file_code is null or "
+        "inv is null");
+  } else if (table_exists(srv, "WGrML." + metautils::args.dsid +
+      "_webfiles2")) {
+    q.set("select w.id, f.format from \"WGrML\"." + metautils::args.dsid +
+        "_webfiles2 as w left join \"WGrML\".formats as f on f.code = w."
+        "format_code");
+  } else if (table_exists(srv, "IObML." + metautils::args.dsid +
+      "_inventory_summary")) {
+    q.set("select w.id, f.format from \"WObML\"." + metautils::args.dsid +
+        "_webfiles2 as w left join IObML." + metautils::args.dsid +
+        "_inventory_summary as i on i.file_code = w.code left join \"WObML\"."
+        "formats as f on f.code = w.format_code where i.file_code is null or "
+        "inv is null");
+  } else if (table_exists(srv, "WObML." + metautils::args.dsid +
+      "_webfiles2")) {
+    q.set("select w.id, f.format from \"WObML\"." + metautils::args.dsid +
+        "_webfiles2 as w left join \"WObML\".formats as f on f.code = w."
+        "format_code");
   }
   if (q.submit(srv) < 0) {
     log_error2("'" + q.error() + "'", F, "gatherxml", USER);
@@ -122,7 +129,7 @@ void inventory_all() {
       if (n != q.num_rows() && n % 100 != 0) {
         cmds[ti] += " -R -S";
       }
-      cmds[ti] += " -d " + metautils::args.dsnum + " -f " + metautils::args.
+      cmds[ti] += " -d " + metautils::args.dsid + " -f " + metautils::args.
           data_format + " -I https://rda.ucar.edu" + webhome() + "/" + row[0];
       pthread_create(&tids[ti], nullptr, do_inventory, reinterpret_cast<void *>(
           &cmds[ti]));
@@ -192,9 +199,9 @@ int main(int argc, char **argv) {
     if (sp[n] == "-f") {
       metautils::args.data_format = sp[++n];
     } else if (sp[n] == "-d") {
-      metautils::args.dsnum = sp[++n];
-      if (regex_search(metautils::args.dsnum, regex("^ds"))) {
-        metautils::args.dsnum = metautils::args.dsnum.substr(2);
+      metautils::args.dsid = sp[++n];
+      if (metautils::args.dsid != "test") {
+        metautils::args.dsid = ng_gdex_id(metautils::args.dsid);
       }
     } else if (sp[n] == "-showinfo") {
       showinfo = true;
@@ -235,8 +242,8 @@ int main(int argc, char **argv) {
     } else {
       metautils::args.data_format = to_lower(metautils::args.data_format);
     }
-    if (metautils::args.dsnum.empty()) {
-      cerr << "Error: no dataset number specified" << endl;
+    if (metautils::args.dsid.empty()) {
+      cerr << "Error: no or invalid dataset ID specified" << endl;
       exit(1);
     }
     metautils::args.path = sp.back();
@@ -252,7 +259,7 @@ exit(1);
       if (metautils::args.path == "invall") {
         inventory_all();
         exit(0);
-      } else if (metautils::args.dsnum != "test") {
+      } else if (metautils::args.dsid != "test") {
         string url = metautils::args.path[0] == '/' ? "https://rda.ucar.edu" +
             webhome() + metautils::args.path : "https://rda.ucar.edu" +
             webhome() + "/" + metautils::args.path;
@@ -274,8 +281,8 @@ exit(1);
           + " " + strutils::substitute(metautils::args.args_string, "%", " "),
           oss, ess);
       if (stat != 0) {
-        if (stat == 2 || metautils::args.dsnum == "test" || metautils::args.
-            dsnum >= "999.0") {
+        if (stat == 2 || metautils::args.dsid == "test" || metautils::args.dsid
+            >= "d999000") {
           cerr << ess.str() << endl;
           exit(1);
         } else {
@@ -300,8 +307,8 @@ exit(1);
               it2->second + " "+ substitute(metautils::args.args_string, "%",
               " "), oss, ess);
           if (stat != 0) {
-            if (stat == 2 || metautils::args.dsnum == "test" || metautils::args.
-                dsnum >= "999.0") {
+            if (stat == 2 || metautils::args.dsid == "test" || metautils::args.
+                dsid >= "d999000") {
               cerr << ess.str() << endl;
               exit(1);
             } else {
