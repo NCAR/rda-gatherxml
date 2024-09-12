@@ -44,6 +44,7 @@ using std::unordered_set;
 using std::vector;
 using strutils::append;
 using strutils::chop;
+using strutils::ds_aliases;
 using strutils::ftos;
 using strutils::itos;
 using strutils::lltos;
@@ -52,6 +53,7 @@ using strutils::replace_all;
 using strutils::split;
 using strutils::strand;
 using strutils::substitute;
+using strutils::to_sql_tuple_string;
 using strutils::trim;
 using unixutils::mysystem2;
 using unixutils::open_output;
@@ -64,10 +66,9 @@ string myerror = "";
 string mywarning = "";
 
 struct LocalArgs {
-  LocalArgs() : dsnum2(), temp_directory(), create_cache(true), notify(false),
-      verbose(false), wms_only(false) { }
+  LocalArgs() : temp_directory(), create_cache(true), notify(false), verbose(
+      false), wms_only(false) { }
 
-  string dsnum2;
   string temp_directory;
   bool create_cache, notify, verbose;
   bool wms_only;
@@ -125,14 +126,6 @@ void parse_args(int argc, char **argv) {
   for (size_t n = 0; n < sp.size(); ++n) {
     if (sp[n] == "-d") {
       metautils::args.dsid = ng_gdex_id(sp[++n]);
-
-// remove the next 5 lines after dsid conversion
-metautils::args.dsnum = sp[n];
-if (regex_search(metautils::args.dsnum, regex("^ds"))) {
-metautils::args.dsnum = metautils::args.dsnum.substr(2);
-}
-local_args.dsnum2 = substitute(metautils::args.dsnum, ".", "");
-
     } else if (sp[n] == "-f") {
       metautils::args.filename = sp[++n];
     } else if (sp[n] == "-C") {
@@ -186,7 +179,7 @@ string grid_definition_parameters(const XMLElement& e) {
 
 void build_wms_capabilities() {
   static const string F = this_function_label(__func__);
-  string res = "https://rda.ucar.edu/datasets/ds" + metautils::args.dsnum +
+  string res = "https://rda.ucar.edu/datasets/" + metautils::args.dsid +
       "/metadata/wfmd/" + substitute(metautils::args.filename, "_inv", "");
   auto f = unixutils::remote_web_file(res + ".gz", temp_dir.name());
   struct stat buf;
@@ -461,8 +454,8 @@ void build_wms_capabilities() {
   mysystem2("/bin/sh -c 'gzip " + tdir->name() + "/metadata/wms/" + gfil + "'",
       oss, ess);
   if (unixutils::rdadata_sync(tdir->name(), "metadata/wms/", "/data/web/"
-      "datasets/ds" + metautils::args.dsnum, metautils::directives.rdadata_home,
-      e) < 0) {
+      "datasets/" + metautils::args.dsid, metautils::directives.rdadata_home, e)
+      < 0) {
     log_error2("could not sync the capabilities file for '" + gfil + "'", F,
         "iinv", USER);
   }
@@ -648,7 +641,7 @@ struct InventoryData {
 void process_grml_product_entry(Server& server, string product, InventoryData&
     inv_data) {
   static const string F = this_function_label(__func__);
-  int i;
+  int i = -1;
   if (product == "Analysis" || regex_search(product, regex("^0-hour")) ||
       product == "Monthly Mean") {
     i = 0;
@@ -767,7 +760,7 @@ void process_grml_parameter_entry(Server& server, string code, string
   }
   Row row;
   q.fetch_row(row);
-  auto tbl = "IGrML.ds" + local_args.dsnum2 + "_inventory_" + row[0];
+  auto tbl = "IGrML." + metautils::args.dsid + "_inventory_" + row[0];
   if (!table_exists(server, tbl)) {
     if (large_byte_offsets) {
       if (server.duplicate_table("IGrML.template_inventory_p_big", tbl) < 0) {
@@ -939,9 +932,9 @@ void insert_grml_inventory() {
   auto wid = substitute(metautils::args.filename, ".GrML_inv", "");
   replace_all(wid, "%", "/");
   LocalQuery q("select code, format_code, tindex from \"WGrML\"." + metautils::
-      args.dsid + "_webfiles2 as w left join dssdb.wfile as x on (x.dsid = 'ds"
-      + metautils::args.dsnum + "' and x.type = 'D' and x.wfile = w.id) where "
-      "w.id = '" + wid + "'");
+      args.dsid + "_webfiles2 as w left join dssdb.wfile as x on (x.dsid in "
+      + to_sql_tuple_string(ds_aliases(metautils::args.dsid)) + " and x.type = "
+      "'D' and x.wfile = w.id) where w.id = '" + wid + "'");
   if (q.submit(server) < 0) {
     log_error2("error: '" + q.error() + "' while looking for code from "
         "webfiles", F, "iinv", USER);
@@ -984,10 +977,10 @@ void insert_grml_inventory() {
     server._delete("IGrML." + metautils::args.dsid + "_inventory_" + pc.second,
         "file_code = " + inv_data.file_code + " and uflag != '" + uflg + "'");
   }
-  if (!table_exists(server, "IGrML.ds" + local_args.dsnum2 +
+  if (!table_exists(server, "IGrML." + metautils::args.dsid +
       "_inventory_summary")) {
-    if (server.duplicate_table("IGrML.template_inventory_summary", "IGrML.ds" +
-        local_args.dsnum2 + "_inventory_summary") < 0) {
+    if (server.duplicate_table("IGrML.template_inventory_summary", "IGrML." +
+        metautils::args.dsid + "_inventory_summary") < 0) {
       log_error2("error: '" + server.error() + "' while trying to create "
           "inventory_summary table", F, "iinv", USER);
     }
@@ -1012,13 +1005,13 @@ void insert_grml_inventory() {
 
 void check_for_times_table(Server& server, string type, string last_decade) {
   static const string F = this_function_label(__func__);
-  if (!table_exists(server, "IObML.ds" + local_args.dsnum2 + "_" + type +
+  if (!table_exists(server, "IObML." + metautils::args.dsid + "_" + type +
       "_times_" + last_decade + "0")) {
     if (server.duplicate_table("IObML.template_" + type + "_times_decade",
-        "IObML.ds" + local_args.dsnum2 + "_" + type + "_times_" + last_decade +
+        "IObML." + metautils::args.dsid + "_" + type + "_times_" + last_decade +
         "0") < 0) {
-      log_error2("error: '" + server.error() + "' while trying to create 'ds" +
-          local_args.dsnum2 + "_" + type + "_times_" + last_decade + "0'", F,
+      log_error2("error: '" + server.error() + "' while trying to create '" +
+          metautils::args.dsid + "_" + type + "_times_" + last_decade + "0'", F,
           "iinv", USER);
     }
   }
@@ -1063,7 +1056,7 @@ void process_IDs(string type, Server& server, string ID_index, string ID_data,
     for (size_t m = nln; m <= xln; ++m) {
       auto slt = itos(n);
       auto sln = itos(m);
-      string tbl = "IObML.ds" + local_args.dsnum2 + "_inventory_" + slt + "_" +
+      string tbl = "IObML." + metautils::args.dsid + "_inventory_" + slt + "_" +
           sln;
       if (type == "irregular") {
         tbl += "_b";
@@ -1095,17 +1088,17 @@ void insert_obml_netcdf_time_series_inventory(std::ifstream& ifs, Server&
         "iinv", USER);
   }
   string uflg = strand(3);
-  if (!table_exists(server, "IObML.ds" + local_args.dsnum2 +
+  if (!table_exists(server, "IObML." + metautils::args.dsid +
       "_inventory_summary")) {
-    if (server.duplicate_table("IObML.template_inventory_summary", "IObML.ds" +
-        local_args.dsnum2 + "_inventory_summary") < 0) {
-      log_error2("error: '" + server.error() + "' while trying to create 'ds" +
-          local_args.dsnum2 + "_inventory_summary'", F, "iinv", USER);
+    if (server.duplicate_table("IObML.template_inventory_summary", "IObML." +
+        metautils::args.dsid + "_inventory_summary") < 0) {
+      log_error2("error: '" + server.error() + "' while trying to create '" +
+          metautils::args.dsid + "_inventory_summary'", F, "iinv", USER);
     }
-    if (server.duplicate_table("IObML.template_data_types", "IObML.ds" +
-        local_args.dsnum2 + "_data_types") < 0) {
-      log_error2("error: '" + server.error() + "' while trying to create 'ds" +
-          local_args.dsnum2 + "_data_types'", F, "iinv", USER);
+    if (server.duplicate_table("IObML.template_data_types", "IObML." +
+        metautils::args.dsid + "_data_types") < 0) {
+      log_error2("error: '" + server.error() + "' while trying to create '" +
+          metautils::args.dsid + "_data_types'", F, "iinv", USER);
     }
   } else {
     if (server._delete("IObML." + metautils::args.dsid + "_inventory_summary",
@@ -1226,7 +1219,7 @@ void insert_obml_netcdf_time_series_inventory(std::ifstream& ifs, Server&
   for (const auto& i : imap) {
     auto nins = 0;
     auto sp_i = split(i.second, "|");
-    string ifil = "IObML.ds" + local_args.dsnum2 + "_inventory_" + sp_i[1] +
+    string ifil = "IObML." + metautils::args.dsid + "_inventory_" + sp_i[1] +
         "_" + sp_i[2];
     for (const auto& dkey : datavar_table.keys()) {
       DataVariableEntry dve;
@@ -1252,8 +1245,8 @@ void insert_obml_netcdf_time_series_inventory(std::ifstream& ifs, Server&
           if (dmap.find(k) == dmap.end()) {
             LocalQuery q("code", "WObML." + metautils::args.dsid +
                 "_data_types_list", "observation_type_code = " + o.second +
-                " and platform_type_code = " + p.second + " and data_type = 'ds"
-                + metautils::args.dsnum + ":" + dve.data->var_name + "'");
+                " and platform_type_code = " + p.second + " and data_type = '"
+                + metautils::args.dsid + ":" + dve.data->var_name + "'");
             Row row;
             if (q.submit(server) < 0 || !q.fetch_row(row)) {
               log_error2("error: '" + q.error() + "' while trying to get "
@@ -1338,17 +1331,17 @@ void insert_obml_netcdf_point_inventory(std::ifstream& ifs, Server& server,
         "iinv", USER);
   }
   string uflg = strand(3);
-  if (!table_exists(server, "IObML.ds" + local_args.dsnum2 +
+  if (!table_exists(server, "IObML." + metautils::args.dsid +
       "_inventory_summary")) {
-    if (server.duplicate_table("IObML.template_inventory_summary", "IObML.ds" +
-        local_args.dsnum2 + "_inventory_summary") < 0) {
-      log_error2("error: '" + server.error() + "' while trying to create 'ds" +
-          local_args.dsnum2 + "_inventory_summary'", F, "iinv", USER);
+    if (server.duplicate_table("IObML.template_inventory_summary", "IObML." +
+        metautils::args.dsid + "_inventory_summary") < 0) {
+      log_error2("error: '" + server.error() + "' while trying to create '" +
+          metautils::args.dsid + "_inventory_summary'", F, "iinv", USER);
     }
-    if (server.duplicate_table("IObML.template_data_types", "IObML.ds" +
-        local_args.dsnum2 + "_data_types") < 0) {
-      log_error2("error: '" + server.error() + "' while trying to create 'ds" +
-          local_args.dsnum2 + "_data_types'", F, "iinv", USER);
+    if (server.duplicate_table("IObML.template_data_types", "IObML." +
+        metautils::args.dsid + "_data_types") < 0) {
+      log_error2("error: '" + server.error() + "' while trying to create '" +
+          metautils::args.dsid + "_data_types'", F, "iinv", USER);
     }
   }
   stringstream tss;
@@ -1490,8 +1483,8 @@ void insert_obml_netcdf_point_inventory(std::ifstream& ifs, Server& server,
           if (dmap.find(k) == dmap.end()) {
             LocalQuery q("code", "WObML." + metautils::args.dsid +
                 "_data_types_list", "observation_type_code = " + o.second +
-                " and platform_type_code = " + p.second + " and data_type = 'ds"
-                + metautils::args.dsnum + ":" + dve.data->var_name + "'");
+                " and platform_type_code = " + p.second + " and data_type = '"
+                + metautils::args.dsid + ":" + dve.data->var_name + "'");
             Row row;
             if (q.submit(server) < 0 || !q.fetch_row(row)) {
               log_error2("error: '" + q.error() + "' while trying to get "
@@ -1582,22 +1575,22 @@ void insert_generic_point_inventory(std::ifstream& ifs ,Server& server, string
   static const string F = this_function_label(__func__);
   auto uflg = strand(3);
   int mnlat = 99, mnlon = 99, mxlat = -1, mxlon = -1;
-  if (!table_exists(server, "IObML.ds" + local_args.dsnum2 +
+  if (!table_exists(server, "IObML." + metautils::args.dsid +
       "_data_types_list_b")) {
-    if (server.duplicate_table("IObML.template_data_types_list_b", "IObML.ds" +
-        local_args.dsnum2 + "_data_types_list_b") < 0) {
-      log_error2("error: '" + server.error() + "' while trying to create 'ds" +
-          local_args.dsnum2 + "_data_types_list_b'", F, "iinv", USER);
+    if (server.duplicate_table("IObML.template_data_types_list_b", "IObML." +
+        metautils::args.dsid + "_data_types_list_b") < 0) {
+      log_error2("error: '" + server.error() + "' while trying to create '" +
+          metautils::args.dsid + "_data_types_list_b'", F, "iinv", USER);
     }
-    if (server.duplicate_table("IObML.template_data_types", "IObML.ds" +
-        local_args.dsnum2 + "_data_types") < 0) {
-      log_error2("error: '" + server.error() + "' while trying to create 'ds" +
-          local_args.dsnum2 + "_data_types'", F, "iinv", USER);
+    if (server.duplicate_table("IObML.template_data_types", "IObML." +
+        metautils::args.dsid + "_data_types") < 0) {
+      log_error2("error: '" + server.error() + "' while trying to create '" +
+          metautils::args.dsid + "_data_types'", F, "iinv", USER);
     }
-    if (server.duplicate_table("IObML.template_inventory_summary", "IObML.ds" +
-        local_args.dsnum2 + "_inventory_summary") < 0) {
-      log_error2("error: '" + server.error() + "' while trying to create 'ds" +
-          local_args.dsnum2 + "_inventory_summary'", F, "iinv", USER);
+    if (server.duplicate_table("IObML.template_inventory_summary", "IObML." +
+        metautils::args.dsid + "_inventory_summary") < 0) {
+      log_error2("error: '" + server.error() + "' while trying to create '" +
+          metautils::args.dsid + "_inventory_summary'", F, "iinv", USER);
     }
   }
   unordered_map<string, string> tmap, omap, pmap, imap;
@@ -1810,8 +1803,8 @@ void insert_obml_inventory() {
   Server srv(metautils::directives.database_server, metautils::directives.
       metadb_username, metautils::directives.metadb_password, "rdadb");
   struct stat buf;
-  auto fil = unixutils::remote_web_file("https://rda.ucar.edu/datasets/ds" +
-      metautils::args.dsnum + "/metadata/inv/" + metautils::args.filename +
+  auto fil = unixutils::remote_web_file("https://rda.ucar.edu/datasets/" +
+      metautils::args.dsid + "/metadata/inv/" + metautils::args.filename +
       ".gz", temp_dir.name());
   if (stat(fil.c_str(), &buf) == 0) {
     if (system(("gunzip " + fil).c_str()) != 0) {
@@ -1819,8 +1812,8 @@ void insert_obml_inventory() {
     }
     chop(fil, 3);
   } else {
-    fil = unixutils::remote_web_file("https://rda.ucar.edu/datasets/ds" +
-        metautils::args.dsnum + "/metadata/inv/" + metautils::args.filename,
+    fil = unixutils::remote_web_file("https://rda.ucar.edu/datasets/" +
+        metautils::args.dsid + "/metadata/inv/" + metautils::args.filename,
         temp_dir.name());
   }
   std::ifstream ifs(fil.c_str());
@@ -1830,9 +1823,9 @@ void insert_obml_inventory() {
   fil = substitute(metautils::args.filename, ".ObML_inv", "");
   replace_all(fil, "%", "/");
   LocalQuery q("select code, tindex from \"WObML\"." + metautils::args.dsid +
-      "_webfiles2 as w left join dssdb.wfile as x on (x.dsid = 'ds" +
-      metautils::args.dsnum + "' and x.type = 'D' and x.wfile = w.id) where w."
-      "id = '" + fil + "'");
+      "_webfiles2 as w left join dssdb.wfile as x on (x.dsid = '" + metautils::
+      args.dsid + "' and x.type = 'D' and x.wfile = w.id) where w.id = '" + fil
+      + "'");
   if (q.submit(srv) < 0) {
     log_error2("error: '" + q.error() + "' while looking for code from "
         "webfiles", F, "iinv", USER);
