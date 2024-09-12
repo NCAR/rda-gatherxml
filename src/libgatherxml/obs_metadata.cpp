@@ -30,10 +30,12 @@ using std::tuple;
 using std::unordered_map;
 using std::unordered_set;
 using std::vector;
+using strutils::ds_aliases;
 using strutils::ftos;
 using strutils::split;
 using strutils::strand;
 using strutils::substitute;
+using strutils::to_sql_tuple_string;
 
 namespace gatherxml {
 
@@ -243,11 +245,10 @@ void compress_locations(unordered_set<string>& location_list, my::map<
 
 bool summarize_obs_data(string caller, string user) {
   static const string F = this_function_label(__func__);
-  auto d2 = substitute(metautils::args.dsnum, ".", "");
   auto b = false; // return value
   Server mysrv(metautils::directives.database_server, metautils::directives.
       metadb_username, metautils::directives.metadb_password, "rdadb");
-  Query q("code, format_code", "WObML.ds" + d2 + "_webfiles2");
+  Query q("code, format_code", "WObML." + metautils::args.dsid + "_webfiles2");
   if (q.submit(mysrv) < 0) {
     myerror = move(q.error());
     exit(1);
@@ -256,9 +257,9 @@ bool summarize_obs_data(string caller, string user) {
   for (const auto& r : q) {
     fmap.emplace(r[0], r[1]);
   }
+  auto ds_set = to_sql_tuple_string(ds_aliases(metautils::args.dsid));
   q.set("format_code, observation_type_code, platform_type_code, box1d_row, "
-      "box1d_bitmap", "search.obs_data", "dsid = '" + metautils::args.dsnum +
-      "'");
+      "box1d_bitmap", "search.obs_data", "dsid in " + ds_set);
   if (q.submit(mysrv) < 0) {
     log_error2("'" + q.error() + "' while querying search.obs_data", F, caller,
         user);
@@ -269,17 +270,18 @@ bool summarize_obs_data(string caller, string user) {
   }
   string e;
   q.set("file_code, observation_type_code, platform_type_code, start_date, "
-      "end_date, box1d_row, box1d_bitmap", "WObML.ds" + d2 + "_locations");
+      "end_date, box1d_row, box1d_bitmap", "WObML." + metautils::args.dsid +
+      "_locations");
   if (q.submit(mysrv) < 0) {
-    log_error2("'" + q.error() + "' while querying WObML.ds" + d2 +
-        "_locations", F, caller, user);
+    log_error2("'" + q.error() + "' while querying WObML." + metautils::args.dsid
+        + "_locations", F, caller, user);
   }
   unordered_map<string, tuple<string, string, string>> summary_table;
   for (const auto& r : q) {
     if (fmap.find(r[0]) == fmap.end()) {
-      log_error2("found a file_code (" + r[0] + ") in WObML.ds" + d2 +
-          "_locations that doesn't exist in WObML.ds" + d2 + "_webfiles2", F,
-          caller, user);
+      log_error2("found a file_code (" + r[0] + ") in WObML." + metautils::args.
+          dsid + "_locations that doesn't exist in WObML." + metautils::args.dsid
+          + "_webfiles2", F, caller, user);
     }
     SummaryEntry se;
     se.key=fmap[r[0]] + "<!>" + r[1] + "<!>" + r[2] + "<!>" + r[5];
@@ -316,7 +318,7 @@ bool summarize_obs_data(string caller, string user) {
           "search.obs_data",
           "dsid, format_code, observation_type_code, platform_type_code, "
               "start_date, end_date, box1d_row, box1d_bitmap, uflg",
-          "'" + metautils::args.dsnum + "', " + sp[0] + ", " + sp[1] + ", " +
+          "'" + metautils::args.dsid + "', " + sp[0] + ", " + sp[1] + ", " +
               sp[2] + ", " + get<0>(e.second) + ", " + get<1>(e.second) + ", " +
               sp[3] + ", '" + get<2>(e.second) + "', '" + uflg + "'",
           "(dsid, format_code, observation_type_code, platform_type_code, "
@@ -327,8 +329,8 @@ bool summarize_obs_data(string caller, string user) {
       log_error2("'" + mysrv.error() + "'", F, caller, user);
     }
   }
-  mysrv._delete("search.obs_data", "dsid = '" + metautils::args.dsnum + "' and "
-      "uflg != '" + uflg + "'");
+  mysrv._delete("search.obs_data", "dsid in " + ds_set + " and uflg != '" + uflg
+      + "'");
   summarize_locations("WObML", e);
   if (!e.empty()) {
     log_error2("'" + e + "'", F, caller, user);
