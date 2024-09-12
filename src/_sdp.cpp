@@ -16,14 +16,17 @@ using std::cerr;
 using std::endl;
 using std::regex;
 using std::regex_search;
+using std::stoi;
 using std::string;
 using std::stringstream;
 using std::to_string;
 using strutils::append;
+using strutils::ds_aliases;
+using strutils::ng_gdex_id;
 using strutils::is_numeric;
 using strutils::split;
-using std::stoi;
 using strutils::strand;
+using strutils::to_sql_tuple_string;
 using strutils::trim;
 using unixutils::mysystem2;
 using unixutils::rdadata_sync;
@@ -34,12 +37,12 @@ string myerror="";
 string mywarning="";
 
 struct LocalArgs {
-  LocalArgs() : gindex(), start_date(), start_time(), end_date(), end_time(),
-      tz(), start_date_flag(0), start_time_flag(0), end_date_flag(0),
-      end_time_flag(0), db_start_date(), db_start_time(), db_end_date(),
-      db_end_time() {}
+  LocalArgs() : ds_set(), gindex(), start_date(), start_time(), end_date(),
+      end_time(), tz(), start_date_flag(0), start_time_flag(0),
+      end_date_flag(0), end_time_flag(0), db_start_date(), db_start_time(),
+      db_end_date(), db_end_time() { }
 
-  string gindex;
+  string ds_set, gindex;
   string start_date, start_time, end_date, end_time, tz;
   int start_date_flag, start_time_flag, end_date_flag, end_time_flag;
   string db_start_date, db_start_time, db_end_date, db_end_time;
@@ -166,10 +169,8 @@ void parse_args(int argc, char **argv) {
   auto sp = split(metautils::args.args_string, "%");
   for (size_t n = 0; n < sp.size(); ++n) {
     if (sp[n] == "-d") {
-      metautils::args.dsnum=sp[++n];
-      if (metautils::args.dsnum.find("ds") == 0) {
-        metautils::args.dsnum = metautils::args.dsnum.substr(2);
-      }
+      metautils::args.dsid = ng_gdex_id(sp[++n]);
+      local_args.ds_set = to_sql_tuple_string(ds_aliases(metautils::args.dsid));
     } else if (sp[n] == "-g") {
       local_args.gindex = sp[++n];
     } else if (sp[n] == "-bd") {
@@ -199,8 +200,8 @@ void parse_args(int argc, char **argv) {
       cerr << "Warning: flag " << sp[n] << " is not a valid flag" << endl;
     }
   }
-  if (metautils::args.dsnum.empty()) {
-    cerr << "Error: no dataset specified" << endl;
+  if (metautils::args.dsid.empty()) {
+    cerr << "Error: no or invalid dataset ID specified" << endl;
     exit(1);
   }
   if (local_args.gindex.empty()) {
@@ -241,27 +242,26 @@ int main(int argc, char **argv) {
     cerr << "Error connecting to RDADB database" << endl;
     exit(1);
   }
-  LocalQuery query("type", "search.datasets", "dsid = '" + metautils::args.dsnum
-      + "'");
+  LocalQuery query("type", "search.datasets", "dsid in " + local_args.ds_set);
   if (query.submit(server_m) < 0) {
     log_error("error '" + query.error() + "' while checking dataset type",
         "sdp", G_USER);
   }
   Row row;
   if (!query.fetch_row(row)) {
-    cerr << "Error: ds" << metautils::args.dsnum << " does not exist" << endl;
+    cerr << "Error: " << metautils::args.dsid << " does not exist" << endl;
     exit(1);
   }
   if (row[0] == "I") {
-    cerr << "Abort: ds" << metautils::args.dsnum << " is an internal dataset" <<
+    cerr << "Abort: " << metautils::args.dsid << " is an internal dataset" <<
         endl;
     exit(1);
   }
-  auto dsnum2 = strutils::substitute(metautils::args.dsnum, ".", "");
   auto schema_names = server_m.schema_names();
   auto found_cmd_db = false;
   for (const auto& db : schema_names) {
-    if (table_exists(server_m, db + ".ds" + dsnum2 + "_primaries")) {
+    if (table_exists(server_m, db + "." + metautils::args.dsid +
+        "_primaries")) {
       found_cmd_db = true;
       break;
     }
@@ -271,8 +271,8 @@ int main(int argc, char **argv) {
         "can't be modified with " << argv[0] << endl;
     exit(1);
   }
-  query.set("gindex", "dssdb.dsperiod", "dsid = 'ds" + metautils::args.dsnum +
-      "' and gindex = " + local_args.gindex);
+  query.set("gindex", "dssdb.dsperiod", "dsid in " + local_args.ds_set + " and "
+      "gindex = " + local_args.gindex);
   if (query.submit(server_d) < 0) {
     cerr << "Error: " << query.error() << endl;
     exit(1);
@@ -285,8 +285,8 @@ int main(int argc, char **argv) {
   }
   metautils::log_warning("You should consider generating file content metadata "
       "for this dataset", "sdp", G_USER);
-  query.set("grpid", "dssdb.dsgroup", "dsid = 'ds" + metautils::args.dsnum +
-      "' and gindex = " + local_args.gindex);
+  query.set("grpid", "dssdb.dsgroup", "dsid in " + local_args.ds_set + " and "
+      "gindex = " + local_args.gindex);
   if (query.submit(server_d) < 0) {
     cerr << "Error: " << query.error() << endl;
     exit(1);
@@ -302,11 +302,11 @@ int main(int argc, char **argv) {
     log_error("unable to create temporary directory (1)", "sdp", G_USER);
   }
   auto old_ds_overview = unixutils::remote_web_file("https://rda.ucar.edu/"
-      "datasets/ds" + metautils::args.dsnum + "/metadata/dsOverview.xml", tdir->
+      "datasets/" + metautils::args.dsid + "/metadata/dsOverview.xml", tdir->
       name());
   std::ifstream ifs(old_ds_overview.c_str());
   if (!ifs.is_open()) {
-    log_error("unable to open overview XML file for ds" + metautils::args.dsnum,
+    log_error("unable to open overview XML file for " + metautils::args.dsid,
         "sdp", G_USER);
   }
   auto *sync_dir = new TempDir();
@@ -397,7 +397,7 @@ int main(int argc, char **argv) {
       metautils::directives.rdadata_home + "/.ssh/" + sp.front() +
       "-sync_rdadata_rsa -l rdadata__INNER_QUOTE__ " + sync_dir->name() +
       "/dsOverview.xml " + sp.front() + ".ucar.edu:/" + sp.front() + "/web/"
-      "ds" + metautils::args.dsnum + ".xml." + cvs_key + "\"", oss, ess) != 0) {
+      + metautils::args.dsid + ".xml." + cvs_key + "\"", oss, ess) != 0) {
     log_error("unable to web-sync file for CVS - error: '" + ess.str() + "'",
         "sdp", G_USER);
   }
@@ -405,7 +405,7 @@ int main(int argc, char **argv) {
   // add the new dataset overview to the CVS version control on the
   //   production web server
   mysystem2("/usr/bin/curl -s --data 'authKey=qGNlKijgo9DJ7MN&cmd=cvssdp&"
-      "dsnum=" + metautils::args.dsnum + "&key=" + cvs_key + "' https://rda."
+      "dsnum=" + metautils::args.dsid + "&key=" + cvs_key + "' https://rda."
       "ucar.edu/cgi-bin/remoteRDAServerUtils", oss, ess);
   if (!oss.str().empty()) {
     log_error("cvs error(s): " + oss.str(), "sdp", G_USER);
@@ -413,8 +413,8 @@ int main(int argc, char **argv) {
   string error;
 
   // sync the new overview to the dataset metadata directory on all sync hosts
-  if (rdadata_sync(sync_dir->name(), ".", "/data/web/datasets/ds" + metautils::
-      args.dsnum + "/metadata", metautils::directives.rdadata_home, error) <
+  if (rdadata_sync(sync_dir->name(), ".", "/data/web/datasets/" + metautils::
+      args.dsid + "/metadata", metautils::directives.rdadata_home, error) <
       0) {
     log_error("unable to rdadata_sync updated XML file - error(s): '" + error +
         "'", "sdp", G_USER);
@@ -448,13 +448,13 @@ int main(int argc, char **argv) {
   if (!local_args.tz.empty()) {
     append(update_string, "time_zone = '" + local_args.tz + "'", ", ");
   }
-  if (server_d.update("dssdb.dsperiod", update_string, "dsid = 'ds" +
-      metautils::args.dsnum + "' and gindex = " + local_args.gindex) < 0) {
+  if (server_d.update("dssdb.dsperiod", update_string, "dsid in " + local_args.
+      ds_set + " and gindex = " + local_args.gindex) < 0) {
     log_error("while updating dssdb.dsperiod: '" + server_d.error() + "'",
         "sdp", G_USER);
   }
   mysystem2(metautils::directives.local_root + "/bin/dsgen " + metautils::args.
-      dsnum, oss, ess);
+      dsid, oss, ess);
   server_d.disconnect();
   server_m.disconnect();
 }
