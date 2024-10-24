@@ -3103,9 +3103,9 @@ bool grid_is_centered_lambert_conformal(const unique_ptr<double[]>& lats,
         }
         def.olongitude = lround((lons[dy2 * dims.x + xm] + lons[dy2 * dims.x +
             dx2]) / 2.);
-        def.dx = def.dy = lround(111.1 * cos(lats[dy2 * dims.x + dx2 - 1] *
+        def.dx = def.dy = lround(111.1 * cos(lats[dy2 * dims.x + xm] *
             3.141592654 / 180.) * (lons[dy2 * dims.x + dx2] - lons[dy2 * dims.x
-            + dx2 - 1]));
+            + xm]));
         if (gatherxml::verbose_operation) {
           cout << "            ... confirmed a centered Lambert-Conformal "
               "projection." << endl;
@@ -3339,23 +3339,27 @@ bool filled_grid_projection(const unique_ptr<double[]>& lats, const unique_ptr<
   }
 
   // check as two-dimensional coordinates
+  static const double LAT_TOL = 0.00001;
   auto dx = fabs(lons[1] - lons[0]);
   for (short n = 0; n < d.y; ++n) {
     for (short m = 1; m < d.x; ++m) {
       auto x = n * d.x + m;
-      if (!myequalf(fabs(lons[x] - lons[x - 1]), dx, 0.000001)) {
+      auto this_dx = fabs(lons[x] - lons[x-1]);
+      if (!myequalf(this_dx, dx, LAT_TOL) && !myequalf(this_dx + dx, 360.,
+          LAT_TOL)) {
         dx = 1.e36;
         n = d.y;
         m = d.x;
       }
     }
   }
+std::cerr << dx << " " << max_dx << std::endl;
   if (!myequalf(dx, 1.e36)) {
     auto dy = fabs(lats[1] - lats[0]);
     for (short m = 0; m < d.x; ++m) {
       for (short n = 1; n < d.y; ++n) {
         auto x = m * d.y + n;
-        if (!myequalf(fabs(lats[x] - lats[x - 1]), dy, 0.000001)) {
+        if (!myequalf(fabs(lats[x] - lats[x-1]), dy, LAT_TOL)) {
           dy = 1.e36;
           m = d.x;
           n = d.y;
@@ -3375,7 +3379,7 @@ bool filled_grid_projection(const unique_ptr<double[]>& lats, const unique_ptr<
       dy = fabs(lats[x + 1] - lats[x]);
       for (short m = 2; m < d.x; ++m) {
         auto x = n * d.x + m;
-        if (!myequalf(fabs(lats[x] - lats[x - 1]), dy, 0.000001)) {
+        if (!myequalf(fabs(lats[x] - lats[x - 1]), dy, LAT_TOL)) {
           dy = 1.e36;
           n = d.y;
           m = d.x;
@@ -3388,7 +3392,7 @@ bool filled_grid_projection(const unique_ptr<double[]>& lats, const unique_ptr<
       auto a = log(tan(PI / 4. + lats[0] * PI / 360.));
       auto b = log(tan(PI / 4. + lats[ny2 * d.x] * PI / 360.));
       auto c = log(tan(PI / 4. + lats[ny2 * 2 * d.x] * PI / 360.));
-      if (myequalf((b - a) / ny2, (c - a) / (ny2 * 2), 0.000001)) {
+      if (myequalf((b - a) / ny2, (c - a) / (ny2 * 2), 0.00001)) {
         f.type = Grid::Type::mercator;
         f.elatitude = lats[nlats - 1];
         f.elongitude = lons[nlons - 1];
@@ -3408,10 +3412,10 @@ bool filled_grid_projection(const unique_ptr<double[]>& lats, const unique_ptr<
   //        1) all four latitudes must be the same
   //        2) the sum of the absolute values of opposing longitudes must
   //           equal 180.
-  if (myequalf(lats[ny2 * d.x + nx2], lats[(ny2 + 1) * d.x + nx2], 0.00001) &&
+  if (myequalf(lats[ny2 * d.x + nx2], lats[(ny2 + 1) * d.x + nx2], LAT_TOL) &&
       myequalf(lats[(ny2 + 1) * d.x + nx2], lats[(ny2 + 1) * d.x + nx2 + 1],
-      0.00001) && myequalf(lats[(ny2 + 1) * d.x + nx2 + 1], lats[ny2 * d.x +
-      nx2 + 1], 0.00001) && myequalf(fabs(lons[ny2 * d.x + nx2]) + fabs(lons[(
+      LAT_TOL) && myequalf(lats[(ny2 + 1) * d.x + nx2 + 1], lats[ny2 * d.x +
+      nx2 + 1], LAT_TOL) && myequalf(fabs(lons[ny2 * d.x + nx2]) + fabs(lons[(
       ny2 + 1) * d.x + nx2 + 1]), 180., 0.001) && myequalf(fabs(lons[(ny2 + 1)
       * d.x + nx2]) + fabs(lons[ny2 * d.x + nx2 + 1]), 180., 0.001)) {
     f.type = Grid::Type::polarStereographic;
@@ -5800,9 +5804,10 @@ int main(int argc, char **argv) {
         metautils::args.filename + "'>", "main()", "nc2xml", USER);
   }
   metautils::cmd_register("nc2xml", USER);
-  if (!metautils::args.overwrite_only && !metautils::args.inventory_only) {
-    metautils::check_for_existing_cmd("GrML");
-    metautils::check_for_existing_cmd("ObML");
+  if (metautils::args.dsid != "test" && !metautils::args.overwrite_only &&
+      !metautils::args.inventory_only) {
+    metautils::check_for_existing_cmd("GrML", "nc2xml", USER);
+    metautils::check_for_existing_cmd("ObML", "nc2xml", USER);
   }
   Timer tmr;
   tmr.start();
