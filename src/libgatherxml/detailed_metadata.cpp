@@ -212,17 +212,21 @@ bool compare_layers(const string& left, const string& right) {
 }
 
 void fill_level_code_map(unordered_map<size_t, tuple<string, string, string>>&
-    level_code_map) {
+    level_code_map, string caller, string user) {
   static const string F = this_function_label(__func__);
-  Server mysrv(metautils::directives.database_server, metautils::directives.
+  Server srv(metautils::directives.database_server, metautils::directives.
       metadb_username, metautils::directives.metadb_password, "rdadb");
+  if (!srv) {
+    log_error2("unable to connect to the database: '" + srv.error() + "'", F,
+        caller, user);
+  }
   LocalQuery q("code, map, type, value", "WGrML.levels");
 #ifdef DUMP_QUERIES
   {
   Timer tm;
   tm.start();
 #endif
-  if (q.submit(mysrv) < 0) {
+  if (q.submit(srv) < 0) {
     myerror = move(q.error());
     exit(1);
   }
@@ -235,7 +239,7 @@ void fill_level_code_map(unordered_map<size_t, tuple<string, string, string>>&
   for (const auto& r : q) {
     level_code_map.emplace(stoi(r[0]), make_tuple(r[1], r[2], r[3]));
   }
-  mysrv.disconnect();
+  srv.disconnect();
 }
 
 void generate_parameter_cross_reference(string format, string title, string
@@ -252,8 +256,12 @@ void generate_parameter_cross_reference(string format, string title, string
       0) {
     log_error2("unable to create temporary directory tree", F, caller, user);
   }
-  Server mysrv(metautils::directives.database_server, metautils::directives.
+  Server srv(metautils::directives.database_server, metautils::directives.
       metadb_username, metautils::directives.metadb_password, "rdadb");
+  if (!srv) {
+    log_error2("unable to connect to the database: '" + srv.error() + "'", F,
+        caller, user);
+  }
   LocalQuery q("select distinct parameter from \"WGrML\".summary as s left "
       "join \"WGrML\".formats as f on f.code = s.format_code where s.dsid in " +
       to_sql_tuple_string(ds_aliases(metautils::args.dsid)) + " and f.format = '"
@@ -263,7 +271,7 @@ void generate_parameter_cross_reference(string format, string title, string
   Timer tm;
   tm.start();
 #endif
-  if (q.submit(mysrv) < 0) {
+  if (q.submit(srv) < 0) {
     myerror = move(q.error());
     exit(1);
   }
@@ -414,16 +422,20 @@ void generate_parameter_cross_reference(string format, string title, string
           "' - error: '" + e + "'", caller, user);
     }
   }
-  mysrv.disconnect();
+  srv.disconnect();
 }
 
 void generate_level_cross_reference(string format, string title, string
      html_file, string caller, string user) {
   static const string F = this_function_label(__func__);
   unordered_map<size_t, tuple<string, string, string>> lcmap;
-  fill_level_code_map(lcmap);
-  Server mysrv(metautils::directives.database_server, metautils::directives.
+  fill_level_code_map(lcmap, caller, user);
+  Server srv(metautils::directives.database_server, metautils::directives.
       metadb_username, metautils::directives.metadb_password, "rdadb");
+  if (!srv) {
+    log_error2("unable to connect to the database: '" + srv.error() + "'", F,
+        caller, user);
+  }
   LocalQuery q("select distinct level_type_codes from \"WGrML\".summary as s "
       "left join \"WGrML\".formats as f on f.code = s.format_code where s.dsid "
       "in " + to_sql_tuple_string(ds_aliases(metautils::args.dsid)) + " and f."
@@ -433,7 +445,7 @@ void generate_level_cross_reference(string format, string title, string
   Timer tm;
   tm.start();
 #endif
-  if (q.submit(mysrv) < 0) {
+  if (q.submit(srv) < 0) {
     myerror = move(q.error());
     exit(1);
   }
@@ -545,7 +557,7 @@ void generate_level_cross_reference(string format, string title, string
           "' - error: '" + e + "'", caller, user);
     }
   }
-  mysrv.disconnect();
+  srv.disconnect();
 }
 
 void replace_token(string& source, string token, string new_s) {
@@ -569,10 +581,11 @@ void add_to_formats(XMLDocument& xdoc, string database, string primaries_table,
     vector<pair<string, string>>& format_list, string& formats, string caller,
     string user) {
   static const string F = this_function_label(__func__);
-  Server mysrv(metautils::directives.database_server, metautils::directives.
+  Server srv(metautils::directives.database_server, metautils::directives.
       metadb_username, metautils::directives.metadb_password, "rdadb");
-  if (!mysrv) {
-    log_error2("unable to connect to metadata server", F, caller, user);
+  if (!srv) {
+    log_error2("unable to connect to metadata server: '" + srv.error() + "'", F,
+        caller, user);
   }
   LocalQuery q("select distinct f.format, f.code from " + postgres_ready(
       database) + ".formats as f left join " + postgres_ready(database) + "." +
@@ -583,7 +596,7 @@ void add_to_formats(XMLDocument& xdoc, string database, string primaries_table,
   Timer tm;
   tm.start();
 #endif
-  if (q.submit(mysrv) < 0) {
+  if (q.submit(srv) < 0) {
     log_error2("'" + q.error() + "'", F, caller, user);
   }
 #ifdef DUMP_QUERIES
@@ -611,6 +624,7 @@ void add_to_formats(XMLDocument& xdoc, string database, string primaries_table,
     }
     formats += "</li>";
   }
+  srv.disconnect();
 }
 
 string parameter_query(Server& mysrv, string format_code, size_t
@@ -1009,18 +1023,22 @@ void generate_detailed_grid_summary(string file_type, ofstream& ofs, const
   unordered_map<string, ParameterData> pdmap;
   unordered_map<size_t, LevelSummary> lsmap;
   unordered_map<size_t, tuple<string, string, string>> lcmap;
-  fill_level_code_map(lcmap);
-  Server mysrv(metautils::directives.database_server, metautils::directives.
+  fill_level_code_map(lcmap, caller, user);
+  Server srv(metautils::directives.database_server, metautils::directives.
       metadb_username, metautils::directives.metadb_password, "rdadb");
+  if (!srv) {
+    log_error2("unable to connect to the database: '" + srv.error() + "'", F,
+        caller, user);
+  }
   LocalQuery q;
   for (const auto& fp : format_list) {
-    q.set(parameter_query(mysrv, fp.second, format_list.size()));
+    q.set(parameter_query(srv, fp.second, format_list.size()));
 #ifdef DUMP_QUERIES
     {
     Timer tm;
     tm.start();
 #endif
-    if (q.submit(mysrv) < 0) {
+    if (q.submit(srv) < 0) {
       log_error2("'" + q.error() + "'", F, caller, user);
     }
 #ifdef DUMP_QUERIES
@@ -1136,13 +1154,13 @@ void generate_detailed_grid_summary(string file_type, ofstream& ofs, const
         "cellpadding=\"5\" border=\"0\"><tr><th class=\"headerRow\" colspan=\""
         << ncols << "\" align=\"center\">Summary for Grids in " << strutils::
         to_capital(f) << " Format</th></tr>" << endl;
-    LocalQuery q(time_range_query(mysrv, fp.second));
+    LocalQuery q(time_range_query(srv, fp.second));
 #ifdef DUMP_QUERIES
     {
     Timer tm;
     tm.start();
 #endif
-    if (q.submit(mysrv) < 0) {
+    if (q.submit(srv) < 0) {
       log_error2("'" + q.error() + "'", F, caller, user);
     }
 #ifdef DUMP_QUERIES
@@ -1401,10 +1419,10 @@ void generate_detailed_grid_summary(string file_type, ofstream& ofs, const
   ofs_p.close();
   ofs_l.close();
   if (pfv.size() > 0) {
-    generate_gridded_product_detail(mysrv, file_type, format_list, t, caller,
+    generate_gridded_product_detail(srv, file_type, format_list, t, caller,
         user);
   }
-  mysrv.disconnect();
+  srv.disconnect();
   string e;
   if (unixutils::rdadata_sync(t.name(), "metadata/", "/data/web/datasets/" +
       metautils::args.dsid, metautils::directives.rdadata_home, e) < 0) {
@@ -1435,8 +1453,12 @@ void generate_detailed_observation_summary(string file_type, ofstream& ofs,
   if (!ofs_o.is_open()) {
     log_error2("unable to open output for observation detail", F, caller, user);
   }
-  Server mysrv(metautils::directives.database_server, metautils::directives.
+  Server srv(metautils::directives.database_server, metautils::directives.
       metadb_username, metautils::directives.metadb_password, "rdadb");
+  if (!srv) {
+    log_error2("unable to connect to the database: '" + srv.error() + "'", F,
+        caller, user);
+  }
   xmlutils::DataTypeMapper data_type_mapper(metautils::directives.
       parameter_map_path);
   for (const auto& fp : format_list) {
@@ -1465,7 +1487,7 @@ void generate_detailed_observation_summary(string file_type, ofstream& ofs,
         "where p.format_code = " + fp.second + " group by t.platform_type, o."
         "obs_type, l.data_type order by t.platform_type, o.obs_type, l."
         "data_type");
-    if (query.submit(mysrv) < 0) {
+    if (query.submit(srv) < 0) {
       log_error2("'" + query.error() + "' for '" + query.show() + "'", F,
           caller, user);
     }
@@ -1516,7 +1538,7 @@ void generate_detailed_observation_summary(string file_type, ofstream& ofs,
         }
       }
     }
-    if (field_exists(mysrv, "WObML." + metautils::args.dsid + "_webfiles2",
+    if (field_exists(srv, "WObML." + metautils::args.dsid + "_webfiles2",
         "min_obs_per")) {
       query.set("select any_value(l.platform_type), any_value(o.obs_type), min("
           "f.min_obs_per), max(f.max_obs_per), f.unit from \"WObML\"." +
@@ -1538,7 +1560,7 @@ void generate_detailed_observation_summary(string file_type, ofstream& ofs,
           "p.format_code = " + fp.second + " group by f.observation_type_code, "
           "f.platform_type_code, f.unit, s.idx order by s.idx");
     }
-    if (query.submit(mysrv) < 0)
+    if (query.submit(srv) < 0)
       log_error2("'" + query.error() + "' for '" + query.show() + "'", F,
           caller, user);
     for (const auto& res : query) {
@@ -1617,7 +1639,7 @@ void generate_detailed_observation_summary(string file_type, ofstream& ofs,
     }
     ofs_o << "</table></center>" << endl;
   }
-  mysrv.disconnect();
+  srv.disconnect();
   ofs_o.close();
   string e;
   if (unixutils::rdadata_sync(t.name(), "metadata/", "/data/web/datasets/" +
@@ -1631,6 +1653,10 @@ void generate_detailed_fix_summary(string file_type, ofstream& ofs, const
     vector<pair<string, string>>& format_list, string caller, string user) {
   static const string F = this_function_label(__func__);
   Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"rdadb");
+  if (!server) {
+    log_error2("unable to connect to the database: '" + server.error() + "'", F,
+        caller, user);
+  }
   my::map<TypeEntry> platform_table;
   for (const auto& fp : format_list) {
     platform_table.clear();
@@ -1717,8 +1743,12 @@ void generate_detailed_metadata_view(string caller, string user) {
   if (!xdoc) {
     log_error2("unable to open FormatReferences.xml", F, caller, user);
   }
-  Server mysrv_m(metautils::directives.database_server, metautils::directives.
+  Server srv_m(metautils::directives.database_server, metautils::directives.
       metadb_username, metautils::directives.metadb_password, "rdadb");
+  if (!srv_m) {
+    log_error2("unable to connect to the database: '" + srv_m.error() + "'", F,
+        caller, user);
+  }
   string fmts, dtyps;
   auto b = false;
 
@@ -1734,7 +1764,7 @@ void generate_detailed_metadata_view(string caller, string user) {
   vector<vector<pair<string, string>>> vv(svec.size());
   for (size_t n = 0; n < svec.size(); ++n) {
     auto tbl = metautils::args.dsid + "_webfiles2";
-    if (table_exists(mysrv_m, get<0>(svec[n]) + "." + tbl)) {
+    if (table_exists(srv_m, get<0>(svec[n]) + "." + tbl)) {
       b = true;
       dtyps += "<li>" + get<1>(svec[n]) + " </li>";
       add_to_formats(xdoc, get<0>(svec[n]), tbl, vv[n], fmts, caller, user);
@@ -1911,7 +1941,7 @@ void generate_detailed_metadata_view(string caller, string user) {
     xdoc.close();
     server_d.disconnect();
   }
-  mysrv_m.disconnect();
+  srv_m.disconnect();
 // generate parameter cross-references
   generate_parameter_cross_reference("WMO_GRIB1","GRIB","grib.html",caller,user);
   generate_parameter_cross_reference("WMO_GRIB2","GRIB2","grib2.html",caller,user);
