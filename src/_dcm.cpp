@@ -127,7 +127,7 @@ void copy_version_controlled_data(Server& server, string db, string
       }
       vtable = "\"V" + db + "\"." + t;
       if (!table_exists(server, vtable)) {
-        if (server.command("create table " + vtable + " like " + tbl) < 0) {
+        if (server.duplicate_table(tbl, vtable) != 0) {
           log_error2("error: '" + server.error() + "' while trying to create " +
               vtable, "copy_version_controlled_data()", "dcm", USER);
         }
@@ -243,8 +243,7 @@ bool remove_from(string database, string table_ext, string file_field_name,
         }
         vtable = "\"V" + vtable + "\"." + metautils::args.dsid + table_ext;
         if (!table_exists(local_server, vtable)) {
-          if (local_server.command("create table " + vtable + " like " +
-              file_table) < 0) {
+          if (local_server.duplicate_table(file_table, vtable) != 0) {
             log_error2("error: '" + local_server.error() + "' while trying to "
                 "create " + vtable, F, "dcm", USER);
           }
