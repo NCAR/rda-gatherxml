@@ -265,8 +265,8 @@ bool remove_from(string database, string table_ext, string file_field_name,
         if (local_server._delete(substitute(database, "W", "I") + "." +
             metautils::args.dsid + "_inventory_summary", "file_code = " +
             file_id_code) == 0) {
-          query.set("select tindex from dssdb.wfile where wfile = '" + file +
-              "'");
+          query.set("select tindex from dssdb.wfile_" + metautils::args.dsid +
+              " where wfile = '" + file + "'");
           if (query.submit(local_server) == 0 && query.num_rows() == 1) {
             query.fetch_row(row);
             if (!row[0].empty() && row[0] != "0") {
@@ -472,13 +472,15 @@ extern "C" void *t_removed(void *ts) {
   }
   Server server_d(metautils::directives.database_server, metautils::directives.
       rdadb_username, metautils::directives.rdadb_password, "rdadb");
-  LocalQuery query("gindex", "dssdb.wfile", "wfile = '" + file + "'");
+  LocalQuery query("gindex", "dssdb.wfile_" + metautils::args.dsid, "wfile = '"
+      + file + "'");
   Row row;
   if (query.submit(server_d) == 0 && query.fetch_row(row)) {
     g_web_gindex_set.emplace(row[0]);
   }
   if (file_removed) {
-    query.set("tindex", "dssdb.wfile", "wfile = '" + file + "'");
+    query.set("tindex", "dssdb.wfile_" + metautils::args.dsid, "wfile = '" +
+        file + "'");
     if (query.submit(server_d) == 0 && query.num_rows() == 1) {
       query.fetch_row(row);
       if (!row[0].empty() && row[0] != "0") {
@@ -487,8 +489,8 @@ extern "C" void *t_removed(void *ts) {
     }
     g_create_web_filelist_cache = true;
   }
-  server_d.update("dssdb.wfile", "meta_link = NULL", "dsid in " + g_ds_set +
-      " and wfile = '" + file + "'");
+  server_d.update("dssdb.wfile_" + metautils::args.dsid, "meta_link = NULL",
+      "wfile = '" + file + "'");
   server_d.disconnect();
   t->file_removed = file_removed;
   if (gatherxml::verbose_operation) {

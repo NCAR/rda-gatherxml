@@ -265,7 +265,7 @@ void build_wms_capabilities() {
     }
     if (gcod != last) {
       double w, s, e, n;
-      if (!gridutils::fill_spatial_domain_from_grid_definition(g.
+      if (!gridutils::filled_spatial_domain_from_grid_definition(g.
           attribute_value("definition") + "<!>" + p, "primeMeridian", w, s, e,
           n)) {
         metautils::log_info("build_wms_capabilities() could not get the "
@@ -932,9 +932,9 @@ void insert_grml_inventory() {
   auto wid = substitute(metautils::args.filename, ".GrML_inv", "");
   replace_all(wid, "%", "/");
   LocalQuery q("select code, format_code, tindex from \"WGrML\"." + metautils::
-      args.dsid + "_webfiles2 as w left join dssdb.wfile as x on (x.dsid in "
-      + to_sql_tuple_string(ds_aliases(metautils::args.dsid)) + " and x.type = "
-      "'D' and x.wfile = w.id) where w.id = '" + wid + "'");
+      args.dsid + "_webfiles2 as w left join dssdb.wfile_" + metautils::args.
+      dsid + " as x on (x.type = 'D' and x.wfile = w.id) where w.id = '" + wid +
+      "'");
   if (q.submit(server) < 0) {
     log_error2("error: '" + q.error() + "' while looking for code from "
         "webfiles", F, "iinv", USER);
@@ -1823,9 +1823,8 @@ void insert_obml_inventory() {
   fil = substitute(metautils::args.filename, ".ObML_inv", "");
   replace_all(fil, "%", "/");
   LocalQuery q("select code, tindex from \"WObML\"." + metautils::args.dsid +
-      "_webfiles2 as w left join dssdb.wfile as x on (x.dsid = '" + metautils::
-      args.dsid + "' and x.type = 'D' and x.wfile = w.id) where w.id = '" + fil
-      + "'");
+      "_webfiles2 as w left join dssdb.wfile_" + metautils::args.dsid + " as x "
+      "on (x.type = 'D' and x.wfile = w.id) where w.id = '" + fil + "'");
   if (q.submit(srv) < 0) {
     log_error2("error: '" + q.error() + "' while looking for code from "
         "webfiles", F, "iinv", USER);

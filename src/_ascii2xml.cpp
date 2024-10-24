@@ -68,7 +68,7 @@ void scan_ghcnv3_file(gatherxml::markup::ObML::ObservationData& obs_data,std::li
   if (!server) {
     metautils::log_error(THIS_FUNC+"() returned error: '"+server.error()+"' while trying to connect to RDADB","ascii2xml",USER);
   }
-  Query query("select wfile from dssdb.wfile where dsid = 'ds564.1' and type = 'O' and wfile like '%qcu.inv'");
+  Query query("select wfile from dssdb.wfile_d564001 where type = 'O' and wfile like '%qcu.inv'");
   if (query.submit(server) < 0) {
     metautils::log_error(THIS_FUNC+"() returned error: '"+query.error()+"' while trying to query for station inventory name","ascii2xml",USER);
   }
