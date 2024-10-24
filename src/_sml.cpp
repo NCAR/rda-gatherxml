@@ -85,7 +85,7 @@ void set_file_meta_links()
   Row row;
   Entry e;
 
-  query.set("select mssfile,meta_link,'mssfile' from mssfile where dsid in "+g_ds_set+" and type = 'P' and status = 'P' union select wfile,meta_link,'wfile' from wfile where dsid in "+g_ds_set+" and type = 'D' and status = 'P'");
+  query.set("select mssfile,meta_link,'mssfile' from mssfile where dsid in "+g_ds_set+" and type = 'P' and status = 'P' union select wfile,meta_link,'wfile' from dssdb.wfile_"+metautils::args.dsid+" where type = 'D' and status = 'P'");
   if (query.submit(server_d) < 0)
     metautils::log_error("error '"+query.error()+"' while trying to get dssdb filelist","sml",user);
   while (query.fetch_row(row)) {
@@ -107,7 +107,7 @@ void set_file_meta_link(std::string filename)
     query.set("select meta_link,'mssfile' from mssfile where dsid in "+g_ds_set+" and mssfile = '"+filename+"'");
   }
   else {
-    query.set("select meta_link,'wfile' from wfile where dsid in "+g_ds_set+" and wfile = '"+filename+"'");
+    query.set("select meta_link,'wfile' from dssdb.wfile_"+metautils::args.dsid+" where wfile = '"+filename+"'");
   }
   if (query.submit(server_d) < 0) {
     metautils::log_error("error '"+query.error()+"' while trying to get entry for '"+filename+"' from dssdb","sml",user);

@@ -305,8 +305,8 @@ void initialize_web_file(MarkupParameters *markup_parameters) {
   }
   markup_parameters->filename = metautils::relative_web_filename(
       markup_parameters->filename);
-  LocalQuery q("tindex", "dssdb.wfile", "wfile = '" + markup_parameters->
-      filename + "'");
+  LocalQuery q("tindex", "dssdb.wfile_" + metautils::args.dsid, "wfile = '" +
+      markup_parameters->filename + "'");
   Row r;
   if (q.submit(mysrv_d) == 0 && q.fetch_row(r) && r[0] != "0") {
     local_args.gindex_list.emplace_back(r[0]);
@@ -314,11 +314,11 @@ void initialize_web_file(MarkupParameters *markup_parameters) {
   markup_parameters->database = "W" + markup_parameters->markup_type;
   markup_parameters->file_type = "web";
   local_args.summarized_web_file = true;
-  if (mysrv_d.update("dssdb.wfile", "meta_link = '" + substitute(
-      markup_parameters->markup_type, "ML", "") + "'", "dsid = '" + metautils::
-      args.dsid + "' and wfile = '" + markup_parameters->filename + "'") < 0) {
+  if (mysrv_d.update("dssdb.wfile_" + metautils::args.dsid, "meta_link = '" +
+      substitute(markup_parameters->markup_type, "ML", "") + "'", "wfile = '" +
+      markup_parameters->filename + "'") < 0) {
     log_error2("error: '" + mysrv_d.error() + "' while trying to update "
-        "'dssdb.wfile'", F, "scm", USER);
+        "'dssdb.wfile_" + metautils::args.dsid + "'", F, "scm", USER);
   }
   mysrv_d.disconnect();
 }
@@ -862,7 +862,7 @@ void *thread_summarize_IDs(void *args) {
   Server srv(metautils::directives.database_server, metautils::directives.
       metadb_username, metautils::directives.metadb_password, "rdadb");;
   if (!srv) {
-    log_error2("could not connect to mysql server - error: '" + srv.error() +
+    log_error2("could not connect to database server - error: '" + srv.error() +
         "'", F, "scm", USER);
   }
 
@@ -1136,8 +1136,8 @@ void *thread_summarize_file_ID_locations(void *args) {
   Server srv(metautils::directives.database_server, metautils::directives.
       metadb_username, metautils::directives.metadb_password, "rdadb");;
   if (!srv) {
-    log_error2("could not connect to mysql server - error: " + srv.error(), F,
-        "scm", USER);
+    log_error2("could not connect to database server - error: " + srv.error(),
+        F, "scm", USER);
   }
   if (lmap.empty()) {
     LocalQuery q("box1d_row, box1d_column, keyword", "search."
@@ -1942,8 +1942,13 @@ void *thread_summarize_fix_data(void *) {
 }
 
 void *thread_index_variables(void *) {
+  static const string F = this_function_label(__func__);
   Server srv(metautils::directives.database_server, metautils::directives.
       metadb_username, metautils::directives.metadb_password, "rdadb");
+  if (!srv) {
+    log_error2("could not connect to database server - error: " + srv.error(),
+        F, "scm", USER);
+  }
   string e;
   if (!searchutils::indexed_variables(srv, metautils::args.dsid, e)) {
     log_error2(e, "thread_index_variables()", "scm", USER);
@@ -1953,8 +1958,13 @@ void *thread_index_variables(void *) {
 }
 
 void *thread_index_locations(void *) {
+  static const string F = this_function_label(__func__);
   Server srv(metautils::directives.database_server, metautils::directives.
       metadb_username, metautils::directives.metadb_password, "rdadb");
+  if (!srv) {
+    log_error2("could not connect to database server - error: " + srv.error(),
+        F, "scm", USER);
+  }
   string e;
   if (!searchutils::indexed_locations(srv, metautils::args.dsid, e)) {
     log_error2(e, "thread_index_locations()", "scm", USER);
@@ -2235,8 +2245,8 @@ int main(int argc, char **argv) {
         if (local_args.gindex_list.size() == 1) {
           if (local_args.gindex_list.front() == "all") {
             local_args.gindex_list.clear();
-            LocalQuery q("select distinct tindex from dssdb.wfile where dsid "
-                "in " + local_args.ds_set + " and type = 'D' and status = 'P'");
+            LocalQuery q("select distinct tindex from dssdb.wfile_" +
+                metautils::args.dsid + " where type = 'D' and status = 'P'");
             if (q.submit(mysrv) < 0) {
               log_error2("error getting group indexes: '" + q.error() + "'", F,
                   "scm", USER);
@@ -2297,8 +2307,8 @@ int main(int argc, char **argv) {
       if (local_args.refresh_inv && local_args.gindex_list.size() == 1) {
         if (local_args.gindex_list.front() == "all") {
           local_args.gindex_list.clear();
-          LocalQuery q("select distinct tindex from dssdb.wfile where dsid in "
-              + local_args.ds_set + " and type = 'D' and status = 'P'");
+          LocalQuery q("select distinct tindex from dssdb.wfile_" + metautils::
+              args.dsid + " where type = 'D' and status = 'P'");
           if (q.submit(mysrv) < 0) {
             log_error2("error getting group indexes: '" + q.error() + "'", F,
                 "scm", USER);

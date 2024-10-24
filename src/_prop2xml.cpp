@@ -395,7 +395,7 @@ int main(int argc,char **argv)
 	else {
 	  path=metautils::args.filename;
 	}
-	query.set("dsid","wfile","wfile = '"+path+"' and dsid in "+ds_set);
+	query.set("wfile","dssdb.wfile_"+metautils::args.dsid,"wfile = '"+path+"'");
     }
     if (query.submit(server) == 0) {
 	if (query.num_rows() > 0) {

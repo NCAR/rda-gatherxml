@@ -56,9 +56,9 @@ bool verified_new_file_is_archived(string& error) {
   if (regex_search(g_old_name, regex(
       "^http(s){0,1}://(rda|dss)\\.ucar\\.edu/"))) {
     col = "wfile";
-    qs = "select wfile from wfile where dsid in " + to_sql_tuple_string(
-        ds_aliases(g_new_dsid)) + " and wfile = '" + metautils::
-        relative_web_filename(g_new_name) + "' and type = 'D' and status = 'P'";
+    qs = "select " + col + " from dssdb.wfile_" + metautils::args.dsid +
+        " where wfile = '" + metautils::relative_web_filename(g_new_name) +
+        "' and type = 'D' and status = 'P'";
   }
   LocalQuery q(qs);
   if (q.submit(server) < 0) {
