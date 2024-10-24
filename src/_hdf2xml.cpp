@@ -3525,8 +3525,8 @@ bool grid_is_non_centered_lambert_conformal(const HDF5::DataArray& lats, const
     auto min_dist = dx_avg * 0.75;
     for (auto n = min_lat; n <= max_lat; ++n) {
       double lat, elon;
-      gridutils::fill_lat_lon_from_lambert_conformal_gridpoint(xbar, ybar, slat,
-          slon, dx_avg, olon, n, lat, elon);
+      gridutils::filled_lat_lon_from_lambert_conformal_gridpoint(xbar, ybar,
+          slat, slon, dx_avg, olon, n, lat, elon);
       auto dx = (comp_lon - elon) * KMDEG * cos((comp_lat + lat) / 2. * DEGRAD);
       auto dy = (comp_lat - lat) * KMDEG;
       auto dist = sqrt(dx * dx + dy * dy);
@@ -4406,8 +4406,8 @@ int main(int argc, char **argv) {
   gatherxml::parse_args(d);
   metautils::cmd_register("hdf2xml", USER);
   if (metautils::args.dsid != "test" && !metautils::args.overwrite_only) {
-    metautils::check_for_existing_cmd("GrML");
-    metautils::check_for_existing_cmd("ObML");
+    metautils::check_for_existing_cmd("GrML", "hdf2xml", USER);
+    metautils::check_for_existing_cmd("ObML", "hdf2xml", USER);
   }
   Timer tmr;
   tmr.start();
