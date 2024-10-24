@@ -653,7 +653,7 @@ int main(int argc, char **argv) {
   }
   metautils::cmd_register("fix2xml", USER);
   if (!metautils::args.overwrite_only) {
-    metautils::check_for_existing_cmd("FixML");
+    metautils::check_for_existing_cmd("FixML", "fix2xml", USER);
   }
   scan_file();
   FixML::write(feature_table, stage_table, "fix2xml", USER);

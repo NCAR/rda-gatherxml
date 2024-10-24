@@ -1628,8 +1628,8 @@ void add_spatial_coverage(TokenDocument& tdoc, const vector<string>& data_types,
     string s = "select gindex, title from dssdb.dsgroup where dsid in " +
         g_ds_set;
     fill_map(grps, s);
-    s = "select wfile, tindex from dssdb.wfile where dsid in " + g_ds_set +
-        " and type = 'D' and " "status = 'P'";
+    s = "select wfile, tindex from dssdb.wfile_" + metautils::args.dsid +
+        " where type = 'D' and " "status = 'P'";
     fill_map(rfils, s);
     s = "select code, id from \"WGrML\"." + metautils::args.dsid + "_webfiles2";
     fill_map(mfils, s);
@@ -1741,7 +1741,7 @@ void add_spatial_coverage(TokenDocument& tdoc, const vector<string>& data_types,
   vector<double> slst;
   for (const auto& e : udefs) {
     double wl, el, sl, nl;
-    if (gridutils::fill_spatial_domain_from_grid_definition(e.first,
+    if (gridutils::filled_spatial_domain_from_grid_definition(e.first,
         "primeMeridian", wl, sl, el, nl)) {
       if (el < 0. && el < wl) {
 

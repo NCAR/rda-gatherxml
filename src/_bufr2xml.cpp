@@ -471,7 +471,7 @@ int main(int argc, char **argv) {
     cflg = "-wf";
   }
   metautils::cmd_register("bufr2xml", USER);
-  metautils::check_for_existing_cmd("ObML");
+  metautils::check_for_existing_cmd("ObML", "bufr2xml", USER);
   Timer tmr;
   tmr.start();
   gatherxml::markup::ObML::ObservationData o;

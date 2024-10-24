@@ -916,7 +916,7 @@ int main(int argc, char **argv) {
   gatherxml::parse_args(d);
   metautils::cmd_register("grid2xml", USER);
   if (!metautils::args.overwrite_only && !metautils::args.inventory_only) {
-    metautils::check_for_existing_cmd("GrML");
+    metautils::check_for_existing_cmd("GrML", "grid2xml", USER);
   }
   Timer tmr;
   tmr.start();
