@@ -61,6 +61,10 @@ void summarize_grid_levels(string database, string caller, string user) {
   }
   Server srv(metautils::directives.database_server, metautils::directives.
       metadb_username, metautils::directives.metadb_password, "rdadb");
+  if (!srv) {
+    log_error2("unable to connect to the database: '" + srv.error() + "'", F,
+        caller, user);
+  }
   LocalQuery q("select distinct p.format_code, g.level_type_codes from " +
       postgres_ready(database) + "." + metautils::args.dsid + "_agrids2 as g "
       "left join " + postgres_ready(database) + "." + metautils::args.dsid + t +
@@ -132,6 +136,10 @@ void summarize_grids(string database, string caller, string user, string
   }
   Server srv(metautils::directives.database_server, metautils::directives.
       metadb_username, metautils::directives.metadb_password, "rdadb");
+  if (!srv) {
+    log_error2("unable to connect to the database: '" + srv.error() + "'", F,
+        caller, user);
+  }
   LocalQuery q("select distinct f.code from " + postgres_ready(database) + "." +
       metautils::args.dsid + t + " as p left join " + postgres_ready(database) +
       ".formats as f on f.code = p.format_code");
@@ -356,6 +364,10 @@ void summarize_grid_resolutions(string caller, string user, string
   static const string F = string(__func__) + "()";
   Server srv(metautils::directives.database_server, metautils::directives.
       metadb_username, metautils::directives.metadb_password, "rdadb");
+  if (!srv) {
+    log_error2("unable to connect to the database: '" + srv.error() + "'", F,
+        caller, user);
+  }
   LocalQuery q("code, definition, def_params", "WGrML.grid_definitions");
 #ifdef DUMP_QUERIES
   {
@@ -505,6 +517,10 @@ void aggregate_grids(string database, string caller, string user, string
   static const string F = this_function_label(__func__);
   Server srv(metautils::directives.database_server, metautils::directives.
       metadb_username, metautils::directives.metadb_password, "rdadb");
+  if (!srv) {
+    log_error2("unable to connect to the database: '" + srv.error() + "'", F,
+        caller, user);
+  }
   LocalQuery q;
   if (database == "WGrML") {
     if (!file_id_code.empty()) {
