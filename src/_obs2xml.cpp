@@ -1078,7 +1078,7 @@ int main(int argc,char **argv)
   }
   metautils::cmd_register("obs2xml",USER);
   if (!metautils::args.inventory_only) {
-    metautils::check_for_existing_cmd("ObML");
+    metautils::check_for_existing_cmd("ObML", "obs2xml", USER);
   }
   Timer tmr;
   tmr.start();
