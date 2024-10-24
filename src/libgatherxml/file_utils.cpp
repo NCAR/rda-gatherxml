@@ -51,11 +51,9 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile, TempDir& tdir, list<
     // Web file
     auto loc = 'G';
     if (args.dsid != "test") {
-      auto w = metautils::relative_web_filename(args.path + "/" + args.
-          filename);
-      LocalQuery q("status, file_format, locflag", "dssdb.wfile", "dsid in " +
-          to_sql_tuple_string(ds_aliases(args.dsid)) + " and wfile = '" + w +
-          "'");
+      auto w = relative_web_filename(args.path + "/" + args.filename);
+      LocalQuery q("status, file_format, locflag", "dssdb.wfile_" + args.dsid,
+          "wfile = '" + w + "'");
       if (q.submit(mys) < 0) {
         error = q.error();
         return false;
