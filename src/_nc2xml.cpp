@@ -3353,7 +3353,6 @@ bool filled_grid_projection(const unique_ptr<double[]>& lats, const unique_ptr<
       }
     }
   }
-std::cerr << dx << " " << max_dx << std::endl;
   if (!myequalf(dx, 1.e36)) {
     auto dy = fabs(lats[1] - lats[0]);
     for (short m = 0; m < d.x; ++m) {
