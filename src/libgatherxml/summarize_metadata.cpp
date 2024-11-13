@@ -203,21 +203,20 @@ void summarize_dates(string caller, string user) {
     log_error2("unable to connect to RDADB: '" + srv.error() + "'", F, caller,
         user);
   }
+  LocalQuery q("select dsid, gindex, dorder, date_start, time_start, "
+      "start_flag, date_end, time_end, end_flag, time_zone from dssdb.dsperiod "
+      "where dsid in " + to_sql_tuple_string(ds_aliases(metautils::args.dsid)));
+  if (q.submit(srv) < 0) {
+    log_error2("'" + q.error() + "' when trying to create dsperiod cache", F,
+        caller, user);
+  }
+  unordered_set<string> dsperiod_cache;
+  for (const auto& r : q) {
+    dsperiod_cache.emplace("'" + r[0] + "', " + r[1] + ", " + r[2] + ", '" + r[
+        3] + "', '" + r[4] + "', " + r[5] + ", '" + r[6] + "', '" + r[7] + "', "
+        + r[8] + ", '" + r[9] + "'");
+  }
   if (!v.empty()) {
-    LocalQuery q("select dsid, gindex, dorder, date_start, time_start, "
-        "start_flag, date_end, time_end, end_flag, time_zone from dssdb."
-        "dsperiod where dsid in " + to_sql_tuple_string(ds_aliases(metautils::
-        args.dsid)));
-    if (q.submit(srv) < 0) {
-      log_error2("'" + q.error() + "' when trying to create dsperiod cache", F,
-          caller, user);
-    }
-    unordered_set<string> dsperiod_cache;
-    for (const auto& r : q) {
-      dsperiod_cache.emplace("'" + r[0] + "', " + r[1] + ", " + r[2] + ", '" +
-          r[3] + "', '" + r[4] + "', " + r[5] + ", '" + r[6] + "', '" + r[7] +
-          "', " + r[8] + ", '" + r[9] + "'");
-    }
     precision = (precision - 2) / 2;
     vector<CMDDateRange> v2;
     v2.reserve(v.size());
@@ -329,14 +328,14 @@ void summarize_dates(string caller, string user) {
         }
       }
     }
-    for (const auto& e : dsperiod_cache) {
-      auto sp = split(e, ", ");
-      srv._delete("dssdb.dsperiod", "dsid = " + sp[0] + " and gindex = " + sp[1]
-          + " and dorder = " + sp[2] + " and date_start = " + sp[3] + " and "
-          "time_start = " + sp[4] + " and start_flag = " + sp[5] + " and "
-          "date_end = " + sp[6] + " and time_end = " + sp[7] + " and end_flag "
-          "= " + sp[8] + " and time_zone = " + sp[9]);
-    }
+  }
+  for (const auto& e : dsperiod_cache) {
+    auto sp = split(e, ", ");
+    srv._delete("dssdb.dsperiod", "dsid = " + sp[0] + " and gindex = " + sp[1]
+        + " and dorder = " + sp[2] + " and date_start = " + sp[3] + " and "
+        "time_start = " + sp[4] + " and start_flag = " + sp[5] + " and "
+        "date_end = " + sp[6] + " and time_end = " + sp[7] + " and end_flag = "
+        + sp[8] + " and time_zone = " + sp[9]);
   }
   srv.disconnect();
 }
