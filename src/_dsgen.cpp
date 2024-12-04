@@ -1119,20 +1119,22 @@ bool add_temporal_range(TokenDocument& tdoc, size_t& swp_cnt) {
         ".dsperiod as p left join dssdb.dsgroup as g on (p.dsid = g.dsid and p"
         ".gindex = g.gindex) where p.dsid in " + g_ds_set + " and g.pindex = 0 "
         "and date_start > '0001-01-01' and date_start < '5000-01-01' and "
-        "date_end > '0001-01-01' and date_end < '5000-01-01' union select p."
-        "date_start, p.time_start, p.start_flag, p.date_end, p.time_end, p."
-        "end_flag, p.time_zone, g2.title, g.grpid from dssdb.dsperiod as p "
-        "left join dssdb.dsgroup as g on (p.dsid = g.dsid and p.gindex = g."
-        "gindex) left join dssdb.dsgroup as g2 on (p.dsid = g2.dsid and g."
-        "pindex = g2.gindex) where p.dsid in " + g_ds_set + " and date_start > "
-        "'0001-01-01' and date_start < '5000-01-01' and date_end > "
-        "'0001-01-01' and date_end < '5000-01-01' and g2.title is not null "
-        "order by title");
+        "date_end > '0001-01-01' and date_end < '5000-01-01' union select min("
+        "concat(p.date_start, ' ', p.time_start)), min(p.start_flag), max("
+        "concat(p.date_end, ' ', p.time_end)), min(p.end_flag), p.time_zone, "
+        "g2.title, NULL from dssdb.dsperiod as p left join dssdb.dsgroup as g "
+        "on (p.dsid = g.dsid and p.gindex = g.gindex) left join dssdb.dsgroup "
+        "as g2 on (p.dsid = g2.dsid and g.pindex = g2.gindex) where p.dsid in "
+        + g_ds_set + " and date_start > '0001-01-01' and date_start < "
+        "'5000-01-01' and date_end > '0001-01-01' and date_end < '5000-01-01' "
+        "and g2.title is not null group by p.time_zone, g2.title order by "
+        "title");
   } else {
     q.set("select date_start, time_start, start_flag, date_end, time_end, "
         "end_flag, time_zone, NULL, NULL from dssdb.dsperiod where dsid in " +
-        g_ds_set + " and date_start > '0001-01-01' and date_start < "
-        "'5000-01-01' and date_end > '0001-01-01' and date_end < '5000-01-01'");
+        g_ds_set + " and (time_zone = 'BCE' or (date_start > '0001-01-01' and "
+        "date_start < '5000-01-01' and date_end > '0001-01-01' and date_end < "
+        "'5000-01-01'))");
   }
   if (q.submit(g_metadata_server) < 0) {
     log_error2("query: " + q.show() + " returned error: " + q.error(), F,
@@ -1186,32 +1188,46 @@ bool add_temporal_range(TokenDocument& tdoc, size_t& swp_cnt) {
         swp_cnt += 2;
       }
     }
-    map<string, tuple<string, string>> pdlist;
+    map<string, tuple<string, string, string, string>> pdlist;
     for (const auto& r : q) {
-      auto sdt = metatranslations::date_time(r[0] + " " + r[1], r[2], r[
-          6]);
+      auto sdt = metatranslations::date_time(r[0] + " " + r[1], r[2], r[6]);
       auto edt = metatranslations::date_time(r[3] + " " + r[4], r[5], r[6]);
       string k;
       k = !r[7].empty() ? r[7] : r[8];
       if (pdlist.find(k) == pdlist.end()) {
-        pdlist.emplace(k, make_tuple(sdt, edt));
+        pdlist.emplace(k, make_tuple(sdt, r[6], edt, r[6]));
       } else {
         string &start = get<0>(pdlist[k]);
-        if (sdt < start) {
-          start = sdt;
-        }
-        string &end = get<1>(pdlist[k]);
-        if (edt > end) {
-          end = edt;
+        string &end = get<2>(pdlist[k]);
+        if (r[6] == "BCE") {
+          if (sdt > start) {
+            start = sdt;
+          }
+          if (edt < end) {
+            end = edt;
+          }
+        } else {
+          if (sdt < start) {
+            start = sdt;
+          }
+          if (edt > end) {
+            end = edt;
+          }
         }
       }   
     }
     string j;
     for (const auto& i : pdlist) {
-      auto trng = get<0>(i.second);
-      auto e = get<1>(i.second);
+      string trng, tz1, e, tz2;
+      tie(trng, tz1, e, tz2) = i.second;
+      if (tz1 == "BCE") {
+        trng += " BCE";
+      }
       if (!e.empty() && e != trng) {
         trng += " to " + e;
+        if (tz2 == "BCE") {
+          trng += " BCE";
+        }
       }
       if (pdlist.size() > 1) {
         trng += " (" + i.first + ")";
