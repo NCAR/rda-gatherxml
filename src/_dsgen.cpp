@@ -1119,16 +1119,15 @@ bool add_temporal_range(TokenDocument& tdoc, size_t& swp_cnt) {
         ".dsperiod as p left join dssdb.dsgroup as g on (p.dsid = g.dsid and p"
         ".gindex = g.gindex) where p.dsid in " + g_ds_set + " and g.pindex = 0 "
         "and date_start > '0001-01-01' and date_start < '5000-01-01' and "
-        "date_end > '0001-01-01' and date_end < '5000-01-01' union select min("
-        "concat(p.date_start, ' ', p.time_start)), min(p.start_flag), max("
-        "concat(p.date_end, ' ', p.time_end)), min(p.end_flag), p.time_zone, "
-        "g2.title, NULL from dssdb.dsperiod as p left join dssdb.dsgroup as g "
-        "on (p.dsid = g.dsid and p.gindex = g.gindex) left join dssdb.dsgroup "
-        "as g2 on (p.dsid = g2.dsid and g.pindex = g2.gindex) where p.dsid in "
-        + g_ds_set + " and date_start > '0001-01-01' and date_start < "
-        "'5000-01-01' and date_end > '0001-01-01' and date_end < '5000-01-01' "
-        "and g2.title is not null group by p.time_zone, g2.title order by "
-        "title");
+        "date_end > '0001-01-01' and date_end < '5000-01-01' union select p."
+        "date_start, p.time_start, p.start_flag, p.date_end, p.time_end, p."
+        "end_flag, p.time_zone, g2.title, NULL from dssdb.dsperiod as p left "
+        "join dssdb.dsgroup as g on (p.dsid = g.dsid and p.gindex = g.gindex) "
+        "left join dssdb.dsgroup as g2 on (p.dsid = g2.dsid and g.pindex = g2."
+        "gindex) where p.dsid in " + g_ds_set + " and date_start > "
+        "'0001-01-01' and date_start < '5000-01-01' and date_end > "
+        "'0001-01-01' and date_end < '5000-01-01' and g2.title is not null "
+        "order by title");
   } else {
     q.set("select date_start, time_start, start_flag, date_end, time_end, "
         "end_flag, time_zone, NULL, NULL from dssdb.dsperiod where dsid in " +
