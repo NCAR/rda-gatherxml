@@ -4,11 +4,11 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <metadata.hpp>
-#include <MySQL.hpp>
+#include <PostgreSQL.hpp>
 #include <strutils.hpp>
 #include <utils.hpp>
 
-using namespace MySQL;
+using namespace PostgreSQL;
 using metautils::log_error2;
 using miscutils::this_function_label;
 using std::endl;
@@ -17,12 +17,12 @@ using std::cout;
 using std::move;
 using std::unordered_map;
 using std::unordered_set;
-using std::regex;
-using std::regex_search;
 using std::string;
 using std::stringstream;
 using strutils::append;
 using strutils::chop;
+using strutils::has_ending;
+using strutils::ng_gdex_id;
 using strutils::split;
 using strutils::substitute;
 using strutils::replace_all;
@@ -46,9 +46,9 @@ string whereis_lmod() {
   return s;
 }
 
-string whereis_singularity() {
+string whereis_singularity(stringstream& ess) {
   string s; // return value
-  stringstream oss, ess;
+  stringstream oss;
   if (mysystem2("/bin/tcsh -c 'which singularity'", oss, ess) != 0) {
     auto m = whereis_lmod();
     if (!m.empty()) {
@@ -135,7 +135,7 @@ void show_gatherxml_info(const unordered_set<string>& util_set, const
     auto sp = split(ess.str(), "\n");
     sp.pop_back();
     for (const auto& s : sp) {
-      if (regex_search(s, regex("^-f"))) {
+      if (s.find("-f") == 0) {
         auto sp2 = split(s);
         cout << "  '" << sp2[1] << "'";
         auto it = r_aka_map.find(sp2[1]);
@@ -157,8 +157,7 @@ void show_gatherxml_info(const unordered_set<string>& util_set, const
 
 string webhome() {
   if (!metautils::directives.data_root_alias.empty()) {
-    return metautils::directives.data_root_alias + "/ds" + metautils::args.
-        dsnum;
+    return metautils::directives.data_root_alias + "/" + metautils::args.dsid;
   }
   return metautils::web_home();
 }
@@ -172,9 +171,9 @@ string gatherxml_utility(string user) {
   auto sp_a = split(metautils::args.args_string, "!");
   for (size_t n = 0; n < sp_a.size(); ++n) {
     if (sp_a[n] == "-d") {
-      metautils::args.dsnum = sp_a[++n];
-      if (metautils::args.dsnum.substr(0, 2) == "ds") {
-        metautils::args.dsnum = metautils::args.dsnum.substr(2);
+      metautils::args.dsid = sp_a[++n];
+      if (metautils::args.dsid != "test") {
+        metautils::args.dsid = ng_gdex_id(metautils::args.dsid);
       }
     } else if (sp_a[n] == "-f") {
       metautils::args.data_format = sp_a[++n];
@@ -245,9 +244,8 @@ string gatherxml_utility(string user) {
         "formats" << endl;
     exit(1);
   }
-  if (sp_a.back()[0] != '/' && !regex_search(sp_a.back(), regex("^https://rda."
-      "ucar.edu/"))) {
-    if (metautils::args.dsnum == "test") {
+  if (sp_a.back()[0] != '/' && sp_a.back().find("https://rda.ucar.edu/") != 0) {
+    if (metautils::args.dsid == "test") {
       char buf[32768];
       auto b = getcwd(buf, 32768);
       if (b == nullptr) {
@@ -291,17 +289,22 @@ int main(int argc, char **argv) {
   if (idx != string::npos) {
     util = util.substr(idx + 1);
   }
-  string u = getenv("USER");
+  auto env = getenv("USER");
+  if (env == nullptr) {
+    cerr << "Terminating - unknown user" << endl;
+    exit(1);
+  }
+  auto u = string(env);
   if (!metautils::read_config(util, u)) {
     log_error2("configuration error: '" + myerror + "'", "main()", util, u);
   }
   Server srv(metautils::directives.database_server, metautils::directives.
-      rdadb_username, metautils::directives.rdadb_password, "dssdb");
+      rdadb_username, metautils::directives.rdadb_password, "rdadb");
   if (!srv) {
     log_error2("unable to connect to database; error: " + srv.error(), "main()",
         util, u);
   }
-  LocalQuery q("stat_flag", "dssgrp", "logname = '" + u + "'");
+  LocalQuery q("stat_flag", "dssdb.dssgrp", "logname = '" + u + "'");
   if (q.submit(srv) < 0) {
     log_error2("authorization server error: " + q.error(), "main()", util, u);
   }
@@ -314,21 +317,36 @@ int main(int argc, char **argv) {
   setreuid(15968, 15968);
   setenv("HOME", "/glade/u/home/rdadata", 1);
   string cmd;
-  if (regex_search(util, regex("_s$"))) {
+  if (has_ending(util, "_s")) {
     chop(util, 2);
+  } else if (has_ending(util, "_pg")) {
+    chop(util, 3);
   }
   if (util == "gatherxml") {
     util = gatherxml_utility(u);
   }
-  auto s = whereis_singularity();
-  if (s.empty()) {
-    auto host = unixutils::host_name();
-    if (host.find("rda-web") == 0 && (util == "doi" || util == "dsgen")) {
-      return command_execute("/usr/local/decs/bin/_" + util + " " + substitute(
-          metautils::args.args_string, "!", " "));
-    } else {
-      log_error2("unable to find singularity", "main()", util, u);
+
+  // handle non-containerized utilities
+  auto host = unixutils::host_name();
+  string c;
+  if (host.find("rda-web") == 0 && (util == "doi" || util == "dsgen")) {
+    c = "/usr/local/decs/bin/_" + util;
+  } else if (host.find("casper") == 0 && util == "doi") {
+    c = "/ncar/rda/setuid/bin/_" + util;
+  }
+  if (!c.empty()) {
+    if (!metautils::args.args_string.empty()) {
+      c += " " + substitute(metautils::args.args_string, "!", " ");
     }
+    return command_execute(c);
+  }
+
+  // locate the singularity command
+  stringstream ess;
+  auto s = whereis_singularity(ess);
+  if (s.empty()) {
+    log_error2("unable to find singularity: '" + ess.str() + "'", "main()",
+        util, u);
   } else {
     string binds;
     struct stat buf;
@@ -345,7 +363,7 @@ int main(int argc, char **argv) {
       append(binds, sp.back().substr(0, idx), ",");
     }
     cmd = s + " -s exec --env PYTHONPATH=x -B " + binds + " /glade/u/home/"
-        "rdadata/bin/singularity/gatherxml-exec.sif /usr/local/bin/_" + util;
+        "rdadata/bin/singularity/gatherxml_pg-exec.sif /usr/local/bin/_" + util;
     if (!metautils::args.args_string.empty()) {
       cmd += " " + substitute(metautils::args.args_string, "!", " ");
     }
