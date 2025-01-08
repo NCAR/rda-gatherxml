@@ -776,13 +776,14 @@ void add_publications(TokenDocument& tdoc, XMLDocument& g_xdoc) {
         add_book_chapter_to_publication(r, ss, json);
       }
       ss << "</div>" << endl;
-      json += "\"";
       auto ann = r.element("annotation").content();
       if (!ann.empty() > 0) {
-        ss << "<div style=\"margin-left: 15px; color: #5f5f5f\">" << ann <<
-            "</div>" << endl;
+        ss << "<div class=\"ms-2 text-muted small\">" << ann << "</div>" <<
+            endl;
+        json += "<div class=\\\"ms-2 text-muted small\\\">" + ann + "</div>";
       }
       ss << "<br>" << endl;
+      json += "\"";
     }
     update_wagtail("publications", "[" + json + "]", F);
   }
