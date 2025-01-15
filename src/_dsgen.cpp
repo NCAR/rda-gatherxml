@@ -466,6 +466,7 @@ string text_field_from_element(const XMLElement& e) {
   if (!s.empty()) {
     replace_all(s, "<" + e.name() + ">", "");
     replace_all(s, "</" + e.name() + ">", "");
+    replace_all(s, "&amp;", "&");
     trim(s);
 /*
     auto i = s.find("<p");
