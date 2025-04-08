@@ -1381,6 +1381,7 @@ void add_gridded_time_range(string key_start, unordered_set<string>&
   auto vars = is->datasets_with_attribute("DIMENSION_LIST");
   for (const auto& dse : vars) {
     auto attr_it = dse.p_ds->attributes.find("DIMENSION_LIST");
+/*
     if (attr_it != dse.p_ds->attributes.end() && grid_data.
         coordinate_variables_set.find(dse.key) == grid_data.
         coordinate_variables_set.end() && attr_it->second.dim_sizes.size() == 1
@@ -1392,6 +1393,56 @@ void add_gridded_time_range(string key_start, unordered_set<string>&
       } else {
         update_grid_entry_set(key_start, tm, grid_data, grid_entry_set);
       }
+    }
+*/
+    // ignore variables that don't have a DIMENSION_LIST
+    if (attr_it == dse.p_ds->attributes.end()) {
+      continue;
+    }
+    // ignore coordinate variables
+    if (grid_data.coordinate_variables_set.find(dse.key) != grid_data.
+        coordinate_variables_set.end()) {
+      continue;
+    }
+    if (attr_it->second.dim_sizes.size() != 1) {
+      continue;
+    }
+    // ignore variables that aren't [time, lat, lon (,...)], except special
+    //  cases
+    if (attr_it->second.dim_sizes[0] < 3) {
+      if (attr_it->second.dim_sizes[0] == 2 && grid_data.valid_time.data_array.
+          num_values != 1) {
+        continue;
+      }
+      if (attr_it->second.dim_sizes[0] == 1) {
+        if (grid_data.lat.data_array.num_values != 1) {
+          continue;
+        }
+        if (grid_data.lon.data_array.num_values != 1) {
+          continue;
+        }
+        attr_it = dse.p_ds->attributes.find("coordinates");
+        if (attr_it == dse.p_ds->attributes.end()) {
+          continue;
+        }
+        if (attr_it->second._class_ != 3) {
+          continue;
+        }
+        auto coordinates = string(reinterpret_cast<char *>(attr_it->
+            second.array));
+        if (coordinates.find(grid_data.lat.id) == string::npos) {
+          continue;
+        }
+        if (coordinates.find(grid_data.lon.id) == string::npos) {
+          continue;
+        }
+      }
+    }
+    auto tm = gridded_time_method(dse.p_ds, grid_data.valid_time.id);
+    if (tm.empty()) {
+      b = true;
+    } else {
+      update_grid_entry_set(key_start, tm, grid_data, grid_entry_set);
     }
   }
   if (b) {
@@ -1710,59 +1761,77 @@ bool added_gridded_parameters_to_netcdf_level_entry(string& grid_entry_key,
   // find all of the variables
   auto vars = is->datasets_with_attribute("DIMENSION_LIST");
   for (const auto& dse : vars) {
-    if (grid_data.coordinate_variables_set.find(dse.key) == grid_data.
+    if (grid_data.coordinate_variables_set.find(dse.key) != grid_data.
         coordinate_variables_set.end()) {
-      auto attr_it = dse.p_ds->attributes.find("DIMENSION_LIST");
-      if (gatherxml::verbose_operation) {
-        cout << "    '" << dse.key << "' has a DIMENSION_LIST: ";
-        attr_it->second.print(cout, is->reference_table_pointer());
-        cout << endl;
+      continue;
+    }
+    auto attr_it = dse.p_ds->attributes.find("DIMENSION_LIST");
+    if (gatherxml::verbose_operation) {
+      cout << "    '" << dse.key << "' has a DIMENSION_LIST: ";
+      attr_it->second.print(cout, is->reference_table_pointer());
+      cout << endl;
+    }
+    if (attr_it->second._class_ != 9 || attr_it->second.vlen.class_ != 7) {
+      continue;
+    }
+    if (attr_it->second.dim_sizes.size() != 1) {
+      continue;
+    }
+    if (attr_it->second.dim_sizes[0] == 1) {
+      auto rtp = is->reference_table_pointer()->find(HDF5::value(
+          &attr_it->second.vlen.buffer[4], attr_it->second.precision_));
+      if (rtp->second != grid_data.valid_time.id) {
+        continue;
       }
-      if (attr_it->second._class_ == 9 && attr_it->second.dim_sizes.size() == 1
-          && (attr_it->second.dim_sizes[0] > 2 || (attr_it->second.dim_sizes[0]
-          == 2 && grid_data.valid_time.data_array.num_values == 1)) && attr_it->
-          second.vlen.class_ == 7 && parameter_matches_dimensions(attr_it->
-          second, grid_data)) {
-        if (gatherxml::verbose_operation) {
-          cout << "*** is a netCDF variable ***" << endl;
+      attr_it = dse.p_ds->attributes.find("coordinates");
+      if (attr_it == dse.p_ds->attributes.end() || attr_it->second._class_ !=
+          3) {
+        continue;
+      }
+      auto coordinates = string(reinterpret_cast<char *>(attr_it->second.
+          array));
+      if (coordinates.find(grid_data.lat.id) == string::npos || coordinates.
+          find(grid_data.lon.id) == string::npos) {
+        continue;
+      }
+    } else if (!parameter_matches_dimensions(attr_it->second, grid_data)) {
+      continue;
+    }
+    if (gatherxml::verbose_operation) {
+      cout << "*** is a netCDF variable ***" << endl;
+    }
+    auto time_method = gridded_time_method(dse.p_ds, grid_data.valid_time.id);
+    time_method = strutils::capitalize(time_method);
+    TimeRange time_range;
+    for (const auto& e : grid_data.time_range_entries) {
+      if (time_method.empty() || (myequalf(e.second.time_bounds.t1, 0, 0.0001)
+          && myequalf(e.second.time_bounds.t1, e.second.time_bounds.t2,
+          0.0001))) {
+        time_range.first_valid_datetime = e.second.instantaneous.
+          first_valid_datetime;
+        time_range.last_valid_datetime = e.second.instantaneous.
+            last_valid_datetime;
+      } else {
+        time_range.first_valid_datetime = e.second.bounded.first_valid_datetime;
+        time_range.last_valid_datetime = e.second.bounded.last_valid_datetime;
+      }
+      string err;
+      auto d = metautils::NcTime::gridded_netcdf_time_range_description2(
+          e.second, *grid_data.time_data, time_method, err);
+      if (!err.empty()) {
+        log_error2(err + "; var name '" + dse.key + "'", F, g_util_ident);
+      }
+      d = capitalize(d);
+      if (regex_search(grid_entry_key, regex(d + "$"))) {
+        g_grml_data->p.key = g_dsid + ":" + dse.key;
+        add_gridded_netcdf_parameter(dse, scan_data, time_range, parameter_data,
+            e.second.num_steps);
+        if (g_inv.P.map.find(g_grml_data->p.key) == g_inv.P.map.end()) {
+          g_inv.P.map.emplace(g_grml_data->p.key, make_pair(g_inv.P.map.size(),
+              0));
+          g_inv.P.lst.emplace_back(g_grml_data->p.key);
         }
-        auto time_method = gridded_time_method(dse.p_ds, grid_data.valid_time.
-            id);
-        time_method = strutils::capitalize(time_method);
-        TimeRange time_range;
-        for (const auto& e : grid_data.time_range_entries) {
-          if (time_method.empty() || (myequalf(e.second.time_bounds.t1, 0,
-              0.0001) && myequalf(e.second.time_bounds.t1, e.second.time_bounds.
-              t2, 0.0001))) {
-            time_range.first_valid_datetime = e.second.instantaneous.
-                first_valid_datetime;
-            time_range.last_valid_datetime = e.second.instantaneous.
-                last_valid_datetime;
-          } else {
-            time_range.first_valid_datetime = e.second.bounded.
-                first_valid_datetime;
-            time_range.last_valid_datetime = e.second.bounded.
-                last_valid_datetime;
-          }
-          string err;
-          auto d = metautils::NcTime::gridded_netcdf_time_range_description2(
-              e.second, *grid_data.time_data, time_method, err);
-          if (!err.empty()) {
-            log_error2(err + "; var name '" + dse.key + "'", F, g_util_ident);
-          }
-          d = capitalize(d);
-          if (regex_search(grid_entry_key, regex(d + "$"))) {
-            g_grml_data->p.key = g_dsid + ":" + dse.key;
-            add_gridded_netcdf_parameter(dse, scan_data, time_range,
-                parameter_data, e.second.num_steps);
-            if (g_inv.P.map.find(g_grml_data->p.key) == g_inv.P.map.end()) {
-              g_inv.P.map.emplace(g_grml_data->p.key, make_pair(g_inv.P.map.
-                  size(), 0));
-              g_inv.P.lst.emplace_back(g_grml_data->p.key);
-            }
-            b = true;
-          }
-        }
+        b = true;
       }
     }
   }
@@ -3191,10 +3260,15 @@ bool found_alternate_lat_lon_coordinates(GridData& grid_data, vector<string>&
         if (gatherxml::verbose_operation) {
           cout << "   ...found '" << var_name << "'" << endl;
         }
-        stringstream dimension_list;
-        dse.p_ds->attributes["DIMENSION_LIST"].print(dimension_list, is->
-            reference_table_pointer());
-        dim_map[n].emplace(dimension_list.str(), var_name);
+        if (dse.p_ds->attributes.find("DIMENSION_LIST") != dse.
+            p_ds->attributes.end()) {
+          stringstream dimension_list;
+          dse.p_ds->attributes["DIMENSION_LIST"].print(dimension_list, is->
+              reference_table_pointer());
+          dim_map[n].emplace(dimension_list.str(), var_name);
+        } else {
+          dim_map[n].emplace("scalar", var_name);
+        }
         grid_data.coordinate_variables_set.emplace(var_name);
       }
     }
@@ -3976,8 +4050,7 @@ void scan_gridded_hdf5nc4_file(ScanData& scan_data) {
       if (it == grid_data.lat.ds->attributes.end()) {
         dim.y = grid_data.lat.data_array.num_values;
         dim.x = grid_data.lon.data_array.num_values;
-      }
-      else {
+      } else {
         stringstream ss;
         it->second.print(ss, is->reference_table_pointer());
         auto sp = split(ss.str().substr(1, ss.str().length() - 2));
