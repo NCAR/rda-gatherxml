@@ -18,7 +18,7 @@
 #include <utils.hpp>
 #include <bitmap.hpp>
 #include <tempfile.hpp>
-#include <search_pg.hpp>
+#include <search.hpp>
 #include <tokendoc.hpp>
 
 using namespace PostgreSQL;
@@ -110,9 +110,9 @@ void update_wagtail(string column, string insert_value, string caller) {
     log_error2("unknown wagtail column '" + column + "'", caller, "dsgen",
         USER);
   }
-  if (g_wagtail_server.update("wagtail." + wagtail_db[column], column + " = '" +
+  if (g_wagtail_server.update("wagtail2." + wagtail_db[column], column + " = '" +
       sql_ready(insert_value) + "'", "dsid in " + g_ds_set) < 0) {
-    log_error2("failed to update wagtail." + wagtail_db[column] + " " + column +
+    log_error2("failed to update wagtail2." + wagtail_db[column] + " " + column +
         ": error '" + g_wagtail_server.error() + "'  insert value: '" +
         insert_value + "'", caller, "dsgen", USER);
   }
@@ -1130,22 +1130,17 @@ bool add_temporal_range(TokenDocument& tdoc, size_t& swp_cnt) {
         "'0001-01-01' and date_start < '5000-01-01' and date_end > "
         "'0001-01-01' and date_end < '5000-01-01' and g2.title is not null "
         "order by title");
-  } else {
-    q.set("select date_start, time_start, start_flag, date_end, time_end, "
-        "end_flag, time_zone, NULL, NULL from dssdb.dsperiod where dsid in " +
-        g_ds_set + " and (time_zone = 'BCE' or (date_start > '0001-01-01' and "
-        "date_start < '5000-01-01' and date_end > '0001-01-01' and date_end < "
-        "'5000-01-01'))");
-  }
-  if (q.submit(g_metadata_server) < 0) {
-    log_error2("query: " + q.show() + " returned error: " + q.error(), F,
-        "dsgen", USER);
+    if (q.submit(g_metadata_server) < 0) {
+      log_error2("query: " + q.show() + " returned error: " + q.error(), F,
+          "dsgen", USER);
+    }
   }
   if (q.num_rows() == 0) {
     q.set("select date_start, time_start, start_flag, date_end, time_end, "
         "end_flag, time_zone, NULL, NULL from dssdb.dsperiod where dsid in "
-        + g_ds_set + " and date_start > '0001-01-01' and date_start < "
-        "'5000-01-01' and date_end > '0001-01-01' and date_end < '5000-01-01'");
+        + g_ds_set + " and (time_zone = 'BCE' or (date_start between "
+        "'0001-01-01' and '5000-01-01' and date_end between '0001-01-01' and "
+        "'5000-01-01'))");
     if (q.submit(g_metadata_server) < 0) {
       log_error2("query: " + q.show() + " returned error: " + q.error(), F,
           "dsgen", USER);
@@ -1282,8 +1277,8 @@ void add_access_restrictions(TokenDocument& tdoc) {
   if (!a.empty()) {
     tdoc.add_if("__HAS_ACCESS_RESTRICTIONS__");
     tdoc.add_replacement("__ACCESS_RESTRICTIONS__", a);
-    update_wagtail("access_restrict", a, F);
   }
+  update_wagtail("access_restrict", a, F);
 }
 
 void add_usage_restrictions(TokenDocument& tdoc) {
@@ -1305,8 +1300,8 @@ void add_usage_restrictions(TokenDocument& tdoc) {
   if (!u.empty()) {
     tdoc.add_if("__HAS_USAGE_RESTRICTIONS__");
     tdoc.add_replacement("__USAGE_RESTRICTIONS__", u);
-    update_wagtail("usage_restrict", u, F);
   }
+  update_wagtail("usage_restrict", u, F);
 }
 
 void add_variable_table(string data_format, TokenDocument& tdoc, string& json) {
@@ -2083,7 +2078,7 @@ void add_data_license() {
   if (id.empty()) {
     id = "CC-BY-4.0";
   }
-  LocalQuery q("name, url, img_url", "wagtail.home_datalicense", "id = '" + id +
+  LocalQuery q("name, url, img_url", "wagtail2.home_datalicense", "id = '" + id +
       "'");
   if (q.submit(g_wagtail_server) < 0) {
     log_error2("unable to retrieve data license - error: '" + g_wagtail_server.
