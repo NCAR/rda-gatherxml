@@ -126,10 +126,18 @@ void show_gatherxml_usage() {
 }
 
 void show_gatherxml_info(const unordered_set<string>& util_set, const
-    unordered_map<string, string>& r_aka_map) {
+    unordered_map<string, string>& r_aka_map, string user) {
+  stringstream ess;
+  auto s = whereis_singularity(ess);
+  if (s.empty()) {
+    log_error2("unable to find singularity: '" + ess.str() + "'",
+        "show_gatherxml_info()", "gatherxml", user);
+  }
   for (const auto& e : util_set) {
+    string cmd = s + " -s exec /glade/u/home/rdadata/bin/singularity/"
+        "gatherxml_pg-exec.sif /usr/local/bin/" + e;
     stringstream oss, ess;
-    mysystem2(metautils::directives.decs_bindir + "/" + e, oss, ess);
+    mysystem2(cmd, oss, ess);
     cout << "\nutility:" << substitute(e, "_", " ") << endl;
     cout << "supported formats (\"-f\" flag):" << endl;
     auto sp = split(ess.str(), "\n");
@@ -220,7 +228,7 @@ string gatherxml_utility(string user) {
     show_gatherxml_usage();
     exit(0);
   } else if (metautils::args.data_format == "showinfo") {
-    show_gatherxml_info(util_set, r_aka_map);
+    show_gatherxml_info(util_set, r_aka_map, user);
     exit(0);
   }
   string util; // return value
@@ -317,10 +325,14 @@ int main(int argc, char **argv) {
   setreuid(15968, 15968);
   setenv("HOME", "/glade/u/home/rdadata", 1);
   string cmd;
+  auto is_test = false;
   if (has_ending(util, "_s")) {
     chop(util, 2);
   } else if (has_ending(util, "_pg")) {
     chop(util, 3);
+  } else if (has_ending(util, "_test")) {
+    chop(util, 5);
+    is_test = true;
   }
   if (util == "gatherxml") {
     util = gatherxml_utility(u);
@@ -363,10 +375,19 @@ int main(int argc, char **argv) {
       append(binds, sp.back().substr(0, idx), ",");
     }
     cmd = s + " -s exec --env PYTHONPATH=x -B " + binds + " /glade/u/home/"
-        "rdadata/bin/singularity/gatherxml_pg-exec.sif /usr/local/bin/_" + util;
+        "rdadata/";
+    if (is_test) {
+        cmd += "lib/singularity/gatherxml_pg-5-test.sif";
+    } else {
+        cmd += "bin/singularity/gatherxml_pg-exec.sif";
+    }
+    cmd += " /usr/local/bin/_" + util;
     if (!metautils::args.args_string.empty()) {
       cmd += " " + substitute(metautils::args.args_string, "!", " ");
     }
+if (is_test) {
+std::cerr << cmd << std::endl;
+}
     return command_execute(cmd);
   }
 }
