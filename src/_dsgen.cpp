@@ -222,8 +222,8 @@ void generate_index(string tdir_name) {
       tdoc.add_replacement("__LOGO_IMAGE__", "default_200_200.png");
       tdoc.add_replacement("__LOGO_WIDTH__", "70");
     }
-    LocalQuery query("doi", "dssdb.dsvrsn", "dsid in " + g_ds_set + " and "
-        "status = 'A'");
+    LocalQuery query("upper(doi)", "dssdb.dsvrsn", "dsid in " + g_ds_set +
+        " and status = 'A'");
     Row row;
     string ds;
     if (query.submit(g_metadata_server) == 0 && query.fetch_row(row) && !row[0].
@@ -1983,6 +1983,7 @@ void add_data_volume(TokenDocument& tdoc, size_t& swp_cnt) {
 void add_related_websites(TokenDocument& tdoc) {
   static const string F = this_function_label(__func__);
   auto elist = g_xdoc.element_list("dsOverview/relatedResource");
+  string json;
   if (!elist.empty()) {
     if (elist.size() > 1) {
       tdoc.add_replacement("__WEB_SITES_VALIGN__", "top");
@@ -1990,7 +1991,6 @@ void add_related_websites(TokenDocument& tdoc) {
       tdoc.add_replacement("__WEB_SITES_VALIGN__", "bottom");
     }
     stringstream ss;
-    string json;
     for (const auto& e : elist) {
       auto d = e.content();
       trim(d);
@@ -2018,8 +2018,8 @@ void add_related_websites(TokenDocument& tdoc) {
     }
     tdoc.add_if("__HAS_RELATED_WEB_SITES__");
     tdoc.add_replacement("__RELATED_WEB_SITES__", ss.str());
-    update_wagtail("related_rsrc_list", "[" + json + "]", F);
   }
+  update_wagtail("related_rsrc_list", "[" + json + "]", F);
 }
 
 void add_related_datasets(TokenDocument& tdoc) {
