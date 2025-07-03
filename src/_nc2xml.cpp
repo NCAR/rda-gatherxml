@@ -5658,8 +5658,8 @@ void write_parameter_map(string tempdir_name, ScanData& scan_data) {
     log_warning("parameter map was not synced - error(s): '" + e + "'",
         "nc2xml", USER);
   }
-  mysystem2("/bin/cp " + scan_data.map_name + " /glade/u/home/rdadata/share"
-      "/metadata/ParameterTables/netCDF." + metautils::args.dsid + ".xml", oss,
+  mysystem2("/bin/cp " + scan_data.map_name + " " + metautils::directives.
+      parameter_map_path + "/netCDF." + metautils::args.dsid + ".xml", oss,
       ess);
   if (gatherxml::verbose_operation) {
     cout << "...finished writing parameter map." << endl;

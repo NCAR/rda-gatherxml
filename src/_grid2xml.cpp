@@ -248,8 +248,7 @@ void scan_file() {
         args.filename + " because archive format is '" + f + "'", F, "grid2xml",
         USER);
   }
-  xmlutils::LevelMapper lmap("/glade/u/home/rdadata/share/metadata"
-      "/LevelTables");
+  xmlutils::LevelMapper lmap(metautils::directives.level_map_path);
   unordered_map<string, int> U_map, G_map, L_map, P_map, R_map, E_map;
   std::list<string> U_lst, G_lst, L_lst, P_lst, R_lst, E_lst;
   std::list<string> ilst;

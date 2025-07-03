@@ -210,10 +210,8 @@ void build_wms_capabilities() {
   if (!server) {
     log_error2("could not connect to the metadata database", F, "iinv", USER);
   }
-  xmlutils::LevelMapper lmapper("/glade/u/home/rdadata/share/metadata/"
-      "LevelTables");
-  xmlutils::ParameterMapper pmapper("/glade/u/home/rdadata/share/metadata/"
-      "ParameterTables");
+  xmlutils::LevelMapper lmapper(metautils::directives.level_map_path);
+  xmlutils::ParameterMapper pmapper(metautils::directives.parameter_map_path);
   auto gfil = xdoc.element("GrML").attribute_value("uri") + ".GrML";
   if (!regex_search(gfil, regex("^http(s){0,1}://rda.ucar.edu/"))) {
     metautils::log_warning("build_wms_capabilities() found an invalid uri: " +
