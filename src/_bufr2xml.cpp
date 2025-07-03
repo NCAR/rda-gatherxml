@@ -425,8 +425,8 @@ void show_usage() {
   cerr << "usage: bufr2xml -f format -d [ds]nnn.n [options...] https://"
       "rda.ucar.edu/..." << endl;
   cerr << "\nrequired (choose one):" << endl;
-  cerr << "-f ecmwfbufr     ECMWF BUFR" << endl;
   cerr << "-f adpbufr       NCEP ADP BUFR" << endl;
+  cerr << "-f ecmwfbufr     ECMWF BUFR" << endl;
   cerr << "-f prepbufr      NCEP PREPBUFR" << endl;
   cerr << "-f radbufr       NCEP Radiance BUFR" << endl;
   cerr << "\nrequired:" << endl;
