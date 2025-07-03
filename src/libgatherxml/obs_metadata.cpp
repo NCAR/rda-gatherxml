@@ -10,7 +10,7 @@
 #include <strutils.hpp>
 #include <utils.hpp>
 #include <bitmap.hpp>
-#include <search_pg.hpp>
+#include <search.hpp>
 #include <myerror.hpp>
 
 using namespace PostgreSQL;

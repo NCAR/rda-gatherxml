@@ -11,7 +11,7 @@
 #include <strutils.hpp>
 #include <utils.hpp>
 #include <bitmap.hpp>
-#include <search_pg.hpp>
+#include <search.hpp>
 #ifdef DUMP_QUERIES
 #include <timer.hpp>
 #endif

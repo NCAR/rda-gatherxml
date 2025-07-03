@@ -8,7 +8,7 @@
 #include <PostgreSQL.hpp>
 #include <strutils.hpp>
 #include <utils.hpp>
-#include <search_pg.hpp>
+#include <search.hpp>
 #include <xml.hpp>
 #include <myerror.hpp>
 #ifdef DUMP_QUERIES

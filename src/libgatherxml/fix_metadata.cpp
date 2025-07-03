@@ -6,7 +6,7 @@
 #include <bitmap.hpp>
 #include <strutils.hpp>
 #include <utils.hpp>
-#include <search_pg.hpp>
+#include <search.hpp>
 
 using namespace PostgreSQL;
 using metautils::log_error2;
