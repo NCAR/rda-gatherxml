@@ -203,7 +203,7 @@ int main(int argc, char **argv) {
       if (metautils::args.dsid != "test") {
         metautils::args.dsid = ng_gdex_id(metautils::args.dsid);
       }
-    } else if (sp[n] == "-showinfo") {
+    } else if (sp[n] == "--showinfo") {
       showinfo = true;
     }
   }
