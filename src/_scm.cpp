@@ -21,7 +21,7 @@
 #include <tempfile.hpp>
 #include <metahelpers.hpp>
 #include <xmlutils.hpp>
-#include <search_pg.hpp>
+#include <search.hpp>
 #include <timer.hpp>
 #include <myerror.hpp>
 
