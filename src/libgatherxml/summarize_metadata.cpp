@@ -1450,7 +1450,7 @@ void create_file_list_cache(string file_type, string caller, string user, string
             "_data_types")) {
           oq.set("select min(start_date), max(end_date) from \"WObML\"." +
               metautils::args.dsid + "_webfiles2 as w left join (select "
-              "distinct file_code from \"IObML\".ds" + metautils::args.dsid +
+              "distinct file_code from \"IObML\"." + metautils::args.dsid +
               "_data_types) as d on d.file_code = w.code where d.file_code is "
               "not null and start_date > 0");
         } else if (table_exists(srv, "IObML." + metautils::args.dsid +
