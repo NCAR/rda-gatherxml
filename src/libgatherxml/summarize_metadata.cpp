@@ -216,6 +216,7 @@ void summarize_dates(string caller, string user) {
         3] + "', '" + r[4] + "', " + r[5] + ", '" + r[6] + "', '" + r[7] + "', "
         + r[8] + ", '" + r[9] + "'");
   }
+  auto updated_dsperiod = false;
   if (!v.empty()) {
     precision = (precision - 2) / 2;
     vector<CMDDateRange> v2;
@@ -260,6 +261,7 @@ void summarize_dates(string caller, string user) {
             log_error2("'" + srv.error() + "' when trying to insert into "
                 "dsperiod(1) (" + s + ")", F, caller, user);
           }
+          updated_dsperiod = true;
         }
       }
     } else {
@@ -325,6 +327,7 @@ void summarize_dates(string caller, string user) {
                   + s + ")", F, caller, user);
             }
           }
+          updated_dsperiod = true;
         }
       }
     }
@@ -336,6 +339,11 @@ void summarize_dates(string caller, string user) {
         "time_start = " + sp[4] + " and start_flag = " + sp[5] + " and "
         "date_end = " + sp[6] + " and time_end = " + sp[7] + " and end_flag = "
         + sp[8] + " and time_zone = " + sp[9]);
+  }
+  if (updated_dsperiod) {
+    srv.update("search.datasets", "timestamp_utc = '" + dateutils::
+        current_date_time().to_string("%Y-%m-%d %T") + "'", "dsid = '" +
+        metautils::args.dsid + "'");
   }
   srv.disconnect();
 }
