@@ -1370,7 +1370,8 @@ void process_obml_markup(void *markup_parameters) {
           }
           dtyp_map.emplace(dtyp_k, c);
         }
-        string inserts = op->file_map[op->filename] + ", " + dtyp_map[dtyp_k];
+        string inserts = op->file_map[op->filename] + ", " + dtyp_map[dtyp_k] +
+            ", " + e.attribute_value("numObs");
         auto v = e.element("vertical");
         if (v.name() == "vertical") {
           inserts += ", " + v.attribute_value("min_altitude") + ", " + v.
@@ -1383,10 +1384,14 @@ void process_obml_markup(void *markup_parameters) {
         inserts += ", '" + uflag + "'";
         if (op->server.insert(
               dt_tbl,
-              "file_code, data_type_code, min_altitude, max_altitude, vunits, "
-                  "avg_nlev, avg_vres, uflg",
+              "file_code, data_type_code, num_observations, min_altitude, "
+                  "max_altitude, vunits, avg_nlev, avg_vres, uflg",
               inserts,
-              "on constraint " + dt_pkey + " do update set uflg = excluded.uflg"
+              "on constraint " + dt_pkey + " do update set num_observations = "
+              "excluded.num_observations, min_altitude = excluded."
+              "min_altitude, max_altitude = excluded.max_altitude, vunits = "
+              "excluded.vunits, avg_nlev = excluded.avg_nlev, avg_vres = "
+              "excluded.avg_vres, uflg = excluded.uflg"
               ) < 0) {
           log_error2("'" + op->server.error() + "' while trying to insert '" +
               inserts + "' into " + dt_tbl, F, "scm", USER);
