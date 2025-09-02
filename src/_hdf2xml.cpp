@@ -83,12 +83,13 @@ stringstream g_warn_ss;
 auto& g_dsid = metautils::args.dsid; // alias
 const metautils::UtilityIdentification g_util_ident("hdf2xml", USER);
 unique_ptr<TempFile> g_work_file;
+vector<string> g_platform_types;
 
 /*****************************************************************************/
 
 struct ScanData {
   ScanData() : num_not_missing(0), write_type(-1), cmd_type(), tdir(nullptr),
-      map_name(), platform_type(), datatype_map(), varlist(),
+      map_name(), platform_type("unknown"), datatype_map(), varlist(),
       var_changes_table(), found_map(false), convert_ids_to_upper_case(false)
       { }
 
@@ -2386,8 +2387,32 @@ void process_vertical_coordinate_variable(DiscreteGeometriesData& dgd, string&
   }
 }
 
-void scan_cf_point_hdf5nc4_file(ScanData& scan_data, gatherxml::markup::ObML::
-    ObservationData& obs_data) {
+void look_for_platform_type(InputHDF5Stream::Attributes& global_attributes,
+    InputHDF5Stream *is, ScanData& scan_data) {
+  if (scan_data.platform_type != "unknown") {
+    return;
+  }
+  auto attr_it = global_attributes.find("project");
+  if (attr_it != global_attributes.end() && attr_it->second._class_ == 3) {
+    string attribute_value(reinterpret_cast<char *>(attr_it->second.get()),
+        attr_it->second.size);
+    if (attribute_value == "MarineFlux") {
+      auto ds = is->dataset("/pt");
+      if (ds != nullptr) {
+        HDF5::DataArray pt_vals;
+        pt_vals.fill(*is, *ds);
+        for (size_t n = 0; n < pt_vals.num_values; ++n) {
+          g_platform_types.emplace_back(ispd_hdf5_platform_type(std::make_tuple(
+              "", "", 0., 0., pt_vals.double_value(n), 0, ' ', false)));
+        }
+        scan_data.platform_type = "pt";
+      }
+    }
+  }
+}
+
+void scan_cf_point_hdf5nc4_file(InputHDF5Stream::Attributes& global_attributes,
+    ScanData& scan_data, gatherxml::markup::ObML::ObservationData& obs_data) {
   static const string F = this_function_label(__func__);
   if (gatherxml::verbose_operation) {
     cout << "  Beginning " << F << "..." << endl;
@@ -2399,19 +2424,17 @@ void scan_cf_point_hdf5nc4_file(ScanData& scan_data, gatherxml::markup::ObML::
   for (const auto& ds_entry : ds_entry_list) {
     process_units_attribute(ds_entry, dgd, time_data);
   }
-  ds_entry_list = is->datasets_with_attribute("coordinates");
+  ds_entry_list = is->datasets_with_attribute("standard_name");
 
   // look for a "station ID"
   for (const auto& ds_entry : ds_entry_list) {
-    if (ds_entry.p_ds->datatype.class_ == 3) {
-      auto attr_it = ds_entry.p_ds->attributes.find("long_name");
-      if (attr_it != ds_entry.p_ds->attributes.end() && attr_it->second._class_
-          == 3) {
+    if (ds_entry.p_ds->datatype.class_ == 3 || ds_entry.p_ds->datatype.class_ ==
+        9) {
+      auto attr_it = ds_entry.p_ds->attributes.find("standard_name");
+      if (attr_it->second._class_ == 3) {
         string attribute_value(reinterpret_cast<char *>(attr_it->
             second.get()), attr_it->second.size);
-        if (regex_search(attribute_value, regex("ID")) ||
-            regex_search(attribute_value, regex("ident",
-            regex::icase))) {
+        if (attribute_value == "platform_id") {
           dgd.indexes.stn_id_var = ds_entry.key;
         }
       }
@@ -2481,6 +2504,9 @@ void scan_cf_point_hdf5nc4_file(ScanData& scan_data, gatherxml::markup::ObML::
     }
     id_vals.fill(*is, *ds);
   }
+  if (scan_data.platform_type == "unknown") {
+    look_for_platform_type(global_attributes, is, scan_data);
+  }
   scan_data.map_name = unixutils::remote_web_file("https://rda.ucar.edu/"
       "metadata/ParameterTables/HDF5." + g_dsid + ".xml", scan_data.tdir->
       name());
@@ -2492,16 +2518,20 @@ void scan_cf_point_hdf5nc4_file(ScanData& scan_data, gatherxml::markup::ObML::
   vector<float> lats, lons;
   lats.reserve(time_vals.num_values);
   lons.reserve(time_vals.num_values);
-  string platform_type = "unknown";
   gatherxml::markup::ObML::IDEntry ientry;
   ientry.key.reserve(32768);
   if (gatherxml::verbose_operation) {
     cout << "    Ready to scan netCDF variables ..." << endl;
   }
+  ds_entry_list = is->datasets_with_attribute("coordinates");
+  if (ds_entry_list.empty()) {
+    ds_entry_list = is->datasets_with_attribute("ioos_category");
+  }
   for (const auto& ds_entry : ds_entry_list) {
     auto& var_name = ds_entry.key;
     if (var_name != dgd.indexes.time_var && var_name != dgd.indexes.lat_var &&
-        var_name != dgd.indexes.lon_var && var_name != dgd.indexes.stn_id_var) {
+        var_name != dgd.indexes.lon_var && var_name != dgd.indexes.stn_id_var &&
+        var_name != scan_data.platform_type) {
       unique_data_type_observation_set.clear();
       de.key = var_name;
       auto ds = is->dataset("/" + var_name);
@@ -2536,8 +2566,10 @@ void scan_cf_point_hdf5nc4_file(ScanData& scan_data, gatherxml::markup::ObML::
           date_times.emplace_back(compute_nc_time(time_vals, time_data, n));
         }
         if (n == ids.size()) {
-          auto lat_val = lat_vals.value(n);
-          lats.emplace_back(lat_val);
+
+          // create a cache on the first netCDF variable to use on subsequent
+          //  variables
+          lats.emplace_back(lat_vals.value(n));
           auto lon_val = lon_vals.value(n);
           if (lon_val > 180.) {
             lon_val -= 360.;
@@ -2561,13 +2593,19 @@ void scan_cf_point_hdf5nc4_file(ScanData& scan_data, gatherxml::markup::ObML::
           }
         }
         if (!ids[n].empty() && var_data.value(n) != var_missing_value) {
-          if (!obs_data.added_to_platforms("surface", platform_type, lats[n],
+          string ptype;
+          if (!g_platform_types.empty()) {
+            ptype = g_platform_types[n];
+          } else {
+            ptype = scan_data.platform_type;
+          }
+          if (!obs_data.added_to_platforms("surface", ptype, lats[n],
               lons[n])) {
             auto error = move(myerror);
-            log_error2(error + " when adding platform " + platform_type, F,
+            log_error2(error + " when adding platform " + ptype, F,
                 g_util_ident);
           }
-          ientry.key = platform_type + "[!]unknown[!]" + ids[n];
+          ientry.key = ptype + "[!]unknown[!]" + ids[n];
           if (!obs_data.added_to_ids("surface", ientry, var_name, "", lats[n],
               lons[n], time_vals.value(n), &date_times[n])) {
             auto error = move(myerror);
@@ -2841,28 +2879,24 @@ void scan_cf_non_orthogonal_profile_hdf5nc4_file(const DiscreteGeometriesData&
         g_util_ident);
   }
   vector<string> platform_types, id_types;
-  if (!scan_data.platform_type.empty()) {
-    for (size_t n = 0; n < id_vals.num_values; ++n) {
-      platform_types.emplace_back(scan_data.platform_type);
+  for (size_t n = 0; n < id_vals.num_values; ++n) {
+    platform_types.emplace_back(scan_data.platform_type);
 id_types.emplace_back("unknown");
-      auto lat = lat_vals.value(n);
-      if (lat < -90. || lat > 90.) {
-        lat = -999.;
-      }
-      auto lon = lon_vals.value(n);
-      if (lon < -180. || lon > 360.) {
-        lon = -999.;
-      }
-      if (lat > -999. && lon > -999. && !obs_data.added_to_platforms(obs_type,
-          platform_types[n], lat, lon)) {
-        auto error = move(myerror);
-        log_error2(error + "' when adding platform " + platform_types[n], F,
-            g_util_ident);
-      }
+    auto lat = lat_vals.value(n);
+    if (lat < -90. || lat > 90.) {
+      lat = -999.;
     }
-  } else {
-    log_error2("undefined platform type", F, g_util_ident);
-  }
+    auto lon = lon_vals.value(n);
+    if (lon < -180. || lon > 360.) {
+      lon = -999.;
+    }
+    if (lat > -999. && lon > -999. && !obs_data.added_to_platforms(obs_type,
+        platform_types[n], lat, lon)) {
+      auto error = move(myerror);
+      log_error2(error + "' when adding platform " + platform_types[n], F,
+          g_util_ident);
+    }
+    }
   ds = is->dataset("/" + dgd.indexes.z_var);
   if (ds == nullptr) {
     log_error2("unable to access vertical level variable", F, g_util_ident);
@@ -4403,10 +4437,14 @@ g_inv.R.map.emplace("x", make_pair(0, 0));
 }
 
 string feature_type(AttributeMap& attributes) {
-  string s; // return value
+  string s; // default return value
   auto it = attributes.find("featureType");
   if (it != attributes.end()) {
-    s = reinterpret_cast<char *>(it->second.array);
+    return reinterpret_cast<char *>(it->second.array);
+  }
+  it = attributes.find("cdm_data_type");
+  if (it != attributes.end()) {
+    return reinterpret_cast<char *>(it->second.array);
   }
   return s;
 }
@@ -4429,9 +4467,9 @@ void scan_hdf5nc4_file(ScanData& scan_data, gatherxml::markup::ObML::
   if (ds == nullptr) {
     log_error2("unable to access global attributes", F, g_util_ident);
   }
-  scan_data.platform_type="unknown";
-  auto attr_it = ds->attributes.find("platform");
-  if (attr_it != ds->attributes.end()) {
+  auto global_attributes = ds->attributes;
+  auto attr_it = global_attributes.find("platform");
+  if (attr_it != global_attributes.end()) {
     string platform = reinterpret_cast<char *>(attr_it->second.array);
     if (!platform.empty()) {
       trim(platform);
@@ -4450,7 +4488,7 @@ void scan_hdf5nc4_file(ScanData& scan_data, gatherxml::markup::ObML::
       }
     }
   }
-  auto ftype = feature_type(ds->attributes);
+  auto ftype = feature_type(global_attributes);
   if (gatherxml::verbose_operation) {
     cout << "Feature type is '" << ftype << "'." << endl;
   }
@@ -4460,9 +4498,9 @@ void scan_hdf5nc4_file(ScanData& scan_data, gatherxml::markup::ObML::
     auto l_ftype = to_lower(ftype);
 
     // patch for ICOADS netCDF4 IDs, which may be a mix, so ignore case
-    patch_icoads_netcdf4_ids(ds->attributes, scan_data);
+    patch_icoads_netcdf4_ids(global_attributes, scan_data);
     if (l_ftype == "point") {
-      scan_cf_point_hdf5nc4_file(scan_data, obs_data);
+      scan_cf_point_hdf5nc4_file(global_attributes, scan_data, obs_data);
     } else if (l_ftype == "timeseries") {
       scan_cf_time_series_hdf5nc4_file(scan_data, obs_data);
     } else if (l_ftype == "profile") {
@@ -4536,7 +4574,9 @@ void scan_hdf5_file(list<string>& filelist, ScanData& scan_data) {
   auto error = metautils::NcParameter::write_parameter_map(scan_data.varlist,
       scan_data.var_changes_table, map_type, scan_data.map_name,
       scan_data.found_map, warning);
-  if (!error.empty()) log_error2(error, F, g_util_ident);
+  if (!error.empty()) {
+    log_error2(error, F, g_util_ident);
+  }
   if (gatherxml::verbose_operation) {
     cout << "HDF5 file scan completed." << endl;
   }
