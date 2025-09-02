@@ -2402,8 +2402,12 @@ void look_for_platform_type(InputHDF5Stream::Attributes& global_attributes,
         HDF5::DataArray pt_vals;
         pt_vals.fill(*is, *ds);
         for (size_t n = 0; n < pt_vals.num_values; ++n) {
-          g_platform_types.emplace_back(ispd_hdf5_platform_type(std::make_tuple(
-              "", "", 0., 0., pt_vals.double_value(n), 0, ' ', false)));
+          auto ptype = ispd_hdf5_platform_type(std::make_tuple("", "", 0., 0.,
+              pt_vals.double_value(n), 0, ' ', false));
+          if (ptype.empty()) {
+            ptype = "unknown";
+          }
+          g_platform_types.emplace_back(ptype);
         }
         scan_data.platform_type = "pt";
       }
