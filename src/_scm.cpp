@@ -1222,7 +1222,15 @@ void *thread_summarize_file_ID_locations(void *args) {
         }
       }
     }
-    srv._delete(tbl, "file_code = " + a[2] + " and uflg != '" + uflg + "'");
+    string del_s = "file_code = " + a[2];
+    if (!a[4].empty()) {
+      del_s += " and observation_type_code = " + a[3] + " and "
+          "platform_type_code = " + a[4];
+    } else {
+      del_s += " and classification_code = " + a[3];
+    }
+    del_s += " and uflg != '" + uflg + "'";
+    srv._delete(tbl, del_s);
     if (!lset.empty()) {
       my::map<gatherxml::summarizeMetadata::ParentLocation> pmap;
       vector<string> v;
@@ -1236,7 +1244,6 @@ void *thread_summarize_file_ID_locations(void *args) {
       } else if (a[7] == "WFixML") {
         cols = "file_code, classification_code, gcmd_keyword, include, uflg";
       }
-      auto uflg = strand(3);
       for (const auto& i : v) {
         gatherxml::summarizeMetadata::ParentLocation pl;
         pmap.found(i, pl);
@@ -1302,8 +1309,7 @@ void *thread_summarize_file_ID_locations(void *args) {
         pl.children_set.reset();
         pl.consolidated_parent_set.reset();
       }
-      srv._delete(loc_tbl, "file_code = " + a[2] + " and uflg != '" + uflg +
-          "'");
+      srv._delete(loc_tbl, del_s);
     }
     xdoc.close();
   } else {
