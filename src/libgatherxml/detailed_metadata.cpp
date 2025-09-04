@@ -1771,23 +1771,22 @@ void generate_detailed_metadata_view(string caller, string user) {
     }
   }
   xdoc.close();
-  if (stat((metautils::directives.server_root+"/web/datasets/"+metautils::args.dsid+"/metadata/dsOverview.xml").c_str(),&buf) == 0) {
-    f=metautils::directives.server_root+"/web/datasets/"+metautils::args.dsid+"/metadata/dsOverview.xml";
-  } else {
-    f=unixutils::remote_web_file("https://rda.ucar.edu/datasets/"+metautils::args.dsid+"/metadata/dsOverview.xml",t.name());
-  }
+  f = unixutils::remote_web_file("https://gdex.k8s.ucar.edu/oai/?verb=GetRecord"
+      "&identifier=oai:edu.ucar.edu:" + metautils::args.dsid + "metadataPrefix="
+      "native", t.name());
   xdoc.open(f);
   if (!xdoc) {
     if (f.empty()) {
-      metautils::log_warning("generate_detailed_metadata_view() returned warning: unable to access dsOverview.xml from the web server",caller,user);
+      metautils::log_warning(F + " returned warning: unable to access dsOverview.xml from the web server",caller,user);
     } else {
-      metautils::log_warning("generate_detailed_metadata_view() returned warning: unable to open "+f+" - error: '"+xdoc.parse_error()+"'",caller,user);
+      metautils::log_warning(F + " returned warning: unable to open "+f+" - error: '"+xdoc.parse_error()+"'",caller,user);
     }
   } else {
-    auto e=xdoc.element("dsOverview/title");
+    string root = "OAI-PMH/GetRecord/record/metadata/dsOverview";
+    auto e=xdoc.element(root + "/title");
     Server server_d(metautils::directives.database_server,metautils::directives.rdadb_username,metautils::directives.rdadb_password,"rdadb");
     if (!b) {
-      auto elist=xdoc.element_list("dsOverview/contentMetadata/dataType");
+      auto elist=xdoc.element_list(root + "/contentMetadata/dataType");
       for (const auto& element : elist) {
         dtyps+="<li>";
         auto data_type=element.content();
@@ -1800,7 +1799,7 @@ void generate_detailed_metadata_view(string caller, string user) {
         }
         dtyps+="</li>";
       }
-      elist=xdoc.element_list("dsOverview/contentMetadata/format");
+      elist=xdoc.element_list(root + "/contentMetadata/format");
       for (auto element : elist) {
         auto format=element.content();
         replace_all(format,"proprietary_","");
@@ -1810,12 +1809,12 @@ void generate_detailed_metadata_view(string caller, string user) {
 // create the metadata directory tree in the temp directory
     stringstream oss,ess;
     if (mysystem2("/bin/mkdir -m 0755 -p "+t.name()+"/metadata",oss,ess) != 0) {
-      metautils::log_error("generate_detailed_metadata_view(): unable to create metadata directory tree - '"+ess.str()+"'",caller,user);
+      metautils::log_error(F + ": unable to create metadata directory tree - '"+ess.str()+"'",caller,user);
     }
     ofstream ofs;
     open_output(ofs, t.name()+"/metadata/detailed.html");
     if (!ofs.is_open()) {
-      metautils::log_error("generate_detailed_metadata_view(): unable to open output for detailed.html",caller,user);
+      metautils::log_error(F + ": unable to open output for detailed.html",caller,user);
     }
     ofs << "<style id=\"detail\">" << endl;
     ofs << "  @import url(/css/transform.css);" << endl;
@@ -1890,12 +1889,12 @@ void generate_detailed_metadata_view(string caller, string user) {
     const int VUNITS_LEN=6;
     const char *vunits[VUNITS_LEN]={"","K","M","G","T","P"};
     if (n >= VUNITS_LEN) {
-      metautils::log_error("generate_detailed_metadata_view() - dataset primary size exceeds volume units specification",caller,user);
+      metautils::log_error(F + " - dataset primary size exceeds volume units specification",caller,user);
     }
     ofs << "<tr valign=\"top\"><td class=\"bg0\" colspan=\"2\"><b>Total volume:</b>&nbsp;&nbsp;" << strutils::ftos(volume,5,3,' ') << " " << vunits[n] << "bytes</td></tr>" << endl;
     if (!b) {
       ofs << "<tr valign=\"top\">" << endl;
-      auto elist=xdoc.element_list("dsOverview/contentMetadata/temporal");
+      auto elist=xdoc.element_list(root + "/contentMetadata/temporal");
       ofs << "<td class=\"bg0\"><b>Temporal Range(s):</b><ul>" << endl;
       for (const auto& element : elist) {
         e=element;
@@ -1905,7 +1904,7 @@ void generate_detailed_metadata_view(string caller, string user) {
         ofs << date+"</li>" << endl;
       }
       ofs << "</ul></td>" << endl;
-      elist=xdoc.element_list("dsOverview/contentMetadata/detailedVariables/detailedVariable");
+      elist=xdoc.element_list(root + "/contentMetadata/detailedVariables/detailedVariable");
       if (elist.size() > 0) {
         ofs << "<td class=\"bg0\"><b>Detailed Variable List:</b><ul>" << endl;
       } else {
@@ -1936,7 +1935,7 @@ void generate_detailed_metadata_view(string caller, string user) {
     ofs.close();
     string error;
     if (unixutils::rdadata_sync(t.name(),"metadata/","/data/web/datasets/"+metautils::args.dsid,metautils::directives.rdadata_home,error) < 0) {
-      metautils::log_warning("generate_detailed_metadata_view() couldn't sync 'detailed.html' - rdadata_sync error(s): '"+error+"'",caller,user);
+      metautils::log_warning(F + " couldn't sync 'detailed.html' - rdadata_sync error(s): '"+error+"'",caller,user);
     }
     xdoc.close();
     server_d.disconnect();
