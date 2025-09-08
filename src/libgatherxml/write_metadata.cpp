@@ -34,8 +34,7 @@ using strutils::substitute;
 using strutils::to_upper;
 using unixutils::mysystem2;
 using unixutils::open_output;
-using unixutils::rdadata_sync;
-using unixutils::rdadata_sync_from;
+using unixutils::gdex_upload_dir;
 
 namespace gatherxml {
 
@@ -100,73 +99,6 @@ void open(string& filename, unique_ptr<TempDir>& tdir, std::ofstream& ofs,
 
 } // end namespace gatherxml::fileInventory
 
-void copy_ancillary_files(string file_type, string metadata_file, string
-    file_type_name, string caller, string user) {
-  static const string F = this_function_label(__func__);
-  stringstream oss, ess;
-  if (mysystem2("/bin/tcsh -c \"curl -s --data 'authKey=qGNlKijgo9DJ7MN&cmd="
-      "listfiles&value=/SERVER_ROOT/web/datasets/" + metautils::args.dsid +
-      "/metadata/fmd&pattern=" + metadata_file + "' http://rda.ucar.edu/"
-      "cgi-bin/dss/remoteRDAServerUtils\"", oss, ess) != 0) {
-    log_warning(F + ": unable to copy " + file_type + " files - error: '" + ess.
-        str() + "'", caller, user);
-  } else {
-    auto sp = split(oss.str(), "\n");
-    auto sp2 = split(sp[0], "/");
-    string hn = "/" + sp2[1];
-    TempFile tf(metautils::directives.temp_path);
-    TempDir td;
-    if (!td.create(metautils::directives.temp_path)) {
-      log_error2("unable to create temporary directory", F, caller, user);
-    }
-
-    // create the directory tree in the temp directory
-    string p = "metadata/wfmd";
-    if (mysystem2("/bin/mkdir -m 0755 -p " + td.name() + "/" + p, oss, ess) !=
-        0) {
-      log_error2("unable to create a temporary directory - '" + ess.str() + "'",
-          F, caller, user);
-    }
-    for (size_t n = 0; n < sp.size(); ++n) {
-      if (sp[n].substr(sp[n].length() - 4) == ".xml") {
-        auto h = sp[n];
-        replace_all(h, hn, "/__HOST__");
-        rdadata_sync_from(h, tf.name(), metautils::directives.rdadata_home,
-            ess);
-        std::ifstream ifs(tf.name().c_str());
-        if (ifs.is_open()) {
-          auto sp2 = split(sp[n], file_type);
-          std::ofstream ofs;
-          open_output(ofs, td.name() + "/" + p + "/" + file_type_name + "." +
-              file_type + sp2[1]);
-          char l[32768];
-          ifs.getline(l, 32768);
-          while (!ifs.eof()) {
-            string s = l;
-            if (strutils::contains(s, "parent=")) {
-              replace_all(s, metadata_file, file_type_name + "." + file_type);
-            }
-            ofs << s << endl;
-            ifs.getline(l, 32768);
-          }
-          ifs.close();
-          ofs.close();
-          ofs.clear();
-        } else {
-          log_warning(F + "(): unable to copy " + file_type + " file '" + sp[n]
-              + "'", caller, user);
-        }
-      }
-    }
-    string e;
-    if (rdadata_sync(td.name(), p + "/", "/data/web/datasets/" + metautils::
-        args.dsid, metautils::directives.rdadata_home, e) < 0) {
-      log_warning(F + "(): unable to sync - rdadata_sync error(s): '" + e + "'",
-          caller, user);
-    }
-  }
-}
-
 namespace markup {
 
 void write_finalize(string filename, string ext, string tdir_name, std::
@@ -180,10 +112,10 @@ void write_finalize(string filename, string ext, string tdir_name, std::
       log_error2("unable to gzip metadata file", F, caller, user);
     }
     string e;
-    if (rdadata_sync(tdir_name, s + "/", "/data/web/datasets/" + metautils::
-        args.dsid, metautils::directives.rdadata_home, e) < 0) {
+    if (gdex_upload_dir(tdir_name, s + "/", "/data/web/datasets/" + metautils::
+        args.dsid, "", e) < 0) {
       log_warning(F + "(): unable to sync '" + filename + "." + ext + "' - "
-          "rdadata_sync error(s): '" + e + "'", caller, user);
+          "gdex_upload_dir() error(s): '" + e + "'", caller, user);
     }
   }
   metautils::args.filename = filename;
@@ -224,59 +156,6 @@ void write_initialize(string& filename, string ext, string tdir_name, std::
 }
 
 namespace FixML {
-
-void copy(string metadata_file, string URL, string caller, string user) {
-  static const string F = this_function_label(__func__);
-  auto f = metautils::relative_web_filename(URL);
-  replace_all(f, "/", "%");
-  TempDir tdir;
-  if (!tdir.create(metautils::directives.temp_path)) {
-    log_error2("unable to create temporary directory", F, caller, user);
-  }
-
-  // create the directory tree in the temp directory
-  string s = "metadata/wfmd";
-  stringstream oss, ess;
-  if (mysystem2("/bin/mkdir -m 0755 -p " + tdir.name() + "/" + s, oss, ess) !=
-      0) {
-    log_error2("unable to create a temporary directory - '" + ess.str() + "'",
-        F, caller, user);
-  }
-  TempFile t(metautils::directives.temp_path);
-  rdadata_sync_from("/__HOST_/web/datasets/" + metautils::args.dsid + "/metadata/fmd/" + metadata_file, t.name(), metautils::directives.rdadata_home, ess);
-  std::ifstream ifs(t.name().c_str());
-  if (!ifs.is_open()) {
-    log_error2("unable to open input file", F, caller, user);
-  }
-  std::ofstream ofs;
-  open_output(ofs, tdir.name() + "/" + s + "/" + f + ".FixML");
-  if (!ofs.is_open()) {
-    log_error2("unable to open output file", F, caller, user);
-  }
-  char l[32768];
-  ifs.getline(l, 32768);
-  while (!ifs.eof()) {
-    string sl = l;
-    if (strutils::contains(sl, "uri=")) {
-      sl = sl.substr(sl.find(" format"));
-      sl = "      uri=\"" + URL + "\"" + s;
-    } else if (regex_search(sl, regex("ref="))) {
-      replace_all(sl, metadata_file, f + ".FixML");
-    }
-    ofs << sl << endl;
-    ifs.getline(l, 32768);
-  }
-  ifs.close();
-  ofs.close();
-  string e;
-  if (rdadata_sync(tdir.name(), s + "/", "/data/web/datasets/" + metautils::
-      args.dsid, metautils::directives.rdadata_home, e) < 0) {
-    log_warning("copy(): unable to sync '" + f + ".FixML' - rdadata_sync error("
-        "s): '" + e + "'", caller, user);
-  }
-  copy_ancillary_files("FixML", metadata_file, f, caller, user);
-  metautils::args.filename = f;
-}
 
 void write(my::map<FeatureEntry>& feature_table, my::map<StageEntry>&
     stage_table, string caller, string user) {
@@ -951,60 +830,6 @@ string write(unordered_map<string, GridEntry>& grid_table, string caller, string
 
 namespace ObML {
 
-void copy(string metadata_file, string URL, string caller, string user) {
-  static const string F = this_function_label(__func__);
-
-  // create the directory tree in the temp directory
-  TempDir t;
-  if (!t.create(metautils::directives.temp_path)) {
-    log_error2("unable to create temporary directory", F, caller, user);
-  }
-  string s = "metadata/wfmd";
-  stringstream oss, ess;
-  if (mysystem2("/bin/mkdir -m 0755 -p " + t.name() + "/" + s, oss, ess) != 0) {
-    log_error2("unable to create a temporary directory - '" + ess.str() + "'",
-        F, caller, user);
-  }
-  TempFile tf(metautils::directives.temp_path);
-  rdadata_sync_from("/__HOST__/web/datasets/" + metautils::args.dsid +
-      "/metadata/fmd/" + metadata_file, tf.name(), metautils::directives.
-      rdadata_home, ess);
-  std::ifstream ifs(tf.name().c_str());
-  if (!ifs.is_open()) {
-    log_error2("unable to open input file", F, caller, user);
-  }
-  auto f = metautils::relative_web_filename(URL);
-  replace_all(f, "/", "%");
-  std::ofstream ofs;
-  open_output(ofs, t.name() + "/" + s + "/" + f + ".ObML");
-  if (!ofs.is_open()) {
-    log_error2("unable to open output file", F, caller, user);
-  }
-  char l[32768];
-  ifs.getline(l, 32768);
-  while (!ifs.eof()) {
-    string s = l;
-    if (regex_search(s, regex("uri="))) {
-      s = s.substr(s.find(" format"));
-      s = "      uri=\"" + URL + "\"" + s;
-    } else if (regex_search(s, regex("ref="))) {
-      replace_all(s, metadata_file, f + ".ObML");
-    }
-    ofs << s << endl;
-    ifs.getline(l, 32768);
-  }
-  ifs.close();
-  ofs.close();
-  string e;
-  if (rdadata_sync(t.name(), s + "/", "/data/web/datasets/" + metautils::args.
-      dsid, metautils::directives.rdadata_home, e) < 0) {
-    log_warning("copy(): unable to sync '" + f + ".ObML' - rdadata_sync "
-        "error(s): '" + e + "'", caller, user);
-  }
-  copy_ancillary_files("ObML", metadata_file, f, caller, user);
-  metautils::args.filename = f;
-}
-
 void write(ObservationData& obs_data, string caller, string user) {
   static const string F = "ObML::" + this_function_label(__func__);
 
@@ -1067,10 +892,10 @@ void write(ObservationData& obs_data, string caller, string user) {
   ofs << "  <timeStamp value=\"" << dateutils::current_date_time().to_string("%Y-%m-%d %T %Z") << "\" />" << endl;
   string map;
   if (metautils::args.data_format == "cpcsumm" || metautils::args.data_format ==
-      "netcdf" || metautils::args.data_format == "hdf5" || metautils::args.
-      data_format == "ghcnmv3" || metautils::args.data_format == "hcn" ||
-      metautils::args.data_format == "proprietary_ASCII" || metautils::args.
-      data_format == "proprietary_Binary") {
+      "netcdf" || metautils::args.data_format.substr(0, 4) == "hdf5" ||
+      metautils::args.data_format == "ghcnmv3" || metautils::args.data_format ==
+      "hcn" || metautils::args.data_format == "proprietary_ASCII" || metautils::
+      args.data_format == "proprietary_Binary") {
     map = metautils::args.dsid;
   }
   string s = "metadata/wfmd";
