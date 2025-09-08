@@ -182,8 +182,6 @@ struct StageEntry {
   std::shared_ptr<Data> data;
 };
 
-extern void copy(std::string metadata_file, std::string URL, std::string caller,
-    std::string user);
 extern void write(my::map<FeatureEntry>& feature_table, my::map<StageEntry>&
     stage_table, std::string caller, std::string user);
 
@@ -294,8 +292,6 @@ struct ObservationData {
   bool track_unique_observations, is_empty;
 };
 
-extern void copy(std::string metadata_file, std::string URL, std::string caller,
-    std::string user);
 extern void write(ObservationData& obs_data, std::string caller, std::string
     user);
 
