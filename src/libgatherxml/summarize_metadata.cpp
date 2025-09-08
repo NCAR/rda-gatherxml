@@ -1006,7 +1006,7 @@ void create_non_cmd_file_list_cache(string file_type, unordered_set<string>&
   } else {
     string e;
     if (unixutils::gdex_unlink("/data/web/datasets/" + metautils::args.dsid +
-        "/metadata/" + f, "", e) < 0) {
+        "/metadata/" + f, metautils::directives.unlink_key, e) < 0) {
       metautils::log_warning("createNonCMDFileCache couldn't unsync '" + f +
           "' - hostSync error(s): '" + e + "'", caller, user);
     }
@@ -1525,7 +1525,7 @@ void create_file_list_cache(string file_type, string caller, string user, string
       if (max == "0") {
         string e;
         if (unixutils::gdex_unlink("/data/web/datasets/" + metautils::args.dsid
-            + "/metadata/" + f, "", e) < 0) {
+            + "/metadata/" + f, metautils::directives.unlink_key, e) < 0) {
           metautils::log_warning(F + "() couldn't unsync '" + f + "' - "
               "gdex_unlink() error(s): '" + e + "'", caller, user);
         }
@@ -1923,7 +1923,8 @@ void create_file_list_cache(string file_type, string caller, string user, string
     }
     string e;
     if (!f.empty() && unixutils::gdex_unlink("/data/web/datasets/" + metautils::
-        args.dsid + "/metadata/" + f, "", e) < 0) {
+        args.dsid + "/metadata/" + f, metautils::directives.unlink_key, e) <
+        0) {
       metautils::log_warning(F + "() couldn't unsync '" + f + "' - "
           "gdex_unlink() error(s): '" + e + "'", caller, user);
     }
