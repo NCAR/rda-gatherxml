@@ -1517,6 +1517,8 @@ void add_vertical_levels(TokenDocument& tdoc, const vector<string>& data_types,
   }
   if (!json.empty()) {
     update_wagtail("levels", "{" + json + "}", F);
+  } else {
+    update_wagtail("levels", "[]", F);
   }
 }
 
