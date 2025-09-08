@@ -396,27 +396,26 @@ void generate_parameter_cross_reference(string format, string title, string
     ofs.close();
     ofs2.close();
     string e;
-    if (unixutils::rdadata_sync(t.name(), "metadata/", "/data/web/datasets/" +
-        metautils::args.dsid, metautils::directives.rdadata_home, e) < 0) {
+    if (unixutils::gdex_upload_dir(t.name(), "metadata/", "/data/web/datasets/"
+        + metautils::args.dsid, "", e) < 0) {
       metautils::log_warning("generate_parameter_cross_reference() couldn't "
-          "sync cross-references - rdadata_sync error(s): '" + e  + "'", caller,
-          user);
+          "sync cross-references - gdex_upload_dir() error(s): '" + e  + "'",
+          caller, user);
     }
   } else {
 
     // remove a parameter table if it exists and there are no parameters for
     //  this format
     string e;
-    if (unixutils::rdadata_unsync("/__HOST__/web/datasets/" + metautils::args.
-        dsid + "/metadata/" + html_file, t.name(), metautils::directives.
-        rdadata_home, e) < 0) {
+    if (unixutils::gdex_unlink("/__HOST__/web/datasets/" + metautils::args.
+        dsid + "/metadata/" + html_file, "", e) < 0) {
       metautils::log_warning("generate_parameter_cross_reference() tried to "
           "but couldn't delete '" + html_file + "' - error: '" + e + "'",
           caller, user);
     }
-    if (unixutils::rdadata_unsync("/__HOST__/web/datasets/" + metautils::args.
-        dsid + "/metadata/" + substitute(html_file, ".html", ".xml"), t.name(),
-        metautils::directives.rdadata_home, e) < 0) {
+    if (unixutils::gdex_unlink("/__HOST__/web/datasets/" + metautils::args.
+        dsid + "/metadata/" + substitute(html_file, ".html", ".xml"), "", e) <
+        0) {
       metautils::log_warning("generate_parameter_cross_reference() tried to "
           "but couldn't delete '" + substitute(html_file, ".html", ".xml") +
           "' - error: '" + e + "'", caller, user);
@@ -540,19 +539,18 @@ void generate_level_cross_reference(string format, string title, string
     }
     ofs.close();
     string e;
-    if (unixutils::rdadata_sync(t.name(), "metadata/", "/data/web/datasets/" +
-        metautils::args.dsid, metautils::directives.rdadata_home, e) < 0) {
+    if (unixutils::gdex_upload_dir(t.name(), "metadata/", "/data/web/datasets/"
+        + metautils::args.dsid, "", e) < 0) {
       metautils::log_warning(F + " couldn't sync '" + html_file + "' - "
-          "rdadata_sync error(s): '" + e + "'", caller, user);
+          "gdex_upload_dir() error(s): '" + e + "'", caller, user);
     }
   } else {
 
     // remove the level table if it exists and there are no levels for this
     //  format
     string e;
-    if (unixutils::rdadata_unsync("/__HOST__/web/datasets/" + metautils::args.
-        dsid + "/metadata/" + html_file, t.name(), metautils::directives.
-        rdadata_home, e) < 0) {
+    if (unixutils::gdex_unlink("/__HOST__/web/datasets/" + metautils::args.
+        dsid + "/metadata/" + html_file, "", e) < 0) {
       metautils::log_warning(F + " tried to but couldn't delete '" + html_file +
           "' - error: '" + e + "'", caller, user);
     }
@@ -1424,10 +1422,10 @@ void generate_detailed_grid_summary(string file_type, ofstream& ofs, const
   }
   srv.disconnect();
   string e;
-  if (unixutils::rdadata_sync(t.name(), "metadata/", "/data/web/datasets/" +
-      metautils::args.dsid, metautils::directives.rdadata_home, e) < 0) {
-    metautils::log_warning(F + " couldn't sync detail files - rdadata_sync "
-        "error(s): '" + e + "'", caller, user);
+  if (unixutils::gdex_upload_dir(t.name(), "metadata/", "/data/web/datasets/" +
+      metautils::args.dsid, "", e) < 0) {
+    metautils::log_warning(F + " couldn't sync detail files - "
+        "gdex_upload_dir() error(s): '" + e + "'", caller, user);
   }
   write_grid_html(ofs, pfv.size());
 }
@@ -1614,8 +1612,7 @@ void generate_detailed_observation_summary(string file_type, ofstream& ofs,
             string_ll_to_date_string(te2.end);
         if (unixutils::exists_on_server(metautils::directives.web_server,
             "/data/web/datasets/" + metautils::args.dsid + "/metadata/" +
-            te2.key + "." + e.second.key + ".kml", metautils::directives.
-            rdadata_home)) {
+            te2.key + "." + e.second.key + ".kml")) {
           ofs_o << "&nbsp;<a href=\"/datasets/" << metautils::args.dsid <<
               "/metadata/" << te2.key << "." << e.second.key << ".kml\"><img "
               "src=\"/images/kml.gif\" width=\"36\" height=\"14\" hspace=\"3\" "
@@ -1642,10 +1639,10 @@ void generate_detailed_observation_summary(string file_type, ofstream& ofs,
   srv.disconnect();
   ofs_o.close();
   string e;
-  if (unixutils::rdadata_sync(t.name(), "metadata/", "/data/web/datasets/" +
-      metautils::args.dsid, metautils::directives.rdadata_home, e) < 0) {
-    metautils::log_warning(F + " couldn't sync detail files - rdadata_sync "
-        "error(s): '" + e + "'", caller, user);
+  if (unixutils::gdex_upload_dir(t.name(), "metadata/", "/data/web/datasets/" +
+      metautils::args.dsid, "", e) < 0) {
+    metautils::log_warning(F + " couldn't sync detail files - "
+        "gdex_upload_dir() error(s): '" + e + "'", caller, user);
   }
 }
 
@@ -1934,8 +1931,10 @@ void generate_detailed_metadata_view(string caller, string user) {
     }
     ofs.close();
     string error;
-    if (unixutils::rdadata_sync(t.name(),"metadata/","/data/web/datasets/"+metautils::args.dsid,metautils::directives.rdadata_home,error) < 0) {
-      metautils::log_warning(F + " couldn't sync 'detailed.html' - rdadata_sync error(s): '"+error+"'",caller,user);
+    if (unixutils::gdex_upload_dir(t.name(), "metadata/", "/data/web/datasets/"
+        + metautils::args.dsid, "", error) < 0) {
+      metautils::log_warning(F + " couldn't sync 'detailed.html' - "
+          "gdex_upload_dir() error(s): '" + error + "'", caller, user);
     }
     xdoc.close();
     server_d.disconnect();
