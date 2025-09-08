@@ -407,15 +407,14 @@ void generate_parameter_cross_reference(string format, string title, string
     // remove a parameter table if it exists and there are no parameters for
     //  this format
     string e;
-    if (unixutils::gdex_unlink("/__HOST__/web/datasets/" + metautils::args.
-        dsid + "/metadata/" + html_file, "", e) < 0) {
+    if (unixutils::gdex_unlink("/data/web/datasets/" + metautils::args.dsid +
+        "/metadata/" + html_file, "", e) < 0) {
       metautils::log_warning("generate_parameter_cross_reference() tried to "
           "but couldn't delete '" + html_file + "' - error: '" + e + "'",
           caller, user);
     }
-    if (unixutils::gdex_unlink("/__HOST__/web/datasets/" + metautils::args.
-        dsid + "/metadata/" + substitute(html_file, ".html", ".xml"), "", e) <
-        0) {
+    if (unixutils::gdex_unlink("/data/web/datasets/" + metautils::args.dsid +
+        "/metadata/" + substitute(html_file, ".html", ".xml"), "", e) < 0) {
       metautils::log_warning("generate_parameter_cross_reference() tried to "
           "but couldn't delete '" + substitute(html_file, ".html", ".xml") +
           "' - error: '" + e + "'", caller, user);
@@ -549,8 +548,8 @@ void generate_level_cross_reference(string format, string title, string
     // remove the level table if it exists and there are no levels for this
     //  format
     string e;
-    if (unixutils::gdex_unlink("/__HOST__/web/datasets/" + metautils::args.
-        dsid + "/metadata/" + html_file, "", e) < 0) {
+    if (unixutils::gdex_unlink("/data/web/datasets/" + metautils::args.dsid +
+        "/metadata/" + html_file, "", e) < 0) {
       metautils::log_warning(F + " tried to but couldn't delete '" + html_file +
           "' - error: '" + e + "'", caller, user);
     }
