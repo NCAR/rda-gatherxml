@@ -205,8 +205,7 @@ void build_wms_capabilities() {
       ess) < 0) {
     log_error2("could not create the directory tree", F, "iinv", USER);
   }
-  Server server(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "rdadb");
+  Server server(metautils::directives.metadb_config);
   if (!server) {
     log_error2("could not connect to the metadata database", F, "iinv", USER);
   }
@@ -451,9 +450,8 @@ void build_wms_capabilities() {
   ofs.close();
   mysystem2("/bin/sh -c 'gzip " + tdir->name() + "/metadata/wms/" + gfil + "'",
       oss, ess);
-  if (unixutils::rdadata_sync(tdir->name(), "metadata/wms/", "/data/web/"
-      "datasets/" + metautils::args.dsid, metautils::directives.rdadata_home, e)
-      < 0) {
+  if (unixutils::gdex_upload_dir(tdir->name(), "metadata/wms/", "/data/web/"
+      "datasets/" + metautils::args.dsid, "", e) < 0) {
     log_error2("could not sync the capabilities file for '" + gfil + "'", F,
         "iinv", USER);
   }
@@ -920,8 +918,7 @@ long long process_grml_inventory_entry(Server& server, int line_number, string
 
 void insert_grml_inventory() {
   static const string F = this_function_label(__func__);
-  Server server(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "rdadb");
+  Server server(metautils::directives.metadb_config);
   std::ifstream ifs(local_args.temp_directory + "/" + metautils::args.filename.
       c_str());
   if (!ifs.is_open()) {
@@ -1798,8 +1795,7 @@ void insert_generic_point_inventory(std::ifstream& ifs ,Server& server, string
 
 void insert_obml_inventory() {
   static const string F = this_function_label(__func__);
-  Server srv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "rdadb");
+  Server srv(metautils::directives.metadb_config);
   struct stat buf;
   auto fil = unixutils::remote_web_file("https://rda.ucar.edu/datasets/" +
       metautils::args.dsid + "/metadata/inv/" + metautils::args.filename +

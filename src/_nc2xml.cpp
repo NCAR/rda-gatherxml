@@ -4344,9 +4344,7 @@ void scan_cf_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data,
     }
     string pt = "unknown";
     if (!p.empty()) {
-      Server server(metautils::directives.database_server, metautils::
-          directives.metadb_username, metautils::directives.metadb_password,
-          "");
+      Server server(metautils::directives.metadb_config);
       if (server) {
         LocalQuery query("obml_platform_type", "search.gcmd_platforms", "path "
             "= '" + p + "'");
@@ -5653,8 +5651,8 @@ void write_parameter_map(string tempdir_name, ScanData& scan_data) {
   }
   ofs.close();
   string e;
-  if (unixutils::rdadata_sync(tempdir_name, "metadata/ParameterTables/",
-      "/data/web", metautils::directives.rdadata_home, e) < 0) {
+  if (unixutils::gdex_upload_dir(tempdir_name, "metadata/ParameterTables/",
+      "/data/web", "", e) < 0) {
     log_warning("parameter map was not synced - error(s): '" + e + "'",
         "nc2xml", USER);
   }
