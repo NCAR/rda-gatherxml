@@ -1720,10 +1720,8 @@ void generate_detailed_metadata_view(string caller, string user) {
   if (!t.create(metautils::directives.temp_path)) {
     log_error2("unable to create temporary directory", F, caller, user);
   }
-  struct stat buf;
-  auto f = unixutils::remote_web_file("https://" + directives.web_server +
-      "/metadata/FormatReferences.xml", t.name());
-  }
+  auto f = unixutils::remote_web_file("https://" + metautils::directives.
+      web_server + "/metadata/FormatReferences.xml", t.name());
   XMLDocument xdoc(f);
   if (!xdoc) {
     log_error2("unable to open FormatReferences.xml", F, caller, user);
