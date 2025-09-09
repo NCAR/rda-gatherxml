@@ -64,7 +64,7 @@ void scan_ghcnv3_file(gatherxml::markup::ObML::ObservationData& obs_data,std::li
     metautils::log_error(THIS_FUNC+"() returned error: unable to create temporary directory","ascii2xml",USER);
   }
 // load the station inventory
-  Server server(metautils::directives.database_server,metautils::directives.rdadb_username,metautils::directives.rdadb_password,"dssdb");
+  Server server(metautils::directives.rdadb_config);
   if (!server) {
     metautils::log_error(THIS_FUNC+"() returned error: '"+server.error()+"' while trying to connect to RDADB","ascii2xml",USER);
   }

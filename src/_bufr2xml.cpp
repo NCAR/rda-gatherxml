@@ -82,8 +82,7 @@ tuple<string, string, string> bufr_types(string bufr_type, size_t code, const
   static const string F = this_function_label(__func__);
   static Server mysrv;
   if (!mysrv) {
-    mysrv.connect(metautils::directives.database_server, metautils::directives.
-        metadb_username, metautils::directives.metadb_password, "rdadb");
+    mysrv.connect(metautils::directives.metadb_config);
     if (!mysrv) {
       log_error2("unable to connect to the database", F, "bufr2xml", USER);
     }
