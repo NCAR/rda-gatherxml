@@ -28,8 +28,8 @@ using strutils::split;
 using strutils::strand;
 using strutils::to_sql_tuple_string;
 using strutils::trim;
+using unixutils::gdex_upload_dir;
 using unixutils::mysystem2;
-using unixutils::rdadata_sync;
 
 metautils::Directives metautils::directives;
 metautils::Args metautils::args;
@@ -230,14 +230,12 @@ int main(int argc, char **argv) {
   }
   metautils::read_config("sdp", G_USER);
   parse_args(argc, argv);
-  Server server_m(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "");
+  Server server_m(metautils::directives.metadb_config);
   if (!server_m) {
     cerr << "Error connecting to metadata database" << endl;
     exit(1);
   }
-  Server server_d(metautils::directives.database_server, metautils::directives.
-      rdadb_username, metautils::directives.rdadb_password, "dssdb");
+  Server server_d(metautils::directives.rdadb_config);
   if (!server_d) {
     cerr << "Error connecting to RDADB database" << endl;
     exit(1);
@@ -413,11 +411,11 @@ int main(int argc, char **argv) {
   string error;
 
   // sync the new overview to the dataset metadata directory on all sync hosts
-  if (rdadata_sync(sync_dir->name(), ".", "/data/web/datasets/" + metautils::
-      args.dsid + "/metadata", metautils::directives.rdadata_home, error) <
+  if (gdex_upload_dir(sync_dir->name(), ".", "/data/web/datasets/" + metautils::
+      args.dsid + "/metadata", "", error) <
       0) {
-    log_error("unable to rdadata_sync updated XML file - error(s): '" + error +
-        "'", "sdp", G_USER);
+    log_error("unable to gdex_upload_dir updated XML file - error(s): '" + error
+        + "'", "sdp", G_USER);
   }
   delete sync_dir;
 
