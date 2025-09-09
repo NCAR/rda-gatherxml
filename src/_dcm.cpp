@@ -35,9 +35,9 @@ using strutils::strand;
 using strutils::substitute;
 using strutils::to_sql_tuple_string;
 using unixutils::exists_on_server;
+using unixutils::gdex_upload_dir;
+using unixutils::gdex_unlink;
 using unixutils::mysystem2;
-using unixutils::rdadata_sync;
-using unixutils::rdadata_unsync;
 using unixutils::remote_web_file;
 
 metautils::Directives metautils::directives;
@@ -141,9 +141,7 @@ void copy_version_controlled_data(Server& server, string db, string
 void clear_tables_by_file_id(string db, string file_id_code, bool
     is_version_controlled) {
   static const string F = this_function_label(__func__);
-  Server local_server(metautils::directives.database_server, metautils::
-      directives.metadb_username, metautils::directives.metadb_password,
-      "rdadb");
+  Server local_server(metautils::directives.metadb_config);
   if (!local_server) {
     log_error2("unable to connect to database server while clearing file code "
         + file_id_code + " from " + db, F, "dcm", USER);
@@ -212,9 +210,7 @@ bool remove_from(string database, string table_ext, string file_field_name,
   is_version_controlled = false;
   string error;
   auto file_table = "\"" + database + "\"." + metautils::args.dsid + table_ext;
-  Server local_server(metautils::directives.database_server, metautils::
-      directives.metadb_username, metautils::directives.metadb_password,
-      "rdadb");
+  Server local_server(metautils::directives.metadb_config);
   if (!local_server) {
     log_error2("unable to connect to database server while removing  " + file,
         F, "dcm", USER);
@@ -305,11 +301,11 @@ bool remove_from(string database, string table_ext, string file_field_name,
         short flag = 0;
         if (exists_on_server(metautils::directives.web_server, "/data/web/"
             "datasets/" + metautils::args.dsid + "/metadata/" + md_directory +
-            "/" + md_file + ".gz", metautils::directives.rdadata_home)) {
+            "/" + md_file + ".gz")) {
           flag = 1;
         } else if (exists_on_server(metautils::directives.web_server, "/data/"
             "web/datasets/" + metautils::args.dsid + "/metadata/" + md_directory
-            + "/" + md_file, metautils::directives.rdadata_home)) {
+            + "/" + md_file)) {
           flag = 2;
         }
         if (file_ext == ".ObML" && flag > 0) {
@@ -347,10 +343,9 @@ bool remove_from(string database, string table_ext, string file_field_name,
                       USER);
                 }
               }
-              if (rdadata_unsync("/__HOST__/web/datasets/" + metautils::args.
-                  dsid + "/metadata/" + md_directory + "/" + e.attribute_value(
-                  "ref"), tdir->name(), metautils::directives.rdadata_home,
-                  error) < 0) {
+              if (gdex_unlink("/data/web/datasets/" + metautils::args.dsid +
+                  "/metadata/" + md_directory + "/" + e.attribute_value(
+                  "ref"), "", error) < 0) {
                 metautils::log_warning("unable to unsync " + e.attribute_value(
                     "ref"), "dcm", USER);
               }
@@ -370,10 +365,9 @@ bool remove_from(string database, string table_ext, string file_field_name,
                       USER);
                 }
               }
-              if (rdadata_unsync("/__HOST__/web/datasets/" + metautils::args.
-                  dsid + "/metadata/" + md_directory + "/" + e.attribute_value(
-                  "ref"), tdir->name(), metautils::directives.rdadata_home,
-                  error) < 0) {
+              if (gdex_unlink("/data/web/datasets/" + metautils::args.dsid +
+                  "/metadata/" + md_directory + "/" + e.attribute_value(
+                  "ref"), metautils::directives.unlink_key, error) < 0) {
                 metautils::log_warning("unable to unsync " + e.attribute_value(
                     "ref"), "dcm", USER);
               }
@@ -384,29 +378,29 @@ bool remove_from(string database, string table_ext, string file_field_name,
         if (md_directory == "wfmd") {
           if (exists_on_server(metautils::directives.web_server, "/data/web/"
               "datasets/" + metautils::args.dsid + "/metadata/inv/" + md_file +
-              "_inv.gz", metautils::directives.rdadata_home)) {
-            if (rdadata_unsync("/__HOST__/web/datasets/" + metautils::args.dsid
-                + "/metadata/inv/" + md_file + "_inv.gz", tdir->name(),
-                metautils::directives.rdadata_home, error) < 0) {
+              "_inv.gz")) {
+            if (gdex_unlink("/data/web/datasets/" + metautils::args.dsid +
+                "/metadata/inv/" + md_file + "_inv.gz", metautils::directives.
+                unlink_key, error) < 0) {
               metautils::log_warning("unable to unsync " + md_file + "_inv",
                   "dcm", USER);
             }
           } else if (exists_on_server(metautils::directives.web_server, "/data/"
               "web/datasets/" + metautils::args.dsid + "/metadata/inv/" +
-              md_file + "_inv", metautils::directives.rdadata_home)) {
-            if (rdadata_unsync("/__HOST__/web/datasets/" + metautils::args.dsid
-                + "/metadata/inv/" + md_file + "_inv", tdir->name(), metautils::
-                directives.rdadata_home, error) < 0) {
+              md_file + "_inv")) {
+            if (gdex_unlink("/data/web/datasets/" + metautils::args.dsid +
+                "/metadata/inv/" + md_file + "_inv", metautils::directives.
+                unlink_key, error) < 0) {
               metautils::log_warning("unable to unsync " + md_file + "_inv",
                   "dcm", USER);
             }
           }
           if (exists_on_server(metautils::directives.web_server, "/data/web/"
               "datasets/" + metautils::args.dsid + "/metadata/wms/" + md_file +
-              ".gz", metautils::directives.rdadata_home)) {
-            if (rdadata_unsync("/__HOST__/web/datasets/" + metautils::args.dsid
-                + "/metadata/wms/" + md_file + ".gz", tdir->name(), metautils::
-                directives.rdadata_home, error) < 0) {
+              ".gz")) {
+            if (gdex_unlink("/data/web/datasets/" + metautils::args.dsid +
+                "/metadata/wms/" + md_file + ".gz", metautils::directives.
+                unlink_key, error) < 0) {
               metautils::log_warning("unable to unsync wms file " + md_file,
                   "dcm", USER);
             }
@@ -421,17 +415,17 @@ bool remove_from(string database, string table_ext, string file_field_name,
               md_file, tdir->name() + "/metadata/" + md_directory + "/v");
           if (!f.empty()) {
             string error;
-            if (rdadata_sync(tdir->name(), "metadata/" + md_directory + "/v/",
-                "/data/web/datasets/" + metautils::args.dsid, metautils::
-                directives.rdadata_home, error) < 0) {
+            if (gdex_upload_dir(tdir->name(), "metadata/" + md_directory +
+                "/v/", "/data/web/datasets/" + metautils::args.dsid, "", error)
+                < 0) {
               log_error2("unable to move version-controlled metadata file " +
                   file + "; error: " + error, F, "dcm", USER);
             }
           }
         }
-        if (rdadata_unsync("/__HOST__/web/datasets/" + metautils::args.dsid +
-            "/metadata/" + md_directory + "/" + md_file, tdir->name(),
-            metautils::directives.rdadata_home, error) < 0) {
+        if (gdex_unlink("/data/web/datasets/" + metautils::args.dsid +
+            "/metadata/" + md_directory + "/" + md_file, metautils::directives.
+            unlink_key, error) < 0) {
           metautils::log_warning("unable to unsync " + md_file, "dcm", USER);
         }
       }
@@ -469,8 +463,7 @@ extern "C" void *t_removed(void *ts) {
     file_removed = true;
     g_removed_from_wfixml = true;
   }
-  Server server_d(metautils::directives.database_server, metautils::directives.
-      rdadb_username, metautils::directives.rdadb_password, "rdadb");
+  Server server_d(metautils::directives.rdadb_config);
   LocalQuery query("gindex", "dssdb.wfile_" + metautils::args.dsid, "wfile = '"
       + file + "'");
   Row row;
@@ -516,8 +509,7 @@ void generate_dataset_home_page() {
 }
 
 extern "C" void *t_index_variables(void *) {
-  Server srv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "rdadb");
+  Server srv(metautils::directives.metadb_config);
   string e;
   searchutils::indexed_variables(srv, metautils::args.dsid, e);
   srv.disconnect();
@@ -584,8 +576,7 @@ int main(int argc, char **argv) {
   }
   metautils::args.args_string = unixutils::unix_args_string(argc, argv, '%');
   metautils::read_config("dcm", USER);
-  Server server(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "rdadb");
+  Server server(metautils::directives.metadb_config);
   if (!server) {
     log_error2("unable to connect to database server on startup", "main()",
         "dcm", USER);
@@ -766,8 +757,7 @@ int main(int argc, char **argv) {
     cerr << endl;
   }
   server.disconnect();
-  server.connect(metautils::directives.database_server, metautils::directives.
-      rdadb_username, metautils::directives.rdadb_password, "rdadb");
+  server.connect(metautils::directives.rdadb_config);
   if (server) {
     server.update("dssdb.dataset", "version = version + 1", "dsid in " +
         g_ds_set);
