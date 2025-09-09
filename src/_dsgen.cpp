@@ -125,8 +125,7 @@ void sync_dataset_files(string tdir_name) {
   }
   p += "/datasets/" + metautils::args.dsid;
   string e;
-  if (unixutils::rdadata_sync(tdir_name, ".", p, metautils::directives.
-      rdadata_home, e) < 0) {
+  if (unixutils::gdex_upload_dir(tdir_name, ".", p, "", e) < 0) {
     metautils::log_error2("couldn't sync dataset files - rdadata_sync "
         "error(s): '" + e + "'", "main()", "dsgen", USER);
   }
@@ -203,8 +202,8 @@ void generate_index(string tdir_name) {
     ofs_j << ss.str();
     ofs_j.close();
     string err;
-    if (unixutils::rdadata_sync(d.name(), ".", "/data/web/jsonld", metautils::
-        directives.rdadata_home, err) < 0) {
+    if (unixutils::gdex_upload_dir(d.name(), ".", "/data/web/jsonld", "", err) <
+        0) {
       metautils::log_error2("couldn't sync JSON-LD file - rdadata_sync "
           "error(s): '" + err + "'", F, "dsgen", USER);
     }
@@ -1306,8 +1305,7 @@ void add_usage_restrictions(TokenDocument& tdoc) {
 
 void add_variable_table(string data_format, TokenDocument& tdoc, string& json) {
   if (exists_on_server(metautils::directives.web_server, "/data/web/datasets/"
-      + metautils::args.dsid + "/metadata/" + data_format + ".html",
-      metautils::directives.rdadata_home)) {
+      + metautils::args.dsid + "/metadata/" + data_format + ".html")) {
     auto token = to_upper(data_format);
     append(json, "{\"format\": \"" + token + "\", \"html\": \"metadata/" +
         data_format + ".html?_do=y\"", ", ");
@@ -1316,8 +1314,7 @@ void add_variable_table(string data_format, TokenDocument& tdoc, string& json) {
         metautils::args.dsid + "/#metadata/" + data_format + ".html?_do=y\">"
         "HTML</a>";
     if (exists_on_server(metautils::directives.web_server, "/data/web/datasets/"
-        + metautils::args.dsid + "/metadata/" + data_format + ".xml",
-        metautils::directives.rdadata_home)) {
+        + metautils::args.dsid + "/metadata/" + data_format + ".xml")) {
       tb += " | <a href=\"/datasets/" + metautils::args.dsid + "/metadata/" +
           data_format + ".xml\">XML</a></div>";
       append(json, "\"xml\": \"metadata/" + data_format + ".xml?_do=y\"",
@@ -1337,8 +1334,7 @@ void add_grouped_variables(TokenDocument& tdoc, size_t& swp_cnt) {
   stringstream ss;
   for (const auto& r : q) {
     if (exists_on_server(metautils::directives.web_server, "/data/web/datasets/"
-        + metautils::args.dsid + "/metadata/customize.WGrML." + r[0],
-        metautils::directives.rdadata_home)) {
+        + metautils::args.dsid + "/metadata/customize.WGrML." + r[0])) {
       auto f = unixutils::remote_web_file("https://rda.ucar.edu/datasets/" +
           metautils::args.dsid + "/metadata/customize.WGrML." + r[0], temp_dir.
           name());
@@ -1456,7 +1452,7 @@ void add_vertical_levels(TokenDocument& tdoc, const vector<string>& data_types,
             "\">detailed metadata</a> for level information";
         if (exists_on_server(metautils::directives.web_server,
             "/data/web/datasets/" + metautils::args.dsid + "/metadata/"
-            "grib2_levels.html", metautils::directives.rdadata_home)) {
+            "grib2_levels.html")) {
           v += "<br /><a href=\"/datasets/" + metautils::args.dsid +
               "/#metadata/grib2_levels.html?_do=y\">GRIB2 level table</a>"; 
         }
@@ -2068,8 +2064,7 @@ void add_related_datasets(TokenDocument& tdoc) {
 void add_more_details(TokenDocument& tdoc) {
   static const string F = this_function_label(__func__);
   if (exists_on_server(metautils::directives.web_server, "/data/web/"
-      "datasets/" + metautils::args.dsid + "/metadata/detailed.html",
-      metautils::directives.rdadata_home)) {
+      "datasets/" + metautils::args.dsid + "/metadata/detailed.html")) {
     tdoc.add_if("__HAS_MORE_DETAILS__");
   }
 }
@@ -2197,9 +2192,7 @@ int main(int argc, char **argv) {
   if (!temp_dir.create(metautils::directives.temp_path)) {
     log_error2("unable to create temporary directory", F, "dsgen", USER);
   }
-  g_metadata_server.connect(metautils::directives.database_server, metautils::
-      directives.metadb_username, metautils::directives.metadb_password,
-      "rdadb");
+  g_metadata_server.connect(metautils::directives.metadb_config);
   LocalQuery q("select type from search.datasets where dsid in " + g_ds_set);
   Row row;
   if (q.submit(g_metadata_server) < 0 || !q.fetch_row(row)) {
@@ -2222,9 +2215,7 @@ int main(int argc, char **argv) {
     log_error2("unable to create temporary document directory", F, "dsgen",
         USER);
   }
-  g_wagtail_server.connect(metautils::directives.database_server, metautils::
-      directives.wagtail_username, metautils::directives.wagtail_password,
-      "rdadb");
+  g_wagtail_server.connect(metautils::directives.wagtail_config);
   generate_index(d.name());
   if (g_dataset_type != "I") {
     generate_description(g_dataset_type, d.name());
