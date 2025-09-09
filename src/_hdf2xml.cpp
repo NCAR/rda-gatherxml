@@ -4477,9 +4477,7 @@ void scan_hdf5nc4_file(ScanData& scan_data, gatherxml::markup::ObML::
     string platform = reinterpret_cast<char *>(attr_it->second.array);
     if (!platform.empty()) {
       trim(platform);
-      Server server(metautils::directives.database_server, metautils::
-          directives.metadb_username, metautils::directives.metadb_password,
-          "");
+      Server server(metautils::directives.metadb_config);
       if (server) {
         LocalQuery query("obml_platform_type", "search.gcmd_platforms", "path "
             "= '" + platform + "'");
