@@ -154,8 +154,8 @@ int main(int argc,char **argv)
     exit(1);
   }
   metautils::read_config("sml",user,false);
-  server_m.connect(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"rdadb");
-  server_d.connect(metautils::directives.database_server,metautils::directives.rdadb_username,metautils::directives.rdadb_password,"rdadb");
+  server_m.connect(metautils::directives.metadb_config);
+  server_d.connect(metautils::directives.rdadb_config);
   if (file_list.size() == 0) {
     fill_files_with_metadata();
     set_file_meta_links();
