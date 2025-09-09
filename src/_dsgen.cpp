@@ -156,32 +156,30 @@ void generate_index(string tdir_name) {
   if (g_dataset_type == "I") {
     tdoc.add_if("__IS_INTERNAL_DATASET__");
   } else {
-    struct stat st;
+    auto parts = split(metautils::directives.web_server, ".");
+    std::reverse(parts.begin(), parts.end());
+    string identifier = "oai:" + strutils::join(vector<string>(parts.begin(),
+        parts.end()), ".") + ":" + metautils::args.dsid;
     string xf;
-    if (stat(("/data/web/datasets/" + metautils::args.dsid + "/metadata/"
-        "dsOverview.xml").c_str(), &st) == 0) {
-      xf = "/data/web/datasets/" + metautils::args.dsid + "/metadata/"
-          "dsOverview.xml";
-    } else {
-      xf = unixutils::remote_web_file("https://rda.ucar.edu/datasets/" +
-          metautils::args.dsid + "/metadata/dsOverview.xml", temp_dir.name());
-      if (xf.empty()) {
-        log_error2("dsOverview.xml does not exist for " + metautils::args.dsid,
-            F, "dsgen", USER);
-      }
+    xf = unixutils::remote_web_file("https://" + metautils::directives.
+        web_server + "/oai/?verb=GetRecord&metadataPrefix=native&identifier=" +
+        identifier, temp_dir.name());
+    if (xf.empty()) {
+      log_error2("dsOverview.xml does not exist for " + metautils::args.dsid, F,
+          "dsgen", USER);
     }
     if (!g_xdoc.open(xf)) {
       log_error2("unable to open dsOverview.xml for " + metautils::args.dsid +
           "; parse error: '" + g_xdoc.parse_error() + "'", F, "dsgen", USER);
     }
     stringstream ss;
-    if (!metadataExport::export_to_dc_meta_tags(ss, metautils::args.dsid,
-        g_xdoc, 0)) {
+    if (!metadataExport::export_to_dc_meta_tags(ss, metautils::args.dsid, 0)) {
       log_error2("unable to export DC meta tags: '" + myerror + "'", F, "dsgen",
           USER);
     }
     tdoc.add_replacement("__DC_META_TAGS__", ss.str());
-    auto e = g_xdoc.element("dsOverview/title");
+    auto e = g_xdoc.element("OAI-PMH/GetRecord/record/metadata/dsOverview/"
+        "title");
     auto ti = e.content();
     tdoc.add_replacement("__TITLE__", ti);
     update_wagtail("dstitle", ti, F);
@@ -208,7 +206,7 @@ void generate_index(string tdir_name) {
           "error(s): '" + err + "'", F, "dsgen", USER);
     }
     tdoc.add_replacement("__JSON_LD__", ss.str());
-    e = g_xdoc.element("dsOverview/logo");
+    e = g_xdoc.element("OAI-PMH/GetRecord/record/metadata/dsOverview/logo");
     if (!e.content().empty()) {
       auto sp = split(e.content(), ".");
       auto sp2 = split(sp[sp.size() - 2], "_");
@@ -811,15 +809,10 @@ void add_data_formats(TokenDocument& tdoc, vector<string>& formats, bool
       formats.emplace_back(f.content() + "<!>" + f.attribute_value("href"));
     }
   }
-  struct stat st;
   XMLDocument fdoc;
-  if (stat("/usr/local/www/server_root/web/metadata", &st) == 0) {
-    fdoc.open("/usr/local/www/server_root/web/metadata/FormatReferences.xml");
-  } else {
-    auto f = unixutils::remote_web_file("https://rda.ucar.edu/metadata/"
-        "FormatReferences.xml", temp_dir.name());
-    fdoc.open(f);
-  }
+  auto f = unixutils::remote_web_file("https://" + metautils::directives.
+      web_server + "/metadata/FormatReferences.xml", temp_dir.name());
+  fdoc.open(f);
   if (!fdoc) {
     log_error2("unable to open FormatReferences.xml", F, "dsgen", USER);
   }
@@ -1335,9 +1328,9 @@ void add_grouped_variables(TokenDocument& tdoc, size_t& swp_cnt) {
   for (const auto& r : q) {
     if (exists_on_server(metautils::directives.web_server, "/data/web/datasets/"
         + metautils::args.dsid + "/metadata/customize.WGrML." + r[0])) {
-      auto f = unixutils::remote_web_file("https://rda.ucar.edu/datasets/" +
-          metautils::args.dsid + "/metadata/customize.WGrML." + r[0], temp_dir.
-          name());
+      auto f = unixutils::remote_web_file("https://" + metautils::directives.
+          web_server + "/datasets/" + metautils::args.dsid + "/metadata/"
+          "customize.WGrML." + r[0], temp_dir.name());
       if (!f.empty()) {
         std::ifstream ifs;
         char line[32768];
