@@ -272,10 +272,11 @@ string grid_definition_parameters(const XMLElement& e) {
 void open_markup_file(XMLDocument& xdoc, string filename) {
   auto f = filename;
   if (local_args.temp_directory.empty()) {
-    f = remote_web_file("https://rda.ucar.edu" + filename, g_temp_dir.name());
+    f = remote_web_file("https://" + metautils::directives.web_server +
+        filename, g_temp_dir.name());
     if (f.empty()) {
-      f = remote_web_file("https://rda.ucar.edu" + filename + ".gz", g_temp_dir.
-          name());
+      f = remote_web_file("https://" + metautils::directives.web_server +
+          filename + ".gz", g_temp_dir.name());
     }
   }
   if (!xdoc.open(f)) {
@@ -865,8 +866,8 @@ void *thread_summarize_IDs(void *args) {
   }
 
   // read in the IDs from the separate XML file
-  auto f = remote_web_file("https://rda.ucar.edu" + a[0] + a[1], g_temp_dir.
-      name());
+  auto f = remote_web_file("https://" + metautils::directives.web_server +
+      a[0] + a[1], g_temp_dir.name());
   std::ifstream ifs(f.c_str());
   if (!ifs.is_open()) {
     log_error2("unable to open '" + a[0] + a[1] + "'", F, "scm", USER);
@@ -1149,8 +1150,8 @@ void *thread_summarize_file_ID_locations(void *args) {
       lmap[k].emplace_back(r["keyword"]);
     }
   }
-  auto f = remote_web_file("https://rda.ucar.edu" + a[0] + a[1], g_temp_dir.
-      name());
+  auto f = remote_web_file("https://" + metautils::directives.web_server +
+      a[0] + a[1], g_temp_dir.name());
   XMLDocument xdoc;
   if (xdoc.open(f)) {
     unordered_set<string> lset;
