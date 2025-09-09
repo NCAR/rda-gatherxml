@@ -306,8 +306,7 @@ int main(int argc, char **argv) {
   if (!metautils::read_config(util, u)) {
     log_error2("configuration error: '" + myerror + "'", "main()", util, u);
   }
-  Server srv(metautils::directives.database_server, metautils::directives.
-      rdadb_username, metautils::directives.rdadb_password, "rdadb");
+  Server srv(metautils::directives.rdadb_config);
   if (!srv) {
     log_error2("unable to connect to database; error: " + srv.error(), "main()",
         util, u);
