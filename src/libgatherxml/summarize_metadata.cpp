@@ -47,6 +47,9 @@ using strutils::sql_ready;
 using strutils::strand;
 using strutils::substitute;
 using strutils::to_sql_tuple_string;
+using unixutils::exists_on_server;
+using unixutils::gdex_unlink;
+using unixutils::gdex_upload_dir;
 using unixutils::mysystem2;
 using unixutils::open_output;
 
@@ -993,17 +996,20 @@ void create_non_cmd_file_list_cache(string file_type, unordered_set<string>&
     }
     ofs.close();
     string e;
-    if (unixutils::gdex_upload_dir(tdir.name(), "metadata/",
-        "/data/web/datasets/" + metautils::args.dsid, "", e) < 0) {
+    if (gdex_upload_dir(tdir.name(), "metadata/", "/data/web/datasets/" +
+        metautils::args.dsid, "", e) < 0) {
       metautils::log_warning("create_non_cmd_file_list_cache() couldn't sync '"
           + f + "' - gdex_upload_dir() error(s): '" + e + "'", caller, user);
     }
   } else {
-    string e;
-    if (unixutils::gdex_unlink("/data/web/datasets/" + metautils::args.dsid +
-        "/metadata/" + f, metautils::directives.unlink_key, e) < 0) {
-      metautils::log_warning("createNonCMDFileCache couldn't unsync '" + f +
-          "' - hostSync error(s): '" + e + "'", caller, user);
+    auto rfile = "/data/web/datasets/" + metautils::args.dsid + "/metadata/" +
+        f;
+    if (exists_on_server(metautils::directives.web_server, rfile)) {
+      string e;
+      if (gdex_unlink(rfile, metautils::directives.unlink_key, e) < 0) {
+        metautils::log_warning("createNonCMDFileCache couldn't unlink '" + rfile
+            + "' - gdex_unlink error(s): '" + e + "'", caller, user);
+      }
     }
   }
   srv.disconnect();
@@ -1498,8 +1504,8 @@ void create_file_list_cache(string file_type, string caller, string user, string
       if (!ofs.is_open()) {
         log_error2("unable to open temporary file for " + f, F, caller, user);
       }
-      if (unixutils::exists_on_server(metautils::directives.web_server, "/data/"
-          "web/datasets/" + metautils::args.dsid + "/metadata/inv")) {
+      if (exists_on_server(metautils::directives.web_server, "/data/web/"
+          "datasets/" + metautils::args.dsid + "/metadata/inv")) {
         ofs << "curl_subset=Y" << endl;
       }
       string min = "99999999999999";
@@ -1513,16 +1519,19 @@ void create_file_list_cache(string file_type, string caller, string user, string
       ofs << endl;
       ofs.close();
       if (max == "0") {
-        string e;
-        if (unixutils::gdex_unlink("/data/web/datasets/" + metautils::args.dsid
-            + "/metadata/" + f, metautils::directives.unlink_key, e) < 0) {
-          metautils::log_warning(F + "() couldn't unsync '" + f + "' - "
-              "gdex_unlink() error(s): '" + e + "'", caller, user);
+        auto rfile = "/data/web/datasets/" + metautils::args.dsid + "/metadata/"
+            + f;
+        if (exists_on_server(metautils::directives.web_server, rfile)) {
+          string e;
+          if (gdex_unlink(rfile, metautils::directives.unlink_key, e) < 0) {
+            metautils::log_warning(F + "() couldn't unlink '" + rfile + "' - "
+                "gdex_unlink() error(s): '" + e + "'", caller, user);
+          }
         }
       } else {
         string e;
-        if (unixutils::gdex_upload_dir(tdir.name(), "metadata/", "/data/web/"
-            "datasets/" + metautils::args.dsid, "", e) < 0) {
+        if (gdex_upload_dir(tdir.name(), "metadata/", "/data/web/datasets/" +
+            metautils::args.dsid, "", e) < 0) {
           metautils::log_warning(F + "() couldn't sync '" + f + "' - "
               "gdex_upload_dir() error(s): '" + e + "'", caller, user);
         }
@@ -1758,8 +1767,8 @@ void create_file_list_cache(string file_type, string caller, string user, string
       }
       ofs.close();
       string e;
-      if (unixutils::gdex_upload_dir(tdir.name(), "metadata/", "/data/web/"
-          "datasets/" + metautils::args.dsid, "", e) < 0) {
+      if (gdex_upload_dir(tdir.name(), "metadata/", "/data/web/datasets/" +
+          metautils::args.dsid, "", e) < 0) {
         metautils::log_warning(F + "() couldn't sync '" + f + "' - "
             "gdex_upload_dir() error(s): '" + e + "'", caller, user);
       }
@@ -1897,8 +1906,8 @@ void create_file_list_cache(string file_type, string caller, string user, string
     }
     ofs.close();
     string e;
-    if (unixutils::gdex_upload_dir(tdir.name(), "metadata/",
-        "/data/web/datasets/" + metautils::args.dsid, "", e) < 0) {
+    if (gdex_upload_dir(tdir.name(), "metadata/", "/data/web/datasets/" +
+        metautils::args.dsid, "", e) < 0) {
       metautils::log_warning(F + "() couldn't sync '" + f + "' - "
           "gdex_upload_dir() error(s): '" + e + "'", caller, user);
     }
@@ -1912,11 +1921,15 @@ void create_file_list_cache(string file_type, string caller, string user, string
       log_error2("unable to create temporary directory (4)", F, caller, user);
     }
     string e;
-    if (!f.empty() && unixutils::gdex_unlink("/data/web/datasets/" + metautils::
-        args.dsid + "/metadata/" + f, metautils::directives.unlink_key, e) <
-        0) {
-      metautils::log_warning(F + "() couldn't unsync '" + f + "' - "
-          "gdex_unlink() error(s): '" + e + "'", caller, user);
+    if (!f.empty()) {
+      auto rfile = "/data/web/datasets/" + metautils::args.dsid + "/metadata/" +
+          f;
+      if (exists_on_server(metautils::directives.web_server, rfile)) {
+        if (gdex_unlink(rfile, metautils::directives.unlink_key, e) < 0) {
+          metautils::log_warning(F + "() couldn't unlink '" + f + "' - "
+              "gdex_unlink() error(s): '" + e + "'", caller, user);
+        }
+      }
     }
   }
   srv.disconnect();
