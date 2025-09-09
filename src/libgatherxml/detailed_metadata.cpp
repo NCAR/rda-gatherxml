@@ -56,6 +56,7 @@ using strutils::substitute;
 using strutils::to_capital;
 using strutils::to_lower;
 using strutils::to_sql_tuple_string;
+using unixutils::gdex_unlink;
 using unixutils::mysystem2;
 using unixutils::open_output;
 
@@ -405,15 +406,17 @@ void generate_parameter_cross_reference(string format, string title, string
     // remove a parameter table if it exists and there are no parameters for
     //  this format
     string e;
-    if (unixutils::gdex_unlink("/data/web/datasets/" + metautils::args.dsid +
-        "/metadata/" + html_file, metautils::directives.unlink_key, e) < 0) {
+    auto status = gdex_unlink("/data/web/datasets/" + metautils::args.dsid +
+         "/metadata/" + html_file, metautils::directives.unlink_key, e);
+    if (status < 0 && status != -404) {
       metautils::log_warning("generate_parameter_cross_reference() tried to "
           "but couldn't delete '" + html_file + "' - error: '" + e + "'",
           caller, user);
     }
-    if (unixutils::gdex_unlink("/data/web/datasets/" + metautils::args.dsid +
+    status = gdex_unlink("/data/web/datasets/" + metautils::args.dsid +
         "/metadata/" + substitute(html_file, ".html", ".xml"), metautils::
-        directives.unlink_key, e) < 0) {
+        directives.unlink_key, e);
+    if (status < 0 && status != -404) {
       metautils::log_warning("generate_parameter_cross_reference() tried to "
           "but couldn't delete '" + substitute(html_file, ".html", ".xml") +
           "' - error: '" + e + "'", caller, user);
@@ -546,8 +549,9 @@ void generate_level_cross_reference(string format, string title, string
     // remove the level table if it exists and there are no levels for this
     //  format
     string e;
-    if (unixutils::gdex_unlink("/data/web/datasets/" + metautils::args.dsid +
-        "/metadata/" + html_file, metautils::directives.unlink_key, e) < 0) {
+    auto status = gdex_unlink("/data/web/datasets/" + metautils::args.dsid +
+        "/metadata/" + html_file, metautils::directives.unlink_key, e);
+    if (status < 0 && status != -404) {
       metautils::log_warning(F + " tried to but couldn't delete '" + html_file +
           "' - error: '" + e + "'", caller, user);
     }
