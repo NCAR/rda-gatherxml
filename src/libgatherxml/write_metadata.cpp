@@ -168,8 +168,8 @@ void write(my::map<FeatureEntry>& feature_table, my::map<StageEntry>&
   write_initialize(f, "FixML", t.name(), ofs, caller, user);
   ofs << "<FixML xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"" <<
       endl;
-  ofs << "       xsi:schemaLocation=\"https://rda.ucar.edu/schemas" << endl;
-  ofs << "                           https://rda.ucar.edu/schemas/FixML.xsd\""
+  ofs << "       xsi:schemaLocation=\"https://gdex.ucar.edu/schemas" << endl;
+  ofs << "                           https://gdex.ucar.edu/schemas/FixML.xsd\""
       << endl;
   ofs << "       uri=\"" << metautils::args.path << "/" << metautils::args.
       filename << "\" format=\"";
@@ -515,8 +515,8 @@ string write(unordered_map<string, GridEntry>& grid_table, string caller, string
   std::ofstream ofs;
   write_initialize(f, "GrML", t.name(), ofs, caller, user);
   ofs << "<GrML xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"" << endl;
-  ofs << "      xsi:schemaLocation=\"https://rda.ucar.edu/schemas" << endl;
-  ofs << "                          https://rda.ucar.edu/schemas/GrML.xsd\"" <<
+  ofs << "      xsi:schemaLocation=\"https://gdex.ucar.edu/schemas" << endl;
+  ofs << "                          https://gdex.ucar.edu/schemas/GrML.xsd\"" <<
       endl;
   ofs << "      uri=\"" << metautils::args.path << "/" << metautils::args.
       filename;
@@ -849,9 +849,9 @@ void write(ObservationData& obs_data, string caller, string user) {
   write_initialize(f, "ObML", t.name(), ofs, caller, user);
   ofs << "<ObML xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"" <<
       endl;
-  ofs << "       xsi:schemaLocation=\"https://rda.ucar.edu/schemas" << endl;
-  ofs << "                           https://rda.ucar.edu/schemas/ObML.xsd\"" <<
-      endl;
+  ofs << "       xsi:schemaLocation=\"https://gdex.ucar.edu/schemas" << endl;
+  ofs << "                           https://gdex.ucar.edu/schemas/ObML.xsd\""
+      << endl;
   ofs << "       uri=\"file://web:" << metautils::relative_web_filename(
       metautils::args.path + "/" + metautils::args.filename);
   ofs << "\" format=\"";
@@ -1123,8 +1123,8 @@ void write(my::map<ScanLineEntry>& scan_line_table, std::list<string>&
   write_initialize(f, "SatML", t.name(), ofs, caller, user);
   ofs << "<SatML xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"" <<
       endl;
-  ofs << "       xsi:schemaLocation=\"https://rda.ucar.edu/schemas" << endl;
-  ofs << "                           https://rda.ucar.edu/schemas/SatML.xsd\""
+  ofs << "       xsi:schemaLocation=\"https://gdex.ucar.edu/schemas" << endl;
+  ofs << "                           https://gdex.ucar.edu/schemas/SatML.xsd\""
       << endl;
   ofs << "       uri=\"" << metautils::args.path << "/" << metautils::args.
       filename << "\" format=\"";
