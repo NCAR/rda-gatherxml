@@ -66,8 +66,7 @@ void inventory_all() {
     log_error2("unable to inventory '" + metautils::args.data_format +
         "' files", F, "gatherxml", USER);
   }
-  Server srv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "rdadb");
+  Server srv(metautils::directives.metadb_config);
   if (!srv) {
     log_error2("unable to connected to RDA metadata database server", F,
         "gatherxml", USER);
