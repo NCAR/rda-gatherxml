@@ -110,8 +110,7 @@ void create_graphics(string plot_script, string image_name, string tempdir_name,
 void *thread_plot(void *tnc) {
   const static string F = this_function_label(__func__);
   ThreadStruct *t = reinterpret_cast<ThreadStruct *>(tnc);
-  Server srv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "rdadb");
+  Server srv(metautils::directives.metadb_config);
   if (t->query.submit(srv) < 0) {
     log_error2(t->query.error(), F, "gsi", USER);
   }
@@ -173,9 +172,9 @@ void *thread_plot(void *tnc) {
   }
   create_graphics(plt_p->name(), img_p->name(), tdir->name(), t->imagetag);
   string e;
-  if (unixutils::rdadata_sync(tdir->name(), "datasets/" + metautils::args.dsid +
-      "/metadata/", "/data/web", metautils::directives.rdadata_home, e) < 0) {
-    log_warning("rdadata_sync errors: '" + e + "'", "gsi", USER);
+  if (unixutils::gdex_upload_dir(tdir->name(), "datasets/" + metautils::args.
+      dsid + "/metadata/", "/data/web", "", e) < 0) {
+    log_warning("gdex_upload_dir() errors: '" + e + "'", "gsi", USER);
   }
   return nullptr;
 }
@@ -279,9 +278,9 @@ void generate_graphics(LocalQuery& query, string type, string table, string
   }
   create_graphics(plt_p->name(), img_p->name(), tdir->name());
   string e;
-  if (unixutils::rdadata_sync(tdir->name(),"datasets/" + metautils::args.dsid +
-      "/metadata/", "/data/web", metautils::directives.rdadata_home, e) < 0) {
-    log_warning("rdadata_sync errors: '" + e + "'", "gsi", USER);
+  if (unixutils::gdex_upload_dir(tdir->name(),"datasets/" + metautils::args.dsid
+      + "/metadata/", "/data/web", "", e) < 0) {
+    log_warning("gdex_upload_dir() errors: '" + e + "'", "gsi", USER);
   }
 }
 
@@ -299,8 +298,7 @@ int main(int argc, char **argv) {
   auto sp = split(metautils::args.args_string, "!");
   metautils::args.dsid = sp.back();
   sp.pop_back();
-  server.connect(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "rdadb");
+  server.connect(metautils::directives.metadb_config);
   if (!server) {
     log_error2("unable to connect to database server on startup", F, "gsi",
         USER);
