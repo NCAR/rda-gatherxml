@@ -56,6 +56,7 @@ using strutils::substitute;
 using strutils::to_capital;
 using strutils::to_lower;
 using strutils::to_sql_tuple_string;
+using unixutils::exists_on_server;
 using unixutils::gdex_unlink;
 using unixutils::mysystem2;
 using unixutils::open_output;
@@ -405,21 +406,27 @@ void generate_parameter_cross_reference(string format, string title, string
 
     // remove a parameter table if it exists and there are no parameters for
     //  this format
-    string e;
-    auto status = gdex_unlink("/data/web/datasets/" + metautils::args.dsid +
-         "/metadata/" + html_file, metautils::directives.unlink_key, e);
-    if (status < 0 && status != -404) {
-      metautils::log_warning("generate_parameter_cross_reference() tried to "
-          "but couldn't delete '" + html_file + "' - error: '" + e + "'",
-          caller, user);
+    string rfile = "/data/web/datasets/" + metautils::args.dsid + "/metadata/" +
+        html_file;
+    if (exists_on_server(metautils::directives.web_server, rfile)) {
+      string e;
+      if (gdex_unlink("/data/web/datasets/" + metautils::args.dsid +
+         "/metadata/" + html_file, metautils::directives.unlink_key, e) < 0) {
+        metautils::log_warning("generate_parameter_cross_reference() tried to "
+            "but couldn't delete '" + html_file + "' - error: '" + e + "'",
+            caller, user);
+      }
     }
-    status = gdex_unlink("/data/web/datasets/" + metautils::args.dsid +
-        "/metadata/" + substitute(html_file, ".html", ".xml"), metautils::
-        directives.unlink_key, e);
-    if (status < 0 && status != -404) {
-      metautils::log_warning("generate_parameter_cross_reference() tried to "
-          "but couldn't delete '" + substitute(html_file, ".html", ".xml") +
-          "' - error: '" + e + "'", caller, user);
+    replace_all(rfile, ".html", ".xml");
+    if (exists_on_server(metautils::directives.web_server, rfile)) {
+      string e;
+      if (gdex_unlink("/data/web/datasets/" + metautils::args.dsid +
+          "/metadata/" + substitute(html_file, ".html", ".xml"), metautils::
+          directives.unlink_key, e) < 0) {
+        metautils::log_warning("generate_parameter_cross_reference() tried to "
+            "but couldn't delete '" + substitute(html_file, ".html", ".xml") +
+            "' - error: '" + e + "'", caller, user);
+      }
     }
   }
   srv.disconnect();
@@ -548,12 +555,15 @@ void generate_level_cross_reference(string format, string title, string
 
     // remove the level table if it exists and there are no levels for this
     //  format
-    string e;
-    auto status = gdex_unlink("/data/web/datasets/" + metautils::args.dsid +
-        "/metadata/" + html_file, metautils::directives.unlink_key, e);
-    if (status < 0 && status != -404) {
-      metautils::log_warning(F + " tried to but couldn't delete '" + html_file +
-          "' - error: '" + e + "'", caller, user);
+    string rfile = "/data/web/datasets/" + metautils::args.dsid + "/metadata/" +
+        html_file;
+    if (exists_on_server(metautils::directives.web_server, rfile)) {
+      string e;
+      if (gdex_unlink("/data/web/datasets/" + metautils::args.dsid +
+          "/metadata/" + html_file, metautils::directives.unlink_key, e) < 0) {
+        metautils::log_warning(F + " tried to but couldn't delete '" + html_file
+            + "' - error: '" + e + "'", caller, user);
+      }
     }
   }
   srv.disconnect();
@@ -1608,9 +1618,9 @@ void generate_detailed_observation_summary(string file_type, ofstream& ofs,
         ofs_o << "</ul></td><td align=\"center\">" << dateutils::
             string_ll_to_date_string(te2.start) << " to " << dateutils::
             string_ll_to_date_string(te2.end);
-        if (unixutils::exists_on_server(metautils::directives.web_server,
-            "/data/web/datasets/" + metautils::args.dsid + "/metadata/" +
-            te2.key + "." + e.second.key + ".kml")) {
+        if (exists_on_server(metautils::directives.web_server, "/data/web/"
+            "datasets/" + metautils::args.dsid + "/metadata/" + te2.key + "." +
+            e.second.key + ".kml")) {
           ofs_o << "&nbsp;<a href=\"/datasets/" << metautils::args.dsid <<
               "/metadata/" << te2.key << "." << e.second.key << ".kml\"><img "
               "src=\"/images/kml.gif\" width=\"36\" height=\"14\" hspace=\"3\" "
