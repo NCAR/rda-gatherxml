@@ -410,8 +410,7 @@ void generate_parameter_cross_reference(string format, string title, string
         html_file;
     if (exists_on_server(metautils::directives.web_server, rfile)) {
       string e;
-      if (gdex_unlink("/data/web/datasets/" + metautils::args.dsid +
-         "/metadata/" + html_file, metautils::directives.unlink_key, e) < 0) {
+      if (gdex_unlink(rfile, metautils::directives.unlink_key, e) < 0) {
         metautils::log_warning("generate_parameter_cross_reference() tried to "
             "but couldn't delete '" + html_file + "' - error: '" + e + "'",
             caller, user);
@@ -420,9 +419,7 @@ void generate_parameter_cross_reference(string format, string title, string
     replace_all(rfile, ".html", ".xml");
     if (exists_on_server(metautils::directives.web_server, rfile)) {
       string e;
-      if (gdex_unlink("/data/web/datasets/" + metautils::args.dsid +
-          "/metadata/" + substitute(html_file, ".html", ".xml"), metautils::
-          directives.unlink_key, e) < 0) {
+      if (gdex_unlink(rfile, metautils::directives.unlink_key, e) < 0) {
         metautils::log_warning("generate_parameter_cross_reference() tried to "
             "but couldn't delete '" + substitute(html_file, ".html", ".xml") +
             "' - error: '" + e + "'", caller, user);
@@ -559,8 +556,7 @@ void generate_level_cross_reference(string format, string title, string
         html_file;
     if (exists_on_server(metautils::directives.web_server, rfile)) {
       string e;
-      if (gdex_unlink("/data/web/datasets/" + metautils::args.dsid +
-          "/metadata/" + html_file, metautils::directives.unlink_key, e) < 0) {
+      if (gdex_unlink(rfile, metautils::directives.unlink_key, e) < 0) {
         metautils::log_warning(F + " tried to but couldn't delete '" + html_file
             + "' - error: '" + e + "'", caller, user);
       }
