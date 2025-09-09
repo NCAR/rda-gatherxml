@@ -1720,15 +1720,9 @@ void generate_detailed_metadata_view(string caller, string user) {
   if (!t.create(metautils::directives.temp_path)) {
     log_error2("unable to create temporary directory", F, caller, user);
   }
-  string f;
   struct stat buf;
-  if (stat((metautils::directives.server_root + "/web/metadata/"
-      "FormatReferences.xml").c_str(), &buf) == 0) {
-    f = metautils::directives.server_root + "/web/metadata/FormatReferences."
-        "xml";
-  } else {
-    f = unixutils::remote_web_file("https://rda.ucar.edu/metadata/"
-        "FormatReferences.xml", t.name());
+  auto f = unixutils::remote_web_file("https://" + directives.web_server +
+      "/metadata/FormatReferences.xml", t.name());
   }
   XMLDocument xdoc(f);
   if (!xdoc) {
