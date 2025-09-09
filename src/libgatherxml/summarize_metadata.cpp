@@ -89,8 +89,7 @@ CMDDateRange cmd_date_range(string start, string end, string gindex, size_t&
 void cmd_dates(string database, size_t date_left_padding, vector<CMDDateRange>&
      ranges, size_t& precision) {
   static const string F = this_function_label(__func__);
-  Server srv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "rdadb");
+  Server srv(metautils::directives.metadb_config);
   if (!srv) {
     myerror = "Error: unable to connect to metadata server: '" + srv.error() +
         "'";
@@ -197,8 +196,7 @@ void summarize_dates(string caller, string user) {
   cmd_dates("WObML", 8, v, precision);
   cmd_dates("WFixML", 12, v, precision);
 //  cmd_dates("SatML", 14, v, precision);
-  Server srv(metautils::directives.database_server, metautils::directives.
-      rdadb_username, metautils::directives.rdadb_password, "rdadb");
+  Server srv(metautils::directives.rdadb_config);
   if (!srv) {
     log_error2("unable to connect to RDADB: '" + srv.error() + "'", F, caller,
         user);
@@ -832,8 +830,7 @@ void summarize_frequencies(string caller, string user, string file_id_code) {
     make_pair("WGrML", summarize_frequencies_from_wgrml),
     make_pair("WObML", summarize_frequencies_from_wobml),
   };
-  Server srv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "rdadb");
+  Server srv(metautils::directives.metadb_config);
   if (!srv) {
     log_error2("unable to connect to the database: '" + srv.error() + "'", F,
         caller, user);
@@ -861,8 +858,7 @@ void summarize_data_formats(string caller, string user) {
   if (dblst.size() == 0) {
     log_error2("empty CMD database list", F, caller, user);
   }
-  Server srv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "rdadb");
+  Server srv(metautils::directives.metadb_config);
   if (!srv) {
     log_error2("unable to connect to the database: '" + srv.error() + "'", F,
         caller, user);
@@ -915,8 +911,7 @@ void create_non_cmd_file_list_cache(string file_type, unordered_set<string>&
 
   // random sleep to minimize collisions from concurrent processes
   sleep(getpid() % 15);
-  Server srv(metautils::directives.database_server, metautils::directives.
-      rdadb_username, metautils::directives.rdadb_password, "rdadb");
+  Server srv(metautils::directives.rdadb_config);
   if (!srv) {
     log_error2("error connecting to database: '" + srv.error() + "'", F,
         caller, user);
@@ -1113,8 +1108,7 @@ void grml_file_data(string file_type, unordered_map<string, string>&
     gindex_map, unordered_map<string, FileEntry>& grml_file_data_table, string&
     caller, string& user) {
   static const string F = this_function_label(__func__);
-  Server srv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "rdadb");
+  Server srv(metautils::directives.metadb_config);
   if (!srv) {
     log_error2("'" + srv.error() + "' while trying to connect", F, caller,
         user);
@@ -1151,8 +1145,7 @@ void obml_file_data(string file_type, unordered_map<string, string>&
     gindex_map, unordered_map<string,  FileEntry>& obml_file_data_table, string&
     caller, string& user) {
   static const string F = this_function_label(__func__);
-  Server srv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "rdadb");
+  Server srv(metautils::directives.metadb_config);
   if (!srv) {
     log_error2("unable to connect to the database: '" + srv.error() + "'", F,
         caller, user);
@@ -1192,8 +1185,7 @@ void fixml_file_data(string file_type, unordered_map<string, string>&
   static const string F = this_function_label(__func__);
   FileEntry fe;
 
-  Server srv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "rdadb");
+  Server srv(metautils::directives.metadb_config);
   if (!srv) {
     log_error2("'" + srv.error() + "' while trying to connect", F, caller,
         user);
@@ -1240,8 +1232,7 @@ void write_grml_parameters(string file_type, string tindex, ofstream& ofs,
   if (file_type != "Web" && file_type != "inv") {
     log_error2("unsupported file type '" + file_type + "'", F, caller, user);
   }
-  Server srv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "rdadb");
+  Server srv(metautils::directives.metadb_config);
   if (!srv) {
     log_error2("'" + srv.error() + "' while trying to connect", F, caller,
         user);
@@ -1422,8 +1413,7 @@ void write_grml_parameters(string file_type, string tindex, ofstream& ofs,
 void create_file_list_cache(string file_type, string caller, string user, string
     tindex) {
   static const string F = this_function_label(__func__);
-  Server srv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "rdadb");
+  Server srv(metautils::directives.metadb_config);
   if (!srv) {
     log_error2("unable to connect to the database: '" + srv.error() + "'", F,
         caller, user);
@@ -1933,8 +1923,7 @@ void create_file_list_cache(string file_type, string caller, string user, string
   if (tindex.empty() && cmdset.size() > 0) {
     create_non_cmd_file_list_cache(file_type, cmdset, caller, user);
   }
-  srv.connect(metautils::directives.database_server, metautils::directives.
-      rdadb_username, metautils::directives.rdadb_password, "rdadb");
+  srv.connect(metautils::directives.rdadb_config);
   srv.update("dssdb.dataset", "meta_link = 'Y', version = version + 1",
       "dsid in " + to_sql_tuple_string(ds_aliases(metautils::args.dsid)));
   srv.disconnect();
@@ -1943,8 +1932,7 @@ void create_file_list_cache(string file_type, string caller, string user, string
 void summarize_locations(string database, string& error) {
   static const string F = this_function_label(__func__);
   error = "";
-  Server srv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "rdadb");
+  Server srv(metautils::directives.metadb_config);
 
   // get all location names that are NOT included
   LocalQuery q("distinct gcmd_keyword", database + "." + metautils::args.dsid +

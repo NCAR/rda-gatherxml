@@ -25,8 +25,7 @@ namespace summarizeMetadata {
 
 void summarize_fix_data(string caller, string user) {
   static const string F = this_function_label(__func__);
-  Server server(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "rdadb");
+  Server server(metautils::directives.metadb_config);
   Query formats_query("code, format_code", "WFixML." + metautils::args.dsid +
       "_webfiles2");
   if (formats_query.submit(server) < 0) {

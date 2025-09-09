@@ -34,8 +34,7 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile, TempDir& tdir, list<
   if (filelist != NULL) {
     filelist->clear();
   }
-  Server mys(directives.database_server, directives.rdadb_username, directives.
-      rdadb_password, "rdadb");
+  Server mys(directives.rdadb_config);
   if (!mys) {
     error = "Error connecting to database server";
     return false;

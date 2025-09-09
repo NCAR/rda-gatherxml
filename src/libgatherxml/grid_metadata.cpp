@@ -59,8 +59,7 @@ void summarize_grid_levels(string database, string caller, string user) {
   } else {
     log_error2("unknown database '" + database + "'", F, caller, user);
   }
-  Server srv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "rdadb");
+  Server srv(metautils::directives.metadb_config);
   if (!srv) {
     log_error2("unable to connect to the database: '" + srv.error() + "'", F,
         caller, user);
@@ -134,8 +133,7 @@ void summarize_grids(string database, string caller, string user, string
   } else {
     log_error2("unknown database '" + database + "'", F, caller, user);
   }
-  Server srv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "rdadb");
+  Server srv(metautils::directives.metadb_config);
   if (!srv) {
     log_error2("unable to connect to the database: '" + srv.error() + "'", F,
         caller, user);
@@ -362,8 +360,7 @@ struct GridDefinitionEntry {
 void summarize_grid_resolutions(string caller, string user, string
     file_id_code) {
   static const string F = string(__func__) + "()";
-  Server srv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "rdadb");
+  Server srv(metautils::directives.metadb_config);
   if (!srv) {
     log_error2("unable to connect to the database: '" + srv.error() + "'", F,
         caller, user);
@@ -515,8 +512,7 @@ void add_bitmap(string bitmap, vector<size_t> values, stringstream& ss) {
 void aggregate_grids(string database, string caller, string user, string
     file_id_code) {
   static const string F = this_function_label(__func__);
-  Server srv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "rdadb");
+  Server srv(metautils::directives.metadb_config);
   if (!srv) {
     log_error2("unable to connect to the database: '" + srv.error() + "'", F,
         caller, user);

@@ -48,8 +48,7 @@ void close(string filename, unique_ptr<TempDir>& tdir, std::ofstream& ofs,
   }
   ofs.close();
   ofs.clear();
-  Server srv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "rdadb");
+  Server srv(metautils::directives.metadb_config);
   srv.update("W" + cmd_type + "." + metautils::args.dsid + "_webfiles2",
       "inv = 'Y'", "id = '" + substitute(filename, "%", "/") + "'");
   if (metautils::args.inventory_only) {

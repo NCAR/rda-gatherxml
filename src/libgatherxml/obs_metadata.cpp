@@ -246,8 +246,7 @@ void compress_locations(unordered_set<string>& location_list, my::map<
 bool summarize_obs_data(string caller, string user) {
   static const string F = this_function_label(__func__);
   auto b = false; // return value
-  Server mysrv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "rdadb");
+  Server mysrv(metautils::directives.metadb_config);
   Query q("code, format_code", "WObML." + metautils::args.dsid + "_webfiles2");
   if (q.submit(mysrv) < 0) {
     myerror = move(q.error());
@@ -409,8 +408,7 @@ ObservationData::ObservationData() : num_types(0), observation_types(),
     observation_indexes(), id_tables(), platform_tables(),
     unique_observation_table(), unknown_id_re("unknown"), unknown_ids(nullptr),
     track_unique_observations(true), is_empty(true) {
-  Server mysrv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "rdadb");
+  Server mysrv(metautils::directives.metadb_config);
   LocalQuery q("obs_type", "WObML.obs_types");
   if (q.submit(mysrv) == 0) {
     for (const auto& r : q) {

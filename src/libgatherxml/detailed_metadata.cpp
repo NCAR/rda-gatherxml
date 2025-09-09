@@ -214,8 +214,7 @@ bool compare_layers(const string& left, const string& right) {
 void fill_level_code_map(unordered_map<size_t, tuple<string, string, string>>&
     level_code_map, string caller, string user) {
   static const string F = this_function_label(__func__);
-  Server srv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "rdadb");
+  Server srv(metautils::directives.metadb_config);
   if (!srv) {
     log_error2("unable to connect to the database: '" + srv.error() + "'", F,
         caller, user);
@@ -256,8 +255,7 @@ void generate_parameter_cross_reference(string format, string title, string
       0) {
     log_error2("unable to create temporary directory tree", F, caller, user);
   }
-  Server srv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "rdadb");
+  Server srv(metautils::directives.metadb_config);
   if (!srv) {
     log_error2("unable to connect to the database: '" + srv.error() + "'", F,
         caller, user);
@@ -429,8 +427,7 @@ void generate_level_cross_reference(string format, string title, string
   static const string F = this_function_label(__func__);
   unordered_map<size_t, tuple<string, string, string>> lcmap;
   fill_level_code_map(lcmap, caller, user);
-  Server srv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "rdadb");
+  Server srv(metautils::directives.metadb_config);
   if (!srv) {
     log_error2("unable to connect to the database: '" + srv.error() + "'", F,
         caller, user);
@@ -579,8 +576,7 @@ void add_to_formats(XMLDocument& xdoc, string database, string primaries_table,
     vector<pair<string, string>>& format_list, string& formats, string caller,
     string user) {
   static const string F = this_function_label(__func__);
-  Server srv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "rdadb");
+  Server srv(metautils::directives.metadb_config);
   if (!srv) {
     log_error2("unable to connect to metadata server: '" + srv.error() + "'", F,
         caller, user);
@@ -1022,8 +1018,7 @@ void generate_detailed_grid_summary(string file_type, ofstream& ofs, const
   unordered_map<size_t, LevelSummary> lsmap;
   unordered_map<size_t, tuple<string, string, string>> lcmap;
   fill_level_code_map(lcmap, caller, user);
-  Server srv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "rdadb");
+  Server srv(metautils::directives.metadb_config);
   if (!srv) {
     log_error2("unable to connect to the database: '" + srv.error() + "'", F,
         caller, user);
@@ -1451,8 +1446,7 @@ void generate_detailed_observation_summary(string file_type, ofstream& ofs,
   if (!ofs_o.is_open()) {
     log_error2("unable to open output for observation detail", F, caller, user);
   }
-  Server srv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "rdadb");
+  Server srv(metautils::directives.metadb_config);
   if (!srv) {
     log_error2("unable to connect to the database: '" + srv.error() + "'", F,
         caller, user);
@@ -1649,7 +1643,7 @@ void generate_detailed_observation_summary(string file_type, ofstream& ofs,
 void generate_detailed_fix_summary(string file_type, ofstream& ofs, const
     vector<pair<string, string>>& format_list, string caller, string user) {
   static const string F = this_function_label(__func__);
-  Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"rdadb");
+  Server server(metautils::directives.metadb_config);
   if (!server) {
     log_error2("unable to connect to the database: '" + server.error() + "'", F,
         caller, user);
@@ -1740,8 +1734,7 @@ void generate_detailed_metadata_view(string caller, string user) {
   if (!xdoc) {
     log_error2("unable to open FormatReferences.xml", F, caller, user);
   }
-  Server srv_m(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "rdadb");
+  Server srv_m(metautils::directives.metadb_config);
   if (!srv_m) {
     log_error2("unable to connect to the database: '" + srv_m.error() + "'", F,
         caller, user);
@@ -1781,7 +1774,7 @@ void generate_detailed_metadata_view(string caller, string user) {
   } else {
     string root = "OAI-PMH/GetRecord/record/metadata/dsOverview";
     auto e=xdoc.element(root + "/title");
-    Server server_d(metautils::directives.database_server,metautils::directives.rdadb_username,metautils::directives.rdadb_password,"rdadb");
+    Server server_d(metautils::directives.rdadb_config);
     if (!b) {
       auto elist=xdoc.element_list(root + "/contentMetadata/dataType");
       for (const auto& element : elist) {
@@ -1954,8 +1947,8 @@ void generate_group_detailed_metadata_view(string group_index,string file_type,s
 //  list<string> formatList;
 //  bool foundDetail=false;
 
-  Server server_m(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"rdadb");
-  Server server_d(metautils::directives.database_server,metautils::directives.rdadb_username,metautils::directives.rdadb_password,"rdadb");
+  Server server_m(metautils::directives.metadb_config);
+  Server server_d(metautils::directives.rdadb_config);
   if (!group_index.empty() || group_index == "0") {
     return;
   }
