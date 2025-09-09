@@ -204,7 +204,7 @@ void scan_input_file(gatherxml::markup::ObML::ObservationData& obs_data)
     std::cout << "Beginning scan of input file '"+metautils::args.local_name+"' containing " << num_input_lines << " lines ..." << std::endl;
   }
   std::unordered_set<std::string> platform_types,id_types;
-  Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
+  Server server(metautils::directives.metadb_config);
   if (!server) {
     metautils::log_error("scan_input_file(): unable to connect to the metadata database","prop2xml",USER);
   }
@@ -329,7 +329,8 @@ void scan_input_file(gatherxml::markup::ObML::ObservationData& obs_data)
   ofs << "</dataTypeMap>" << std::endl;
   ofs.close();
   std::string error;
-  if (unixutils::rdadata_sync(tdir.name(),"metadata/ParameterTables/","/data/web",metautils::directives.rdadata_home,error) < 0) {
+  if (unixutils::gdex_upload_dir(tdir.name(), "metadata/ParameterTables/",
+      "/data/web", "", error) < 0) {
     metautils::log_error("unable to sync data type map - error(s): '"+error+"'","prop2xml",USER);
   }
   if (unixutils::mysystem2("/bin/cp "+datatype_map+" "+metautils::directives.parameter_map_path+"/",oss,ess) < 0) {
@@ -379,7 +380,7 @@ int main(int argc,char **argv)
   metautils::cmd_register("prop2xml",USER);
   if (metautils::args.dsid < "d999000") {
     auto verified_file=false;
-    Server server(metautils::directives.database_server,metautils::directives.rdadb_username,metautils::directives.rdadb_password,"dssdb");
+    Server server(metautils::directives.rdadb_config);
     std::string file_type;
     LocalQuery query;
     auto ds_set = to_sql_tuple_string(ds_aliases(metautils::args.dsid));
