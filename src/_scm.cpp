@@ -297,8 +297,7 @@ struct MarkupParameters {
 
 void initialize_web_file(MarkupParameters *markup_parameters) {
   static const string F = this_function_label(__func__);
-  Server mysrv_d(metautils::directives.database_server, metautils::directives.
-      rdadb_username, metautils::directives.rdadb_password, "rdadb");
+  Server mysrv_d(metautils::directives.rdadb_config);
   if (!mysrv_d) {
     log_error2("could not connect to RDADB - error: '" + mysrv_d.error() + "'",
         F, "scm", USER);
@@ -859,8 +858,7 @@ void process_grml_markup(void *markup_parameters) {
 void *thread_summarize_IDs(void *args) {
   static const string F = this_function_label(__func__);
   auto &a = *(reinterpret_cast<vector<string> *>(args));
-  Server srv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "rdadb");;
+  Server srv(metautils::directives.metadb_config);
   if (!srv) {
     log_error2("could not connect to database server - error: '" + srv.error() +
         "'", F, "scm", USER);
@@ -1133,8 +1131,7 @@ void *thread_summarize_file_ID_locations(void *args) {
   static const string F = this_function_label(__func__);
   static unordered_map<string, vector<string>> lmap;
   auto &a = *reinterpret_cast<vector<string> *>(args);
-  Server srv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "rdadb");;
+  Server srv(metautils::directives.metadb_config);
   if (!srv) {
     log_error2("could not connect to database server - error: " + srv.error(),
         F, "scm", USER);
@@ -1822,9 +1819,7 @@ void summarize_markup(string markup_type, unordered_map<string, vector<
     } else {
       log_error2("invalid markup type '" + t + "'", F, "scm", USER);
     }
-    mp->server.connect(metautils::directives.database_server, metautils::
-        directives.metadb_username, metautils::directives.metadb_password,
-        "rdadb");
+    mp->server.connect(metautils::directives.metadb_config);
     if (!mp->server) {
       log_error2("could not connect to metadata database - error: '" + mp->
           server.error() + "'", F, "scm", USER);
@@ -1954,8 +1949,7 @@ void *thread_summarize_fix_data(void *) {
 
 void *thread_index_variables(void *) {
   static const string F = this_function_label(__func__);
-  Server srv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "rdadb");
+  Server srv(metautils::directives.metadb_config);
   if (!srv) {
     log_error2("could not connect to database server - error: " + srv.error(),
         F, "scm", USER);
@@ -1970,8 +1964,7 @@ void *thread_index_variables(void *) {
 
 void *thread_index_locations(void *) {
   static const string F = this_function_label(__func__);
-  Server srv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "rdadb");
+  Server srv(metautils::directives.metadb_config);
   if (!srv) {
     log_error2("could not connect to database server - error: " + srv.error(),
         F, "scm", USER);
@@ -2112,8 +2105,7 @@ int main(int argc, char **argv) {
   // start the execution timer
   Timer tm;
   tm.start();
-  Server mysrv(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "rdadb");
+  Server mysrv(metautils::directives.metadb_config);
   if (!mysrv) {
     log_error2("unable to connect to database server at startup", F, "scm",
         USER);
