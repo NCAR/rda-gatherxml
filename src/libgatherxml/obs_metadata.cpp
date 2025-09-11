@@ -125,18 +125,12 @@ void compress_locations(unordered_set<string>& location_list, my::map<
     caller, string user) {
   TempDir temp_dir;
   string f;
-  struct stat buf;
-  if (stat((metautils::directives.server_root + "/web/metadata/gcmd_locations").
-      c_str(), &buf) == 0) {
-    f = metautils::directives.server_root + "/web/metadata/gcmd_locations";
-  } else {
-    if (!temp_dir.create(metautils::directives.temp_path)) {
-      myerror = "Error creating temporary directory";
-      exit(1);
-    }
-    f = unixutils::remote_web_file("https://rda.ucar.edu/metadata/"
-        "gcmd_locations", temp_dir.name());
+  if (!temp_dir.create(metautils::directives.temp_path)) {
+    myerror = "Error creating temporary directory";
+    exit(1);
   }
+  f = unixutils::remote_web_file("https://gdex.ucar.edu/metadata/"
+      "gcmd_locations", temp_dir.name());
   std::ifstream ifs(f.c_str());
   if (!ifs.is_open()) {
     myerror = "Error opening gcmd_locations";
