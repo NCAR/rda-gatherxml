@@ -125,7 +125,8 @@ void sync_dataset_files(string tdir_name) {
   }
   p += "/datasets/" + metautils::args.dsid;
   string e;
-  if (unixutils::gdex_upload_dir(tdir_name, ".", p, "", e) < 0) {
+  if (unixutils::gdex_upload_dir(tdir_name, ".", p, metautils::directives.
+      gdex_upload_key, e) < 0) {
     metautils::log_error2("couldn't sync dataset files - rdadata_sync "
         "error(s): '" + e + "'", "main()", "dsgen", USER);
   }
@@ -200,8 +201,8 @@ void generate_index(string tdir_name) {
     ofs_j << ss.str();
     ofs_j.close();
     string err;
-    if (unixutils::gdex_upload_dir(d.name(), ".", "/data/web/jsonld", "", err) <
-        0) {
+    if (unixutils::gdex_upload_dir(d.name(), ".", "/data/web/jsonld",
+        metautils::directives.gdex_upload_key, err) < 0) {
       metautils::log_error2("couldn't sync JSON-LD file - rdadata_sync "
           "error(s): '" + err + "'", F, "dsgen", USER);
     }
@@ -460,6 +461,8 @@ string create_table_from_strings(vector<string> list, size_t max_columns, string
 
 string text_field_from_element(const XMLElement& e) {
   auto s = e.to_string();
+std::cerr << s << std::endl;
+std::cerr << "------" << std::endl;
   if (!s.empty()) {
     replace_all(s, "<" + e.name() + ">", "");
     replace_all(s, "</" + e.name() + ">", "");
@@ -503,10 +506,14 @@ void insert_text_field(ofstream& ofs, const XMLElement& e, string
 
 void add_abstract(TokenDocument& tdoc) {
   static const string F = this_function_label(__func__);
-  tdoc.add_replacement("__ABSTRACT__", text_field_from_element(g_xdoc.element(
-      "dsOverview/summary")));
-  update_wagtail("abstract", text_field_from_element(g_xdoc.element(
-      "dsOverview/summary")), F);
+  auto abstract = g_xdoc.element("OAI-PMH/GetRecord/record/metadata/dsOverview/"
+      "summary").content();
+  replace_all(abstract, "&lt;", "<");
+  replace_all(abstract, "&gt;", ">");
+  replace_all(abstract, "<![CDATA[", "");
+  replace_all(abstract, "]]", "");
+  tdoc.add_replacement("__ABSTRACT__", abstract);
+  update_wagtail("abstract", abstract, F);
 }
 
 void exit_if_dead_dataset(TokenDocument& tdoc, string tdir_name, std::ofstream&
@@ -554,8 +561,8 @@ void initialize(vector<string>& formats, vector<string>& data_types, bool&
 
 void add_acknowledgement(TokenDocument& tdoc) {
   static const string F = this_function_label(__func__);
-  auto ack = text_field_from_element(g_xdoc.element("dsOverview/"
-      "acknowledgement"));
+  auto ack = text_field_from_element(g_xdoc.element("OAI-PMH/GetRecord/record/"
+      "metadata/dsOverview/acknowledgement"));
   if (!ack.empty()) {
     tdoc.add_if("__HAS_ACKNOWLEDGEMENTS__");
     tdoc.add_replacement("__ACKNOWLEDGEMENT__", ack);
@@ -750,7 +757,8 @@ void add_book_chapter_to_publication(const XMLElement& e, stringstream& ss,
 
 void add_publications(TokenDocument& tdoc, XMLDocument& g_xdoc) {
   static const string F = this_function_label(__func__);
-  auto rlist = g_xdoc.element_list("dsOverview/reference");
+  auto rlist = g_xdoc.element_list("OAI-PMH/GetRecord/record/metadata/"
+      "dsOverview/reference");
   stringstream ss;
   if (!rlist.empty()) {
     tdoc.add_if("__HAS_PUBLICATIONS__");
@@ -785,7 +793,8 @@ void add_publications(TokenDocument& tdoc, XMLDocument& g_xdoc) {
     }
     update_wagtail("publications", "[" + json + "]", F);
   }
-  auto ulist = g_xdoc.element_list("dsOverview/referenceURL");
+  auto ulist = g_xdoc.element_list("OAI-PMH/GetRecord/record/metadata/"
+      "dsOverview/referenceURL");
   if (!ulist.empty()) {
     if (ss.str().empty()) {
       tdoc.add_if("__HAS_PUBLICATIONS__");
@@ -804,7 +813,8 @@ void add_data_formats(TokenDocument& tdoc, vector<string>& formats, bool
     found_content_metadata) {
   static const string F = this_function_label(__func__);
   if (!found_content_metadata) {
-    auto flist=g_xdoc.element_list("dsOverview/contentMetadata/format");
+    auto flist=g_xdoc.element_list("OAI-PMH/GetRecord/record/metadata/"
+        "dsOverview/contentMetadata/format");
     for (const auto& f : flist) {
       formats.emplace_back(f.content() + "<!>" + f.attribute_value("href"));
     }
@@ -1240,7 +1250,8 @@ bool add_temporal_range(TokenDocument& tdoc, size_t& swp_cnt) {
 
 void add_update_frequency(TokenDocument& tdoc) {
   static const string F = this_function_label(__func__);
-  auto e = g_xdoc.element("dsOverview/continuingUpdate");
+  auto e = g_xdoc.element("OAI-PMH/GetRecord/record/metadata/dsOverview/"
+      "continuingUpdate");
   if (e.attribute_value("value") == "yes") {
     tdoc.add_if("__HAS_UPDATE_FREQUENCY__");
     tdoc.add_replacement("__UPDATE_FREQUENCY__", capitalize(e.attribute_value(
@@ -1252,7 +1263,8 @@ void add_update_frequency(TokenDocument& tdoc) {
 
 void add_access_restrictions(TokenDocument& tdoc) {
   static const string F = this_function_label(__func__);
-  auto e = g_xdoc.element("dsOverview/restrictions/access");
+  auto e = g_xdoc.element("OAI-PMH/GetRecord/record/metadata/dsOverview/"
+      "restrictions/access");
   auto a = e.to_string();
   replace_all(a, "<access>", "");
   replace_all(a, "</access>", "");
@@ -1275,7 +1287,8 @@ void add_access_restrictions(TokenDocument& tdoc) {
 
 void add_usage_restrictions(TokenDocument& tdoc) {
   static const string F = this_function_label(__func__);
-  auto e = g_xdoc.element("dsOverview/restrictions/usage");
+  auto e = g_xdoc.element("OAI-PMH/GetRecord/record/metadata/dsOverview/"
+      "restrictions/usage");
   auto u = e.to_string();
   replace_all(u, "<usage>", "");
   replace_all(u, "</usage>", "");
@@ -1409,8 +1422,8 @@ void add_variables(TokenDocument& tdoc, size_t& swp_cnt) {
   json = "\"gcmd\": [" + json + "]";
   tdoc.add_replacement("__VARIABLES__", create_table_from_strings(l, 4,
       "#e1eaff", "#c8daff"));
-  auto elist = g_xdoc.element_list("dsOverview/contentMetadata/"
-      "detailedVariables/detailedVariable");
+  auto elist = g_xdoc.element_list("OAI-PMH/GetRecord/record/metadata/"
+      "dsOverview/contentMetadata/detailedVariables/detailedVariable");
   if (elist.size() > 0) {
     for (const auto& e : elist) {
       if (has_beginning(e.content(), "http://") || has_beginning(e.content(),
@@ -1454,9 +1467,10 @@ void add_vertical_levels(TokenDocument& tdoc, const vector<string>& data_types,
       }
     }
   } else {
-    auto elist = g_xdoc.element_list("dsOverview/contentMetadata/levels/level");
-    auto elist2 = g_xdoc.element_list("dsOverview/contentMetadata/levels/"
-        "layer");
+    auto elist = g_xdoc.element_list("OAI-PMH/GetRecord/record/metadata/"
+        "dsOverview/contentMetadata/levels/level");
+    auto elist2 = g_xdoc.element_list("OAI-PMH/GetRecord/record/metadata/"
+        "dsOverview/contentMetadata/levels/layer");
     elist.insert(elist.end(), elist2.begin(), elist2.end());
     if (!elist.empty()) {
       tdoc.add_if("__HAS_VERTICAL_LEVELS__");
@@ -1513,8 +1527,8 @@ void add_vertical_levels(TokenDocument& tdoc, const vector<string>& data_types,
 
 void add_temporal_frequency(TokenDocument& tdoc) {
   static const string F = this_function_label(__func__);
-  auto elist = g_xdoc.element_list("dsOverview/contentMetadata/"
-      "temporalFrequency");
+  auto elist = g_xdoc.element_list("OAI-PMH/GetRecord/record/metadata/"
+      "dsOverview/contentMetadata/temporalFrequency");
   auto m = 0;
   if (elist.size() > 0) {
     tdoc.add_if("__HAS_TEMPORAL_FREQUENCY__");
@@ -1592,7 +1606,8 @@ void add_data_types(TokenDocument& tdoc, const vector<string>& data_types,
       tdoc.add_replacement("__DATA_TYPES__", s);
     }
   } else {
-    auto elist = g_xdoc.element_list("dsOverview/contentMetadata/dataType");
+    auto elist = g_xdoc.element_list("OAI-PMH/GetRecord/record/metadata/"
+        "dsOverview/contentMetadata/dataType");
     if (!elist.empty()) {
       tdoc.add_if("__HAS_DATA_TYPES__");
       string s;
@@ -1705,8 +1720,8 @@ void add_spatial_coverage(TokenDocument& tdoc, const vector<string>& data_types,
       }
     }
   } else {
-    auto elist = g_xdoc.element_list("dsOverview/contentMetadata/"
-        "geospatialCoverage/grid");
+    auto elist = g_xdoc.element_list("OAI-PMH/GetRecord/record/metadata/"
+        "dsOverview/contentMetadata/geospatialCoverage/grid");
     for (const auto& e : elist) {
       auto d = e.attribute_value("definition");
       if (e.attribute_value("isCell") == "true") {
@@ -1973,7 +1988,8 @@ void add_data_volume(TokenDocument& tdoc, size_t& swp_cnt) {
 
 void add_related_websites(TokenDocument& tdoc) {
   static const string F = this_function_label(__func__);
-  auto elist = g_xdoc.element_list("dsOverview/relatedResource");
+  auto elist = g_xdoc.element_list("OAI-PMH/GetRecord/record/metadata/"
+      "dsOverview/relatedResource");
   string json;
   if (!elist.empty()) {
     if (elist.size() > 1) {
@@ -2015,7 +2031,8 @@ void add_related_websites(TokenDocument& tdoc) {
 
 void add_related_datasets(TokenDocument& tdoc) {
   static const string F = this_function_label(__func__);
-  auto elist = g_xdoc.element_list("dsOverview/relatedDataset");
+  auto elist = g_xdoc.element_list("OAI-PMH/GetRecord/record/metadata/"
+      "dsOverview/relatedDataset");
   if (!elist.empty()) {
     if (elist.size() > 1) {
       tdoc.add_replacement("__RELATED_DATASETS_VALIGN__", "top");
@@ -2064,7 +2081,8 @@ void add_more_details(TokenDocument& tdoc) {
 
 void add_data_license() {
   static const string F = this_function_label(__func__);
-  auto id = g_xdoc.element("dsOverview/dataLicense").content();
+  auto id = g_xdoc.element("OAI-PMH/GetRecord/record/metadata/dsOverview/"
+      "dataLicense").content();
   if (id.empty()) {
     id = "CC-BY-4.0";
   }
