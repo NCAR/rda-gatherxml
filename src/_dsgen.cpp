@@ -461,8 +461,6 @@ string create_table_from_strings(vector<string> list, size_t max_columns, string
 
 string text_field_from_element(const XMLElement& e) {
   auto s = e.to_string();
-std::cerr << s << std::endl;
-std::cerr << "------" << std::endl;
   if (!s.empty()) {
     replace_all(s, "<" + e.name() + ">", "");
     replace_all(s, "</" + e.name() + ">", "");
