@@ -50,6 +50,7 @@ using std::unique_ptr;
 using std::unordered_map;
 using std::unordered_set;
 using std::vector;
+using strutils::append;
 using strutils::ftos;
 using strutils::itos;
 using strutils::lltos;
@@ -456,6 +457,20 @@ string gridded_time_method(const NetCDF::Variable& var, string timeid) {
         trim(s);
         idx = s.find(": ");
         if (idx == string::npos) {
+          auto parts = split(s);
+          if (parts.size() > 1) {
+            // remove duplicates
+            unordered_set<string> methods;
+            for (const auto& part : parts) {
+              methods.emplace(part);
+            }
+            if (methods.size() != parts.size()) {
+              s = "";
+              for (const auto& e : methods) {
+                append(s, e, " ");
+              }
+            }
+          }
           return s;
         } else {
 
