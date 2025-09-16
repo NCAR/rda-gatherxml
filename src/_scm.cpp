@@ -445,6 +445,11 @@ void create_obml_tables(MarkupParameters *markup_parameters) {
         "creating table " + tb_base + "_id_list", F, "scm", USER);
   }
   if (markup_parameters->server.duplicate_table(markup_parameters->database +
+      ".template_id_data_types_list", tb_base + "_id_data_types_list") < 0) {
+    log_error2("error: '" + markup_parameters->server.error() + "' while "
+        "creating table " + tb_base + "_id_data_types_list", F, "scm", USER);
+  }
+  if (markup_parameters->server.duplicate_table(markup_parameters->database +
       ".template_geobounds", tb_base + "_geobounds") < 0) {
     log_error2("error: '" + markup_parameters->server.error() + "' while "
         "creating table " + tb_base + "_geobounds", F, "scm", USER);
