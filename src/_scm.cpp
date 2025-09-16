@@ -47,15 +47,17 @@ using std::stoi;
 using std::stoll;
 using std::string;
 using std::stringstream;
+using std::to_string;
 using std::unique_ptr;
 using std::unordered_map;
 using std::unordered_set;
 using std::vector;
 using strutils::append;
-using strutils::ftos;
 using strutils::chop;
 using strutils::ds_aliases;
+using strutils::ftos;
 using strutils::itos;
+using strutils::join;
 using strutils::lltos;
 using strutils::ng_gdex_id;
 using strutils::replace_all;
@@ -863,7 +865,8 @@ void process_grml_markup(void *markup_parameters) {
 
 void *thread_summarize_IDs(void *args) {
   static const string F = this_function_label(__func__);
-  auto &a = *(reinterpret_cast<vector<string> *>(args));
+  auto &p_args = *(reinterpret_cast<pair<vector<string>, unordered_map<string,
+      string> *> *>(args));
   Server srv(metautils::directives.metadb_config);
   if (!srv) {
     log_error2("could not connect to database server - error: '" + srv.error() +
@@ -872,18 +875,19 @@ void *thread_summarize_IDs(void *args) {
 
   // read in the IDs from the separate XML file
   auto f = remote_web_file("https://" + metautils::directives.web_server +
-      a[0] + a[1], g_temp_dir.name());
+      p_args.first[0] + p_args.first[1], g_temp_dir.name());
   std::ifstream ifs(f.c_str());
   if (!ifs.is_open()) {
-    log_error2("unable to open '" + a[0] + a[1] + "'", F, "scm", USER);
+    log_error2("unable to open '" + p_args.first[0] + p_args.first[1] + "'", F,
+        "scm", USER);
   }
   char l[32768];
   double avgd = 0., navgd = 0., avgm = 0., navgm = 0.;
   size_t obs_count = 0;
   unordered_map<string, string> id_map;
-  auto tbl = a[5] + "." + metautils::args.dsid + "_id_list";
+  auto tbl = p_args.first[5] + "." + metautils::args.dsid + "_id_list";
   auto pkey = metautils::args.dsid + "_id_list_pkey";
-  auto uflg = strand(3);
+  vector<string> id_data_type_values;
   ifs.getline(l, 32768);
   while (!ifs.eof()) {
     if (l[2] == '<' && l[3] == 'I' && l[4] == 'D') {
@@ -896,8 +900,8 @@ void *thread_summarize_IDs(void *args) {
       auto e = snippet.element("ID");
       auto idtyp = e.attribute_value("type");
       if (id_map.find(idtyp) == id_map.end()) {
-        auto c = table_code(srv, a[5] + ".id_types", "id_type = '" + idtyp +
-            "'");
+        auto c = table_code(srv, p_args.first[5] + ".id_types", "id_type = '" +
+            idtyp + "'");
         if (c.empty()) {
           log_error2("unable to get id type code", F, "scm", USER);
         }
@@ -919,16 +923,17 @@ void *thread_summarize_IDs(void *args) {
         v = e.attribute_value("cornerSW");
         auto sp = split(v, ",");
         if (sp.size() != 2) {
-          log_error2("error in cornerSW attribute for file code " + a[2] + ", '"
-              + a[1] + "', '" + v + "'", F, "scm", USER);
+          log_error2("error in cornerSW attribute for file code " + p_args.
+              first[2] + ", '" + p_args.first[1] + "', '" + v + "'", F, "scm",
+              USER);
         }
         sw_lat = metatranslations::string_coordinate_to_db(sp[0]);
         sw_lon = metatranslations::string_coordinate_to_db(sp[1]);
         v = e.attribute_value("cornerNE");
         sp = split(v, ",");
         if (sp.size() != 2) {
-          log_error2("error in cornerNE attribute for file code " + a[2], F,
-              "scm", USER);
+          log_error2("error in cornerNE attribute for file code " + p_args.
+              first[2], F, "scm", USER);
         }
         ne_lat = metatranslations::string_coordinate_to_db(sp[0]);
         ne_lon = metatranslations::string_coordinate_to_db(sp[1]);
@@ -939,10 +944,10 @@ void *thread_summarize_IDs(void *args) {
       if (ne_lon == "-9990000") {
         ne_lon = "-8388608";
       }
-      auto id_code = table_code(srv, a[5] + "." + metautils::args.dsid + "_ids",
-          "id_type_code = " + id_map[idtyp] + " AND id = '" + ID + "' AND "
-          "sw_lat = " + sw_lat + " AND sw_lon = " + sw_lon + " AND ne_lat = " +
-          ne_lat + " AND ne_lon = " + ne_lon);
+      auto id_code = table_code(srv, p_args.first[5] + "." + metautils::args.
+          dsid + "_ids", "id_type_code = " + id_map[idtyp] + " AND id = '" + ID
+          + "' AND sw_lat = " + sw_lat + " AND sw_lon = " + sw_lon + " AND "
+          "ne_lat = " + ne_lat + " AND ne_lon = " + ne_lon);
       if (id_code.empty()) {
         log_error2("unable to get id code", F, "scm", USER);
       }
@@ -985,9 +990,10 @@ void *thread_summarize_IDs(void *args) {
         dt2.set(stoll(v));
       }
       auto nobs = e.attribute_value("numObs");
-      auto inserts = id_code + ", " + a[3] + ", " + a[4] + ", " + a[2] + ", " +
-          nobs + ", " + dt1.to_string("%Y%m%d%H%MM%SS") + ", " + dt2.to_string(
-          "%Y%m%d%H%MM%SS") + ", " + tz + ", '" + uflg + "'";
+      auto inserts = id_code + ", " + p_args.first[3] + ", " + p_args.first[4] +
+          ", " + p_args.first[2] + ", " + nobs + ", " + dt1.to_string(
+          "%Y%m%d%H%MM%SS") + ", " + dt2.to_string("%Y%m%d%H%MM%SS") + ", " +
+          tz + ", '" + p_args.first[7] + "'";
       if (srv.insert(
             tbl,
             "id_code, observation_type_code, platform_type_code, file_code, "
@@ -999,15 +1005,15 @@ void *thread_summarize_IDs(void *args) {
             "' into " + tbl, F, "scm", USER);
       }
       for (const auto& element : e.element_list("dataType")) {
-        if (dt2 != dt1 || (dt1.time() == 999999 && dt2.time() == 999999)) {
-          auto v = element.attribute_value("numObs");
+        auto num_obs = element.attribute_value("numObs");
 
-          // backward compatibility for content metadata that was generated
-          //   before the number of observations by data type was captured
-          if (v.empty()) {
-            v = nobs;
-          }
-          auto i = stoi(v);
+        // backward compatibility for content metadata that was generated
+        //   before the number of observations by data type was captured
+        if (num_obs.empty()) {
+          num_obs = nobs;
+        }
+        auto i = stoi(num_obs);
+        if (dt2 != dt1 || (dt1.time() == 999999 && dt2.time() == 999999)) {
           if (i > 1) {
             if (dt2.time() == 999999) {
               dt2.add_days(1);
@@ -1029,14 +1035,20 @@ void *thread_summarize_IDs(void *args) {
             }
           }
         }
+        auto dtyp_key = p_args.first[3] + "|" + p_args.first[4] + "|" +
+            element.attribute_value("map") + ":" + element.attribute_value(
+            "value");
+        id_data_type_values.emplace_back(id_code + ", " + p_args.second->at(
+            dtyp_key) + ", " + p_args.first[2] + ", " + num_obs + ", '" +
+            p_args.first[7] + "'");
       }
     }
     ifs.getline(l, 32768);
   }
   ifs.close();
-  srv._delete(tbl, "file_code = " + a[2] + " and observation_type_code = " +
-      a[3] + " and platform_type_code = " + a[4] + " and uflg != '" + uflg +
-      "'");
+  srv._delete(tbl, "file_code = " + p_args.first[2] + " and "
+      "observation_type_code = " + p_args.first[3] + " and platform_type_code "
+      "= " + p_args.first[4] + " and uflg != '" + p_args.first[7] + "'");
   if (navgd > 0.) {
     avgd /= navgd;
   }
@@ -1084,6 +1096,15 @@ void *thread_summarize_IDs(void *args) {
       }
     }
   }
+  tbl = p_args.first[5] + "." + metautils::args.dsid + "_id_data_types_list";
+  if (srv.insert(
+        tbl,
+        join(id_data_type_values, "), (")
+     ) < 0) {
+      log_error2("'" + srv.error() + "' while trying to insert into " + tbl +
+          " (" + to_string(id_data_type_values.size()) + " rows)", F, "scm",
+          USER);
+  }
   string i, k;
   if (lround(avgd) >= 1) {
     i = itos(lround(avgd));
@@ -1093,10 +1114,11 @@ void *thread_summarize_IDs(void *args) {
     k = searchutils::time_resolution_keyword("irregular", lround(avgm), u, "");
   }
   if (i != "0") {
-    auto tbl = a[5] + "." + metautils::args.dsid + "_frequencies";
+    auto tbl = p_args.first[5] + "." + metautils::args.dsid + "_frequencies";
     auto pkey = metautils::args.dsid + "_frequencies_pkey";
-    auto inserts = a[2] + ", " + a[3] + ", " + a[4] + ", " + i + ", " + itos(
-        obs_count) + ", '" + u + "', '" + a[7] + "'";
+    auto inserts = p_args.first[2] + ", " + p_args.first[3] + ", " + p_args.
+        first[4] + ", " + i + ", " + itos(obs_count) + ", '" + u + "', '" +
+        p_args.first[7] + "'";
     if (srv.insert(
           tbl,
           "file_code, observation_type_code, platform_type_code, avg_obs_per, "
@@ -1110,24 +1132,27 @@ void *thread_summarize_IDs(void *args) {
           " (" + inserts + ")", F, "scm", USER);
     }
   }
-  if (a[5] == "WObML") {
-    auto tbl = "\"" + a[5] + "\"." + metautils::args.dsid + "_geobounds";
+  if (p_args.first[5] == "WObML") {
+    auto tbl = "\"" + p_args.first[5] + "\"." + metautils::args.dsid +
+        "_geobounds";
     auto pkey = metautils::args.dsid + "_geobounds_pkey";
     auto uflg = strand(3);
     if (srv.command("insert into " + tbl + " (file_code, min_lat, min_lon, "
-        "max_lat, max_lon, uflg) select " + a[2] + " as file_code, min(i."
-        "sw_lat), min(i.sw_lon), max(i.ne_lat), max(i.ne_lon), '" + uflg +
-        "' from \"" + a[5] + "\"." + metautils::args.dsid + "_id_list as i2 "
-        "left join \"" + a[5] + "\"." + metautils::args.dsid + "_ids as i on i."
-        "code = i2.id_code where i2.file_code = " + a[2] + " and i.sw_lat > "
-        "-990000 and i.sw_lon > -1810000 and i.ne_lat < 990000 and i.ne_lon < "
-        "1810000 on conflict on constraint " + pkey + " do update set min_lat "
-        "= excluded.min_lat, max_lat = excluded.max_lat, min_lon = excluded."
-        "min_lon,  max_lon = excluded.max_lon, uflg = excluded.uflg") < 0) {
+        "max_lat, max_lon, uflg) select " + p_args.first[2] + " as file_code, "
+        "min(i.sw_lat), min(i.sw_lon), max(i.ne_lat), max(i.ne_lon), '" + uflg +
+        "' from \"" + p_args.first[5] + "\"." + metautils::args.dsid +
+        "_id_list as i2 left join \"" + p_args.first[5] + "\"." + metautils::
+        args.dsid + "_ids as i on i.code = i2.id_code where i2.file_code = " +
+        p_args.first[2] + " and i.sw_lat > -990000 and i.sw_lon > -1810000 and "
+        "i.ne_lat < 990000 and i.ne_lon < 1810000 on conflict on constraint " +
+        pkey + " do update set min_lat = excluded.min_lat, max_lat = excluded."
+        "max_lat, min_lon = excluded.min_lon, max_lon = excluded.max_lon, uflg "
+        "= excluded.uflg") < 0) {
       log_error2("'" + srv.error() + "' while trying to insert into " + tbl +
-          " for file_code = " + a[2], F, "scm", USER);
+          " for file_code = " + p_args.first[2], F, "scm", USER);
     }
-    srv._delete(tbl, "file_code = " + a[2] + " and uflg != '" + uflg + "'");
+    srv._delete(tbl, "file_code = " + p_args.first[2] + " and uflg != '" + uflg
+        + "'");
   }
   srv.disconnect();
   return nullptr;
@@ -1409,20 +1434,22 @@ void process_obml_markup(void *markup_parameters) {
       cnt += stoi((platform.p)->attribute_value("numObs"));
       string ts, te;
       vector<pthread_t> tv;
-      list<vector<string>> targs;
+      list<pair<vector<string>, unordered_map<string, string> *>> id_args;
+      list<vector<string>> loc_args;
       for (const auto& e : platform.p->element_addresses()) {
         if (e.p->name() == "IDs") {
-          targs.emplace_back(vector<string>());
-          targs.back().emplace_back(op->metadata_path);
-          targs.back().emplace_back(e.p->attribute_value("ref"));
-          targs.back().emplace_back(op->file_map[op->filename]);
-          targs.back().emplace_back(obs_map[obs]);
-          targs.back().emplace_back(plat_map[plat]);
-          targs.back().emplace_back(op->database);
-          targs.back().emplace_back(op->file_type);
-          targs.back().emplace_back(uflag);
+          id_args.emplace_back(make_pair(vector<string>(), nullptr));
+          id_args.back().first.emplace_back(op->metadata_path);
+          id_args.back().first.emplace_back(e.p->attribute_value("ref"));
+          id_args.back().first.emplace_back(op->file_map[op->filename]);
+          id_args.back().first.emplace_back(obs_map[obs]);
+          id_args.back().first.emplace_back(plat_map[plat]);
+          id_args.back().first.emplace_back(op->database);
+          id_args.back().first.emplace_back(op->file_type);
+          id_args.back().first.emplace_back(uflag);
+          id_args.back().second = &dtyp_map;
           pthread_t t;
-          pthread_create(&t, nullptr, thread_summarize_IDs, &targs.back());
+          pthread_create(&t, nullptr, thread_summarize_IDs, &id_args.back());
           tv.emplace_back(t);
         } else if (e.p->name() == "temporal") {
           ts = e.p->attribute_value("start");
@@ -1438,18 +1465,18 @@ void process_obml_markup(void *markup_parameters) {
         } else if (e.p->name() == "locations") {
 
           // read in the locations from the separate XML file
-          targs.emplace_back(vector<string>());
-          targs.back().emplace_back(op->metadata_path);
-          targs.back().emplace_back(e.p->attribute_value("ref"));
-          targs.back().emplace_back(op->file_map[op->filename]);
-          targs.back().emplace_back(obs_map[obs]);
-          targs.back().emplace_back(plat_map[plat]);
-          targs.back().emplace_back(ts);
-          targs.back().emplace_back(te);
-          targs.back().emplace_back("WObML");
+          loc_args.emplace_back(vector<string>());
+          loc_args.back().emplace_back(op->metadata_path);
+          loc_args.back().emplace_back(e.p->attribute_value("ref"));
+          loc_args.back().emplace_back(op->file_map[op->filename]);
+          loc_args.back().emplace_back(obs_map[obs]);
+          loc_args.back().emplace_back(plat_map[plat]);
+          loc_args.back().emplace_back(ts);
+          loc_args.back().emplace_back(te);
+          loc_args.back().emplace_back("WObML");
           pthread_t t;
           pthread_create(&t, nullptr, thread_summarize_file_ID_locations,
-              &targs.back());
+              &loc_args.back());
           tv.emplace_back(t);
         }
       }
@@ -1462,6 +1489,9 @@ void process_obml_markup(void *markup_parameters) {
       "and uflg != '" + uflag + "'");
   op->server._delete("WObML." + metautils::args.dsid + "_frequencies",
       "file_code = " + op->file_map[op->filename] + " and uflag != '" + uflag +
+      "'");
+  op->server._delete("WObML." + metautils::args.dsid + "_id_data_types_list",
+      "file_code = " + op->file_map[op->filename] + " and uflg != '" + uflag +
       "'");
   auto s = "num_observations = " + itos(cnt) + ", start_date = " + mndt + ", "
       "end_date = " + mxdt;
