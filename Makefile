@@ -560,7 +560,7 @@ ifneq ($(or $(findstring BUG,$(VERSION)),$(findstring MINOR,$(VERSION)),$(findst
 	  && $(RDADATARUN) chmod 740 $(TARGET).$(NEW_VERSION) \
 	  && $(RDADATARUN) ln -s -f $(TARGET).$(NEW_VERSION) $(TARGET)
 else
-ifneq ($(findstring singularity,$(HOST)),)
+ifneq ($(or $(findstring singularity,$(HOST)),$(findstring docker,$(HOST))),)
 	mv $(BUILDDIR)/$(TARGET).$(NEW_VERSION) $(INSTALLDIR)/$(TARGET).$(NEW_VERSION) \
 	  && cd $(INSTALLDIR) \
 	  && ln -s -f $(TARGET).$(NEW_VERSION) $(TARGET)
