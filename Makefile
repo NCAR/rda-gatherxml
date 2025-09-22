@@ -1,3 +1,5 @@
+SHELL := /bin/bash
+#
 ifeq ($(strip $(HOST)),)
 	HOST = $(shell hostname)
 endif
@@ -19,38 +21,19 @@ TIMESTAMP = $(shell date +%Y%m%d%H%M%S)
 ifneq ($(or $(findstring casper,$(HOST))),)
 # Settings for the DAV nodes
 	BUILDEXT = dav
-	COMPILER = /glade/u/apps/dav/opt/gnu/9.1.0/bin/g++
-	GCCVERSION = $(shell $(COMPILER) --version |grep "^g++" |awk '{print $$3}')
-	EXPECTEDGCCVERSION = 9.1.0
+	COMPILER = g++
+	GCCVERSION = $(shell $(COMPILER) --version |grep "^g++" |awk '{print $$4}')
+	EXPECTEDGCCVERSION = 12.2.0
 	GLOBALINCLUDEDIR = /glade/u/home/dattore/cpp/lib/include
 	DBINCLUDEDIR = /glade/work/dattore/conda-envs/libpq/include
 	LIBDIR = /glade/u/home/rdadata/lib/dav
-	DBLIBDIR = /gpfs/fs1/work/dattore/conda-envs/libpq/lib
+	DBLIBDIR = /glade/work/dattore/conda-envs/libpq/lib
 	DBLIBS = -lpq -lpostgresql
 	JASPERINCLUDEDIR = /glade/work/dattore/conda-envs/jasper/include
 	JASPERLIBDIR = /glade/u/home/dattore/cpp/lib/jasper/lib
 	BINDIR = /glade/u/home/rdadata/bin/dav
 	LOCALBINDIR = /ncar/rda/setuid/bin
 	RUNPATH = -Wl,-rpath,/glade/u/apps/opt/gnu/$(EXPECTEDGCCVERSION)/lib64 -Wl,-rpath,$(LIBDIR)
-	OKAY_TO_MAKE = 1
-	RDADATARUN = /ncar/rda/setuid/bin/rdadatarun
-endif
-#
-ifneq ($(or $(findstring cheyenne,$(HOST)), $(findstring chadmin,$(HOST))),)
-# Cheyenne settings
-	BUILDEXT = ch
-	COMPILER = /glade/u/apps/ch/opt/gnu/9.1.0/bin/g++
-	GCCVERSION = $(shell $(COMPILER) --version |grep "^g++" |awk '{print $$3}')
-	EXPECTEDGCCVERSION = 9.1.0
-	GLOBALINCLUDEDIR = /glade/u/home/dattore/cpp/lib/include
-	DBINCLUDEDIR = /glade/work/dattore/conda-envs/libpq/include
-	LIBDIR = /glade/u/home/rdadata/lib/ch
-	DBLIBDIR = /gpfs/fs1/work/dattore/conda-envs/libpq/lib
-	DBLIBS = -lpq -lpostgresql
-	JASPERLIBDIR = /glade/u/home/dattore/cpp/lib/jasper/lib
-	BINDIR = /glade/u/home/rdadata/bin/ch
-	LOCALBINDIR = /ncar/rda/setuid/bin
-	RUNPATH = -Wl,-rpath,/glade/u/apps/ch/opt/gnu/$(EXPECTEDGCCVERSION)/lib64 -Wl,-rpath,$(LIBDIR)
 	OKAY_TO_MAKE = 1
 	RDADATARUN = /ncar/rda/setuid/bin/rdadatarun
 endif
@@ -66,10 +49,10 @@ else ifneq ($(findstring rda-web-dev,$(HOST)),)
 endif
 	COMPILER = g++49
 	GLOBALINCLUDEDIR = /glade/u/home/dattore/cpp/lib/include
-        DBINCLUDEDIR = /usr/include/mysql
+        DBINCLUDEDIR = /usr/include
         LIBDIR = /usr/local/decs/lib
-        DBLIBDIR = /usr/lib64/mysql
-	DBLIBS = mysqlclient
+        DBLIBDIR = /usr/lib64
+	DBLIBS = -lpq -lpostgresql
 	JASPERLIBDIR = /usr/lib64
 	BINDIR = /usr/local/decs/bin
 	LOCALBINDIR = $(BINDIR)
@@ -85,10 +68,10 @@ ifneq ($(findstring rda-web-test01,$(HOST)),)
 endif
 	COMPILER = g++
 	GLOBALINCLUDEDIR = /glade/u/home/dattore/cpp/lib/include
-        DBINCLUDEDIR = /usr/include/mysql
+        DBINCLUDEDIR = /usr/include
         LIBDIR = /usr/local/decs/lib
         DBLIBDIR = /usr/lib64
-	DBLIBS = mysqlclient
+	DBLIBS = -lpq -lpostgresql
 	JASPERLIBDIR = /usr/lib64
 	BINDIR = /usr/local/decs/bin
 	LOCALBINDIR = $(BINDIR)
@@ -120,6 +103,21 @@ ifneq ($(findstring singularity,$(HOST)),)
 	GLOBALINCLUDEDIR = /usr/include/myincludes
         DBINCLUDEDIR = /usr/include/postgresql
         LIBDIR = /usr/lib64/mylibs
+        DBLIBDIR = /usr/lib/x86_64-linux-gnu
+	DBLIBS = -lpq -lpostgresql
+	JASPERINCLUDEDIR = /usr/include/jasper
+	JASPERLIBDIR = /usr/lib/x86_64-linux-gnu/lib
+	BINDIR = /usr/local/bin
+	RUNPATH = -Wl,-rpath,$(LIBDIR)
+	OKAY_TO_MAKE = 1
+endif
+ifneq ($(findstring docker,$(HOST)),)
+# Settings for docker containers
+	BUILDEXT = docker
+	COMPILER = g++
+	GLOBALINCLUDEDIR = /usr/local/include/myincludes
+        DBINCLUDEDIR = /usr/include/postgresql
+        LIBDIR = /usr/local/lib
         DBLIBDIR = /usr/lib/x86_64-linux-gnu
 	DBLIBS = -lpq -lpostgresql
 	JASPERINCLUDEDIR = /usr/include/jasper
@@ -182,7 +180,7 @@ _ascii2xml: CHECKDIR=$(BINDIR)
 _ascii2xml: CHECK_TARGET=_ascii2xml
 _ascii2xml: $(SOURCEDIR)/_ascii2xml.cpp builddir get_version
 ifeq ($(OKAY_TO_MAKE),1)
-	$(eval LINK_LIBS = $(DBLIBS) -lgatherxml -lobs -lutils -lutilsthread -ldatetime -lbitmap -lio -lmetautils_pg -lmetahelpers_pg -lgridutils -lsearch_pg -lxml -ls3 -lmyssl -lssl -lcurl -lz -lpthread)
+	$(eval LINK_LIBS = $(DBLIBS) -lgatherxml -lobs -lutils -lutilsthread -ldatetime -lbitmap -lio -lmetautils -lmetahelpers -lgridutils -lsearch -lxml -ls3 -lmyssl -lssl -lcurl -lz -lpthread)
 ifneq ($(or $(findstring BUG,$(VERSION)),$(findstring MINOR,$(VERSION)),$(findstring MAJOR,$(VERSION)),$(findstring singularity,$(HOST))),)
 	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(LIBDIR) -L$(DBLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 else
@@ -195,7 +193,7 @@ _bufr2xml: CHECKDIR=$(BINDIR)
 _bufr2xml: CHECK_TARGET=_bufr2xml
 _bufr2xml: $(SOURCEDIR)/_bufr2xml.cpp builddir get_version
 ifeq ($(OKAY_TO_MAKE),1)
-	$(eval LINK_LIBS = $(DBLIBS) -lgatherxml -lio -lutils -lutilsthread -ldatetime -lmetautils_pg -lmetahelpers_pg -lbufr -lobs -lbitmap -lgridutils -lsearch_pg -lxml -ls3 -lmyssl -lcurl -lz -lpthread)
+	$(eval LINK_LIBS = $(DBLIBS) -lgatherxml -lio -lutils -lutilsthread -ldatetime -lmetautils -lmetahelpers -lbufr -lobs -lbitmap -lgridutils -lsearch -lxml -ls3 -lmyssl -lcurl -lz -lpthread)
 ifneq ($(or $(findstring BUG,$(VERSION)),$(findstring MINOR,$(VERSION)),$(findstring MAJOR,$(VERSION)),$(findstring singularity,$(HOST))),)
 	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(LIBDIR) -L$(DBLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 else
@@ -208,8 +206,8 @@ cmd_util_pg: CHECKDIR=$(LOCALBINDIR)
 cmd_util_pg: CHECK_TARGET=cmd_util_pg
 cmd_util_pg: $(SOURCEDIR)/cmd_util_pg.cpp builddir get_version
 ifeq ($(OKAY_TO_MAKE),1)
-	$(eval LINK_LIBS = $(DBLIBS) -lutils -lutilsthread -ldatetime -lmetautils_pg -lmetahelpers_pg -lgridutils -lbitmap -lsearch_pg -lxml -lz -lcurl)
-	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(LIBDIR) -L$(DBLIBDIR) $(DBLIBS) -lutils -lutilsthread -ldatetime -lmetautils_pg -lmetahelpers_pg -lgridutils -lbitmap -lsearch_pg -lxml -lz -lcurl -o $(BUILDDIR)/$@.$(NEW_VERSION)
+	$(eval LINK_LIBS = $(DBLIBS) -lutils -lutilsthread -ldatetime -lmetautils -lmetahelpers -lgridutils -lbitmap -lsearch -lxml -lz -lcurl)
+	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(LIBDIR) -L$(DBLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 ifneq ($(VERSION),TEST)
 	$(RDADATARUN) cp $(BUILDDIR)/$@.$(NEW_VERSION) $(LOCALBINDIR)/$@.$(NEW_VERSION) \
           && cd $(LOCALBINDIR) \
@@ -226,7 +224,7 @@ _dcm: CHECKDIR=$(BINDIR)
 _dcm: CHECK_TARGET=_dcm
 _dcm: $(SOURCEDIR)/_dcm.cpp builddir get_version
 ifeq ($(OKAY_TO_MAKE),1)
-	$(eval LINK_LIBS = $(DBLIBS) -lgatherxml -lutils -lutilsthread -ldatetime -lmetautils_pg -lmetahelpers_pg -lgridutils -lsearch_pg -lxml -lbitmap -ls3 -lmyssl -lz -lcurl -lpthread)
+	$(eval LINK_LIBS = $(DBLIBS) -lgatherxml -lutils -lutilsthread -ldatetime -lmetautils -lmetahelpers -lgridutils -lsearch -lxml -lbitmap -ls3 -lmyssl -lz -lcurl -lpthread)
 ifneq ($(or $(findstring BUG,$(VERSION)),$(findstring MINOR,$(VERSION)),$(findstring MAJOR,$(VERSION))),)
 	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(LIBDIR) -L$(DBLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 else
@@ -239,7 +237,7 @@ _dsgen: CHECKDIR=$(BINDIR)
 _dsgen: CHECK_TARGET=_dsgen
 _dsgen: $(SOURCEDIR)/_dsgen.cpp builddir get_version
 ifeq ($(OKAY_TO_MAKE),1)
-	$(eval LINK_LIBS = $(DBLIBS) -lutils -lutilsthread -ldatetime -lmetautils_pg -lmetahelpers_pg -lmetaexport_pg -lmetaexporthelpers_pg -lgridutils -lsearch_pg -lxml -lbitmap -lcitation_pg -lz -lpthread -lcurl)
+	$(eval LINK_LIBS = $(DBLIBS) -lutils -lutilsthread -ldatetime -lmetautils -lmetahelpers -lmetaexport_pg -lmetaexporthelpers_pg -lgridutils -lsearch -lxml -lbitmap -lcitation_pg -lz -lpthread -lcurl)
 ifneq ($(or $(findstring BUG,$(VERSION)),$(findstring MINOR,$(VERSION)),$(findstring MAJOR,$(VERSION))),)
 	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(LIBDIR) -L$(DBLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 else
@@ -256,7 +254,7 @@ _fix2xml: CHECKDIR=$(BINDIR)
 _fix2xml: CHECK_TARGET=_fix2xml
 _fix2xml: $(SOURCEDIR)/_fix2xml.cpp builddir get_version
 ifeq ($(OKAY_TO_MAKE),1)
-	$(eval LINK_LIBS = -lgatherxml $(DBLIBS) -lcyclone -lutils -lutilsthread -ldatetime -lio -lmetautils_pg -lmetahelpers_pg -lgridutils -lbitmap -lsearch_pg -lxml -ls3 -lmyssl -lssl -lcurl -lz -lpthread)
+	$(eval LINK_LIBS = -lgatherxml $(DBLIBS) -lcyclone -lutils -lutilsthread -ldatetime -lio -lmetautils -lmetahelpers -lgridutils -lbitmap -lsearch -lxml -ls3 -lmyssl -lssl -lcurl -lz -lpthread)
 ifneq ($(or $(findstring BUG,$(VERSION)),$(findstring MINOR,$(VERSION)),$(findstring MAJOR,$(VERSION))),)
 	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(DBRUNPATH) $(JASPERRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(LIBDIR) -L$(DBLIBDIR) -L$(JASPERLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 else
@@ -269,7 +267,7 @@ _gatherxml: CHECKDIR=$(BINDIR)
 _gatherxml: CHECK_TARGET=_gatherxml
 _gatherxml: $(SOURCEDIR)/_gatherxml.cpp builddir get_version
 ifeq ($(OKAY_TO_MAKE),1)
-	$(eval LINK_LIBS = $(DBLIBS) -lgatherxml -lutils -lutilsthread -ldatetime -lmetautils_pg -lmetahelpers_pg -lgridutils -lbitmap -lsearch_pg -lxml -lmyssl -ls3 -lz -lpthread -lcurl)
+	$(eval LINK_LIBS = $(DBLIBS) -lgatherxml -lutils -lutilsthread -ldatetime -lmetautils -lmetahelpers -lgridutils -lbitmap -lsearch -lxml -lmyssl -ls3 -lz -lpthread -lcurl)
 ifneq ($(or $(findstring BUG,$(VERSION)),$(findstring MINOR,$(VERSION)),$(findstring MAJOR,$(VERSION))),)
 	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(LIBDIR) -L$(DBLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 else
@@ -282,11 +280,11 @@ _grid2xml: CHECKDIR=$(BINDIR)
 _grid2xml: CHECK_TARGET=_grid2xml
 _grid2xml: $(SOURCEDIR)/_grid2xml.cpp builddir get_version
 ifeq ($(OKAY_TO_MAKE),1)
-	$(eval LINK_LIBS = -lgatherxml $(DBLIBS) -lgrids -ljasper -lutils -lutilsthread -ldatetime -lbitmap -lio -lmetautils_pg -lmetahelpers_pg -lgridutils -lsearch_pg -lxml -ls3 -lmyssl -lerror -lcurl -lpthread -lz)
+	$(eval LINK_LIBS = -lgatherxml $(DBLIBS) -lgrids -ljasper -lutils -lutilsthread -ldatetime -lbitmap -lio -lmetautils -lmetahelpers -lgridutils -lsearch -lxml -ls3 -lmyssl -lerror -lcurl -lpthread -lz)
 ifneq ($(or $(findstring BUG,$(VERSION)),$(findstring MINOR,$(VERSION)),$(findstring MAJOR,$(VERSION)),$(findstring singularity,$(HOST))),)
-	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(DBRUNPATH) $(JASPERRUNPATH) $(SOURCEDIR)/$@.cpp -D__JASPER -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -I$(JASPERINCLUDEDIR) -L$(LIBDIR) -L$(DBLIBDIR) -L$(JASPERLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
+	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(DBRUNPATH) $(JASPERRUNPATH) $(SOURCEDIR)/$@.cpp -D__WITH_JASPER -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -I$(JASPERINCLUDEDIR) -L$(LIBDIR) -L$(DBLIBDIR) -L$(JASPERLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 else
-	$(COMPILER) $(COMPILE_OPTIONS) -Wl,-rpath,$(BUILDDIR) $(RUNPATH) $(DBRUNPATH) $(JASPERRUNPATH) $(SOURCEDIR)/$@.cpp -D__JASPER -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -I$(JASPERINCLUDEDIR) -L$(BUILDDIR) -L$(LIBDIR) -L$(DBLIBDIR) -L$(JASPERLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
+	$(COMPILER) $(COMPILE_OPTIONS) -Wl,-rpath,$(BUILDDIR) $(RUNPATH) $(DBRUNPATH) $(JASPERRUNPATH) $(SOURCEDIR)/$@.cpp -D__WITH_JASPER -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -I$(JASPERINCLUDEDIR) -L$(BUILDDIR) -L$(LIBDIR) -L$(DBLIBDIR) -L$(JASPERLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 endif
 	$(MAKE) NEW_VERSION=$(NEW_VERSION) TARGET=$@ INSTALLDIR=$(BINDIR) install
 endif
@@ -295,7 +293,7 @@ _gsi: CHECKDIR=$(BINDIR)
 _gsi: CHECK_TARGET=_gsi
 _gsi: $(SOURCEDIR)/_gsi.cpp builddir get_version
 ifeq ($(OKAY_TO_MAKE),1)
-	$(eval LINK_LIBS = $(DBLIBS) -lutils -lutilsthread -ldatetime -lmetautils_pg -lmetahelpers_pg -lgridutils -lbitmap -lxml -lsearch_pg -lcurl -lpthread -lz)
+	$(eval LINK_LIBS = $(DBLIBS) -lutils -lutilsthread -ldatetime -lmetautils -lmetahelpers -lgridutils -lbitmap -lxml -lsearch -lcurl -lpthread -lz)
 ifneq ($(or $(findstring BUG,$(VERSION)),$(findstring MINOR,$(VERSION)),$(findstring MAJOR,$(VERSION))),)
 	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(LIBDIR) -L$(DBLIBDIR) $(LINK_LIBS) -lz -o $(BUILDDIR)/$@.$(NEW_VERSION)
 else
@@ -307,7 +305,7 @@ endif
 _hdf2xml: CHECKDIR=$(BINDIR)
 _hdf2xml: CHECK_TARGET=_hdf2xml
 _hdf2xml: $(SOURCEDIR)/_hdf2xml.cpp builddir get_version
-	$(eval LINK_LIBS = $(DBLIBS) -lgatherxml -lio -lutils -lutilsthread -ldatetime -lbitmap -lhdf -lmetautils_pg -lmetahelpers_pg -lgridutils -lxml -lsearch_pg -ls3 -lmyssl -lcurl -lpthread -lz)
+	$(eval LINK_LIBS = $(DBLIBS) -lgatherxml -lio -lutils -lutilsthread -ldatetime -lbitmap -lhdf -lmetautils -lmetahelpers -lgridutils -lxml -lsearch -ls3 -lmyssl -lcurl -lpthread -lz)
 ifneq ($(or $(findstring BUG,$(VERSION)),$(findstring MINOR,$(VERSION)),$(findstring MAJOR,$(VERSION))),)
 	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(LIBDIR) -L$(DBLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 else
@@ -318,7 +316,7 @@ endif
 _iinv: CHECKDIR=$(BINDIR)
 _iinv: CHECK_TARGET=_iinv
 _iinv: $(SOURCEDIR)/_iinv.cpp builddir get_version
-	$(eval LINK_LIBS = $(DBLIBS) -lgatherxml -lutils -lutilsthread -ldatetime -lbitmap -lmetautils_pg -lmetahelpers_pg -lsearch_pg -lxml -lgridutils -ls3 -lmyssl -lcurl -lpthread -lz)
+	$(eval LINK_LIBS = $(DBLIBS) -lgatherxml -lutils -lutilsthread -ldatetime -lbitmap -lmetautils -lmetahelpers -lsearch -lxml -lgridutils -ls3 -lmyssl -lcurl -lpthread -lz)
 ifneq ($(or $(findstring BUG,$(VERSION)),$(findstring MINOR,$(VERSION)),$(findstring MAJOR,$(VERSION))),)
 	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(LIBDIR) -L$(DBLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 else
@@ -329,7 +327,7 @@ endif
 _nc2xml: CHECKDIR=$(BINDIR)
 _nc2xml: CHECK_TARGET=_nc2xml
 _nc2xml: $(SOURCEDIR)/_nc2xml.cpp builddir get_version
-	$(eval LINK_LIBS = $(DBLIBS) -lgatherxml -lio -lutils -lutilsthread -ldatetime -lmetautils_pg -lmetahelpers_pg -lgridutils -lsearch_pg -lxml -lbufr -lbitmap -ls3 -lmyssl -lerror -lpthread -lz -lcurl)
+	$(eval LINK_LIBS = $(DBLIBS) -lgatherxml -lio -lutils -lutilsthread -ldatetime -lmetautils -lmetahelpers -lgridutils -lsearch -lxml -lbufr -lbitmap -ls3 -lmyssl -lerror -lpthread -lz -lcurl)
 ifneq ($(or $(findstring BUG,$(VERSION)),$(findstring MINOR,$(VERSION)),$(findstring MAJOR,$(VERSION)),$(findstring singularity,$(HOST))),)
 	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(DBRUNPATH) $(JASPERRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(LIBDIR) -L$(DBLIBDIR) -L$(JASPERLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 else
@@ -341,7 +339,7 @@ _obs2xml: CHECKDIR=$(BINDIR)
 _obs2xml: CHECK_TARGET=_obs2xml
 _obs2xml: $(SOURCEDIR)/_obs2xml.cpp builddir get_version
 ifeq ($(OKAY_TO_MAKE),1)
-	$(eval LINK_LIBS = -lgatherxml $(DBLIBS) -lio -lobs -lutils -lutilsthread -ldatetime -lbitmap -lmetautils_pg -lmetahelpers_pg -lsearch_pg -lxml -lgridutils -ls3 -lmyssl -lssl -lcurl -lz -lpthread)
+	$(eval LINK_LIBS = -lgatherxml $(DBLIBS) -lio -lobs -lutils -lutilsthread -ldatetime -lbitmap -lmetautils -lmetahelpers -lsearch -lxml -lgridutils -ls3 -lmyssl -lssl -lcurl -lz -lpthread)
 ifneq ($(or $(findstring BUG,$(VERSION)),$(findstring MINOR,$(VERSION)),$(findstring MAJOR,$(VERSION))),)
 	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(LIBDIR) -L$(DBLIBDIR) -L$(JASPERLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 else
@@ -354,7 +352,7 @@ _prop2xml: CHECKDIR=$(BINDIR)
 _prop2xml: CHECK_TARGET=_prop2xml
 _prop2xml: $(SOURCEDIR)/_prop2xml.cpp builddir get_version
 ifeq ($(OKAY_TO_MAKE),1)
-	$(eval LINK_LIBS = $(DBLIBS) -lgatherxml -lutils -lutilsthread -ldatetime -lmetautils_pg -lmetahelpers_pg -lbitmap -lgridutils -lsearch_pg -lxml -ls3 -lmyssl -lssl -lcurl -lz -lpthread)
+	$(eval LINK_LIBS = $(DBLIBS) -lgatherxml -lutils -lutilsthread -ldatetime -lmetautils -lmetahelpers -lbitmap -lgridutils -lsearch -lxml -ls3 -lmyssl -lssl -lcurl -lz -lpthread)
 ifneq ($(or $(findstring BUG,$(VERSION)),$(findstring MINOR,$(VERSION)),$(findstring MAJOR,$(VERSION))),)
 	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(LIBDIR) -L$(DBLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 else
@@ -367,7 +365,7 @@ _rcm: CHECKDIR=$(BINDIR)
 _rcm: CHECK_TARGET=_rcm
 _rcm: $(SOURCEDIR)/_rcm.cpp builddir get_version
 ifeq ($(OKAY_TO_MAKE),1)
-	$(eval LINK_LIBS = $(DBLIBS) -lgatherxml -lutils -lutilsthread -ldatetime -lmetautils_pg -lmetahelpers_pg -lgridutils -lsearch_pg -lxml -lbitmap -ls3 -lmyssl -lssl -lcurl -lz -lpthread)
+	$(eval LINK_LIBS = $(DBLIBS) -lgatherxml -lutils -lutilsthread -ldatetime -lmetautils -lmetahelpers -lgridutils -lsearch -lxml -lbitmap -ls3 -lmyssl -lssl -lcurl -lz -lpthread)
 ifneq ($(or $(findstring BUG,$(VERSION)),$(findstring MINOR,$(VERSION)),$(findstring MAJOR,$(VERSION))),)
 	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(LIBDIR) -L$(DBLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 else
@@ -380,7 +378,7 @@ _scm: CHECKDIR=$(BINDIR)
 _scm: CHECK_TARGET=_scm
 _scm: $(SOURCEDIR)/_scm.cpp builddir get_version
 ifeq ($(OKAY_TO_MAKE),1)
-	$(eval LINK_LIBS = $(DBLIBS) -lgatherxml -lutils -lutilsthread -ldatetime -lgridutils -lmetautils_pg -lmetahelpers_pg -lsearch_pg -lxml -lbitmap -ls3 -lmyssl -lz -lcurl -lpthread)
+	$(eval LINK_LIBS = $(DBLIBS) -lgatherxml -lutils -lutilsthread -ldatetime -lgridutils -lmetautils -lmetahelpers -lsearch -lxml -lbitmap -ls3 -lmyssl -lz -lcurl -lpthread)
 ifneq ($(or $(findstring BUG,$(VERSION)),$(findstring MINOR,$(VERSION)),$(findstring MAJOR,$(VERSION))),)
 	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(LIBDIR) -L$(DBLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 else
@@ -393,7 +391,7 @@ _sdp: CHECKDIR=$(BINDIR)
 _sdp: CHECK_TARGET=_sdp
 _sdp: $(SOURCEDIR)/_sdp.cpp builddir get_version
 ifeq ($(OKAY_TO_MAKE),1)
-	$(eval LINK_LIBS = $(DBLIBS) -lutils -lutilsthread -ldatetime -lgridutils -lbitmap -lmetautils_pg -lmetahelpers_pg -lsearch_pg -lxml -lcurl -lz -lpthread)
+	$(eval LINK_LIBS = $(DBLIBS) -lutils -lutilsthread -ldatetime -lgridutils -lbitmap -lmetautils -lmetahelpers -lsearch -lxml -lcurl -lz -lpthread)
 ifneq ($(or $(findstring BUG,$(VERSION)),$(findstring MINOR,$(VERSION)),$(findstring MAJOR,$(VERSION))),)
 	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(LIBDIR) -L$(DBLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 else
@@ -406,7 +404,7 @@ _sml: CHECKDIR=$(BINDIR)
 _sml: CHECK_TARGET=_sml
 _sml: $(SOURCEDIR)/_sml.cpp builddir get_version
 ifeq ($(OKAY_TO_MAKE),1)
-	$(eval LINK_LIBS = $(DBLIBS) -lmetautils_pg -lutils -lutilsthread -ldatetime -lgridutils -lbitmap -lmetahelpers_pg -lsearch_pg -lxml -lcurl -lz -lpthread)
+	$(eval LINK_LIBS = $(DBLIBS) -lmetautils -lutils -lutilsthread -ldatetime -lgridutils -lbitmap -lmetahelpers -lsearch -lxml -lcurl -lz -lpthread)
 ifneq ($(or $(findstring BUG,$(VERSION)),$(findstring MINOR,$(VERSION)),$(findstring MAJOR,$(VERSION))),)
 	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(LIBDIR) -L$(DBLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 else
@@ -414,6 +412,12 @@ else
 endif
 	$(MAKE) NEW_VERSION=$(NEW_VERSION) TARGET=$@ INSTALLDIR=$(BINDIR) install
 endif
+#
+gatherxml_pg-4-test.sif:
+	cd /data/ptmp \
+	  && export SINGULARITY_TMPDIR=/data/ptmp \
+	  && sudo -E /usr/local/bin/singularity build --force $@ /glade/u/home/dattore/gatherxml_pg/singularity/$(basename $@).def \
+	  && mv -f $@ /glade/u/home/rdadata/lib/singularity/
 #
 gatherxml_pg-1-os.sif gatherxml_pg-2-pkgs.sif gatherxml_pg-3-python.sif gatherxml_pg-4-libs.sif:
 ifneq ($(or $(findstring rda-web-dev,$(HOST)),$(findstring rda-work,$(HOST))),)
@@ -425,6 +429,12 @@ else
 	$(error make on rda-web-dev.ucar.edu or rda-work.ucar.edu)
 endif
 #
+gatherxml_pg-4-test-update.sif:
+	cd /data/ptmp \
+	  && export SINGULARITY_TMPDIR=/data/ptmp \
+	  && sudo -E /usr/local/bin/singularity build --force $@ /glade/u/home/dattore/gatherxml_pg/singularity/$(basename $@).def \
+	  && mv -f $@ /glade/u/home/rdadata/lib/singularity/$(subst -update,,$(basename $@).sif)
+#
 gatherxml_pg-4-libs-update.sif:
 ifneq ($(or $(findstring rda-web-dev,$(HOST)),$(findstring rda-work,$(HOST))),)
 	cd /data/ptmp \
@@ -435,8 +445,13 @@ else
 	$(error make on rda-web-dev.ucar.edu or rda-work.ucar.edu)
 endif
 #
+gatherxml_pg-5-test.sif:
+	cd /data/ptmp \
+	  && export SINGULARITY_TMPDIR=/data/ptmp \
+	  && sudo -E /usr/local/bin/singularity build --force $@ /glade/u/home/dattore/gatherxml_pg/singularity/$(basename $@).def \
+	  && mv -f $@ /glade/u/home/rdadata/lib/singularity/
+#
 gatherxml_pg-5-utils.sif:
-ifneq ($(or $(findstring rda-web-dev,$(HOST)),$(findstring rda-work,$(HOST))),)
 ifeq ($(strip $(UTILITY)),)
 	$(eval GO_BACK = $(shell pwd))
 	cd /data/ptmp \
@@ -446,11 +461,16 @@ ifeq ($(strip $(UTILITY)),)
 	  && cd $(GO_BACK) \
 	  && $(MAKE) gatherxml_pg-exec.sif
 else
-	$(error found UTILITY=$(UTILITY) - did you mean to build 'gatherxml-5-utils-update.sif'?)
+	$(error found UTILITY=$(UTILITY) - did you mean to build 'gatherxml_pg-5-utils-update.sif'?)
 endif
-else
-	$(error make on rda-web-dev.ucar.edu or rda-work.ucar.edu)
-endif
+#
+gatherxml_pg-5-utils-test.sif:
+	$(eval GO_BACK = $(shell pwd))
+	module load apptainer \
+	  && cd /lustre/desc1/scratch/dattore \
+	  && export SINGULARITY_TMPDIR=/lustre/desc1/scratch/dattore \
+	  && which singularity \
+	  && singularity build --force $@ /glade/u/home/dattore/gatherxml_pg/singularity/$(basename $@).def
 #
 gatherxml_pg-5-utils-update.sif:
 ifneq ($(or $(findstring rda-web-dev,$(HOST)),$(findstring rda-work,$(HOST))),)
