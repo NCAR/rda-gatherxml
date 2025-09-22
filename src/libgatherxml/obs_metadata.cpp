@@ -123,24 +123,16 @@ void check_point(double latp, double lonp, Server& server, unordered_set<
 void compress_locations(unordered_set<string>& location_list, my::map<
     ParentLocation>& parent_location_table, vector<string>& sorted_array, string
     caller, string user) {
-  TempDir temp_dir;
-  string f;
-  if (!temp_dir.create(metautils::directives.temp_path)) {
-    myerror = "Error creating temporary directory";
-    exit(1);
-  }
-  f = unixutils::remote_web_file("https://gdex.ucar.edu/metadata/"
-      "gcmd_locations", temp_dir.name());
-  std::ifstream ifs(f.c_str());
-  if (!ifs.is_open()) {
-    myerror = "Error opening gcmd_locations";
+  Server mysrv(metautils::directives.metadb_config);
+  LocalQuery q("select path from search.gcmd_locations where path like "
+      "'% > % > %'");
+  if (q.submit(mysrv) < 0) {
+    myerror = "Error getting GCMD locations";
     exit(1);
   }
   ParentLocation pl;
-  char l[256];
-  ifs.getline(l, 256);
-  while (!ifs.eof()) {
-    pl.key = l;
+  for (const auto& r : q) {
+    pl.key = r[0];
     while (strutils::occurs(pl.key, " > ") > 1) {
       auto c = pl.key;
       pl.key = pl.key.substr(0, pl.key.rfind(" > "));
@@ -156,9 +148,8 @@ void compress_locations(unordered_set<string>& location_list, my::map<
         }
       }
     }
-    ifs.getline(l, 256);
   }
-  ifs.close();
+  mysrv.disconnect();
 
   //special handling for Antarctica since it has no children
   pl.key = "Continent > Antarctica";
