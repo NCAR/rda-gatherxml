@@ -397,7 +397,7 @@ void generate_parameter_cross_reference(string format, string title, string
     ofs2.close();
     string e;
     if (unixutils::gdex_upload_dir(t.name(), "metadata/", "/data/web/datasets/"
-        + metautils::args.dsid, "", e) < 0) {
+        + metautils::args.dsid, metautils::directives.gdex_upload_key, e) < 0) {
       metautils::log_warning("generate_parameter_cross_reference() couldn't "
           "sync cross-references - gdex_upload_dir() error(s): '" + e  + "'",
           caller, user);
@@ -410,7 +410,7 @@ void generate_parameter_cross_reference(string format, string title, string
         html_file;
     if (exists_on_server(metautils::directives.web_server, rfile)) {
       string e;
-      if (gdex_unlink(rfile, metautils::directives.unlink_key, e) < 0) {
+      if (gdex_unlink(rfile, metautils::directives.gdex_unlink_key, e) < 0) {
         metautils::log_warning("generate_parameter_cross_reference() tried to "
             "but couldn't delete '" + html_file + "' - error: '" + e + "'",
             caller, user);
@@ -419,7 +419,7 @@ void generate_parameter_cross_reference(string format, string title, string
     replace_all(rfile, ".html", ".xml");
     if (exists_on_server(metautils::directives.web_server, rfile)) {
       string e;
-      if (gdex_unlink(rfile, metautils::directives.unlink_key, e) < 0) {
+      if (gdex_unlink(rfile, metautils::directives.gdex_unlink_key, e) < 0) {
         metautils::log_warning("generate_parameter_cross_reference() tried to "
             "but couldn't delete '" + substitute(html_file, ".html", ".xml") +
             "' - error: '" + e + "'", caller, user);
@@ -544,7 +544,7 @@ void generate_level_cross_reference(string format, string title, string
     ofs.close();
     string e;
     if (unixutils::gdex_upload_dir(t.name(), "metadata/", "/data/web/datasets/"
-        + metautils::args.dsid, "", e) < 0) {
+        + metautils::args.dsid, metautils::directives.gdex_upload_key, e) < 0) {
       metautils::log_warning(F + " couldn't sync '" + html_file + "' - "
           "gdex_upload_dir() error(s): '" + e + "'", caller, user);
     }
@@ -556,7 +556,7 @@ void generate_level_cross_reference(string format, string title, string
         html_file;
     if (exists_on_server(metautils::directives.web_server, rfile)) {
       string e;
-      if (gdex_unlink(rfile, metautils::directives.unlink_key, e) < 0) {
+      if (gdex_unlink(rfile, metautils::directives.gdex_unlink_key, e) < 0) {
         metautils::log_warning(F + " tried to but couldn't delete '" + html_file
             + "' - error: '" + e + "'", caller, user);
       }
@@ -1428,7 +1428,7 @@ void generate_detailed_grid_summary(string file_type, ofstream& ofs, const
   srv.disconnect();
   string e;
   if (unixutils::gdex_upload_dir(t.name(), "metadata/", "/data/web/datasets/" +
-      metautils::args.dsid, "", e) < 0) {
+      metautils::args.dsid, metautils::directives.gdex_upload_key, e) < 0) {
     metautils::log_warning(F + " couldn't sync detail files - "
         "gdex_upload_dir() error(s): '" + e + "'", caller, user);
   }
@@ -1644,7 +1644,7 @@ void generate_detailed_observation_summary(string file_type, ofstream& ofs,
   ofs_o.close();
   string e;
   if (unixutils::gdex_upload_dir(t.name(), "metadata/", "/data/web/datasets/" +
-      metautils::args.dsid, "", e) < 0) {
+      metautils::args.dsid, metautils::directives.gdex_upload_key, e) < 0) {
     metautils::log_warning(F + " couldn't sync detail files - "
         "gdex_upload_dir() error(s): '" + e + "'", caller, user);
   }
@@ -1927,7 +1927,8 @@ void generate_detailed_metadata_view(string caller, string user) {
     ofs.close();
     string error;
     if (unixutils::gdex_upload_dir(t.name(), "metadata/", "/data/web/datasets/"
-        + metautils::args.dsid, "", error) < 0) {
+        + metautils::args.dsid, metautils::directives.gdex_upload_key, error) <
+        0) {
       metautils::log_warning(F + " couldn't sync 'detailed.html' - "
           "gdex_upload_dir() error(s): '" + error + "'", caller, user);
     }
