@@ -1,5 +1,6 @@
 #include <iostream>
 #include <fstream>
+#include <unistd.h>
 #include <sys/stat.h>
 #include <string>
 #include <sstream>
@@ -2181,6 +2182,7 @@ int main(int argc, char **argv) {
     show_usage();
     exit(1);
   }
+std::cerr << "UIDs=" << getuid() << " " << geteuid() << std::endl;
   const string F = this_function_label(__func__);
   auto next = 1;
   if (string(argv[next]) == "--no-dset-waf") {
