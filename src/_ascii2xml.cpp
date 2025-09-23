@@ -22,15 +22,16 @@ using std::list;
 using std::regex;
 using std::regex_search;
 using std::stof;
+using std::string;
 using unixutils::mysystem2;
 
 metautils::Directives metautils::directives;
 metautils::Args metautils::args;
 bool gatherxml::verbose_operation;
-extern const std::string USER = getenv("USER");
-std::string myerror = "";
-std::string mywarning = "";
-std::string myoutput = "";
+extern const string USER = getenv("USER");
+string myerror = "";
+string mywarning = "";
+string myoutput = "";
 
 std::unique_ptr<TempFile> work_file;
 std::unique_ptr<TempDir> work_dir;
@@ -59,13 +60,13 @@ extern "C" void int_handler(int) {
 struct InvEntry {
   InvEntry() : key(), lat(0.), lon(0.), plat_type(0) { }
 
-  std::string key;
+  string key;
   float lat, lon;
   short plat_type;
 };
 
 void scan_ghcnv3_file(gatherxml::markup::ObML::ObservationData& obs_data,
-    list<std::string>& filelist) {
+    list<string>& filelist) {
   static const string F = this_function_label(__func__);
   TempDir stn_tdir;
   if (!stn_tdir.create(metautils::directives.temp_path)) {
@@ -97,8 +98,8 @@ void scan_ghcnv3_file(gatherxml::markup::ObML::ObservationData& obs_data,
   while (!ifs.eof()) {
     InvEntry ie;
     ie.key.assign(line, 11);
-    ie.lat = stof(std::string(&line[12],8));
-    ie.lon = stof(std::string(&line[21],9));
+    ie.lat = stof(string(&line[12],8));
+    ie.lon = stof(string(&line[21],9));
     if (ie.key.substr(0, 3) < "800") {
       ie.plat_type = 0;
     } else {
@@ -120,7 +121,7 @@ void scan_ghcnv3_file(gatherxml::markup::ObML::ObservationData& obs_data,
       InvEntry ie;
       ie.key.assign(line,11);
       inv_table.found(ie.key,ie);
-      std::string platform_type;
+      string platform_type;
       if (ie.plat_type == 0) {
         platform_type="land_station";
       }
@@ -128,16 +129,16 @@ void scan_ghcnv3_file(gatherxml::markup::ObML::ObservationData& obs_data,
         platform_type="fixed_ship";
       }
       ientry.key=platform_type+"[!]GHCNV3[!]"+ie.key;
-      auto year=std::stoi(std::string(&line[11],4));
+      auto year=std::stoi(string(&line[11],4));
       auto off=19;
       auto add_platform_entry=false;
       for (size_t n=0; n < 12; ++n) {
-        if (std::string(&line[off],5) != "-9999") {
+        if (string(&line[off],5) != "-9999") {
           DateTime min_datetime,max_datetime;
           auto month=n+1;
           min_datetime.set(year,month,1,0);
           max_datetime.set(year,month,dateutils::days_in_month(year,month),235959);
-          if (!obs_data.added_to_ids("surface",ientry,std::string(&line[15],4),"",ie.lat,ie.lon,-1.,&min_datetime,&max_datetime)) {
+          if (!obs_data.added_to_ids("surface",ientry,string(&line[15],4),"",ie.lat,ie.lon,-1.,&min_datetime,&max_datetime)) {
             log_error2("'" + myerror + "' while adding ID " + ientry.key, F,
                 "ascii2xml", USER);
           }
@@ -159,9 +160,9 @@ void scan_ghcnv3_file(gatherxml::markup::ObML::ObservationData& obs_data,
   }
 }
 
-void scan_hcn_file(gatherxml::markup::ObML::ObservationData& obs_data,list<std::string>& filelist)
+void scan_hcn_file(gatherxml::markup::ObML::ObservationData& obs_data,list<string>& filelist)
 {
-  static const std::string THIS_FUNC=__func__;
+  static const string THIS_FUNC=__func__;
   TempDir stn_tdir;
   if (!stn_tdir.create(metautils::directives.temp_path)) {
     log_error(THIS_FUNC+"() returned error: unable to create temporary directory","ascii2xml",USER);
@@ -172,14 +173,14 @@ void scan_hcn_file(gatherxml::markup::ObML::ObservationData& obs_data,list<std::
   if (!ifs.is_open()) {
     log_error(THIS_FUNC+"() returned error: unable to open station history file","ascii2xml",USER);
   }
-  std::unordered_map<std::string,std::vector<std::tuple<int,int,float,float>>> stn_history;
+  std::unordered_map<string,std::vector<std::tuple<int,int,float,float>>> stn_history;
   const size_t LINE_LENGTH=32768;
   char line[LINE_LENGTH];
   ifs.getline(line,LINE_LENGTH);
-  std::string xref;
+  string xref;
   while (!ifs.eof()) {
     if (line[44] == ' ') {
-      std::string stn_id;
+      string stn_id;
       if (xref.empty()) {
         stn_id.assign(&line[0],6);
       }
@@ -209,7 +210,7 @@ void scan_hcn_file(gatherxml::markup::ObML::ObservationData& obs_data,list<std::
       stn_history[stn_id].emplace_back(start_date,end_date,lat,lon);
     }
     else {
-      if (std::string(&line[61],5) == "FROM ") {
+      if (string(&line[61],5) == "FROM ") {
         xref.assign(&line[66],4);
       }
       else {
@@ -228,7 +229,7 @@ void scan_hcn_file(gatherxml::markup::ObML::ObservationData& obs_data,list<std::
     }
     ifs.getline(line,LINE_LENGTH);
     while (!ifs.eof()) {
-      std::string stn_id(&line[0],6);
+      string stn_id(&line[0],6);
       if (stn_id[0] == ' ') {
         stn_id[0]='0';
       }
@@ -270,11 +271,11 @@ void scan_hcn_file(gatherxml::markup::ObML::ObservationData& obs_data,list<std::
       strutils::strget(&line[20],ndays,2);
       auto off=24;
       for (size_t n=0; n < ndays; ++n) {
-        std::string value(&line[off],4);
+        string value(&line[off],4);
         if (value != "-999") {
           DateTime min_datetime(yr,mo,n+1,0,-2400);
           DateTime max_datetime=min_datetime.days_added(1);
-          if (!obs_data.added_to_ids("surface",ientry,std::string(&line[7],4),"",lat,lon,-1.,&min_datetime,&max_datetime)) {
+          if (!obs_data.added_to_ids("surface",ientry,string(&line[7],4),"",lat,lon,-1.,&min_datetime,&max_datetime)) {
             log_error(THIS_FUNC+"() returned error: '"+myerror+"' while adding ID "+ientry.key,"ascii2xml",USER);
           }
           add_platform_entry=true;
@@ -293,7 +294,7 @@ void scan_hcn_file(gatherxml::markup::ObML::ObservationData& obs_data,list<std::
   }
 }
 
-void scan_little_r_file(gatherxml::markup::ObML::ObservationData& obs_data,list<std::string>& filelist)
+void scan_little_r_file(gatherxml::markup::ObML::ObservationData& obs_data,list<string>& filelist)
 {
   const char *DATA_TYPES[10]={"Pressure","Height","Temperature","Dew point","Wind speed","Wind direction","East-west wind","North-south wind","Relative humidity","Thickness"};
   std::unique_ptr<unsigned char []> buffer;
@@ -356,14 +357,14 @@ void scan_little_r_file(gatherxml::markup::ObML::ObservationData& obs_data,list<
           }
         }
         if (!all_missing) {
-          std::string obs_type;
+          string obs_type;
           if (obs.is_sounding()) {
             obs_type="upper_air";
           }
           else {
             obs_type="surface";
           }
-          std::string platform_type;
+          string platform_type;
           switch (obs.platform_code()) {
             case 12:
             case 14:
@@ -444,7 +445,7 @@ void scan_little_r_file(gatherxml::markup::ObML::ObservationData& obs_data,list<
   }
 }
 
-void scan_nodc_sea_level_file(gatherxml::markup::ObML::ObservationData& obs_data,list<std::string>& filelist)
+void scan_nodc_sea_level_file(gatherxml::markup::ObML::ObservationData& obs_data,list<string>& filelist)
 {
   std::unique_ptr<unsigned char[]> buffer(nullptr);
   for (const auto& file : filelist) {
@@ -504,8 +505,8 @@ void scan_file(gatherxml::markup::ObML::ObservationData& obs_data)
   work_file->open(metautils::directives.temp_path);
   work_dir.reset(new TempDir);
   work_dir->create(metautils::directives.temp_path);
-  std::string file_format,error;
-  list<std::string> filelist;
+  string file_format,error;
+  list<string> filelist;
   if (!metautils::primaryMetadata::prepare_file_for_metadata_scanning(*work_file,*work_dir,&filelist,file_format,error)) {
     log_error("prepare_file_for_metadata_scanning() returned '"+error+"'","ascii2xml",USER);
   }
@@ -554,14 +555,14 @@ int main(int argc, char **argv) {
       arg_delimiter);
   metautils::read_config("ascii2xml", USER);
   gatherxml::parse_args(arg_delimiter);
-  std::string flags = "-f";
+  string flags = "-f";
   if (regex_search(metautils::args.path, regex("^https://rda.ucar.edu"))) {
     flags = "-wf";
   }
   metautils::cmd_register("ascii2xml", USER);
   gatherxml::markup::ObML::ObservationData obs_data;
   scan_file(obs_data);
-  std::string ext;
+  string ext;
   if (write_type == grml_type) {
     ext = "GrML";
   } else if (write_type == obml_type) {
@@ -581,7 +582,7 @@ int main(int argc, char **argv) {
     if (!metautils::args.update_summary) {
       flags = "-S "+flags;
     }
-    std::stringstream oss, ess;
+    stringstream oss, ess;
     if (mysystem2(metautils::directives.local_root + "/bin/scm -d " +
         metautils::args.dsid + " " + flags + " " + metautils::args.filename +
         "." + ext, oss, ess) < 0) {
