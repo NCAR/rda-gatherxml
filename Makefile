@@ -237,7 +237,7 @@ _dsgen: CHECKDIR=$(BINDIR)
 _dsgen: CHECK_TARGET=_dsgen
 _dsgen: $(SOURCEDIR)/_dsgen.cpp builddir get_version
 ifeq ($(OKAY_TO_MAKE),1)
-	$(eval LINK_LIBS = $(DBLIBS) -lutils -lutilsthread -ldatetime -lmetautils -lmetahelpers -lmetaexport_pg -lmetaexporthelpers_pg -lgridutils -lsearch -lxml -lbitmap -lcitation_pg -lz -lpthread -lcurl)
+	$(eval LINK_LIBS = $(DBLIBS) -lutils -lutilsthread -ldatetime -lmetautils -lmetahelpers -lmetaexport -lmetaexporthelpers -lgridutils -lsearch -lxml -lbitmap -lcitation -lz -lpthread -lcurl)
 ifneq ($(or $(findstring BUG,$(VERSION)),$(findstring MINOR,$(VERSION)),$(findstring MAJOR,$(VERSION))),)
 	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(LIBDIR) -L$(DBLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 else
