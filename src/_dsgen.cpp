@@ -2200,9 +2200,11 @@ std::cerr << unixutils::host_name() << std::endl;
   g_ds_set = to_sql_tuple_string(ds_aliases(metautils::args.dsid));
   metautils::args.args_string = unixutils::unix_args_string(argc, argv);
   metautils::read_config("dsgen", USER, false);
+std::cerr << "TEMP PATH=" << metautils::directives.temp_path << std::endl;
   if (!temp_dir.create(metautils::directives.temp_path)) {
     log_error2("unable to create temporary directory", F, "dsgen", USER);
   }
+std::cerr << "METADB Password=" << metautils::directives.metadb_config.password << std::endl;
   g_metadata_server.connect(metautils::directives.metadb_config);
   LocalQuery q("select type from search.datasets where dsid in " + g_ds_set);
   Row row;
