@@ -18,8 +18,9 @@ metautils::Directives metautils::directives;
 metautils::Args metautils::args;
 bool gatherxml::verbose_operation;
 extern const std::string USER=getenv("USER");
-std::string myerror="";
-std::string mywarning="";
+std::string myerror = "";
+std::string mywarning = "";
+std::string myoutput = "";
 
 std::unique_ptr<TempFile> work_file;
 std::unique_ptr<TempDir> work_dir;
