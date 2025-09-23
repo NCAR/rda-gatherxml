@@ -115,12 +115,12 @@ ifneq ($(findstring docker,$(HOST)),)
 # Settings for docker containers
 	BUILDEXT = docker
 	COMPILER = g++
-	GLOBALINCLUDEDIR = /usr/local/include/myincludes
+	GLOBALINCLUDEDIR = /usr/local/include
         DBINCLUDEDIR = /usr/include/postgresql
         LIBDIR = /usr/local/lib
         DBLIBDIR = /usr/lib/x86_64-linux-gnu
 	DBLIBS = -lpq -lpostgresql
-	JASPERINCLUDEDIR = /usr/include/jasper
+	JASPERINCLUDEDIR = /usr/include
 	JASPERLIBDIR = /usr/lib/x86_64-linux-gnu/lib
 	BINDIR = /usr/local/bin
 	RUNPATH = -Wl,-rpath,$(LIBDIR)
