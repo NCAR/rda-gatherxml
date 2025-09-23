@@ -21,7 +21,8 @@ std::string myerror="";
 std::string mywarning="";
 
 Server server_m,server_d;
-std::string user=getenv("USER");
+auto env = getenv("USER");
+std::string USER = (env == nullptr) ? "unknown" : env;
 std::string ds_meta_link="N";
 struct Entry {
   Entry() : key(),meta_link() {}

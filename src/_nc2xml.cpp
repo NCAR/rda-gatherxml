@@ -65,7 +65,8 @@ using unixutils::open_output;
 metautils::Directives metautils::directives;
 metautils::Args metautils::args;
 bool gatherxml::verbose_operation;
-extern const string USER = getenv("USER");
+auto env = getenv("USER");
+extern const string USER = (env == nullptr) ? "unknown" : env;
 string myerror = "";
 string mywarning = "";
 string myoutput = "";
@@ -3733,6 +3734,7 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
           diff = 365;
         }
         if (!myequalf(diff, time_bounds_s.diff)) {
+          // allow month-intervals specified in units of days to pass
           if (time_data.units != "days" || time_bounds_s.diff < 28 ||
               time_bounds_s.diff > 31 || diff < 28 || diff > 31) {
             time_bounds_s.changed = true;
@@ -4333,15 +4335,15 @@ void scan_wrf_simulation_netcdf_file(InputNetCDFStream& istream,bool& found_map,
 void scan_cf_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data,
     gatherxml::markup::ObML::ObservationData& obs_data) {
   static const string F = this_function_label(__func__);
-  string ft, lft, p;
+  string feature_type, lft, platform;
   for (const auto& a : gattrs) {
     if (a.name == "featureType") {
-      ft = *(reinterpret_cast<string *>(a.values));
-      lft = to_lower(ft);
-      trim(ft);
+      feature_type = *(reinterpret_cast<string *>(a.values));
+      trim(feature_type);
+      lft = to_lower(feature_type);
     } else if (a.name == "platform") {
-      p = *(reinterpret_cast<string *>(a.values));
-      trim(p);
+      platform = *(reinterpret_cast<string *>(a.values));
+      trim(platform);
     }
   }
 
@@ -4357,21 +4359,21 @@ void scan_cf_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data,
     }
     scan_data.map_name += ".p";
   }
-  if (!ft.empty()) {
+  if (!feature_type.empty()) {
     if (!scan_data.map_name.empty() && scan_data.datatype_map.fill(scan_data.
         map_name)) {
       scan_data.map_filled = true;
     }
-    string pt = "unknown";
-    if (!p.empty()) {
+    string platform_type = "unknown";
+    if (!platform.empty()) {
       Server server(metautils::directives.metadb_config);
       if (server) {
         LocalQuery query("obml_platform_type", "search.gcmd_platforms", "path "
-            "= '" + p + "'");
+            "= '" + platform + "'");
         if (query.submit(server) == 0) {
           Row row;
           if (query.fetch_row(row)) {
-            pt = row[0];
+            platform_type = row[0];
           }
         }
         server.disconnect();
@@ -4380,18 +4382,23 @@ void scan_cf_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data,
     DiscreteGeometriesData dgd;
     process_variable_attributes(dgd);
     if (lft == "point") {
-      scan_cf_point_netcdf_file(istream, pt, dgd, scan_data, obs_data);
-    } else if (lft == "timeseries") {
-      scan_cf_time_series_netcdf_file(istream, pt, dgd, scan_data, obs_data);
-    } else if (lft == "trajectory") {
-      scan_cf_trajectory_netcdf_file(istream, pt, dgd, scan_data, obs_data);
-    } else if (lft == "profile") {
-      scan_cf_profile_netcdf_file(istream, pt, dgd, scan_data, obs_data);
-    } else if (lft == "timeseriesprofile") {
-      scan_cf_time_series_profile_netcdf_file(istream, pt, dgd, scan_data,
+      scan_cf_point_netcdf_file(istream, platform_type, dgd, scan_data,
           obs_data);
+    } else if (lft == "timeseries") {
+      scan_cf_time_series_netcdf_file(istream, platform_type, dgd, scan_data,
+          obs_data);
+    } else if (lft == "trajectory") {
+      scan_cf_trajectory_netcdf_file(istream, platform_type, dgd, scan_data,
+          obs_data);
+    } else if (lft == "profile") {
+      scan_cf_profile_netcdf_file(istream, platform_type, dgd, scan_data,
+          obs_data);
+    } else if (lft == "timeseriesprofile") {
+      scan_cf_time_series_profile_netcdf_file(istream, platform_type, dgd,
+          scan_data, obs_data);
     } else {
-      log_error2("featureType '" + ft + "' not recognized", F, "nc2xml", USER);
+      log_error2("featureType '" + feature_type + "' not recognized", F,
+          "nc2xml", USER);
     }
   } else {
     if (!scan_data.map_name.empty() && scan_data.parameter_map.fill(scan_data.

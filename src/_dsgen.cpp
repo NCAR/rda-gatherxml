@@ -70,7 +70,8 @@ metautils::Directives metautils::directives;
 metautils::Args metautils::args;
 string myerror = "";
 string mywarning = "";
-extern const string USER = getenv("USER");
+auto env = getenv("USER");
+extern const string USER = (env == nullptr) ? "unknown" : env;
 
 TempDir temp_dir;
 XMLDocument g_xdoc;

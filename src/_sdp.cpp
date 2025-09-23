@@ -47,7 +47,8 @@ struct LocalArgs {
   int start_date_flag, start_time_flag, end_date_flag, end_time_flag;
   string db_start_date, db_start_time, db_end_date, db_end_time;
 } local_args;
-const string G_USER=getenv("USER");
+auto env = getenv("USER");
+const string G_USER = (env == nullptr) ? "unknown" : env;
 
 int check_date(string date, string& db_date, string type) {
   db_date = date;
@@ -412,7 +413,7 @@ int main(int argc, char **argv) {
 
   // sync the new overview to the dataset metadata directory on all sync hosts
   if (gdex_upload_dir(sync_dir->name(), ".", "/data/web/datasets/" + metautils::
-      args.dsid + "/metadata", "", error) <
+      args.dsid + "/metadata", metautils::directives.gdex_upload_key, error) <
       0) {
     log_error("unable to gdex_upload_dir updated XML file - error(s): '" + error
         + "'", "sdp", G_USER);

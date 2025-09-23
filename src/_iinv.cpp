@@ -61,7 +61,8 @@ using unixutils::open_output;
 metautils::Directives metautils::directives;
 metautils::Args metautils::args;
 bool gatherxml::verbose_operation;
-extern const string USER = getenv("USER");
+auto env = getenv("USER");
+extern const string USER = (env == nullptr) ? "unknown" : env;
 string myerror = "";
 string mywarning = "";
 

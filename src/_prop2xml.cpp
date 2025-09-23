@@ -17,7 +17,8 @@ using strutils::to_sql_tuple_string;
 metautils::Directives metautils::directives;
 metautils::Args metautils::args;
 bool gatherxml::verbose_operation;
-extern const std::string USER=getenv("USER");
+auto env = getenv("USER");
+extern const string USER = (env == nullptr) ? "unknown" : env;
 std::string myerror="";
 std::string mywarning="";
 
@@ -330,7 +331,7 @@ void scan_input_file(gatherxml::markup::ObML::ObservationData& obs_data)
   ofs.close();
   std::string error;
   if (unixutils::gdex_upload_dir(tdir.name(), "metadata/ParameterTables/",
-      "/data/web", "", error) < 0) {
+      "/data/web", metautils::directives.gdex_upload_key, error) < 0) {
     metautils::log_error("unable to sync data type map - error(s): '"+error+"'","prop2xml",USER);
   }
   if (unixutils::mysystem2("/bin/cp "+datatype_map+" "+metautils::directives.parameter_map_path+"/",oss,ess) < 0) {

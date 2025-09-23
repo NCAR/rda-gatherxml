@@ -49,7 +49,8 @@ struct ThreadStruct {
 
 Server server;
 char bitmap[60][121];
-const string USER = getenv("USER");
+auto env = getenv("USER");
+extern const string USER = (env == nullptr) ? "unknown" : env;
 const string PLT_EXT = ".py";
 const string IMG_EXT = ".png";
 
@@ -173,7 +174,8 @@ void *thread_plot(void *tnc) {
   create_graphics(plt_p->name(), img_p->name(), tdir->name(), t->imagetag);
   string e;
   if (unixutils::gdex_upload_dir(tdir->name(), "datasets/" + metautils::args.
-      dsid + "/metadata/", "/data/web", "", e) < 0) {
+      dsid + "/metadata/", "/data/web", metautils::directives.gdex_upload_key,
+      e) < 0) {
     log_warning("gdex_upload_dir() errors: '" + e + "'", "gsi", USER);
   }
   return nullptr;
@@ -279,7 +281,8 @@ void generate_graphics(LocalQuery& query, string type, string table, string
   create_graphics(plt_p->name(), img_p->name(), tdir->name());
   string e;
   if (unixutils::gdex_upload_dir(tdir->name(),"datasets/" + metautils::args.dsid
-      + "/metadata/", "/data/web", "", e) < 0) {
+      + "/metadata/", "/data/web", metautils::directives.gdex_upload_key, e) <
+      0) {
     log_warning("gdex_upload_dir() errors: '" + e + "'", "gsi", USER);
   }
 }
