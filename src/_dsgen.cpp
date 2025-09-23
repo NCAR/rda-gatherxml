@@ -517,12 +517,17 @@ void add_abstract(TokenDocument& tdoc) {
   update_wagtail("abstract", abstract, F);
 }
 
+/*
 void exit_if_dead_dataset(TokenDocument& tdoc, string tdir_name, std::ofstream&
     ofs) {
+*/
+void exit_if_dead_dataset(string tdir_name) {
   if (g_dataset_type == "D") {
+/*
     tdoc.add_if("__IS_DEAD_DATASET__");
     ofs << tdoc;
     ofs.close();
+*/
     sync_dataset_files(tdir_name);
     exit(0);
   }
@@ -560,13 +565,16 @@ void initialize(vector<string>& formats, vector<string>& data_types, bool&
   }
 }
 
-void add_acknowledgement(TokenDocument& tdoc) {
+//void add_acknowledgement(TokenDocument& tdoc) {
+void add_acknowledgement() {
   static const string F = this_function_label(__func__);
   auto ack = text_field_from_element(g_xdoc.element("OAI-PMH/GetRecord/record/"
       "metadata/dsOverview/acknowledgement"));
   if (!ack.empty()) {
+/*
     tdoc.add_if("__HAS_ACKNOWLEDGEMENTS__");
     tdoc.add_replacement("__ACKNOWLEDGEMENT__", ack);
+*/
   }
   update_wagtail("acknowledgement", ack, F);
 }
@@ -756,13 +764,14 @@ void add_book_chapter_to_publication(const XMLElement& e, stringstream& ss,
   json += ".";
 }
 
-void add_publications(TokenDocument& tdoc, XMLDocument& g_xdoc) {
+//void add_publications(TokenDocument& tdoc, XMLDocument& g_xdoc) {
+void add_publications(XMLDocument& g_xdoc) {
   static const string F = this_function_label(__func__);
   auto rlist = g_xdoc.element_list("OAI-PMH/GetRecord/record/metadata/"
       "dsOverview/reference");
   stringstream ss;
   if (!rlist.empty()) {
-    tdoc.add_if("__HAS_PUBLICATIONS__");
+//    tdoc.add_if("__HAS_PUBLICATIONS__");
     rlist.sort(compare_references);
     string json;
     for (const auto& r : rlist) {
@@ -798,7 +807,7 @@ void add_publications(TokenDocument& tdoc, XMLDocument& g_xdoc) {
       "dsOverview/referenceURL");
   if (!ulist.empty()) {
     if (ss.str().empty()) {
-      tdoc.add_if("__HAS_PUBLICATIONS__");
+//      tdoc.add_if("__HAS_PUBLICATIONS__");
     }
     for (const auto& u : ulist) {
       ss << "<a href=\"" << u.attribute_value("url") << "\">" << u.content() <<
@@ -806,11 +815,12 @@ void add_publications(TokenDocument& tdoc, XMLDocument& g_xdoc) {
     }
   }
   if (!ss.str().empty()) {
-    tdoc.add_replacement("__PUBLICATIONS__", ss.str());
+//    tdoc.add_replacement("__PUBLICATIONS__", ss.str());
   }
 }
 
-void add_data_formats(TokenDocument& tdoc, vector<string>& formats, bool
+//void add_data_formats(TokenDocument& tdoc, vector<string>& formats, bool
+void add_data_formats(vector<string>& formats, bool
     found_content_metadata) {
   static const string F = this_function_label(__func__);
   if (!found_content_metadata) {
@@ -869,7 +879,7 @@ void add_data_formats(TokenDocument& tdoc, vector<string>& formats, bool
     append(json, "{" + j + "}", ", ");
   }
   fdoc.close();
-  tdoc.add_replacement("__DATA_FORMATS__", df);
+//  tdoc.add_replacement("__DATA_FORMATS__", df);
   update_wagtail("data_formats", "[" + json + "]", F);
 }
 
@@ -970,7 +980,8 @@ void append_proceedings_to_citation(string& citation, string doi, string
       "\"_doi\">https://doi.org/" + doi + "</a>";
 }
 
-void add_data_citations(TokenDocument& tdoc) {
+//void add_data_citations(TokenDocument& tdoc) {
+void add_data_citations() {
   static const string F = this_function_label(__func__);
   LocalQuery qc("select distinct d.doi_work from citation.data_citations as d "
       "left join dssdb.dsvrsn as v on v.doi = d.doi_data where v.dsid in " +
@@ -1078,7 +1089,8 @@ void add_data_citations(TokenDocument& tdoc) {
     }
   }
   if (clist.size() > 0) {
-    tdoc.add_if("__HAS_DATA_CITATIONS__");
+//    tdoc.add_if("__HAS_DATA_CITATIONS__");
+/*
     if (clist.size() > 1) {
       tdoc.add_replacement("__NUM_DATA_CITATIONS__", "<strong>" + itos(clist.
           size()) + "</strong> times");
@@ -1086,30 +1098,34 @@ void add_data_citations(TokenDocument& tdoc) {
       tdoc.add_replacement("__NUM_DATA_CITATIONS__", "<strong>" + itos(clist.
           size()) + "</strong> time");
     }
+*/
     std::sort(clist.begin(), clist.end(), compare_citations);
     unordered_set<string> yrs;
     string json;
     for (const auto& c : clist) {
       auto pub_year=get<0>(c);
       if (yrs.find(pub_year) == yrs.end()) {
+/*
         tdoc.add_repeat("__DATA_CITER__", "CITATION[!]" + get<1>(c) +
             "<!>YEAR[!]" + pub_year);
+*/
         append(json, "{\"year\": " + pub_year + ", \"publications\": [\"" +
             substitute(get<1>(c), "\"", "\\\"") + "\"", "]}, ");
         yrs.emplace(pub_year);
       } else {
-        tdoc.add_repeat("__DATA_CITER__", "CITATION[!]" + get<1>(c));
+//        tdoc.add_repeat("__DATA_CITER__", "CITATION[!]" + get<1>(c));
         append(json, "\"" + substitute(get<1>(c), "\"", "\\\"") + "\"", ", ");
       }
     }
     update_wagtail("num_citations", to_string(clist.size()), F);
     update_wagtail("citations", "[" + json + "]}]", F);
   } else {
-    tdoc.add_replacement("__NUM_DATA_CITATIONS__", "<strong>0</strong> times");
+//    tdoc.add_replacement("__NUM_DATA_CITATIONS__", "<strong>0</strong> times");
   }
 }
 
-bool add_temporal_range(TokenDocument& tdoc, size_t& swp_cnt) {
+//bool add_temporal_range(TokenDocument& tdoc, size_t& swp_cnt) {
+bool add_temporal_range(size_t& swp_cnt) {
   static const string F = this_function_label(__func__);
 
   bool grouped_periods = false; // return value
@@ -1151,7 +1167,7 @@ bool add_temporal_range(TokenDocument& tdoc, size_t& swp_cnt) {
   }
   string json;
   if (q.num_rows() > 0) {
-    tdoc.add_if("__HAS_TEMPORAL_RANGE__");
+//    tdoc.add_if("__HAS_TEMPORAL_RANGE__");
     if (q.num_rows() > 1) {
       LocalQuery qgp("distinct gindex", "dssdb.dsperiod", "dsid in " +
           g_ds_set);
@@ -1161,7 +1177,7 @@ bool add_temporal_range(TokenDocument& tdoc, size_t& swp_cnt) {
       }
       if (qgp.num_rows() > 1) {
         grouped_periods = true;
-        tdoc.add_if("__HAS_TEMPORAL_BY_GROUP1__");
+//        tdoc.add_if("__HAS_TEMPORAL_BY_GROUP1__");
         LocalQuery qdt("select min(concat(date_start, ' ', time_start)), min("
             "start_flag), max(concat(date_end, ' ', time_end)), min(end_flag), "
             "time_zone from dssdb.dsperiod where dsid in " + g_ds_set + " and "
@@ -1180,10 +1196,10 @@ bool add_temporal_range(TokenDocument& tdoc, size_t& swp_cnt) {
         if (!edt.empty() && edt != sdt) {
           temporal += " to " + edt;
         }
-        tdoc.add_replacement("__TEMPORAL_RANGE__", temporal);
+//        tdoc.add_replacement("__TEMPORAL_RANGE__", temporal);
         json = "\"full\": \"" + temporal + "\"";
-        tdoc.add_replacement("__N_TEMPORAL__", itos(swp_cnt));
-        tdoc.add_replacement("__N_TEMPORAL1__", itos(swp_cnt + 1));
+//        tdoc.add_replacement("__N_TEMPORAL__", itos(swp_cnt));
+//        tdoc.add_replacement("__N_TEMPORAL1__", itos(swp_cnt + 1));
         swp_cnt += 2;
       }
     }
@@ -1230,16 +1246,18 @@ bool add_temporal_range(TokenDocument& tdoc, size_t& swp_cnt) {
       }
       if (pdlist.size() > 1) {
         trng += " (" + i.first + ")";
+/*
         tdoc.add_repeat("__TEMPORAL_RANGE__", "<div style=\"margin-left: 10px"
             "\">" + trng + "</div>");
+*/
         append(j, "\"" + trng + "\"", ", ");
       } else {
-        tdoc.add_repeat("__TEMPORAL_RANGE__", trng);
+//        tdoc.add_repeat("__TEMPORAL_RANGE__", trng);
         json = "\"full\": \"" + trng + "\"";
       }
     }
     if (grouped_periods) {
-      tdoc.add_if("__HAS_TEMPORAL_BY_GROUP2__");
+//      tdoc.add_if("__HAS_TEMPORAL_BY_GROUP2__");
     }
     if (!j.empty()) {
       json += ", \"groups\": [" + j + "]";
@@ -1249,20 +1267,24 @@ bool add_temporal_range(TokenDocument& tdoc, size_t& swp_cnt) {
   return grouped_periods;
 }
 
-void add_update_frequency(TokenDocument& tdoc) {
+//void add_update_frequency(TokenDocument& tdoc) {
+void add_update_frequency() {
   static const string F = this_function_label(__func__);
   auto e = g_xdoc.element("OAI-PMH/GetRecord/record/metadata/dsOverview/"
       "continuingUpdate");
   if (e.attribute_value("value") == "yes") {
+/*
     tdoc.add_if("__HAS_UPDATE_FREQUENCY__");
     tdoc.add_replacement("__UPDATE_FREQUENCY__", capitalize(e.attribute_value(
         "frequency")));
+*/
     update_wagtail("update_freq", capitalize(e.attribute_value("frequency")),
         F);
   }
 }
 
-void add_access_restrictions(TokenDocument& tdoc) {
+//void add_access_restrictions(TokenDocument& tdoc) {
+void add_access_restrictions() {
   static const string F = this_function_label(__func__);
   auto e = g_xdoc.element("OAI-PMH/GetRecord/record/metadata/dsOverview/"
       "restrictions/access");
@@ -1280,13 +1302,16 @@ void add_access_restrictions(TokenDocument& tdoc) {
   }
 */
   if (!a.empty()) {
+/*
     tdoc.add_if("__HAS_ACCESS_RESTRICTIONS__");
     tdoc.add_replacement("__ACCESS_RESTRICTIONS__", a);
+*/
   }
   update_wagtail("access_restrict", a, F);
 }
 
-void add_usage_restrictions(TokenDocument& tdoc) {
+//void add_usage_restrictions(TokenDocument& tdoc) {
+void add_usage_restrictions() {
   static const string F = this_function_label(__func__);
   auto e = g_xdoc.element("OAI-PMH/GetRecord/record/metadata/dsOverview/"
       "restrictions/usage");
@@ -1304,19 +1329,22 @@ void add_usage_restrictions(TokenDocument& tdoc) {
   }
 */
   if (!u.empty()) {
+/*
     tdoc.add_if("__HAS_USAGE_RESTRICTIONS__");
     tdoc.add_replacement("__USAGE_RESTRICTIONS__", u);
+*/
   }
   update_wagtail("usage_restrict", u, F);
 }
 
-void add_variable_table(string data_format, TokenDocument& tdoc, string& json) {
+//void add_variable_table(string data_format, TokenDocument& tdoc, string& json) {
+void add_variable_table(string data_format, string& json) {
   if (exists_on_server(metautils::directives.web_server, "/data/web/datasets/"
       + metautils::args.dsid + "/metadata/" + data_format + ".html")) {
     auto token = to_upper(data_format);
     append(json, "{\"format\": \"" + token + "\", \"html\": \"metadata/" +
         data_format + ".html?_do=y\"", ", ");
-    tdoc.add_if("__FOUND_" + token + "_TABLE__");
+//    tdoc.add_if("__FOUND_" + token + "_TABLE__");
     auto tb = "<div>" + token + " parameter table:  <a href=\"/datasets/" +
         metautils::args.dsid + "/#metadata/" + data_format + ".html?_do=y\">"
         "HTML</a>";
@@ -1328,11 +1356,12 @@ void add_variable_table(string data_format, TokenDocument& tdoc, string& json) {
           ", ");
     }
     json += "}";
-    tdoc.add_replacement("__" + token + "_TABLE__", tb);
+//    tdoc.add_replacement("__" + token + "_TABLE__", tb);
   }
 }
 
-void add_grouped_variables(TokenDocument& tdoc, size_t& swp_cnt) {
+//void add_grouped_variables(TokenDocument& tdoc, size_t& swp_cnt) {
+void add_grouped_variables(size_t& swp_cnt) {
   LocalQuery q("gindex, title", "dssdb.dsgroup", "dsid in " + g_ds_set + "and "
       "pindex = 0 and dwebcnt > 0");
   if (q.submit(g_metadata_server) != 0) {
@@ -1399,12 +1428,15 @@ void add_grouped_variables(TokenDocument& tdoc, size_t& swp_cnt) {
   }
   if (ss.tellp() > 0) {
     ss << "</span></span></div>";
+/*
     tdoc.add_if("__HAS_VARIABLES_BY_PRODUCT__");
     tdoc.add_replacement("__VARIABLES_BY_PRODUCT__", ss.str());
+*/
   }
 }
 
-void add_variables(TokenDocument& tdoc, size_t& swp_cnt) {
+//void add_variables(TokenDocument& tdoc, size_t& swp_cnt) {
+void add_variables(size_t& swp_cnt) {
   static const string F = this_function_label(__func__);
   LocalQuery q("select split_part(path, ' > ', -1) as var from search."
       "variables as v left join search.gcmd_sciencekeywords as g on g.uuid = v."
@@ -1421,39 +1453,51 @@ void add_variables(TokenDocument& tdoc, size_t& swp_cnt) {
     append(json, "\"" + capitalize(r[0]) + "\"", ", ");
   }
   json = "\"gcmd\": [" + json + "]";
+/*
   tdoc.add_replacement("__VARIABLES__", create_table_from_strings(l, 4,
       "#e1eaff", "#c8daff"));
+*/
   auto elist = g_xdoc.element_list("OAI-PMH/GetRecord/record/metadata/"
       "dsOverview/contentMetadata/detailedVariables/detailedVariable");
   if (elist.size() > 0) {
     for (const auto& e : elist) {
       if (has_beginning(e.content(), "http://") || has_beginning(e.content(),
           "https://")) {
-        tdoc.add_if("__HAS_DETAILED_VARIABLES__");
-        tdoc.add_replacement("__DETAILED_VARIABLES_LINK__", e.content());
+//        tdoc.add_if("__HAS_DETAILED_VARIABLES__");
+//        tdoc.add_replacement("__DETAILED_VARIABLES_LINK__", e.content());
         break;
       }
     }
   }
   string tj;
+/*
   add_variable_table("grib", tdoc, tj);
   add_variable_table("grib2", tdoc, tj);
   add_variable_table("on84", tdoc, tj);
+*/
+add_variable_table("grib", tj);
+add_variable_table("grib2", tj);
+add_variable_table("on84", tj);
   if (!tj.empty()) {
     append(json, "\"tables\": [" + tj + "]", ", ");
   }
-  add_grouped_variables(tdoc, swp_cnt);
+//  add_grouped_variables(tdoc, swp_cnt);
+add_grouped_variables(swp_cnt);
   update_wagtail("variables", "{" + json + "}", F);
 }
 
+/*
 void add_vertical_levels(TokenDocument& tdoc, const vector<string>& data_types,
     bool found_content_metadata) {
+*/
+void add_vertical_levels(const vector<string>& data_types, bool
+    found_content_metadata) {
   static const string F = this_function_label(__func__);
   string json;
   if (found_content_metadata) {
     for (const auto& dt : data_types) {
       if (dt == "grid") {
-        tdoc.add_if("__HAS_VERTICAL_LEVELS__");
+//        tdoc.add_if("__HAS_VERTICAL_LEVELS__");
         json = "\"list\": []";
         string v = "See the <a href=\"#metadata/detailed.html?_do=y&view=level"
             "\">detailed metadata</a> for level information";
@@ -1463,7 +1507,7 @@ void add_vertical_levels(TokenDocument& tdoc, const vector<string>& data_types,
           v += "<br /><a href=\"/datasets/" + metautils::args.dsid +
               "/#metadata/grib2_levels.html?_do=y\">GRIB2 level table</a>"; 
         }
-        tdoc.add_replacement("__VERTICAL_LEVELS__", v);
+//        tdoc.add_replacement("__VERTICAL_LEVELS__", v);
         break;
       }
     }
@@ -1474,7 +1518,7 @@ void add_vertical_levels(TokenDocument& tdoc, const vector<string>& data_types,
         "dsOverview/contentMetadata/levels/layer");
     elist.insert(elist.end(), elist2.begin(), elist2.end());
     if (!elist.empty()) {
-      tdoc.add_if("__HAS_VERTICAL_LEVELS__");
+//      tdoc.add_if("__HAS_VERTICAL_LEVELS__");
       vector<string> llst;
       for (const auto& ele : elist) {
         if ((ele.attribute_value("value") == "0" || (ele.attribute_value("top")
@@ -1511,8 +1555,10 @@ void add_vertical_levels(TokenDocument& tdoc, const vector<string>& data_types,
         }
       }
       sort(llst.begin(), llst.end(), compare_levels);
+/*
       tdoc.add_replacement("__VERTICAL_LEVELS__", create_table_from_strings(
           llst, 4, "#c8daff", "#e1eaff"));
+*/
       for (const auto& e : llst) {
         append(json, "\"" + e + "\"", ", ");
       }
@@ -1526,13 +1572,14 @@ void add_vertical_levels(TokenDocument& tdoc, const vector<string>& data_types,
   }
 }
 
-void add_temporal_frequency(TokenDocument& tdoc) {
+//void add_temporal_frequency(TokenDocument& tdoc) {
+void add_temporal_frequency() {
   static const string F = this_function_label(__func__);
   auto elist = g_xdoc.element_list("OAI-PMH/GetRecord/record/metadata/"
       "dsOverview/contentMetadata/temporalFrequency");
   auto m = 0;
   if (elist.size() > 0) {
-    tdoc.add_if("__HAS_TEMPORAL_FREQUENCY__");
+//    tdoc.add_if("__HAS_TEMPORAL_FREQUENCY__");
     stringstream ss;
     for (const auto& ele : elist) {
       auto typ = ele.attribute_value("type");
@@ -1587,30 +1634,31 @@ void add_temporal_frequency(TokenDocument& tdoc) {
       }
       ++m;
     }
-    tdoc.add_replacement("__TEMPORAL_FREQUENCY__", ss.str());
+//    tdoc.add_replacement("__TEMPORAL_FREQUENCY__", ss.str());
     update_wagtail("temporal_freq", ss.str(), F);
   }
 }
 
-void add_data_types(TokenDocument& tdoc, const vector<string>& data_types,
+//void add_data_types(TokenDocument& tdoc, const vector<string>& data_types,
+void add_data_types(const vector<string>& data_types,
     bool found_content_metadata) {
   static const string F = this_function_label(__func__);
   string json;
   if (found_content_metadata) {
     if (!data_types.empty()) {
-      tdoc.add_if("__HAS_DATA_TYPES__");
+//      tdoc.add_if("__HAS_DATA_TYPES__");
       string s;
       for (const auto& data_type : data_types) {
         append(s, to_capital(data_type), ", ");
         append(json, "\"" + to_capital(data_type) + "\"", ", ");
       }
-      tdoc.add_replacement("__DATA_TYPES__", s);
+//      tdoc.add_replacement("__DATA_TYPES__", s);
     }
   } else {
     auto elist = g_xdoc.element_list("OAI-PMH/GetRecord/record/metadata/"
         "dsOverview/contentMetadata/dataType");
     if (!elist.empty()) {
-      tdoc.add_if("__HAS_DATA_TYPES__");
+//      tdoc.add_if("__HAS_DATA_TYPES__");
       string s;
       unordered_map<string, char> u;
       for (const auto& ele : elist) {
@@ -1620,7 +1668,7 @@ void add_data_types(TokenDocument& tdoc, const vector<string>& data_types,
           u[ele.content()] = 'Y';
         }
       }
-      tdoc.add_replacement("__DATA_TYPES__", s);
+//      tdoc.add_replacement("__DATA_TYPES__", s);
     }
   }
   update_wagtail("data_types", "[" + json + "]", F);
@@ -1639,7 +1687,8 @@ void fill_map(unordered_map<string, string>& map, string query) {
   }
 }
 
-void add_spatial_coverage(TokenDocument& tdoc, const vector<string>& data_types,
+//void add_spatial_coverage(TokenDocument& tdoc, const vector<string>& data_types,
+void add_spatial_coverage(const vector<string>& data_types,
     bool found_content_metadata, bool grouped_periods, size_t& swp_cnt) {
   static const string F = this_function_label(__func__);
   unordered_map<string, string> grps, rfils, mfils;
@@ -1874,13 +1923,16 @@ void add_spatial_coverage(TokenDocument& tdoc, const vector<string>& data_types,
       json += ", \"details\": [" + j + "]";
     }
     ss << "</span></span>" << endl;
+/*
     tdoc.add_if("__HAS_SPATIAL_COVERAGE__");
     tdoc.add_replacement("__SPATIAL_COVERAGE__", ss.str());
+*/
     update_wagtail("spatial_coverage", "{" + json + "}", F);
   }
 }
 
-void add_contributors(TokenDocument& tdoc) {
+//void add_contributors(TokenDocument& tdoc) {
+void add_contributors() {
   static const string F = this_function_label(__func__);
   LocalQuery q("select g.path from search.contributors_new as c left join "
       "search.gcmd_providers as g on g.uuid = c.keyword where c.dsid in " +
@@ -1913,13 +1965,14 @@ void add_contributors(TokenDocument& tdoc) {
     append(json, "{\"id\": \"" + snam + "\", \"name\": \"" + lnam + "\"}", ", ");
     ++n;
   }
-  tdoc.add_replacement("__DATA__CONTRIBUTORS__", ss.str());
+//  tdoc.add_replacement("__DATA__CONTRIBUTORS__", ss.str());
   if (!json.empty()) {
     update_wagtail("contributors", "[" + json + "]", F);
   }
 }
 
-void add_data_volume(TokenDocument& tdoc, size_t& swp_cnt) {
+//void add_data_volume(TokenDocument& tdoc, size_t& swp_cnt) {
+void add_data_volume(size_t& swp_cnt) {
   static const string F = this_function_label(__func__);
   LocalQuery q("dweb_size", "dssdb.dataset", "dsid in " + g_ds_set);
   if (q.submit(g_metadata_server) < 0) {
@@ -1981,23 +2034,26 @@ void add_data_volume(TokenDocument& tdoc, size_t& swp_cnt) {
       json += ", \"groups\": [" + j + "]";
     }
   }
-  tdoc.add_replacement("__VOLUME__", ss.str());
+//  tdoc.add_replacement("__VOLUME__", ss.str());
   if (!json.empty()) {
     update_wagtail("volume", "{" + json + "}", F);
   }
 }
 
-void add_related_websites(TokenDocument& tdoc) {
+//void add_related_websites(TokenDocument& tdoc) {
+void add_related_websites() {
   static const string F = this_function_label(__func__);
   auto elist = g_xdoc.element_list("OAI-PMH/GetRecord/record/metadata/"
       "dsOverview/relatedResource");
   string json;
   if (!elist.empty()) {
+/*
     if (elist.size() > 1) {
       tdoc.add_replacement("__WEB_SITES_VALIGN__", "top");
     } else {
       tdoc.add_replacement("__WEB_SITES_VALIGN__", "bottom");
     }
+*/
     stringstream ss;
     for (const auto& e : elist) {
       auto d = e.content();
@@ -2024,22 +2080,25 @@ void add_related_websites(TokenDocument& tdoc) {
       append(json, "{\"description\": \"" + d + "\", \"url\": \"" + url + "\"}",
           ", ");
     }
-    tdoc.add_if("__HAS_RELATED_WEB_SITES__");
-    tdoc.add_replacement("__RELATED_WEB_SITES__", ss.str());
+//    tdoc.add_if("__HAS_RELATED_WEB_SITES__");
+//    tdoc.add_replacement("__RELATED_WEB_SITES__", ss.str());
   }
   update_wagtail("related_rsrc_list", "[" + json + "]", F);
 }
 
-void add_related_datasets(TokenDocument& tdoc) {
+//void add_related_datasets(TokenDocument& tdoc) {
+void add_related_datasets() {
   static const string F = this_function_label(__func__);
   auto elist = g_xdoc.element_list("OAI-PMH/GetRecord/record/metadata/"
       "dsOverview/relatedDataset");
   if (!elist.empty()) {
+/*
     if (elist.size() > 1) {
       tdoc.add_replacement("__RELATED_DATASETS_VALIGN__", "top");
     } else {
       tdoc.add_replacement("__RELATED_DATASETS_VALIGN__", "bottom");
     }
+*/
     elist.sort(
     [](XMLElement& left, XMLElement& right) -> bool {
       if (left.attribute_value("ID") <= right.attribute_value("ID")) {
@@ -2066,17 +2125,18 @@ void add_related_datasets(TokenDocument& tdoc) {
       append(json, "{\"dsid\": \"" + row[0] + "\", \"title\": \"" + title +
           "\"}", ", ");
     }
-    tdoc.add_if("__HAS_RELATED_DATASETS__");
-    tdoc.add_replacement("__RELATED_DATASETS__", s);
+//    tdoc.add_if("__HAS_RELATED_DATASETS__");
+//    tdoc.add_replacement("__RELATED_DATASETS__", s);
     update_wagtail("related_dslist", "[" + json + "]", F);
   }
 }
 
-void add_more_details(TokenDocument& tdoc) {
+//void add_more_details(TokenDocument& tdoc) {
+void add_more_details() {
   static const string F = this_function_label(__func__);
   if (exists_on_server(metautils::directives.web_server, "/data/web/"
       "datasets/" + metautils::args.dsid + "/metadata/detailed.html")) {
-    tdoc.add_if("__HAS_MORE_DETAILS__");
+//    tdoc.add_if("__HAS_MORE_DETAILS__");
   }
 }
 
@@ -2107,6 +2167,7 @@ void add_data_license() {
 
 void generate_description(string type, string tdir_name) {
   static const string F = this_function_label(__func__);
+/*
   ofstream ofs;
   if (g_dataset_type == "W") {
     open_output(ofs, tdir_name + "/test_description.html");
@@ -2126,9 +2187,11 @@ void generate_description(string type, string tdir_name) {
           USER);
     }
   }
+*/
   update_wagtail("dstype", g_dataset_type, F);
-  add_abstract(tdoc); //wagtail
-  exit_if_dead_dataset(tdoc, tdir_name, ofs);
+//  add_abstract(tdoc); //wagtail
+//  exit_if_dead_dataset(tdoc, tdir_name, ofs);
+exit_if_dead_dataset(tdir_name);
 
 /*
   if (g_dataset_type == "I") {
@@ -2143,32 +2206,51 @@ void generate_description(string type, string tdir_name) {
   vector<string> formats, data_types;
   auto found_content_metadata = false;
   initialize(formats, data_types, found_content_metadata);
-  tdoc.add_replacement("__DSNUM__", metautils::args.dsid);
+//  tdoc.add_replacement("__DSNUM__", metautils::args.dsid);
 
-  add_acknowledgement(tdoc); //wagtail
-  auto grouped_periods = add_temporal_range(tdoc,swp_cnt); // wagtail
-  add_update_frequency(tdoc); // wagtail
-  add_access_restrictions(tdoc); // wagtail
-  add_usage_restrictions(tdoc); // wagtail
-  add_variables(tdoc, swp_cnt); // wagtail
-  add_vertical_levels(tdoc, data_types, found_content_metadata); // wagtail
+//  add_acknowledgement(tdoc); //wagtail
+add_acknowledgement(); //wagtail
+//  auto grouped_periods = add_temporal_range(tdoc, swp_cnt); // wagtail
+auto grouped_periods = add_temporal_range(swp_cnt); // wagtail
+//  add_update_frequency(tdoc); // wagtail
+add_update_frequency(); // wagtail
+//  add_access_restrictions(tdoc); // wagtail
+add_access_restrictions(); // wagtail
+//  add_usage_restrictions(tdoc); // wagtail
+add_usage_restrictions(); // wagtail
+//  add_variables(tdoc, swp_cnt); // wagtail
+add_variables(swp_cnt); // wagtail
+//  add_vertical_levels(tdoc, data_types, found_content_metadata); // wagtail
+add_vertical_levels(data_types, found_content_metadata); // wagtail
   if (!found_content_metadata) {
-    add_temporal_frequency(tdoc);
+//    add_temporal_frequency(tdoc); // wagtail
+add_temporal_frequency(); // wagtail
   }
-  add_data_types(tdoc, data_types, found_content_metadata); // wagtail
-  add_spatial_coverage(tdoc, data_types, found_content_metadata,
+//  add_data_types(tdoc, data_types, found_content_metadata); // wagtail
+add_data_types(data_types, found_content_metadata); // wagtail
+//  add_spatial_coverage(tdoc, data_types, found_content_metadata,
+add_spatial_coverage(data_types, found_content_metadata,
      grouped_periods, swp_cnt); // wagtail
-  add_contributors(tdoc); // wagtail
-  add_related_websites(tdoc); // wagtail
-  add_publications(tdoc, g_xdoc); // wagtail
-  add_data_volume(tdoc, swp_cnt); // wagtail
-  add_data_formats(tdoc, formats, found_content_metadata); // wagtail
-  add_related_datasets(tdoc); // wagtail
-  add_more_details(tdoc);
-  add_data_citations(tdoc); // wagtail
+//  add_contributors(tdoc); // wagtail
+add_contributors(); // wagtail
+//  add_related_websites(tdoc); // wagtail
+add_related_websites(); // wagtail
+//  add_publications(tdoc, g_xdoc); // wagtail
+add_publications(g_xdoc); // wagtail
+//  add_data_volume(tdoc, swp_cnt); // wagtail
+add_data_volume(swp_cnt); // wagtail
+//  add_data_formats(tdoc, formats, found_content_metadata); // wagtail
+add_data_formats(formats, found_content_metadata); // wagtail
+//  add_related_datasets(tdoc); // wagtail
+add_related_datasets(); // wagtail
+//  add_more_details(tdoc);
+//  add_data_citations(tdoc); // wagtail
+add_data_citations(); // wagtail
   add_data_license();
+/*
   ofs << tdoc;
   ofs.close();
+*/
 }
 
 void show_usage() {
