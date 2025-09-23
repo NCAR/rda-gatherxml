@@ -2177,6 +2177,7 @@ void show_usage() {
 }
 
 int main(int argc, char **argv) {
+std::cerr << unixutils::host_name() << std::endl;
   if (argc != 2 && argc != 3) {
     show_usage();
     exit(1);
