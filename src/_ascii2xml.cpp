@@ -13,11 +13,21 @@
 #include <myerror.hpp>
 
 using namespace PostgreSQL;
+using metautils::log_error;
+using metautils::log_error2;
+using miscutils::this_function_label;
+using std::cerr;
+using std::endl;
+using std::list;
+using std::regex;
+using std::regex_search;
+using std::stof;
+using unixutils::mysystem2;
 
 metautils::Directives metautils::directives;
 metautils::Args metautils::args;
 bool gatherxml::verbose_operation;
-extern const std::string USER=getenv("USER");
+extern const std::string USER = getenv("USER");
 std::string myerror = "";
 std::string mywarning = "";
 std::string myoutput = "";
@@ -25,79 +35,77 @@ std::string myoutput = "";
 std::unique_ptr<TempFile> work_file;
 std::unique_ptr<TempDir> work_dir;
 gatherxml::markup::ObML::IDEntry ientry;
-enum {grml_type=1,obml_type};
-int write_type=-1;
+enum {grml_type=1, obml_type};
+int write_type = -1;
 
-extern "C" void clean_up()
-{
+extern "C" void clean_up() {
   if (!myerror.empty()) {
-    std::cerr << "Error: " << myerror << std::endl;
-    metautils::log_error(myerror,"ascii2xml",USER);
+    cerr << "Error: " << myerror << endl;
+    log_error(myerror, "ascii2xml",USER);
   }
 }
 
-extern "C" void segv_handler(int)
-{
+extern "C" void segv_handler(int) {
   clean_up();
   metautils::cmd_unregister();
-  metautils::log_error("core dump","ascii2xml",USER);
+  log_error("core dump", "ascii2xml", USER);
 }
 
-extern "C" void int_handler(int)
-{
+extern "C" void int_handler(int) {
   clean_up();
   metautils::cmd_unregister();
 }
 
 struct InvEntry {
-  InvEntry() : key(),lat(0.),lon(0.),plat_type(0) {}
+  InvEntry() : key(), lat(0.), lon(0.), plat_type(0) { }
 
   std::string key;
-  float lat,lon;
+  float lat, lon;
   short plat_type;
 };
 
-void scan_ghcnv3_file(gatherxml::markup::ObML::ObservationData& obs_data,std::list<std::string>& filelist)
-{
-  static const std::string THIS_FUNC=__func__;
+void scan_ghcnv3_file(gatherxml::markup::ObML::ObservationData& obs_data,
+    list<std::string>& filelist) {
+  static const string F = this_function_label(__func__);
   TempDir stn_tdir;
   if (!stn_tdir.create(metautils::directives.temp_path)) {
-    metautils::log_error(THIS_FUNC+"() returned error: unable to create temporary directory","ascii2xml",USER);
+    log_error2("unable to create temporary directory", F, "ascii2xml", USER);
   }
 // load the station inventory
   Server server(metautils::directives.rdadb_config);
   if (!server) {
-    metautils::log_error(THIS_FUNC+"() returned error: '"+server.error()+"' while trying to connect to RDADB","ascii2xml",USER);
+    log_error2("'" + server.error() + "' while trying to connect to RDADB", F,
+        "ascii2xml", USER);
   }
   Query query("select wfile from dssdb.wfile_d564001 where type = 'O' and wfile like '%qcu.inv'");
   if (query.submit(server) < 0) {
-    metautils::log_error(THIS_FUNC+"() returned error: '"+query.error()+"' while trying to query for station inventory name","ascii2xml",USER);
+    log_error2("'" + query.error() + "' while trying to query for station "
+        "inventory name", F, "ascii2xml", USER);
   }
   Row row;
   if (!query.fetch_row(row)) {
-    metautils::log_error(THIS_FUNC+"() returned error: unable to get station inventory name","ascii2xml",USER);
+    log_error2("unable to get station inventory name", F, "ascii2xml", USER);
   }
   auto ghcn_inventory=unixutils::remote_web_file("https://rda.ucar.edu/datasets/ds564.1/docs/"+row[0],stn_tdir.name());
   std::ifstream ifs(ghcn_inventory.c_str());
   if (!ifs.is_open()) {
-    metautils::log_error(THIS_FUNC+"() returned error: unable to open station inventory file","ascii2xml",USER);
+    log_error2("unable to open station inventory file", F, "ascii2xml", USER);
   }
   my::map<InvEntry> inv_table(9999);
   char line[32768];
   ifs.getline(line,32768);
   while (!ifs.eof()) {
     InvEntry ie;
-    ie.key.assign(line,11);
-    ie.lat=std::stof(std::string(&line[12],8));
-    ie.lon=std::stof(std::string(&line[21],9));
-    if (ie.key.substr(0,3) < "800") {
-      ie.plat_type=0;
-    }
-    else {
-      ie.plat_type=1;
+    ie.key.assign(line, 11);
+    ie.lat = stof(std::string(&line[12],8));
+    ie.lon = stof(std::string(&line[21],9));
+    if (ie.key.substr(0, 3) < "800") {
+      ie.plat_type = 0;
+    } else {
+      ie.plat_type = 1;
     }
     inv_table.insert(ie);
-    ifs.getline(line,32768);
+    ifs.getline(line, 32768);
   }
   ifs.close();
   ifs.clear();
@@ -130,36 +138,39 @@ void scan_ghcnv3_file(gatherxml::markup::ObML::ObservationData& obs_data,std::li
           min_datetime.set(year,month,1,0);
           max_datetime.set(year,month,dateutils::days_in_month(year,month),235959);
           if (!obs_data.added_to_ids("surface",ientry,std::string(&line[15],4),"",ie.lat,ie.lon,-1.,&min_datetime,&max_datetime)) {
-            metautils::log_error(THIS_FUNC+"() returned error: '"+myerror+"' while adding ID "+ientry.key,"ascii2xml",USER);
+            log_error2("'" + myerror + "' while adding ID " + ientry.key, F,
+                "ascii2xml", USER);
           }
           add_platform_entry=true;
         }
         off+=8;
       }
       if (add_platform_entry) {
-        if (!obs_data.added_to_platforms("surface",platform_type,ie.lat,ie.lon)) {
-          metautils::log_error(THIS_FUNC+"() returned error: '"+myerror+"' while adding platform "+platform_type,"ascii2xml",USER);
+        if (!obs_data.added_to_platforms("surface", platform_type, ie.lat,
+            ie.lon)) {
+          log_error2("'" + myerror + "' while adding platform " + platform_type,
+              F, "ascii2xml", USER);
         }
       }
-      ifs.getline(line,32768);
+      ifs.getline(line, 32768);
     }
     ifs.close();
     ifs.clear();
   }
 }
 
-void scan_hcn_file(gatherxml::markup::ObML::ObservationData& obs_data,std::list<std::string>& filelist)
+void scan_hcn_file(gatherxml::markup::ObML::ObservationData& obs_data,list<std::string>& filelist)
 {
   static const std::string THIS_FUNC=__func__;
   TempDir stn_tdir;
   if (!stn_tdir.create(metautils::directives.temp_path)) {
-    metautils::log_error(THIS_FUNC+"() returned error: unable to create temporary directory","ascii2xml",USER);
+    log_error(THIS_FUNC+"() returned error: unable to create temporary directory","ascii2xml",USER);
   }
 // get the station inventory
   auto hcn_inventory=unixutils::remote_web_file("https://rda.ucar.edu/datasets/ds511.0/station_libraries/history.txt",stn_tdir.name());
   std::ifstream ifs(hcn_inventory.c_str());
   if (!ifs.is_open()) {
-    metautils::log_error(THIS_FUNC+"() returned error: unable to open station history file","ascii2xml",USER);
+    log_error(THIS_FUNC+"() returned error: unable to open station history file","ascii2xml",USER);
   }
   std::unordered_map<std::string,std::vector<std::tuple<int,int,float,float>>> stn_history;
   const size_t LINE_LENGTH=32768;
@@ -222,7 +233,7 @@ void scan_hcn_file(gatherxml::markup::ObML::ObservationData& obs_data,std::list<
         stn_id[0]='0';
       }
       if (stn_history.find(stn_id) == stn_history.end()) {
-        metautils::log_error(THIS_FUNC+"() returned error: no history entry for '"+stn_id+"'","ascii2xml",USER);
+        log_error(THIS_FUNC+"() returned error: no history entry for '"+stn_id+"'","ascii2xml",USER);
       }
       int yr,mo;
       strutils::strget(&line[13],yr,4);
@@ -264,7 +275,7 @@ void scan_hcn_file(gatherxml::markup::ObML::ObservationData& obs_data,std::list<
           DateTime min_datetime(yr,mo,n+1,0,-2400);
           DateTime max_datetime=min_datetime.days_added(1);
           if (!obs_data.added_to_ids("surface",ientry,std::string(&line[7],4),"",lat,lon,-1.,&min_datetime,&max_datetime)) {
-            metautils::log_error(THIS_FUNC+"() returned error: '"+myerror+"' while adding ID "+ientry.key,"ascii2xml",USER);
+            log_error(THIS_FUNC+"() returned error: '"+myerror+"' while adding ID "+ientry.key,"ascii2xml",USER);
           }
           add_platform_entry=true;
         }
@@ -272,7 +283,7 @@ void scan_hcn_file(gatherxml::markup::ObML::ObservationData& obs_data,std::list<
       }
       if (add_platform_entry) {
         if (!obs_data.added_to_platforms("surface","land_station",lat,lon)) {
-          metautils::log_error(THIS_FUNC+"() returned error: '"+myerror+"' while adding platform","ascii2xml",USER);
+          log_error(THIS_FUNC+"() returned error: '"+myerror+"' while adding platform","ascii2xml",USER);
         }
       }
       ifs.getline(line,LINE_LENGTH);
@@ -282,7 +293,7 @@ void scan_hcn_file(gatherxml::markup::ObML::ObservationData& obs_data,std::list<
   }
 }
 
-void scan_little_r_file(gatherxml::markup::ObML::ObservationData& obs_data,std::list<std::string>& filelist)
+void scan_little_r_file(gatherxml::markup::ObML::ObservationData& obs_data,list<std::string>& filelist)
 {
   const char *DATA_TYPES[10]={"Pressure","Height","Temperature","Dew point","Wind speed","Wind direction","East-west wind","North-south wind","Relative humidity","Thickness"};
   std::unique_ptr<unsigned char []> buffer;
@@ -408,11 +419,11 @@ void scan_little_r_file(gatherxml::markup::ObML::ObservationData& obs_data,std::
               break;
             }
             default: {
-              metautils::log_error("scan_little_r_file() encountered an undocumented platform code: "+strutils::itos(obs.platform_code()),"ascii2xml",USER);
+              log_error("scan_little_r_file() encountered an undocumented platform code: "+strutils::itos(obs.platform_code()),"ascii2xml",USER);
             }
           }
           if (!obs_data.added_to_platforms(obs_type,platform_type,obs.location().latitude,obs.location().longitude)) {
-            metautils::log_error("scan_little_r_file() returned error: '"+myerror+"' while adding platform "+obs_type+"-"+platform_type,"ascii2xml",USER);
+            log_error("scan_little_r_file() returned error: '"+myerror+"' while adding platform "+obs_type+"-"+platform_type,"ascii2xml",USER);
           }
           size_t j,i;
           geoutils::convert_lat_lon_to_box(1,obs.location().latitude,obs.location().longitude,j,i);
@@ -422,7 +433,7 @@ void scan_little_r_file(gatherxml::markup::ObML::ObservationData& obs_data,std::
             if (data_present[n] == 1) {
               gatherxml::markup::ObML::DataTypeEntry de;
               if (!obs_data.added_to_ids(obs_type,ientry,DATA_TYPES[n],"",obs.location().latitude,obs.location().longitude,-1,&date_time)) {
-                metautils::log_error("scan_little_r_file() returned error: '"+myerror+"' while adding ID "+ientry.key,"ascii2xml",USER);
+                log_error("scan_little_r_file() returned error: '"+myerror+"' while adding ID "+ientry.key,"ascii2xml",USER);
               }
             }
           }
@@ -433,7 +444,7 @@ void scan_little_r_file(gatherxml::markup::ObML::ObservationData& obs_data,std::
   }
 }
 
-void scan_nodc_sea_level_file(gatherxml::markup::ObML::ObservationData& obs_data,std::list<std::string>& filelist)
+void scan_nodc_sea_level_file(gatherxml::markup::ObML::ObservationData& obs_data,list<std::string>& filelist)
 {
   std::unique_ptr<unsigned char[]> buffer(nullptr);
   for (const auto& file : filelist) {
@@ -453,10 +464,10 @@ void scan_nodc_sea_level_file(gatherxml::markup::ObML::ObservationData& obs_data
           metautils::args.data_format=obs.data_format();
         }
         else if (metautils::args.data_format != obs.data_format()) {
-          metautils::log_error("scan_nodc_sea_level_file(): data format changed","ascii2xml",USER);
+          log_error("scan_nodc_sea_level_file(): data format changed","ascii2xml",USER);
         }
         if (!obs_data.added_to_platforms("surface","tide_station",obs.location().latitude,obs.location().longitude)) {
-          metautils::log_error("scan_nodc_sea_level_file() returned error: '"+myerror+"' while adding platform","ascii2xml",USER);
+          log_error("scan_nodc_sea_level_file() returned error: '"+myerror+"' while adding platform","ascii2xml",USER);
         }
         ientry.key="tide_station[!]NODC[!]"+obs.location().ID;
         DateTime start_date_time;
@@ -478,7 +489,7 @@ void scan_nodc_sea_level_file(gatherxml::markup::ObML::ObservationData& obs_data
           start_date_time.set_time(start_date_time.time()+99);
         }
         if (!obs_data.added_to_ids("surface",ientry,"Sea Level Data","",obs.location().latitude,obs.location().longitude,-1.,&start_date_time,end_date_time.get())) {
-          metautils::log_error("scan_nodc_sea_level_file() returned error: '"+myerror+"' while adding ID "+ientry.key,"ascii2xml",USER);
+          log_error("scan_nodc_sea_level_file() returned error: '"+myerror+"' while adding ID "+ientry.key,"ascii2xml",USER);
         }
       }
     }
@@ -494,9 +505,9 @@ void scan_file(gatherxml::markup::ObML::ObservationData& obs_data)
   work_dir.reset(new TempDir);
   work_dir->create(metautils::directives.temp_path);
   std::string file_format,error;
-  std::list<std::string> filelist;
+  list<std::string> filelist;
   if (!metautils::primaryMetadata::prepare_file_for_metadata_scanning(*work_file,*work_dir,&filelist,file_format,error)) {
-    metautils::log_error("prepare_file_for_metadata_scanning() returned '"+error+"'","ascii2xml",USER);
+    log_error("prepare_file_for_metadata_scanning() returned '"+error+"'","ascii2xml",USER);
   }
   if (filelist.size() == 0) {
     filelist.emplace_back(work_file->name());
@@ -519,60 +530,62 @@ void scan_file(gatherxml::markup::ObML::ObservationData& obs_data)
   }
 }
 
-int main(int argc,char **argv)
-{
+int main(int argc, char **argv) {
   if (argc < 4) {
-    std::cerr << "usage: ascii2xml -f format -d [ds]nnn.n path" << std::endl;
-    std::cerr << std::endl;
-    std::cerr << "required (choose one):" << std::endl;
-    std::cerr << "-f ghcnmv3    GHCN Monthly V3 format" << std::endl;
-    std::cerr << "-f little_r   LITTLE_R for WRFDA format" << std::endl;
-    std::cerr << "-f nodcsl     NODC Sea Level Data Formats" << std::endl;
-    std::cerr << std::endl;
-    std::cerr << "required:" << std::endl;
-    std::cerr << "<path>        full HPSS path or URL of the file to read" << std::endl;
-    std::cerr << "              - HPSS paths must begin with \"/FS/DECS\"" << std::endl;
-    std::cerr << "              - URLs must begin with \"https://rda.ucar.edu\"" << std::endl;
+    cerr << "usage: ascii2xml -f format -d [ds]nnn.n path" << endl;
+    cerr << endl;
+    cerr << "required (choose one):" << endl;
+    cerr << "-f ghcnmv3    GHCN Monthly V3 format" << endl;
+    cerr << "-f little_r   LITTLE_R for WRFDA format" << endl;
+    cerr << "-f nodcsl     NODC Sea Level Data Formats" << endl;
+    cerr << endl;
+    cerr << "required:" << endl;
+    cerr << "<path>        full HPSS path or URL of the file to read" << endl;
+    cerr << "              - HPSS paths must begin with \"/FS/DECS\"" << endl;
+    cerr << "              - URLs must begin with \"https://rda.ucar.edu\"" <<
+        endl;
     exit(1);
   }
-  signal(SIGSEGV,segv_handler);
-  signal(SIGINT,int_handler);
+  signal(SIGSEGV, segv_handler);
+  signal(SIGINT, int_handler);
   atexit(clean_up);
-  auto arg_delimiter='!';
-  metautils::args.args_string=unixutils::unix_args_string(argc,argv,arg_delimiter);
-  metautils::read_config("ascii2xml",USER);
+  auto arg_delimiter = '!';
+  metautils::args.args_string = unixutils::unix_args_string(argc, argv,
+      arg_delimiter);
+  metautils::read_config("ascii2xml", USER);
   gatherxml::parse_args(arg_delimiter);
-  std::string flags="-f";
-  if (std::regex_search(metautils::args.path,std::regex("^https://rda.ucar.edu"))) {
-    flags="-wf";
+  std::string flags = "-f";
+  if (regex_search(metautils::args.path, regex("^https://rda.ucar.edu"))) {
+    flags = "-wf";
   }
-  metautils::cmd_register("ascii2xml",USER);
+  metautils::cmd_register("ascii2xml", USER);
   gatherxml::markup::ObML::ObservationData obs_data;
   scan_file(obs_data);
   std::string ext;
   if (write_type == grml_type) {
-    ext="GrML";
-  }
-  else if (write_type == obml_type) {
-    ext="ObML";
+    ext = "GrML";
+  } else if (write_type == obml_type) {
+    ext = "ObML";
     if (!obs_data.is_empty) {
-      gatherxml::markup::ObML::write(obs_data,"ascii2xml",USER);
-    }
-    else {
-      std::cerr << "All stations have missing location information - no usable data found; no content metadata will be saved for this file" << std::endl;
+      gatherxml::markup::ObML::write(obs_data, "ascii2xml",USER);
+    } else {
+      cerr << "All stations have missing location information - no usable data "
+          "found; no content metadata will be saved for this file" << endl;
       exit(1);
     }
   }
   if (metautils::args.update_db) {
     if (!metautils::args.regenerate) {
-      flags="-R "+flags;
+      flags = "-R "+flags;
     }
     if (!metautils::args.update_summary) {
-      flags="-S "+flags;
+      flags = "-S "+flags;
     }
-    std::stringstream oss,ess;
-    if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsid+" "+flags+" "+metautils::args.filename+"."+ext,oss,ess) < 0) {
-      std::cerr << ess.str() << std::endl;
+    std::stringstream oss, ess;
+    if (mysystem2(metautils::directives.local_root + "/bin/scm -d " +
+        metautils::args.dsid + " " + flags + " " + metautils::args.filename +
+        "." + ext, oss, ess) < 0) {
+      cerr << ess.str() << endl;
     }
   }
 }
