@@ -11,8 +11,8 @@
 #include <PostgreSQL.hpp>
 #include <metadata.hpp>
 #include <metahelpers.hpp>
-#include <metadata_export_pg.hpp>
-#include <citation_pg.hpp>
+#include <metadata_export.hpp>
+#include <citation.hpp>
 #include <strutils.hpp>
 #include <gridutils.hpp>
 #include <utils.hpp>
