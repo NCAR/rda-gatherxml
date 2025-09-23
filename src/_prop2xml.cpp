@@ -11,6 +11,8 @@
 #include <myerror.hpp>
 
 using namespace PostgreSQL;
+using std::string;
+using std::stringstream;
 using strutils::ds_aliases;
 using strutils::to_sql_tuple_string;
 
@@ -19,8 +21,8 @@ metautils::Args metautils::args;
 bool gatherxml::verbose_operation;
 auto env = getenv("USER");
 extern const string USER = (env == nullptr) ? "unknown" : env;
-std::string myerror="";
-std::string mywarning="";
+string myerror="";
+string mywarning="";
 
 extern "C" void clean_up()
 {
@@ -42,7 +44,7 @@ extern "C" void int_handler(int)
   metautils::cmd_unregister();
 }
 
-DateTime fill_date(std::string date_s,const std::string& line)
+DateTime fill_date(string date_s,const string& line)
 {
   DateTime dt;
   auto dt_parts=strutils::split(date_s);
@@ -83,7 +85,7 @@ DateTime fill_date(std::string date_s,const std::string& line)
   return dt;
 }
 
-void process_variable_list(const std::string& line,std::unordered_map<std::string,std::tuple<std::string,std::set<std::string>>>& variables)
+void process_variable_list(const string& line,std::unordered_map<string,std::tuple<string,std::set<string>>>& variables)
 {
   auto fields=strutils::split(line,",");
   for (auto& field : fields) {
@@ -98,7 +100,7 @@ void process_variable_list(const std::string& line,std::unordered_map<std::strin
   }
   auto description=fields[1].substr(fields[1].find("=")+1);
   if (variables.find(varlist_id) == variables.end()) {
-    variables.emplace(varlist_id,std::make_tuple(description,std::set<std::string>()));
+    variables.emplace(varlist_id,std::make_tuple(description,std::set<string>()));
   }
   else {
     std::cerr << "Error: variable list '" << varlist_id << "' redefined on line\n:" << line << std::endl;
@@ -109,7 +111,7 @@ void process_variable_list(const std::string& line,std::unordered_map<std::strin
   }
 }
 
-void process_observation(const std::string& line,const std::unordered_set<std::string>& platform_types,const std::unordered_set<std::string>& id_types,std::unordered_map<std::string,std::tuple<std::string,std::set<std::string>>>& variables,std::unordered_map<std::string,std::string>& unique_datatypes,gatherxml::markup::ObML::ObservationData& obs_data)
+void process_observation(const string& line,const std::unordered_set<string>& platform_types,const std::unordered_set<string>& id_types,std::unordered_map<string,std::tuple<string,std::set<string>>>& variables,std::unordered_map<string,string>& unique_datatypes,gatherxml::markup::ObML::ObservationData& obs_data)
 {
   auto fields=strutils::split(line,",");
   if (fields.size() != 9) {
@@ -125,7 +127,7 @@ void process_observation(const std::string& line,const std::unordered_set<std::s
     std::cerr << "Error: invalid observation type '" << fields[0] << "' on line:\n" << line << std::endl;
     exit(1);
   }
-  std::string platform_key;
+  string platform_key;
   if (platform_types.find(fields[1]) == platform_types.end()) {
     std::cerr << "Error: invalid platform type '" << fields[1] << "' on line:\n" << line << std::endl;
     exit(1);
@@ -199,12 +201,12 @@ void scan_input_file(gatherxml::markup::ObML::ObservationData& obs_data)
   }
   long long num_input_lines=0;
   if (gatherxml::verbose_operation) {
-    std::stringstream oss,ess;
+    stringstream oss,ess;
     unixutils::mysystem2("/bin/tcsh -c \"wc -l "+metautils::args.local_name+" |awk '{print $1}'\"",oss,ess);
     num_input_lines=std::stoll(oss.str());
     std::cout << "Beginning scan of input file '"+metautils::args.local_name+"' containing " << num_input_lines << " lines ..." << std::endl;
   }
-  std::unordered_set<std::string> platform_types,id_types;
+  std::unordered_set<string> platform_types,id_types;
   Server server(metautils::directives.metadb_config);
   if (!server) {
     metautils::log_error("scan_input_file(): unable to connect to the metadata database","prop2xml",USER);
@@ -229,14 +231,14 @@ void scan_input_file(gatherxml::markup::ObML::ObservationData& obs_data)
     }
   }
   std::regex varlist_re("^varlist=");
-  std::unordered_map<std::string,std::string> unique_datatypes;
-  std::unordered_map<std::string,std::tuple<std::string,std::set<std::string>>> variables;
+  std::unordered_map<string,string> unique_datatypes;
+  std::unordered_map<string,std::tuple<string,std::set<string>>> variables;
   const size_t LINE_LENGTH=32768;
   std::unique_ptr<char[]> line(new char[LINE_LENGTH]);
   ifs.getline(line.get(),LINE_LENGTH);
   auto num_lines=0;
   while (!ifs.eof()) {
-    std::string sline=line.get();
+    string sline=line.get();
     strutils::replace_all(sline,"\\\\","__SLASH__");
     strutils::replace_all(sline,"\\,","__COMMA__");
     if (std::regex_search(sline,varlist_re)) {
@@ -257,12 +259,12 @@ void scan_input_file(gatherxml::markup::ObML::ObservationData& obs_data)
   }
   server.disconnect();
   TempDir tdir;
-  std::stringstream oss,ess;
+  stringstream oss,ess;
   if (!tdir.create(metautils::directives.temp_path) || unixutils::mysystem2("/bin/mkdir -m 0755 -p "+tdir.name()+"/metadata/ParameterTables",oss,ess) < 0) {
     metautils::log_error("can't create temporary directory for data type map","prop2xml",USER);
   }
   auto existing_datatype_map=unixutils::remote_web_file("https://rda.ucar.edu/metadata/ParameterTables/"+metautils::args.data_format+"."+metautils::args.dsid+".xml",tdir.name());
-  std::vector<std::string> existing_map_contents;
+  std::vector<string> existing_map_contents;
   if (!existing_datatype_map.empty()) {
     std::ifstream ifs(existing_datatype_map.c_str());
     char line[32768];
@@ -277,7 +279,7 @@ void scan_input_file(gatherxml::markup::ObML::ObservationData& obs_data)
   if (gatherxml::verbose_operation) {
     std::cout << "Writing parameter map ..." << std::endl;
   }
-  std::string datatype_map=tdir.name()+"/metadata/ParameterTables/"+metautils::args.data_format+"."+metautils::args.dsid+".xml";
+  string datatype_map=tdir.name()+"/metadata/ParameterTables/"+metautils::args.data_format+"."+metautils::args.dsid+".xml";
   std::ofstream ofs;
   unixutils::open_output(ofs, datatype_map);
   if (!ofs.is_open()) {
@@ -329,7 +331,7 @@ void scan_input_file(gatherxml::markup::ObML::ObservationData& obs_data)
   }
   ofs << "</dataTypeMap>" << std::endl;
   ofs.close();
-  std::string error;
+  string error;
   if (unixutils::gdex_upload_dir(tdir.name(), "metadata/ParameterTables/",
       "/data/web", metautils::directives.gdex_upload_key, error) < 0) {
     metautils::log_error("unable to sync data type map - error(s): '"+error+"'","prop2xml",USER);
@@ -382,7 +384,7 @@ int main(int argc,char **argv)
   if (metautils::args.dsid < "d999000") {
     auto verified_file=false;
     Server server(metautils::directives.rdadb_config);
-    std::string file_type;
+    string file_type;
     LocalQuery query;
     auto ds_set = to_sql_tuple_string(ds_aliases(metautils::args.dsid));
     if (std::regex_search(metautils::args.path,std::regex("^/FS/DECS"))) {
@@ -428,7 +430,7 @@ int main(int argc,char **argv)
   scan_input_file(obs_data);
   gatherxml::markup::ObML::write(obs_data,"prop2xml",USER);
   if (metautils::args.update_db) {
-    std::string flags="-f";
+    string flags="-f";
     if (!std::regex_search(metautils::args.path,std::regex("^/FS/DECS"))) {
 	flags="-wf";
     }
@@ -438,7 +440,7 @@ int main(int argc,char **argv)
     if (!metautils::args.update_summary) {
 	flags="-S "+flags;
     }
-    std::stringstream oss,ess;
+    stringstream oss,ess;
     if (gatherxml::verbose_operation) {
 	std::cout << "Calling 'scm' ..." << std::endl;
     }
