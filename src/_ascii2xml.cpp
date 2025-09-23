@@ -23,6 +23,7 @@ using std::regex;
 using std::regex_search;
 using std::stof;
 using std::string;
+using std::stringstream;
 using unixutils::mysystem2;
 
 metautils::Directives metautils::directives;
