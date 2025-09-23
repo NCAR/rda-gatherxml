@@ -2199,7 +2199,7 @@ std::cerr << unixutils::host_name() << std::endl;
   }
   g_ds_set = to_sql_tuple_string(ds_aliases(metautils::args.dsid));
   metautils::args.args_string = unixutils::unix_args_string(argc, argv);
-  metautils::read_config("dsgen", USER);
+  metautils::read_config("dsgen", USER, false);
   if (!temp_dir.create(metautils::directives.temp_path)) {
     log_error2("unable to create temporary directory", F, "dsgen", USER);
   }
