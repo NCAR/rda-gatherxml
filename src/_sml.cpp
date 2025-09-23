@@ -55,7 +55,7 @@ void fill_files_with_metadata(std::string filename = "")
 	  query.set("select id from "+dbs[n]+"."+metautils::args.dsid+"_webfiles2");
 	}
 	if (query.submit(server_m) < 0) {
-	  metautils::log_error("error '"+query.error()+"' while trying to get "+dbs[n]+" filelist","sml",user);
+	  metautils::log_error("error '"+query.error()+"' while trying to get "+dbs[n]+" filelist","sml",USER);
 	}
 	while (query.fetch_row(row)) {
 	  e.key=row[0];
@@ -69,14 +69,14 @@ void fill_files_with_metadata(std::string filename = "")
 void nullify_meta_link(std::string table,std::string file,std::string old_meta_link)
 {
   if (server_d.update("dssdb."+table,"meta_link = NULL","dsid in "+g_ds_set+" and "+table+" = '"+file+"'") < 0)
-    metautils::log_error("error '"+server_d.error()+"' while trying to nullify meta_link for '"+file+"'","sml",user);
+    metautils::log_error("error '"+server_d.error()+"' while trying to nullify meta_link for '"+file+"'","sml",USER);
   std::cout << "Info: changed 'meta_link' from '" << old_meta_link << "' to NULL for file: '" << file << "'" << std::endl;
 }
 
 void update_meta_link(std::string table,std::string file,std::string new_meta_link,std::string old_meta_link)
 {
   if (server_d.update("dssdb."+table,"meta_link = '"+new_meta_link+"'","dsid in "+g_ds_set+" and "+table+" = '"+file+"'") < 0)
-    metautils::log_error("error '"+server_d.error()+"' while trying to set meta_link for '"+file+"' to '"+new_meta_link+"'","sml",user);
+    metautils::log_error("error '"+server_d.error()+"' while trying to set meta_link for '"+file+"' to '"+new_meta_link+"'","sml",USER);
   std::cout << "Info: changed 'meta_link' from '" << old_meta_link << "' to '" << new_meta_link << "' for file: '" << file << "'" << std::endl;
 }
 
@@ -88,7 +88,7 @@ void set_file_meta_links()
 
   query.set("select mssfile,meta_link,'mssfile' from mssfile where dsid in "+g_ds_set+" and type = 'P' and status = 'P' union select wfile,meta_link,'wfile' from dssdb.wfile_"+metautils::args.dsid+" where type = 'D' and status = 'P'");
   if (query.submit(server_d) < 0)
-    metautils::log_error("error '"+query.error()+"' while trying to get dssdb filelist","sml",user);
+    metautils::log_error("error '"+query.error()+"' while trying to get dssdb filelist","sml",USER);
   while (query.fetch_row(row)) {
     if (!files_with_metadata.found(row[0],e)) {
 	if (!row[1].empty() && row[1] != "N")
@@ -111,10 +111,10 @@ void set_file_meta_link(std::string filename)
     query.set("select meta_link,'wfile' from dssdb.wfile_"+metautils::args.dsid+" where wfile = '"+filename+"'");
   }
   if (query.submit(server_d) < 0) {
-    metautils::log_error("error '"+query.error()+"' while trying to get entry for '"+filename+"' from dssdb","sml",user);
+    metautils::log_error("error '"+query.error()+"' while trying to get entry for '"+filename+"' from dssdb","sml",USER);
   }
   if (query.num_rows() == 0) {
-    metautils::log_error("'"+filename+"' is not in dssdb","sml",user);
+    metautils::log_error("'"+filename+"' is not in dssdb","sml",USER);
   }
   else {
     Row row;
@@ -154,7 +154,7 @@ int main(int argc,char **argv)
     std::cerr << "Error: no or invalid dataset ID specified" << std::endl;
     exit(1);
   }
-  metautils::read_config("sml",user,false);
+  metautils::read_config("sml",USER,false);
   server_m.connect(metautils::directives.metadb_config);
   server_d.connect(metautils::directives.rdadb_config);
   if (file_list.size() == 0) {
@@ -171,7 +171,7 @@ int main(int argc,char **argv)
     ds_meta_link="Y";
   }
   if (server_d.update("dssdb.dataset","meta_link = '"+ds_meta_link+"', version = version + 1","dsid in "+g_ds_set) < 0) {
-    metautils::log_error("error '"+server_d.error()+"' while updating meta_link field for dataset","sml",user);
+    metautils::log_error("error '"+server_d.error()+"' while updating meta_link field for dataset","sml",USER);
   }
   server_d.disconnect();
   server_m.disconnect();
