@@ -194,7 +194,7 @@ _bufr2xml: CHECK_TARGET=_bufr2xml
 _bufr2xml: $(SOURCEDIR)/_bufr2xml.cpp builddir get_version
 ifeq ($(OKAY_TO_MAKE),1)
 	$(eval LINK_LIBS = $(DBLIBS) -lgatherxml -lio -lutils -lutilsthread -ldatetime -lmetautils -lmetahelpers -lbufr -lobs -lbitmap -lgridutils -lsearch -lxml -ls3 -lmyssl -lcurl -lz -lpthread)
-ifneq ($(or $(findstring BUG,$(VERSION)),$(findstring MINOR,$(VERSION)),$(findstring MAJOR,$(VERSION)),$(findstring singularity,$(HOST))),)
+ifneq ($(or $(findstring BUG,$(VERSION)),$(findstring MINOR,$(VERSION)),$(findstring MAJOR,$(VERSION)),$(findstring singularity,$(HOST)),$(findstring docker,$(HOST))),)
 	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(LIBDIR) -L$(DBLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 else
 	$(COMPILER) $(COMPILE_OPTIONS) -Wl,-rpath,$(BUILDDIR) $(RUNPATH) $(DBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(BUILDDIR) -L$(LIBDIR) -L$(DBLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
@@ -281,7 +281,7 @@ _grid2xml: CHECK_TARGET=_grid2xml
 _grid2xml: $(SOURCEDIR)/_grid2xml.cpp builddir get_version
 ifeq ($(OKAY_TO_MAKE),1)
 	$(eval LINK_LIBS = -lgatherxml $(DBLIBS) -lgrids -ljasper -lutils -lutilsthread -ldatetime -lbitmap -lio -lmetautils -lmetahelpers -lgridutils -lsearch -lxml -ls3 -lmyssl -lerror -lcurl -lpthread -lz)
-ifneq ($(or $(findstring BUG,$(VERSION)),$(findstring MINOR,$(VERSION)),$(findstring MAJOR,$(VERSION)),$(findstring singularity,$(HOST))),)
+ifneq ($(or $(findstring BUG,$(VERSION)),$(findstring MINOR,$(VERSION)),$(findstring MAJOR,$(VERSION)),$(findstring singularity,$(HOST)),$(findstring docker,$(HOST))),)
 	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(DBRUNPATH) $(JASPERRUNPATH) $(SOURCEDIR)/$@.cpp -D__WITH_JASPER -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -I$(JASPERINCLUDEDIR) -L$(LIBDIR) -L$(DBLIBDIR) -L$(JASPERLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 else
 	$(COMPILER) $(COMPILE_OPTIONS) -Wl,-rpath,$(BUILDDIR) $(RUNPATH) $(DBRUNPATH) $(JASPERRUNPATH) $(SOURCEDIR)/$@.cpp -D__WITH_JASPER -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -I$(JASPERINCLUDEDIR) -L$(BUILDDIR) -L$(LIBDIR) -L$(DBLIBDIR) -L$(JASPERLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
@@ -328,7 +328,7 @@ _nc2xml: CHECKDIR=$(BINDIR)
 _nc2xml: CHECK_TARGET=_nc2xml
 _nc2xml: $(SOURCEDIR)/_nc2xml.cpp builddir get_version
 	$(eval LINK_LIBS = $(DBLIBS) -lgatherxml -lio -lutils -lutilsthread -ldatetime -lmetautils -lmetahelpers -lgridutils -lsearch -lxml -lbufr -lbitmap -ls3 -lmyssl -lerror -lpthread -lz -lcurl)
-ifneq ($(or $(findstring BUG,$(VERSION)),$(findstring MINOR,$(VERSION)),$(findstring MAJOR,$(VERSION)),$(findstring singularity,$(HOST))),)
+ifneq ($(or $(findstring BUG,$(VERSION)),$(findstring MINOR,$(VERSION)),$(findstring MAJOR,$(VERSION)),$(findstring singularity,$(HOST)),$(findstring docker,$(HOST))),)
 	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(DBRUNPATH) $(JASPERRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(LIBDIR) -L$(DBLIBDIR) -L$(JASPERLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 else
 	$(COMPILER) $(COMPILE_OPTIONS) -Wl,-rpath,$(BUILDDIR) $(RUNPATH) $(DBRUNPATH) $(JASPERRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(BUILDDIR) -L$(LIBDIR) -L$(DBLIBDIR) -L$(JASPERLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
