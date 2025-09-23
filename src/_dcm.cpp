@@ -367,7 +367,7 @@ bool remove_from(string database, string table_ext, string file_field_name,
               }
               if (gdex_unlink("/data/web/datasets/" + metautils::args.dsid +
                   "/metadata/" + md_directory + "/" + e.attribute_value(
-                  "ref"), metautils::directives.unlink_key, error) < 0) {
+                  "ref"), metautils::directives.gdex_unlink_key, error) < 0) {
                 metautils::log_warning("unable to unsync " + e.attribute_value(
                     "ref"), "dcm", USER);
               }
@@ -381,7 +381,7 @@ bool remove_from(string database, string table_ext, string file_field_name,
               "_inv.gz")) {
             if (gdex_unlink("/data/web/datasets/" + metautils::args.dsid +
                 "/metadata/inv/" + md_file + "_inv.gz", metautils::directives.
-                unlink_key, error) < 0) {
+                gdex_unlink_key, error) < 0) {
               metautils::log_warning("unable to unsync " + md_file + "_inv",
                   "dcm", USER);
             }
@@ -390,7 +390,7 @@ bool remove_from(string database, string table_ext, string file_field_name,
               md_file + "_inv")) {
             if (gdex_unlink("/data/web/datasets/" + metautils::args.dsid +
                 "/metadata/inv/" + md_file + "_inv", metautils::directives.
-                unlink_key, error) < 0) {
+                gdex_unlink_key, error) < 0) {
               metautils::log_warning("unable to unsync " + md_file + "_inv",
                   "dcm", USER);
             }
@@ -400,7 +400,7 @@ bool remove_from(string database, string table_ext, string file_field_name,
               ".gz")) {
             if (gdex_unlink("/data/web/datasets/" + metautils::args.dsid +
                 "/metadata/wms/" + md_file + ".gz", metautils::directives.
-                unlink_key, error) < 0) {
+                gdex_unlink_key, error) < 0) {
               metautils::log_warning("unable to unsync wms file " + md_file,
                   "dcm", USER);
             }
@@ -416,8 +416,8 @@ bool remove_from(string database, string table_ext, string file_field_name,
           if (!f.empty()) {
             string error;
             if (gdex_upload_dir(tdir->name(), "metadata/" + md_directory +
-                "/v/", "/data/web/datasets/" + metautils::args.dsid, "", error)
-                < 0) {
+                "/v/", "/data/web/datasets/" + metautils::args.dsid, metautils::
+                directives.gdex_upload_key, error) < 0) {
               log_error2("unable to move version-controlled metadata file " +
                   file + "; error: " + error, F, "dcm", USER);
             }
@@ -425,7 +425,7 @@ bool remove_from(string database, string table_ext, string file_field_name,
         }
         if (gdex_unlink("/data/web/datasets/" + metautils::args.dsid +
             "/metadata/" + md_directory + "/" + md_file, metautils::directives.
-            unlink_key, error) < 0) {
+            gdex_unlink_key, error) < 0) {
           metautils::log_warning("unable to unsync " + md_file, "dcm", USER);
         }
       }
