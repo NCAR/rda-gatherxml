@@ -120,7 +120,7 @@ ifneq ($(findstring docker,$(HOST)),)
         LIBDIR = /usr/local/lib
         DBLIBDIR = /usr/lib/x86_64-linux-gnu
 	DBLIBS = -lpq -lpostgresql
-	JASPERINCLUDEDIR = /usr/include
+	JASPERINCLUDEDIR = /usr/local/include
 	JASPERLIBDIR = /usr/lib/x86_64-linux-gnu/lib
 	BINDIR = /usr/local/bin
 	RUNPATH = -Wl,-rpath,$(LIBDIR)
