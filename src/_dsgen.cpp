@@ -135,6 +135,7 @@ void sync_dataset_files(string tdir_name) {
 
 void generate_index(string tdir_name) {
   static const string F = this_function_label(__func__);
+/*
   ofstream ofs;
   if (g_dataset_type == "W") {
     open_output(ofs, tdir_name + "/test_index.html");
@@ -155,8 +156,9 @@ void generate_index(string tdir_name) {
   }
   auto &tdoc = *t;
   tdoc.add_replacement("__DSNUM__", metautils::args.dsid);
+*/
   if (g_dataset_type == "I") {
-    tdoc.add_if("__IS_INTERNAL_DATASET__");
+//    tdoc.add_if("__IS_INTERNAL_DATASET__");
   } else {
     auto parts = split(metautils::directives.web_server, ".");
     std::reverse(parts.begin(), parts.end());
@@ -179,11 +181,11 @@ void generate_index(string tdir_name) {
       log_error2("unable to export DC meta tags: '" + myerror + "'", F, "dsgen",
           USER);
     }
-    tdoc.add_replacement("__DC_META_TAGS__", ss.str());
+//    tdoc.add_replacement("__DC_META_TAGS__", ss.str());
     auto e = g_xdoc.element("OAI-PMH/GetRecord/record/metadata/dsOverview/"
         "title");
     auto ti = e.content();
-    tdoc.add_replacement("__TITLE__", ti);
+//    tdoc.add_replacement("__TITLE__", ti);
     update_wagtail("dstitle", ti, F);
     TempDir d;
     if (!d.create(metautils::directives.temp_path)) {
@@ -207,19 +209,19 @@ void generate_index(string tdir_name) {
       metautils::log_error2("couldn't sync JSON-LD file - rdadata_sync "
           "error(s): '" + err + "'", F, "dsgen", USER);
     }
-    tdoc.add_replacement("__JSON_LD__", ss.str());
+//    tdoc.add_replacement("__JSON_LD__", ss.str());
     e = g_xdoc.element("OAI-PMH/GetRecord/record/metadata/dsOverview/logo");
     if (!e.content().empty()) {
       auto sp = split(e.content(), ".");
       auto sp2 = split(sp[sp.size() - 2], "_");
       auto w = stoi(sp2[sp2.size() - 2]);
       auto h = stoi(sp2[sp2.size() - 1]);
-      tdoc.add_replacement("__LOGO_IMAGE__", e.content());
-      tdoc.add_replacement("__LOGO_WIDTH__", itos(lroundf(w * 70. / h)));
+//      tdoc.add_replacement("__LOGO_IMAGE__", e.content());
+//      tdoc.add_replacement("__LOGO_WIDTH__", itos(lroundf(w * 70. / h)));
       update_wagtail("dslogo", e.content(), F);
     } else {
-      tdoc.add_replacement("__LOGO_IMAGE__", "default_200_200.png");
-      tdoc.add_replacement("__LOGO_WIDTH__", "70");
+//      tdoc.add_replacement("__LOGO_IMAGE__", "default_200_200.png");
+//      tdoc.add_replacement("__LOGO_WIDTH__", "70");
     }
     LocalQuery query("upper(doi)", "dssdb.dsvrsn", "dsid in " + g_ds_set +
         " and status = 'A'");
@@ -230,14 +232,14 @@ void generate_index(string tdir_name) {
       ds = "&nbsp;|&nbsp;<span class=\"blue\">DOI: " + row[0] + "</span>";
       update_wagtail("dsdoi", row[0], F);
     }
-    tdoc.add_replacement("__DOI_SPAN__", ds);
+//    tdoc.add_replacement("__DOI_SPAN__", ds);
     if (g_dataset_type == "D") {
-      tdoc.add_if("__IS_DEAD_DATASET__");
+//      tdoc.add_if("__IS_DEAD_DATASET__");
     }
   }
-  ofs << tdoc;
-  ofs.close();
-  delete t;
+//  ofs << tdoc;
+//  ofs.close();
+//  delete t;
 }
 
 bool compare_strings(const string& left, const string& right) {
