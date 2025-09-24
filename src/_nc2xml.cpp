@@ -5820,7 +5820,7 @@ int main(int argc, char **argv) {
   atexit(clean_up);
   auto d = '%';
   metautils::args.args_string = unixutils::unix_args_string(argc, argv, d);
-  metautils::read_config("nc2xml", USER);
+  metautils::read_config("nc2xml", USER, false);
   gatherxml::parse_args(d);
   if (metautils::args.dsid == "d999009") {
     log_error2("Terminating - Testing has changed. Use:\n  gatherxml -d test "
