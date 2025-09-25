@@ -3476,6 +3476,66 @@ bool filled_grid_projection(const unique_ptr<double[]>& lats, const unique_ptr<
   return found_grid_projection(grid_is_lambert_conformal(lats, lons, d, f));
 }
 
+void process_time_bounds(InputNetCDFStream& istream, string time_bounds_id,
+    metautils::NcTime::TimeRangeEntry& tre) {
+  static const string F = this_function_label(__func__);
+  if (gatherxml::verbose_operation) {
+    cout << "   ...adjusting times for time bounds" << endl;
+  }
+  auto tb_type = NetCDF::NCType::_NULL;
+  for (const auto& v : vars) {
+    if (v.name == time_bounds_id) {
+      tb_type = v.nc_type;
+      break;
+    }
+  }
+  if (tb_type == NetCDF::NCType::_NULL) {
+    log_error2("unable to determine type of time bounds", F, "nc2xml", USER);
+  }
+  NetCDF::VariableData vd;
+  istream.variable_data(time_bounds_id, vd);
+  if (vd.size() != time_s.num_times * 2) {
+    log_error2("unable to handle more than two time bounds values per time", F,
+        "nc2xml", USER);
+  }
+  time_bounds_s.t1 = vd.front();
+  time_bounds_s.diff = vd[1] - time_bounds_s.t1;
+  for (size_t l = 2; l < vd.size(); l += 2) {
+    double diff = vd[l + 1] - vd[l];
+    // handle leap years in year-length time bounds
+    if (time_data.calendar == "gregorian" && time_data.units == "days" &&
+        ((time_bounds_s.diff == 365 && diff == 366) || (time_bounds_s.diff ==
+        366 && diff == 365))) {
+      time_bounds_s.diff = 365;
+      diff = 365;
+    }
+    if (!myequalf(diff, time_bounds_s.diff)) {
+      // allow month-intervals specified in units of days to pass
+      if (time_data.units != "days" || time_bounds_s.diff < 28 || time_bounds_s.
+          diff > 31 || diff < 28 || diff > 31) {
+        time_bounds_s.changed = true;
+      }
+    }
+  }
+  time_bounds_s.t2 = vd.back();
+  string e;
+  tre.bounded.first_valid_datetime = metautils::NcTime::actual_date_time(
+      time_bounds_s.t1, time_data, e);
+  if (!e.empty()) {
+    log_error2(e, F, "nc2xml", USER);
+  }
+  tre.bounded.last_valid_datetime = metautils::NcTime::actual_date_time(
+      time_bounds_s.t2, time_data, e);
+  if (!e.empty()) {
+    log_error2(e, F, "nc2xml", USER);
+  }
+  if (gatherxml::verbose_operation) {
+    cout << "      ...now temporal range is:" << endl;
+    cout << "         " << tre.bounded.first_valid_datetime.to_string() <<
+        " to " << tre.bounded.last_valid_datetime.to_string() << endl;
+  }
+}
+
 void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
   static const string F = this_function_label(__func__);
   if (gatherxml::verbose_operation) {
@@ -3704,77 +3764,18 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
     }
     tre.num_steps = vd.size();
     if (!grid_data.time_bounds.id.empty()) {
-      if (gatherxml::verbose_operation) {
-        cout << "   ...adjusting times for time bounds" << endl;
-      }
-      for (const auto& v : vars) {
-        if (v.name == grid_data.time_bounds.id) {
-          grid_data.time_bounds.type = v.nc_type;
-          break;
-        }
-      }
-      if (grid_data.time_bounds.type == NetCDF::NCType::_NULL) {
-        log_error2("unable to determine type of time bounds", F, "nc2xml",
-            USER);
-      }
-      istream.variable_data(grid_data.time_bounds.id, vd);
-      if (vd.size() != time_s.num_times * 2) {
-        log_error2("unable to handle more than two time bounds values per time",
-            F, "nc2xml", USER);
-      }
-      time_bounds_s.t1 = vd.front();
-      time_bounds_s.diff = vd[1] - time_bounds_s.t1;
-      for (size_t l = 2; l < vd.size(); l += 2) {
-        double diff = vd[l + 1] - vd[l];
-        // handle leap years in year-length time bounds
-        if (time_data.calendar == "gregorian" && time_data.units == "days" &&
-            ((time_bounds_s.diff == 365 && diff == 366) || (time_bounds_s.diff
-            == 366 && diff == 365))) {
-          time_bounds_s.diff = 365;
-          diff = 365;
-        }
-        if (!myequalf(diff, time_bounds_s.diff)) {
-          // allow month-intervals specified in units of days to pass
-          if (time_data.units != "days" || time_bounds_s.diff < 28 ||
-              time_bounds_s.diff > 31 || diff < 28 || diff > 31) {
-            time_bounds_s.changed = true;
-          }
-        }
-      }
-      time_bounds_s.t2 = vd.back();
-      string e;
-      tre.bounded.first_valid_datetime = metautils::NcTime::
-          actual_date_time(time_bounds_s.t1, time_data, e);
-      if (!e.empty()) {
-        log_error2(e, F, "nc2xml", USER);
-      }
-      tre.bounded.last_valid_datetime = metautils::NcTime::
-          actual_date_time(time_bounds_s.t2, time_data, e);
-      if (!e.empty()) {
-        log_error2(e, F, "nc2xml", USER);
-      }
-      if (gatherxml::verbose_operation) {
-        cout << "      ...now temporal range is:" << endl;
-        cout << "         " << tre.bounded.first_valid_datetime.
-            to_string() << " to " << tre.bounded.last_valid_datetime.
-            to_string() << endl;
-      }
+      process_time_bounds(istream, grid_data.time_bounds.id, tre);
     }
-    if (time_data.units == "months") {
-      if ((tre.instantaneous.first_valid_datetime).day() == 1) {
-//          (tre.instantaneous->last_valid_datetime).addDays(dateutils::days_in_month((tre.instantaneous->last_valid_datetime).year(),(tre.instantaneous->last_valid_datetime).month(),time_data.calendar)-1,time_data.calendar);
-(tre.instantaneous.last_valid_datetime).add_months(1);
-      }
-/*
-      if (!grid_data.time_bounds.id.empty()) {
-        if ((tre.bounded.first_valid_datetime).day() == 1) {
-          (tre.bounded.last_valid_datetime).add_months(1);
-        }
-      }
-*/
-      }
+    if (time_data.units == "months" && tre.instantaneous.first_valid_datetime.
+        day() == 1) {
+      tre.instantaneous.last_valid_datetime.add_months(1);
+    }
     tr_table.insert(tre);
   }
+std::cerr << "TR table size=" << tr_table.size() << std::endl;
+for (const auto& key : tr_table.keys()) {
+std::cerr << static_cast<long long>(key) << std::endl;
+}
   for (size_t x = 0; x < grid_data.lats.size(); ++x) {
     if (grid_data.lats[x].dim < 100) {
       gdf.emplace_back(Grid::GridDefinition());
