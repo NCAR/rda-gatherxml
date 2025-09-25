@@ -3499,21 +3499,23 @@ void process_time_bounds(InputNetCDFStream& istream, string time_bounds_id,
         "nc2xml", USER);
   }
   time_bounds_s.t1 = vd.front();
-  time_bounds_s.diff = vd[1] - time_bounds_s.t1;
-  for (size_t l = 2; l < vd.size(); l += 2) {
-    double diff = vd[l + 1] - vd[l];
-    // handle leap years in year-length time bounds
-    if (time_data.calendar == "gregorian" && time_data.units == "days" &&
-        ((time_bounds_s.diff == 365 && diff == 366) || (time_bounds_s.diff ==
-        366 && diff == 365))) {
-      time_bounds_s.diff = 365;
-      diff = 365;
-    }
-    if (!myequalf(diff, time_bounds_s.diff)) {
-      // allow month-intervals specified in units of days to pass
-      if (time_data.units != "days" || time_bounds_s.diff < 28 || time_bounds_s.
-          diff > 31 || diff < 28 || diff > 31) {
-        time_bounds_s.changed = true;
+  if (static_cast<long long>(tre.key) != -11) {
+    time_bounds_s.diff = vd[1] - time_bounds_s.t1;
+    for (size_t l = 2; l < vd.size(); l += 2) {
+      double diff = vd[l + 1] - vd[l];
+      // handle leap years in year-length time bounds
+      if (time_data.calendar == "gregorian" && time_data.units == "days" &&
+          ((time_bounds_s.diff == 365 && diff == 366) || (time_bounds_s.diff ==
+          366 && diff == 365))) {
+        time_bounds_s.diff = 365;
+        diff = 365;
+      }
+      if (!myequalf(diff, time_bounds_s.diff)) {
+        // allow month-intervals specified in units of days to pass
+        if (time_data.units != "days" || time_bounds_s.diff < 28 ||
+            time_bounds_s.diff > 31 || diff < 28 || diff > 31) {
+          time_bounds_s.changed = true;
+        }
       }
     }
   }
