@@ -3536,6 +3536,64 @@ void process_time_bounds(InputNetCDFStream& istream, string time_bounds_id,
   }
 }
 
+void process_horizontal_grid(InputNetCDFStream& istream, const GridData&
+    grid_data, vector<Grid::GridDimensions>& grid_dims, vector<Grid::
+    GridDefinition>& grid_defs) {
+  static const string F = this_function_label(__func__);
+  for (size_t x = 0; x < grid_data.lats.size(); ++x) {
+    if (grid_data.lats[x].dim < 100) {
+      grid_defs.emplace_back(Grid::GridDefinition());
+      grid_defs.back().type = Grid::Type::latitudeLongitude;
+
+      // get the latitude range
+      NetCDF::VariableData vd;
+      istream.variable_data(grid_data.lats[x].id, vd);
+      grid_dims.emplace_back(Grid::GridDimensions());
+      grid_dims.back().y = vd.size();
+      grid_defs.back().slatitude = vd.front();
+      grid_defs.back().elatitude = vd.back();
+      grid_defs.back().laincrement = fabs((grid_defs.back().elatitude -
+          grid_defs.back().slatitude) / (vd.size() - 1));
+      if (grid_data.lons[x].dim != MISSING_FLAG) {
+
+        // check for gaussian lat-lon
+        if (!myequalf(fabs(vd[1] - vd[0]), grid_defs.back().laincrement, 0.001)
+            && myequalf(vd.size() / 2., vd.size() / 2, 0.00000000001)) {
+          grid_defs.back().type = Grid::Type::gaussianLatitudeLongitude;
+          grid_defs.back().laincrement = vd.size() / 2;
+        }
+        if (!grid_data.lats_b[x].id.empty()) {
+          if (grid_data.lons_b[x].id.empty()) {
+            log_error2("found a lat bounds but no lon bounds", F, "nc2xml",
+                USER);
+          }
+          istream.variable_data(grid_data.lats_b[x].id, vd);
+          grid_defs.back().slatitude = vd.front();
+          grid_defs.back().elatitude = vd.back();
+          grid_defs.back().is_cell = true;
+        }
+
+        // get the longitude range
+        istream.variable_data(grid_data.lons[x].id, vd);
+        grid_dims.back().x = vd.size();
+        grid_defs.back().slongitude = vd.front();
+        grid_defs.back().elongitude = vd.back();
+        grid_defs.back().loincrement = fabs((grid_defs.back().elongitude -
+            grid_defs.back().slongitude) / (vd.size() - 1));
+        if (!grid_data.lons_b[x].id.empty()) {
+          if (grid_data.lats_b[x].id.empty()) {
+            log_error2("found a lon bounds but no lat bounds", F, "nc2xml",
+                USER);
+          }
+          istream.variable_data(grid_data.lons_b[x].id, vd);
+          grid_defs.back().slongitude = vd.front();
+          grid_defs.back().elongitude = vd.back();
+        }
+      }
+    }
+  }
+}
+
 void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
   static const string F = this_function_label(__func__);
   if (gatherxml::verbose_operation) {
@@ -3778,58 +3836,7 @@ std::cerr << "TR table size=" << tr_table.size() << std::endl;
 for (const auto& key : tr_table.keys()) {
 std::cerr << static_cast<long long>(key) << std::endl;
 }
-  for (size_t x = 0; x < grid_data.lats.size(); ++x) {
-    if (grid_data.lats[x].dim < 100) {
-      grid_defs.emplace_back(Grid::GridDefinition());
-      grid_defs.back().type = Grid::Type::latitudeLongitude;
-
-      // get the latitude range
-      NetCDF::VariableData vd;
-      istream.variable_data(grid_data.lats[x].id, vd);
-      grid_dims.emplace_back(Grid::GridDimensions());
-      grid_dims.back().y = vd.size();
-      grid_defs.back().slatitude = vd.front();
-      grid_defs.back().elatitude = vd.back();
-      grid_defs.back().laincrement = fabs((grid_defs.back().elatitude -
-          grid_defs.back().slatitude) / (vd.size() - 1));
-      if (grid_data.lons[x].dim != MISSING_FLAG) {
-
-        // check for gaussian lat-lon
-        if (!myequalf(fabs(vd[1] - vd[0]), grid_defs.back().laincrement, 0.001)
-            && myequalf(vd.size() / 2., vd.size() / 2, 0.00000000001)) {
-          grid_defs.back().type = Grid::Type::gaussianLatitudeLongitude;
-          grid_defs.back().laincrement = vd.size() / 2;
-        }
-        if (!grid_data.lats_b[x].id.empty()) {
-          if (grid_data.lons_b[x].id.empty()) {
-            log_error2("found a lat bounds but no lon bounds", F, "nc2xml",
-                USER);
-          }
-          istream.variable_data(grid_data.lats_b[x].id, vd);
-          grid_defs.back().slatitude = vd.front();
-          grid_defs.back().elatitude = vd.back();
-          grid_defs.back().is_cell = true;
-        }
-
-        // get the longitude range
-        istream.variable_data(grid_data.lons[x].id, vd);
-        grid_dims.back().x = vd.size();
-        grid_defs.back().slongitude = vd.front();
-        grid_defs.back().elongitude = vd.back();
-        grid_defs.back().loincrement = fabs((grid_defs.back().elongitude -
-            grid_defs.back().slongitude) / (vd.size() - 1));
-        if (!grid_data.lons_b[x].id.empty()) {
-          if (grid_data.lats_b[x].id.empty()) {
-            log_error2("found a lon bounds but no lat bounds", F, "nc2xml",
-                USER);
-          }
-          istream.variable_data(grid_data.lons_b[x].id, vd);
-          grid_defs.back().slongitude = vd.front();
-          grid_defs.back().elongitude = vd.back();
-        }
-      }
-    }
-  }
+  process_horizontal_grid(istream, grid_data, grid_dims, grid_defs);
   for (size_t z = 0; z < grid_data.levels.size(); ++z) {
     auto levid = grid_data.levdata[z].ID.substr(0, grid_data.levdata[z].ID.find(
         "@@"));
