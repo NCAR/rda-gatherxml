@@ -3560,8 +3560,8 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
   if (grid_data.time.id.empty()) {
     log_error2("time coordinate not found", F, "nc2xml", USER);
   }
-  vector<Grid::GridDimensions> gdm;
-  vector<Grid::GridDefinition> gdf;
+  vector<Grid::GridDimensions> grid_dims;
+  vector<Grid::GridDefinition> grid_defs;
   if (grid_data.lats.empty() || grid_data.lons.empty()) {
     if (!grid_data.lats.empty()) {
 
@@ -3590,30 +3590,31 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
           log_error2("auxiliary latitude and longitude coordinate variables (" +
               itos(n) + ") do not have the same dimensions", F, "nc2xml", USER);
         }
-        gdm.emplace_back();
-        gdm.back().y = grid_data.lats[n].dim / 10000 - 1;
-        gdm.back().x = (grid_data.lats[n].dim % 10000) / 100 - 1;
-        gdf.emplace_back();
+        grid_dims.emplace_back();
+        grid_dims.back().y = grid_data.lats[n].dim / 10000 - 1;
+        grid_dims.back().x = (grid_data.lats[n].dim % 10000) / 100 - 1;
+        grid_defs.emplace_back();
         NetCDF::VariableData vd;
         istream.variable_data(grid_data.lats[n].id, vd);
-        gdf.back().slatitude = vd.front();
+        grid_defs.back().slatitude = vd.front();
         auto nlats = vd.size();
         unique_ptr<double[]> lats(new double[nlats]);
         for (size_t m = 0; m < nlats; ++m) {
           lats[m] = vd[m];
         }
         istream.variable_data(grid_data.lons[n].id, vd);
-        gdf.back().slongitude = vd.front();
+        grid_defs.back().slongitude = vd.front();
         auto nlons = vd.size();
         unique_ptr<double[]> lons(new double[nlons]);
         for (size_t m = 0; m < nlons; ++m) {
           lons[m] = vd[m];
         }
         Grid::GridDimensions d;
-        d.x = dims[gdm.back().x].length;
-        d.y = dims[gdm.back().y].length;
-        if (filled_grid_projection(lats, lons, d, gdf.back(), nlats, nlons)) {
-          gdm.back() = d;
+        d.x = dims[grid_dims.back().x].length;
+        d.y = dims[grid_dims.back().y].length;
+        if (filled_grid_projection(lats, lons, d, grid_defs.back(), nlats,
+            nlons)) {
+          grid_dims.back() = d;
         } else {
           log_error2("unable to determine grid projection", F, "nc2xml", USER);
         }
@@ -3673,7 +3674,8 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
       grid_data.levdata.pop_back();
     }
     if (!grid_data.levels.empty() && grid_data.levdata.empty()) {
-      log_error2("unable to determine the level coordinates", F, "nc2xml", USER);
+      log_error2("unable to determine the level coordinates", F, "nc2xml",
+          USER);
     }
     if (gatherxml::verbose_operation) {
       cout << "... found " << grid_data.levels.size() << " auxiliary level "
@@ -3778,25 +3780,25 @@ std::cerr << static_cast<long long>(key) << std::endl;
 }
   for (size_t x = 0; x < grid_data.lats.size(); ++x) {
     if (grid_data.lats[x].dim < 100) {
-      gdf.emplace_back(Grid::GridDefinition());
-      gdf.back().type = Grid::Type::latitudeLongitude;
+      grid_defs.emplace_back(Grid::GridDefinition());
+      grid_defs.back().type = Grid::Type::latitudeLongitude;
 
       // get the latitude range
       NetCDF::VariableData vd;
       istream.variable_data(grid_data.lats[x].id, vd);
-      gdm.emplace_back(Grid::GridDimensions());
-      gdm.back().y = vd.size();
-      gdf.back().slatitude = vd.front();
-      gdf.back().elatitude = vd.back();
-      gdf.back().laincrement = fabs((gdf.back().elatitude - gdf.back().
-          slatitude) / (vd.size() - 1));
+      grid_dims.emplace_back(Grid::GridDimensions());
+      grid_dims.back().y = vd.size();
+      grid_defs.back().slatitude = vd.front();
+      grid_defs.back().elatitude = vd.back();
+      grid_defs.back().laincrement = fabs((grid_defs.back().elatitude -
+          grid_defs.back().slatitude) / (vd.size() - 1));
       if (grid_data.lons[x].dim != MISSING_FLAG) {
 
         // check for gaussian lat-lon
-        if (!myequalf(fabs(vd[1] - vd[0]), gdf.back().laincrement, 0.001) &&
-            myequalf(vd.size() / 2., vd.size() / 2, 0.00000000001)) {
-          gdf.back().type = Grid::Type::gaussianLatitudeLongitude;
-          gdf.back().laincrement = vd.size() / 2;
+        if (!myequalf(fabs(vd[1] - vd[0]), grid_defs.back().laincrement, 0.001)
+            && myequalf(vd.size() / 2., vd.size() / 2, 0.00000000001)) {
+          grid_defs.back().type = Grid::Type::gaussianLatitudeLongitude;
+          grid_defs.back().laincrement = vd.size() / 2;
         }
         if (!grid_data.lats_b[x].id.empty()) {
           if (grid_data.lons_b[x].id.empty()) {
@@ -3804,26 +3806,26 @@ std::cerr << static_cast<long long>(key) << std::endl;
                 USER);
           }
           istream.variable_data(grid_data.lats_b[x].id, vd);
-          gdf.back().slatitude = vd.front();
-          gdf.back().elatitude = vd.back();
-          gdf.back().is_cell = true;
+          grid_defs.back().slatitude = vd.front();
+          grid_defs.back().elatitude = vd.back();
+          grid_defs.back().is_cell = true;
         }
 
         // get the longitude range
         istream.variable_data(grid_data.lons[x].id, vd);
-        gdm.back().x = vd.size();
-        gdf.back().slongitude = vd.front();
-        gdf.back().elongitude = vd.back();
-        gdf.back().loincrement = fabs((gdf.back().elongitude - gdf.back().
-            slongitude) / (vd.size() - 1));
+        grid_dims.back().x = vd.size();
+        grid_defs.back().slongitude = vd.front();
+        grid_defs.back().elongitude = vd.back();
+        grid_defs.back().loincrement = fabs((grid_defs.back().elongitude -
+            grid_defs.back().slongitude) / (vd.size() - 1));
         if (!grid_data.lons_b[x].id.empty()) {
           if (grid_data.lats_b[x].id.empty()) {
             log_error2("found a lon bounds but no lat bounds", F, "nc2xml",
                 USER);
           }
           istream.variable_data(grid_data.lons_b[x].id, vd);
-          gdf.back().slongitude = vd.front();
-          gdf.back().elongitude = vd.back();
+          grid_defs.back().slongitude = vd.front();
+          grid_defs.back().elongitude = vd.back();
         }
       }
     }
@@ -3852,9 +3854,9 @@ std::cerr << static_cast<long long>(key) << std::endl;
       tr_table.found(tr_key, tre);
       for (size_t y = 0; y < grid_data.lats.size(); ++y) {
         vector<string> v;
-        add_gridded_lat_lon_keys(v, gdm[y], gdf[y], grid_data.time.id,
-            grid_data.time.dim, grid_data.levels[z].dim, grid_data.lats[y].dim,
-            grid_data.lons[y].dim, tre);
+        add_gridded_lat_lon_keys(v, grid_dims[y], grid_defs[y], grid_data.time.
+            id, grid_data.time.dim, grid_data.levels[z].dim, grid_data.lats[y].
+            dim, grid_data.lons[y].dim, tre);
         for (const auto& e : v) {
           grid_entry_key = e;
           auto idx = grid_entry_key.rfind("<!>");
