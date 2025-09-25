@@ -3834,10 +3834,6 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
     }
     tr_table.insert(tre);
   }
-std::cerr << "TR table size=" << tr_table.size() << std::endl;
-for (const auto& key : tr_table.keys()) {
-std::cerr << static_cast<long long>(key) << std::endl;
-}
   process_horizontal_grid(istream, grid_data, grid_dims, grid_defs);
   for (size_t z = 0; z < grid_data.levels.size(); ++z) {
     auto levid = grid_data.levdata[z].ID.substr(0, grid_data.levdata[z].ID.find(
