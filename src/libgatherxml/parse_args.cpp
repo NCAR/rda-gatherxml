@@ -28,6 +28,8 @@ void parse_args(char arg_delimiter) {
       }
     } else if (sp[n] == "-f") {
       metautils::args.data_format = sp[++n];
+    } else if (sp[n] == "-af") {
+      metautils::args.file_format = sp[++n];
     } else if (sp[n] == "-G") {
       metautils::args.update_graphics = false;
     } else if (sp[n] == "-I") {
