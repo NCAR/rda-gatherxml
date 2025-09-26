@@ -98,13 +98,34 @@ void cmd_dates(string database, size_t date_left_padding, vector<CMDDateRange>&
         "'";
     exit(1);
   }
-  string tbl = postgres_ready(database) + "." + metautils::args.dsid +
-      "_webfiles2";
+  database = postgres_ready(database);
+  string tbl = database + "." + metautils::args.dsid + "_webfiles2";
   if (table_exists(srv, tbl)) {
-    LocalQuery q("select min(w.start_date), max(w.end_date), wf.gindex from " +
+    auto has_climate_model_simulation = false;
+    if (database.find("GrML") != string::npos) {
+      LocalQuery q("select count(*) from " + database + "." + metautils::args.
+          dsid + "_grids2 as g left join " + database + ".time_ranges as t on "
+          "t.code = g.time_range_code where t.time_range = "
+          "'Climate Model Simulation'");
+      Row r;
+      if (q.submit(srv) == 0 && q.fetch_row(r) && r[0] != "0") {
+        has_climate_model_simulation = true;
+      }
+    }
+    string qs = "select min(w.start_date), max(w.end_date), wf.gindex from " +
         tbl + " as w left join dssdb.wfile_" + metautils::args.dsid + " as wf "
-        "on wf.wfile = w.id where wf.type = 'D' and wf.status = 'P' and w."
-        "start_date > 0 group by wf.gindex");
+        "on wf.wfile = w.id";
+    if (has_climate_model_simulation) {
+      qs += " left join " + database + "." + metautils::args.dsid + "_grids2 "
+          "as g on g.file_code = w.code left join " + database + ".time_ranges "
+          "as t on t.code = g.time_range_code";
+    }
+    qs += " where wf.type = 'D' and wf.status = 'P' and w.start_date > 0";
+    if (has_climate_model_simulation) {
+      qs += " and t.time_range != 'Climate Model Simulation'";
+    }
+    qs += " group by wf.gindex";
+    LocalQuery q(qs);
 #ifdef DUMP_QUERIES
     {
     Timer tm;
@@ -122,8 +143,9 @@ void cmd_dates(string database, size_t date_left_padding, vector<CMDDateRange>&
 #endif
     Row row;
     auto b = q.fetch_row(row);
-    if (q.num_rows() < 2 && (!b || row[2] == "0")) {
-      auto i = to_string(date_left_padding);
+    if (q.num_rows() < 2 && ((!b && !has_climate_model_simulation) || row[2] ==
+        "0")) {
+      // check files table for new additions/deletions
       q.set("start_date, end_date", tbl, "start_date != 0 order by start_date, "
           "end_date");
 #ifdef DUMP_QUERIES
