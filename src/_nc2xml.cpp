@@ -2850,6 +2850,10 @@ void find_coordinate_variables(InputNetCDFStream& istream, vector<NetCDF::
             // check for time ranges other than analysis
             string clim;
             for (const auto& a2 : v.attrs) {
+              if (a2.name == "cell_methods") {
+                log_error2("cell_methods on the time variable is not "
+                    "CF-compliant", F, "nc2xml", USER);
+              }
               if (a2.nc_type == NetCDF::NCType::CHAR) {
                 if (a2.name == "calendar") {
                   time_data.calendar = *(reinterpret_cast<string *>(a2.values));
@@ -3477,7 +3481,7 @@ bool filled_grid_projection(const unique_ptr<double[]>& lats, const unique_ptr<
 }
 
 void process_time_bounds(InputNetCDFStream& istream, string time_bounds_id,
-    metautils::NcTime::TimeRangeEntry& tre) {
+    metautils::NcTime::TimeRangeEntry& tre, string source) {
   static const string F = this_function_label(__func__);
   if (gatherxml::verbose_operation) {
     cout << "   ...adjusting times for time bounds" << endl;
@@ -3516,6 +3520,11 @@ void process_time_bounds(InputNetCDFStream& istream, string time_bounds_id,
             time_bounds_s.diff > 31 || diff < 28 || diff > 31) {
           time_bounds_s.changed = true;
         }
+      }
+      // allow very last time period to be short in NA-CORDEX files
+      if (time_bounds_s.changed && source == "CORDEX-Adjust" && l ==
+          (vd.size()-2)) {
+        time_bounds_s.changed = false;
       }
     }
   }
@@ -3610,7 +3619,8 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
   }
   string source;
   for (const auto& a : gattrs) {
-    if (to_lower(a.name) == "source") {
+    auto name = to_lower(a.name);
+    if (name == "source" || name == "project_id") {
       source = *(reinterpret_cast<string *>(a.values));
     }
   }
@@ -3826,7 +3836,7 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
     }
     tre.num_steps = vd.size();
     if (!grid_data.time_bounds.id.empty()) {
-      process_time_bounds(istream, grid_data.time_bounds.id, tre);
+      process_time_bounds(istream, grid_data.time_bounds.id, tre, source);
     }
     if (time_data.units == "months" && tre.instantaneous.first_valid_datetime.
         day() == 1) {
