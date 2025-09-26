@@ -38,7 +38,8 @@ using unixutils::open_output;
 metautils::Directives metautils::directives;
 metautils::Args metautils::args;
 bool gatherxml::verbose_operation;
-extern const string USER = getenv("USER");
+auto env = getenv("USER");
+extern const string USER = (env == nullptr) ? "unknown" : env;
 string myerror = "";
 string mywarning = "";
 
@@ -50,14 +51,13 @@ bool verified_new_file_is_archived(string& error) {
   if (metautils::args.dsid > "d998999" || metautils::args.dsid == "test") {
     return true;
   }
-  Server server(metautils::directives.database_server, metautils::directives.
-      rdadb_username, metautils::directives.rdadb_password, "dssdb");
+  Server server(metautils::directives.rdadb_config);
   string qs, col;
   if (regex_search(g_old_name, regex(
       "^http(s){0,1}://(rda|dss)\\.ucar\\.edu/"))) {
     col = "wfile";
-    qs = "select " + col + " from dssdb.wfile_" + metautils::args.dsid +
-        " where wfile = '" + metautils::relative_web_filename(g_new_name) +
+    qs = "select " + col + " from dssdb.wfile_" + g_new_dsid + " where wfile = "
+        "'" + metautils::relative_web_filename(g_new_name, g_new_dsid) +
         "' and type = 'D' and status = 'P'";
   }
   LocalQuery q(qs);
@@ -78,7 +78,8 @@ bool verified_new_file_is_archived(string& error) {
 void replace_uri(string& sline, string cmdir, string member_name = "") {
   auto s = sline.substr(0, sline.find("\"") + 1);
   if (cmdir == "wfmd") {
-    s += "file://web:" + metautils::relative_web_filename(g_new_name);
+    s += "file://web:" + metautils::relative_web_filename(g_new_name,
+        g_new_dsid);
   }
   s += sline.substr(sline.find("\" format"));
   sline = s;
@@ -86,26 +87,13 @@ void replace_uri(string& sline, string cmdir, string member_name = "") {
 
 void rewrite_uri_in_cmd_file(string db) {
   const string F = this_function_label(__func__);
-  LocalQuery query;
-  Row row;
-  std::ifstream ifs;
-  std::ofstream ofs;
-  char line[32768],line2[32768];
-  std::list<string> file_list;
-  std::deque<string> sp,sp2;
-  string sline,sline2,cmdir,db_prefix,ref_file,new_ref_file;
-  string sdum,error;
-  size_t idx;
   TempDir tdir;
-  my::map<metautils::StringEntry> unique_stage_table;
-  metautils::StringEntry se;
-  bool old_is_gzipped=false;
-
   if (!tdir.create(metautils::directives.temp_path)) {
     log_error2("unable to create temporary directory", F, "rcm", USER);
   }
   string oname = g_old_name;
   string nname = g_new_name;
+  string cmdir, db_prefix;
   if (regex_search(g_old_name, regex(
       "^http(s){0,1}://(rda|dss)\\.ucar\\.edu/"))) {
     cmdir = "wfmd";
@@ -117,7 +105,7 @@ void rewrite_uri_in_cmd_file(string db) {
     } else {
       oname = metautils::relative_web_filename(oname);
     }
-    nname = metautils::relative_web_filename(nname);
+    nname = metautils::relative_web_filename(nname, g_new_dsid);
   }
   stringstream oss, ess;
   if (mysystem2("/bin/mkdir -m 0755 -p " + tdir.name() + "/metadata/" + cmdir,
@@ -133,25 +121,21 @@ void rewrite_uri_in_cmd_file(string db) {
   auto re_uri = regex("uri=");
   replace_all(oname, "/", "%");
   replace_all(nname, "/", "%");
-  file_list.emplace_back(oname + "<!>" + nname);
   if (db == (db_prefix + "ObML")) {
-    string f = "";
-    if (exists_on_server("rda-web-prod.ucar.edu", "/data/web/datasets/" +
+    bool old_is_gzipped = false;
+    auto f = unixutils::remote_web_file("https://rda.ucar.edu/datasets/" +
         metautils::args.dsid + "/metadata/" + cmdir + "/" + oname + ".ObML.gz",
-        metautils::directives.rdadata_home)) {
-      f = unixutils::remote_web_file("https://rda.ucar.edu/datasets/" +
-          metautils::args.dsid + "/metadata/" + cmdir + "/" + oname +
-          ".ObML.gz", tdir.name());
+        tdir.name());
+    if (!f.empty()) {
       system(("gunzip " + f).c_str());
       chop(f, 3);
       old_is_gzipped = true;
-    } else if (exists_on_server("rda-web-prod.ucar.edu", "/data/web/datasets/" +
-        metautils::args.dsid + "/metadata/" + cmdir + "/" + oname + ".ObML",
-        metautils::directives.rdadata_home)) {
+    } else {
       f = unixutils::remote_web_file("https://rda.ucar.edu/datasets/" +
           metautils::args.dsid + "/metadata/" + cmdir + "/" + oname + ".ObML",
           tdir.name());
     }
+    std::ifstream ifs;
     if (!f.empty()) {
       ifs.open(f.c_str());
     }
@@ -159,6 +143,7 @@ void rewrite_uri_in_cmd_file(string db) {
       log_error2("unable to open old file '" + f + "' for input", F, "rcm",
           USER);
     }
+    std::ofstream ofs;
     open_output(ofs, tdir.name() + "/metadata/" + cmdir + "/" + nname +
         ".ObML");
     if (!ofs.is_open()) {
@@ -166,18 +151,18 @@ void rewrite_uri_in_cmd_file(string db) {
     }
     auto re_ref = regex("ref=");
     auto re_parent = regex("parent=");
+    char line[32768];
     ifs.getline(line, 32768);
     while (!ifs.eof()) {
-      sline = line;
+      auto sline = string(line);
       if (regex_search(sline, re_uri)) {
         replace_uri(sline, cmdir);
       } else if (oname != nname && regex_search(sline, re_ref)) {
-        ref_file = sline.substr(sline.find("ref=") + 5);
+        auto ref_file = sline.substr(sline.find("ref=") + 5);
         ref_file = ref_file.substr(0, ref_file.find("\""));
-        new_ref_file = substitute(ref_file, oname, nname);
+        auto new_ref_file = substitute(ref_file, oname, nname);
         if (exists_on_server("rda-web-prod.ucar.edu", "/data/web/datasets/" +
-            metautils::args.dsid + "/metadata/" + cmdir + "/" + ref_file,
-            metautils::directives.rdadata_home)) {
+            metautils::args.dsid + "/metadata/" + cmdir + "/" + ref_file)) {
           std::ifstream ifs2(unixutils::remote_web_file(
               "https://rda.ucar.edu/datasets/" + metautils::args.dsid +
               "/metadata/" + cmdir + "/" + ref_file, tdir.name()).c_str());
@@ -189,9 +174,10 @@ void rewrite_uri_in_cmd_file(string db) {
               log_error2("could not open output file for a reference", F, "rcm",
                   USER);
             }
+            char line2[32768];
             ifs2.getline(line2, 32768);
             while (!ifs2.eof()) {
-              sline2 = line2;
+              auto sline2 = string(line2);
               if (regex_search(sline2, re_parent)) {
                 sline2 = sline2.substr(0, sline2.find("\"") + 1) + nname +
                     ".ObML" + sline2.substr(sline2.find("\" group"));
@@ -204,11 +190,12 @@ void rewrite_uri_in_cmd_file(string db) {
             ofs2.close();
 
             // remove the old ref file
-            if (unixutils::rdadata_unsync("/__HOST__/web/datasets/" +
-                metautils::args.dsid + "/metadata/" + cmdir + "/" + ref_file,
-                tdir.name(), metautils::directives.rdadata_home, error) < 0) {
-              metautils::log_warning("rewrite_uri_in_cmd_file() could not "
-                  "remove old reference file '" + ref_file + "'", "rcm", USER);
+            string error;
+            if (unixutils::gdex_unlink("/data/web/datasets/" + metautils::args.
+                dsid + "/metadata/" + cmdir + "/" + ref_file, metautils::
+                directives.gdex_unlink_key, error) < 0) {
+              metautils::log_warning(F + " could not remove old reference file "
+                  "'" + ref_file + "'", "rcm", USER);
             }
             replace_all(sline, oname, nname);
           } else {
@@ -228,20 +215,20 @@ void rewrite_uri_in_cmd_file(string db) {
 
        // remove the old file
        if (old_is_gzipped) {
-         if (unixutils::rdadata_unsync("/__HOST__/web/datasets/" + metautils::
-             args.dsid + "/metadata/" + cmdir + "/" + oname + ".ObML.gz", tdir.
-             name(), metautils::directives.rdadata_home, error) < 0) {
-          metautils::log_warning("rewrite_uri_in_cmd_file() could not remove " +
-              oname + ".ObML - unixutils::rdadata_unsync error(s): '" + error +
-              "'", "rcm", USER);
+         string error;
+         if (unixutils::gdex_unlink("/data/web/datasets/" + metautils::args.dsid
+             + "/metadata/" + cmdir + "/" + oname + ".ObML.gz", metautils::
+             directives.gdex_unlink_key, error) < 0) {
+          metautils::log_warning(F + " could not remove " + oname + ".ObML - "
+              "gdex_unlink() error(s): '" + error + "'", "rcm", USER);
         }
       } else {
-         if (unixutils::rdadata_unsync("/__HOST__/web/datasets/" + metautils::
-             args.dsid + "/metadata/" + cmdir + "/" + oname + ".ObML", tdir.
-             name(), metautils::directives.rdadata_home, error) < 0) {
-          metautils::log_warning("rewrite_uri_in_cmd_file() could not remove " +
-              oname + ".ObML - unixutils::rdadata_unsync error(s): '" + error +
-              "'", "rcm", USER);
+         string error;
+         if (unixutils::gdex_unlink("/data/web/datasets/" + metautils::args.dsid
+             + "/metadata/" + cmdir + "/" + oname + ".ObML", metautils::
+             directives.gdex_unlink_key, error) < 0) {
+          metautils::log_warning(F + " could not remove " + oname + ".ObML - "
+              "gdex_unlink() error(s): '" + error + "'", "rcm", USER);
         }
       }
     }
@@ -257,29 +244,24 @@ void rewrite_uri_in_cmd_file(string db) {
       system(("gunzip " + fixml_filename).c_str());
       chop(fixml_filename, 3);
     }
+    std::ifstream ifs;
     ifs.open(fixml_filename.c_str());
     if (!ifs.is_open()) {
       log_error2("unable to open old file for input", F, "rcm", USER);
     }
+    std::ofstream ofs;
     open_output(ofs, tdir.name() + "/metadata/" + cmdir + "/" + nname +
         ".FixML");
     if (!ofs.is_open()) {
       log_error2("unable to open new file for output", F, "rcm", USER);
     }
     auto re_stage = regex("classification stage=");
+    char line[32768];
     ifs.getline(line, 32768);
     while (!ifs.eof()) {
-      sline = line;
+      auto sline = string(line);
       if (regex_search(sline, re_uri)) {
         replace_uri(sline, cmdir);
-      } else if (oname != nname && regex_search(sline, re_stage)) {
-        se.key = sline.substr(sline.find("classification stage=") + 22);
-        if (!se.key.empty() && (idx = se.key.find("\"")) != string::npos) {
-          se.key = se.key.substr(0, idx);
-          if (!unique_stage_table.found(se.key, se)) {
-            unique_stage_table.insert(se);
-          }
-        }
       }
       ofs << sline << endl;
       ifs.getline(line, 32768);
@@ -291,12 +273,12 @@ void rewrite_uri_in_cmd_file(string db) {
     if (oname != nname) {
 
        // remove the old file
-       if (unixutils::rdadata_unsync("/__HOST__/web/datasets/" + metautils::
-           args.dsid + "/metadata/" + cmdir + "/" + oname + ".FixML", tdir.
-           name(), metautils::directives.rdadata_home, error) < 0) {
-        metautils::log_warning("rewrite_uri_in_cmd_file() could not remove " +
-            oname + ".FixML - unixutils::rdadata_unsync error(s): '" + error +
-            "'", "rcm", USER);
+       string error;
+       if (unixutils::gdex_unlink("/data/web/datasets/" + metautils::args.dsid +
+           "/metadata/" + cmdir + "/" + oname + ".FixML", metautils::directives.
+           gdex_unlink_key, error) < 0) {
+        metautils::log_warning(F + " could not remove " + oname + ".FixML - "
+            "gdex_unlink() error(s): '" + error + "'", "rcm", USER);
       }
     }
   } else {
@@ -305,25 +287,18 @@ void rewrite_uri_in_cmd_file(string db) {
   }
 
   // sync all of the new files
-  if (unixutils::rdadata_sync(tdir.name(), "metadata/", "/data/web/datasets/" +
-      g_new_dsid, metautils::directives.rdadata_home, error) < 0) {
-    log_error2("could not sync new file(s) - rdadata_sync error(s): '" + error +
-        "'", F, "rcm", USER);
+  string error;
+  if (unixutils::gdex_upload_dir(tdir.name(), "metadata/", "/data/web/datasets/"
+      + g_new_dsid, metautils::directives.gdex_upload_key, error) < 0) {
+    log_error2("could not sync new file(s) - gdex_upload_dir() error(s): '" +
+        error + "'", F, "rcm", USER);
   }
 }
 
 bool renamed_cmd() {
   const string F = this_function_label(__func__);
-  string error;
-  LocalQuery query,query2;
-  Row row;
-  string oname,nname,scm_flag,sdum;
-
-  Server server(metautils::directives.database_server, metautils::directives.
-      metadb_username, metautils::directives.metadb_password, "");
-  Server server_d(metautils::directives.database_server, metautils::directives.
-      rdadb_username, metautils::directives.rdadb_password, "dssdb");
-  string ftbl, col, dcol;
+  string oname, nname;
+  string ftbl, col, dcol, scm_flag;
   if (regex_search(g_old_name, regex(
       "^http(s){0,1}://(rda|dss)\\.ucar\\.edu/"))) {
     ftbl = "_webfiles2";
@@ -336,32 +311,25 @@ bool renamed_cmd() {
     } else {
       oname = metautils::relative_web_filename(g_old_name);
     }
-    if (metautils::args.dsid != g_new_dsid) {
-      auto d = metautils::args.dsid;
-      metautils::args.dsid = g_new_dsid;
-      nname = metautils::relative_web_filename(g_new_name);
-      metautils::args.dsid = d;
-    } else {
-      nname = metautils::relative_web_filename(g_new_name);
-    }
+    nname = metautils::relative_web_filename(g_new_name, g_new_dsid);
     scm_flag = "-wf";
   }
+  Server server(metautils::directives.metadb_config);
   auto schemas = server.schema_names();
+  Server server_d(metautils::directives.rdadb_config);
   for (const auto& db : schemas) {
+    string error;
     auto tbl_names = table_names(server, db, metautils::args.dsid + ftbl,
         error);
     for (const auto& tbl : tbl_names) {
-      query.set("code", db + "." + tbl, col + " = '" + oname + "'");
+      LocalQuery query("code", db + "." + tbl, col + " = '" + oname + "'");
       if (query.submit(server) < 0) {
         log_error2("error: '" + query.error() + "'", F, "rcm", USER);
       }
       if (query.num_rows() > 0) {
-        query2.set("code", db + "." + substitute(tbl, metautils::args.dsid,
-            g_new_dsid), "binary " +  col  +  " = '" + nname + "'");
-        if (query2.submit(server) < 0) {
-          log_error2("error: '" + query2.error() + "'", F, "rcm", USER);
-        }
-        if (query2.num_rows() > 0) {
+        LocalQuery query2("code", db + "." + substitute(tbl, metautils::args.
+            dsid, g_new_dsid), col  +  " = '" + nname + "'");
+        if (query2.submit(server) == 0 && query2.num_rows() > 0) {
           if (!g_old_web_home.empty() && oname == nname) {
             rewrite_uri_in_cmd_file(db);
             exit(0);
@@ -371,10 +339,17 @@ bool renamed_cmd() {
           }
         }
         if (db != "WGrML") {
-          rewrite_uri_in_cmd_file(db);
+          if(oname != nname) {
+            rewrite_uri_in_cmd_file(db);
+          } else if (g_new_dsid != metautils::args.dsid) {
+          } else {
+            // this should not happen
+            log_error2("error: 'old == new for both dataset and filename - "
+                "should not happen", F, "rcm", USER);
+          }
         }
         if (g_new_dsid == metautils::args.dsid) {
-          while (query.fetch_row(row)) {
+          for (const auto& row : query) {
             if (server.update(db + "." + tbl, col + " = '" + nname + "'",
                 "code = " + row[0]) < 0) {
               log_error2("error: '" + server.error() + "'", F, "rcm", USER);
@@ -486,6 +461,7 @@ int main(int argc, char **argv) {
     g_old_name = "https://rda.ucar.edu" + metautils::directives.data_root_alias
         + "/" + metautils::args.dsid + "/" + g_old_name;
   }
+/*
   if (!exists_on_server("rda-web-prod.ucar.edu",
       "/data/web/datasets/" + metautils::args.dsid + "/metadata/wfmd",
       metautils::directives.rdadata_home)) {
@@ -493,9 +469,10 @@ int main(int argc, char **argv) {
         << endl;
     exit(1);
   }
+*/
   if (!regex_search(g_new_name, regex("^https://rda.ucar.edu"))) {
     g_new_name = "https://rda.ucar.edu" + metautils::directives.data_root_alias
-        + "/" + metautils::args.dsid + "/" + g_new_name;
+        + "/" + g_new_dsid + "/" + g_new_name;
   }
   if (g_new_name == g_old_name && g_new_dsid == metautils::args.dsid) {
     cerr << "Error: new_name must be different from old_name" << endl;
