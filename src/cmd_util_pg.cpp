@@ -68,15 +68,15 @@ string whereis_singularity(stringstream& ess) {
 }
 
 void show_gatherxml_usage() {
-  cout << "usage: (1) gatherxml -d [ds]<nnn.n> -f <format> [-R] [-S] { URL | "
+  cout << "usage: (1) gatherxml -d <dnnnnnn> -f <format> [-R] [-S] { URL | "
        "WF } " << endl;
   cout << "   or: (2) gatherxml --showinfo" << endl;
-  cout << "   or: (3) gatherxml -d <[ds]nnn.n> -f <format> -I { URL | invall }"
+  cout << "   or: (3) gatherxml -d <dnnnnnn> -f <format> -I { URL | invall }"
       << endl;
-  cout << "   or: (4) gatherxml -d test -f <format> PATH" << endl;
+  cout << "   or: (4) gatherxml -d test -f <format> [-af <format>] PATH" <<
+      endl;
   cout << "\nrequired:" << endl;
-  cout << "  -d [ds]<nnn.n>  (1), (3): the dataset number, optionally "
-      "prepended with \"ds\"" << endl;
+  cout << "  -d <dnnnnnn>    (1), (3): the dataset ID" << endl;
   cout << "  -d test         (4): perform a test run to see if gatherxml will "
       "handle a" << endl;
   cout << "                    particular file" << endl;
@@ -111,6 +111,9 @@ void show_gatherxml_usage() {
   cout << "  -S              (1): save time by not rebuilding the metadata "
       "caches for the" << endl;
   cout << "                    dataset (see NOTES below)" << endl;
+  cout << "  -af <format>    (4): archive format as for the -AF option of "
+      "dsarch, if the" << endl;
+  cout << "                    test file contains any formatting" << endl;
   cout << "\nNOTES:" << endl;
   cout << "  - Using the -R and -S options are particularly useful when "
       "backfilling file" << endl;
