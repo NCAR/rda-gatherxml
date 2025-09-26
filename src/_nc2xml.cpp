@@ -5800,8 +5800,8 @@ void show_usage() {
 //    cerr << "-f wrfsimnetcdf  Climate Simulations from WRF" << endl;
   cerr << endl;
   cerr << "required:" << endl;
-  cerr << "-d <nnn.n>       nnn.n is the dataset number to which the data file "
-      "belongs" << endl;
+  cerr << "-d <dnnnnn>      dnnnnn is the dataset number to which the data "
+      "file belongs" << endl;
   cerr << endl;
   cerr << "options:" << endl;
   if (USER == "dattore") {
@@ -5822,8 +5822,7 @@ void show_usage() {
   cerr << "-V               verbose operation" << endl;
   cerr << endl;
   cerr << "required:" << endl;
-  cerr << "<path>           full MSS path or URL of the file to read" << endl;
-  cerr << "                 - MSS paths must begin with \"/FS/DECS\"" << endl;
+  cerr << "<path>           full URL of the file to read" << endl;
   cerr << "                 - URLs must begin with \"https://rda.ucar.edu\""
       << endl;
 }
