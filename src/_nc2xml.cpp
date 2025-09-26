@@ -5710,7 +5710,7 @@ void scan_file(ScanData& scan_data, gatherxml::markup::ObML::ObservationData&
         metautils::directives.temp_path, F +
         ": prepare_file_for_metadata_scanning()", "nc2xml", USER);
   }
-  scan_data.map_name = unixutils::remote_web_file("https://rda.ucar.edu/"
+  scan_data.map_name = unixutils::remote_web_file("https://gdex.ucar.edu/"
       "metadata/ParameterTables/netCDF." + metautils::args.dsid + ".xml", tdir->
       name());
   list<string> flst;
