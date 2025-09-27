@@ -36,7 +36,7 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile, TempDir& tdir, list<
   }
   if (args.dsid == "test" && args.file_format.empty()) {
     if (filelist != nullptr) {
-      file_list->emplace_back(args.path + "/" + args.filename);
+      filelist->emplace_back(args.path + "/" + args.filename);
       return true;
     } else {
       error = "Null filelist not allowed";
@@ -110,7 +110,7 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile, TempDir& tdir, list<
           }
           if (args.file_format.empty()) {
             if (filelist != nullptr) {
-              file_list->emplace_back(gnm);
+              filelist->emplace_back(gnm);
               return true;
             } else {
               error = "Null filelist not allowed";
