@@ -78,7 +78,7 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile, TempDir& tdir, list<
     string lnm = args.path;
     if (!args.override_primary_check) {
       replace_all(lnm, "https://rda.ucar.edu", "");
-      if (regex_search(lnm, regex("^" + directives.data_root_alias))) {
+      if (lnm.find(directives.data_root_alias) == 0) {
         if (loc == 'B' || loc == 'G') {
           lnm = directives.data_root + lnm.substr(directives.data_root_alias
               .length());
@@ -97,11 +97,6 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile, TempDir& tdir, list<
         case 'G': {
 
           // file is on glade
-          TempDir t;
-          if (!t.create(directives.temp_path)) {
-            error = "Error creating temporary directory";
-            return false;
-          }
           auto gnm = args.path + "/" + args.filename;
           replace_all(gnm, "https://rda.ucar.edu/data", directives.data_root);
           if ( (stat64(gnm.c_str(), &s64)) != 0 || s64.st_size == 0) {
@@ -116,6 +111,11 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile, TempDir& tdir, list<
               error = "Null filelist not allowed";
               return false;
             }
+          }
+          TempDir t;
+          if (!t.create(directives.temp_path)) {
+            error = "Error creating temporary directory";
+            return false;
           }
           if (system(("cp " + gnm + " " + tfile.name()).c_str()) != 0) {
             error = "error copying glade file " + gnm;
@@ -143,6 +143,16 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile, TempDir& tdir, list<
         }
       }
     } else {
+      // if no file format, open in place
+      if (args.file_format.empty()) {
+        if (filelist != nullptr) {
+          filelist->emplace_back(lnm);
+          return true;
+        } else {
+          error = "Null filelist not allowed";
+          return false;
+        }
+      }
 
       // make a copy of the local file because we might need to remove blocking,
       //    uncompress, etc.
