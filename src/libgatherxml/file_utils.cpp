@@ -31,8 +31,17 @@ namespace primaryMetadata {
 bool prepare_file_for_metadata_scanning(TempFile& tfile, TempDir& tdir, list<
     string> *filelist, string& file_format, string& error) {
   error = "";
-  if (filelist != NULL) {
+  if (filelist != nullptr) {
     filelist->clear();
+  }
+  if (args.dsid == "test" && args.file_format.empty()) {
+    if (filelist != nullptr) {
+      file_list->emplace_back(args.path + "/" + args.filename);
+      return true;
+    } else {
+      error = "Null filelist not allowed";
+      return false;
+    }
   }
   Server mys(directives.rdadb_config);
   if (!mys) {
@@ -159,7 +168,7 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile, TempDir& tdir, list<
     } else {
       while (expand_file(tdir.name(), tf, &file_format)) { }
     }
-    if (filelist != NULL) {
+    if (filelist != nullptr) {
       filelist->emplace_back(tf);
     }
   } else {
@@ -218,7 +227,7 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile, TempDir& tdir, list<
           if ((args.data_format == "cxml" || args.data_format == "tcvitals" ||
               regex_search(args.data_format, netcdf_re) || regex_search(args
               .data_format, hdf_re) || regex_search(args.data_format,
-              bufr_re)) && filelist != NULL) {
+              bufr_re)) && filelist != nullptr) {
             for (const auto& f : *filelist) {
               flist.emplace_back(f);
             }
@@ -383,7 +392,7 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile, TempDir& tdir, list<
               }
               ifs.close();
             } else {
-              if (filelist != NULL) {
+              if (filelist != nullptr) {
                 filelist->emplace_back(f);
               } else {
                 error = "non-null filelist must be provided for format " +
