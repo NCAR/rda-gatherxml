@@ -39,13 +39,8 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile, TempDir& tdir, list<
     error = "Error connecting to database server";
     return false;
   }
-  if (regex_search(args.path, regex("^/FS/DECS"))) {
-
-    // HPSS file
-    error = "Terminating - HPSS files are no longer supported";
-    return false;
-  } else if (regex_search(args.path, regex("^https://rda.ucar.edu")) || args.
-      dsid == "test") {
+  if (regex_search(args.path, regex("^https://rda.ucar.edu")) || args.dsid ==
+      "test") {
 
     // Web file
     auto loc = 'G';
