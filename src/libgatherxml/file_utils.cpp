@@ -104,6 +104,19 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile, TempDir& tdir, list<
           }
           auto gnm = args.path + "/" + args.filename;
           replace_all(gnm, "https://rda.ucar.edu/data", directives.data_root);
+          if ( (stat64(gnm.c_str(), &s64)) != 0 || s64.st_size == 0) {
+            error = "glade file not found or zero length";
+            return false;
+          }
+          if (args.file_format.empty()) {
+            if (filelist != nullptr) {
+              file_list->emplace_back(gnm);
+              return true;
+            } else {
+              error = "Null filelist not allowed";
+              return false;
+            }
+          }
           if (system(("cp " + gnm + " " + tfile.name()).c_str()) != 0) {
             error = "error copying glade file " + gnm;
             return false;
