@@ -38,9 +38,6 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile, TempDir& tdir, list<
     if (filelist != nullptr) {
       filelist->emplace_back(args.path + "/" + args.filename);
       return true;
-    } else {
-      error = "Null filelist not allowed";
-      return false;
     }
   }
   Server mys(directives.rdadb_config);
@@ -107,9 +104,6 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile, TempDir& tdir, list<
             if (filelist != nullptr) {
               filelist->emplace_back(gnm);
               return true;
-            } else {
-              error = "Null filelist not allowed";
-              return false;
             }
           }
           TempDir t;
@@ -148,9 +142,6 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile, TempDir& tdir, list<
         if (filelist != nullptr) {
           filelist->emplace_back(lnm);
           return true;
-        } else {
-          error = "Null filelist not allowed";
-          return false;
         }
       }
 
