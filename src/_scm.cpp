@@ -1100,7 +1100,8 @@ void *thread_summarize_IDs(void *args) {
   tbl = p_args.first[5] + "." + metautils::args.dsid + "_id_data_types_list";
   if (srv.insert(
         tbl,
-        join(id_data_type_values, "), (")
+        join(id_data_type_values, "), ("),
+        "do nothing"
      ) < 0) {
       log_error2("'" + srv.error() + "' while trying to insert into " + tbl +
           " (" + to_string(id_data_type_values.size()) + " rows)", F, "scm",
