@@ -1330,7 +1330,7 @@ void scan_usarray_transportable_hdf5_file(
   gatherxml::markup::ObML::DataTypeEntry dte;
   ientry.data->data_types_table.found(datatype, dte);
   ientry.data->nsteps = dte.data->nsteps = scan_data.num_not_missing;
-  scan_data.map_name = unixutils::remote_web_file("https://rda.ucar.edu/"
+  scan_data.map_name = unixutils::remote_web_file("https://gdex.ucar.edu/"
       "metadata/ParameterTables/HDF5." + g_dsid + ".xml", scan_data.tdir->
       name());
   scan_data.found_map = !scan_data.map_name.empty();
@@ -2512,7 +2512,7 @@ void scan_cf_point_hdf5nc4_file(InputHDF5Stream::Attributes& global_attributes,
   if (scan_data.platform_type == "unknown") {
     look_for_platform_type(global_attributes, is, scan_data);
   }
-  scan_data.map_name = unixutils::remote_web_file("https://rda.ucar.edu/"
+  scan_data.map_name = unixutils::remote_web_file("https://gdex.ucar.edu/"
       "metadata/ParameterTables/HDF5." + g_dsid + ".xml", scan_data.tdir->
       name());
   scan_data.found_map = !scan_data.map_name.empty();
@@ -3084,7 +3084,7 @@ void scan_cf_profile_hdf5nc4_file(ScanData& scan_data, gatherxml::markup::ObML::
   if (obs_type.empty()) {
     log_error2("unable to determine observation type", F, g_util_ident);
   }
-  scan_data.map_name = unixutils::remote_web_file("https://rda.ucar.edu/"
+  scan_data.map_name = unixutils::remote_web_file("https://gdex.ucar.edu/"
       "metadata/ParameterTables/netCDF4." + g_dsid + ".xml", scan_data.tdir->
       name());
   scan_data.found_map=(!scan_data.map_name.empty());
@@ -4023,7 +4023,7 @@ void scan_gridded_hdf5nc4_file(ScanData& scan_data) {
     gatherxml::fileInventory::open(g_inv.file, g_inv.dir, g_inv.stream, "GrML",
         "hdf2xml", USER);
   }
-  auto f = "https://rda.ucar.edu/metadata/ParameterTables/netCDF4." + g_dsid +
+  auto f = "https://gdex.ucar.edu/metadata/ParameterTables/netCDF4." + g_dsid +
       ".xml";
   scan_data.map_name = unixutils::remote_web_file(f, scan_data.tdir->name());
   ParameterData parameter_data;
