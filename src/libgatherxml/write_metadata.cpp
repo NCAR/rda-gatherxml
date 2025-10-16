@@ -58,7 +58,7 @@ void close(string filename, unique_ptr<TempDir>& tdir, std::ofstream& ofs,
   stringstream oss, ess;
   if (insert_into_db) {
     auto c = metautils::directives.local_root + "/bin/iinv";
-    if (!create_cache) {
+    if (!create_cache || metautils::args.inventory_only) {
       c += " -C";
     }
     c += " -d " + metautils::args.dsid + " -t " + tdir->name() + " -f " +
