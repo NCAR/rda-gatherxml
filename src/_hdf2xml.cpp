@@ -1808,14 +1808,22 @@ void add_gridded_netcdf_parameter(const InputHDF5Stream::DatasetEntry& dse,
       if (attr_it == attributes.end()) {
         attr_it = attributes.find("Comment");
       }
-      if (attr_it != attributes.end() && attr_it->second._class_ == 3) {
-        description = reinterpret_cast<char *>(attr_it->second.array);
+      if (attr_it != attributes.end()) {
+        if (attr_it->second._class_ == 3) {
+          description = reinterpret_cast<char *>(attr_it->second.array);
+        }
       }
     }
     if (description.empty()) {
       attr_it = attributes.find("long_name");
       if (attr_it != attributes.end() && attr_it->second._class_ == 3) {
         description = reinterpret_cast<char *>(attr_it->second.array);
+      } else {
+        int len = (attr_it->second.vlen.buffer[0] << 24) + (attr_it->
+            second.vlen.buffer[1] << 16) + (attr_it->second.vlen.buffer[2] <<
+            8) + attr_it->second.vlen.buffer[3];
+        description = string(reinterpret_cast<char *>(&attr_it->
+            second.vlen.buffer[4]), len);
       }
     }
   }
