@@ -146,8 +146,8 @@ void cmd_dates(string database, size_t date_left_padding, vector<CMDDateRange>&
     if (q.num_rows() < 2 && ((!b && !has_climate_model_simulation) || row[2] ==
         "0")) {
       // check files table for new additions/deletions
-      q.set("start_date, end_date", tbl, "start_date != 0 order by start_date, "
-          "end_date");
+      q.set("start_date, end_date", tbl, "start_date > 160000000000 order by "
+          "start_date, end_date");
 #ifdef DUMP_QUERIES
       {
       Timer tm;
