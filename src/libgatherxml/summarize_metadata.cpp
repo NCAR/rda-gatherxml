@@ -780,13 +780,12 @@ unordered_set<string> summarize_frequencies_from_wgrml(Server& server, string
   if (file_id_code.empty()) {
 
     // no file id provided, summarize for full dataset
-    return move(summarize_frequencies_from_wgrml_by_dataset(server, caller,
-        user));
+    return summarize_frequencies_from_wgrml_by_dataset(server, caller, user);
   } else {
 
     // adding information from a given file id
-    return move(summarize_frequencies_from_wgrml_by_data_file(server,
-        file_id_code, caller, user));
+    return summarize_frequencies_from_wgrml_by_data_file(server, file_id_code,
+        caller, user);
   }
 }
 
