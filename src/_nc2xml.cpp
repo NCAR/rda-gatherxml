@@ -296,14 +296,13 @@ DateTime compute_nc_time(NetCDF::VariableData& times, size_t index) {
   return dt;
 }
 
-void extract_from_variable_attribute(const vector<NetCDF::Attribute>&
-    attribute_list, NetCDF::NCType nc_type, NetCDFVariableAttributeData&
-    nc_attribute_data, string conventions) {
+void extract_from_variable_attribute(const NetCDF::Variable& var,
+    NetCDFVariableAttributeData& nc_attribute_data, string conventions) {
   nc_attribute_data.long_name = "";
   nc_attribute_data.units = "";
   nc_attribute_data.cf_keyword = "";
   nc_attribute_data.missing_value.clear();
-  for (const auto& a : attribute_list) {
+  for (const auto& a : var.attrs) {
     if (a.name == "long_name") {
       nc_attribute_data.long_name = *(reinterpret_cast<string *>(a.values));
       trim(nc_attribute_data.long_name);
@@ -315,8 +314,8 @@ void extract_from_variable_attribute(const vector<NetCDF::Attribute>&
       nc_attribute_data.cf_keyword = *(reinterpret_cast<string *>(a.values));
       trim(nc_attribute_data.cf_keyword);
     } else if (a.name == "_FillValue" || a.name == "missing_value") {
-      nc_attribute_data.missing_value.resize(nc_type);
-      switch (nc_type) {
+      nc_attribute_data.missing_value.resize(var.nc_type);
+      switch (var.nc_type) {
         case NetCDF::NCType::CHAR: {
           nc_attribute_data.missing_value.set(*(reinterpret_cast<char *>(a.
               values)));
@@ -352,6 +351,9 @@ void extract_from_variable_attribute(const vector<NetCDF::Attribute>&
       nc_attribute_data.long_name = *(reinterpret_cast<string *>(a.values));
     }
   }
+  if (nc_attribute_data.long_name.empty()) {
+    nc_attribute_data.long_name = var.name;
+  }
 }
 
 bool found_missing(const double& time, const NetCDF::DataValue
@@ -376,8 +378,7 @@ void add_gridded_netcdf_parameter(const NetCDF::Variable& var, const DateTime&
      first_valid_date_time, const DateTime& last_valid_date_time, int nsteps,
      unordered_set<string>& parameter_table, ScanData& scan_data) {
   NetCDFVariableAttributeData nc_va_data;
-  extract_from_variable_attribute(var.attrs, var.nc_type, nc_va_data, scan_data.
-      conventions);
+  extract_from_variable_attribute(var, nc_va_data, scan_data.conventions);
   auto key = var.name + "<!>" + nc_va_data.long_name + "<!>" + nc_va_data.units
       + "<!>" + nc_va_data.cf_keyword;
   if (parameter_table.find(key) == parameter_table.end()) {
@@ -1224,8 +1225,7 @@ void scan_cf_point_netcdf_file(InputNetCDFStream& istream, string platform_type,
             "nc2xml", USER);
       }
       NetCDFVariableAttributeData ad;
-      extract_from_variable_attribute(v.attrs, v.nc_type, ad, scan_data.
-          conventions);
+      extract_from_variable_attribute(v, ad, scan_data.conventions);
       add_to_netcdf_variables(v.name + "<!>" + ad.long_name + "<!>" + ad.units +
           "<!>" + ad.cf_keyword, scan_data);
       for (size_t n = 0; n < tvd.size(); ++n) {
@@ -1473,8 +1473,7 @@ void scan_cf_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,
             "nc2xml", USER);
       }
       NetCDFVariableAttributeData ad;
-      extract_from_variable_attribute(v.attrs, v.nc_type, ad, scan_data.
-          conventions);
+      extract_from_variable_attribute(v, ad, scan_data.conventions);
       add_to_netcdf_variables(v.name + "<!>" + ad.long_name + "<!>" + ad.units +
           "<!>" + ad.cf_keyword, scan_data);
       size_t nt;
@@ -1653,8 +1652,7 @@ void scan_cf_non_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,
               "nc2xml", USER);
         }
         NetCDFVariableAttributeData ad;
-        extract_from_variable_attribute(v.attrs, v.nc_type, ad, scan_data.
-            conventions);
+        extract_from_variable_attribute(v, ad, scan_data.conventions);
         add_to_netcdf_variables(v.name + "<!>" + ad.long_name + "<!>" + ad.units
             + "<!>" + ad.cf_keyword, scan_data);
         long long off = 0;
@@ -1719,8 +1717,7 @@ void scan_cf_non_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,
               endl;
         }
         NetCDFVariableAttributeData ad;
-        extract_from_variable_attribute(v.attrs, v.nc_type, ad, scan_data.
-            conventions);
+        extract_from_variable_attribute(v, ad, scan_data.conventions);
         add_to_netcdf_variables(v.name + "<!>" + ad.long_name + "<!>" + ad.units
             + "<!>" + ad.cf_keyword, scan_data);
         for (size_t n = 0; n < svd.size(); ++n) {
@@ -1781,8 +1778,8 @@ void scan_cf_non_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,
       cout << "   ...incomplete multidimensional array" << endl;
     }
     NetCDFVariableAttributeData td;
-    extract_from_variable_attribute(vars[dgd.indexes.time_var].attrs, vars[dgd.
-        indexes.time_var].nc_type, td, scan_data.conventions);
+    extract_from_variable_attribute(vars[dgd.indexes.time_var], td, scan_data.
+        conventions);
     size_t nobs;
     if (vars[dgd.indexes.stn_id_var].is_rec) {
       nobs = dims[od].length;
@@ -1799,8 +1796,7 @@ void scan_cf_non_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,
               "nc2xml", USER);
         }
         NetCDFVariableAttributeData ad;
-        extract_from_variable_attribute(v.attrs, v.nc_type, ad, scan_data.
-            conventions);
+        extract_from_variable_attribute(v, ad, scan_data.conventions);
         add_to_netcdf_variables(v.name + "<!>" + ad.long_name + "<!>" + ad.units
             + "<!>" + ad.cf_keyword, scan_data);
         if (v.dimids.front() == sd) {
@@ -2032,8 +2028,7 @@ log_error2("continuous ragged array currently not supported", F, "nc2xml", USER)
           == idim) {
         ++nv;
         NetCDFVariableAttributeData ad;
-        extract_from_variable_attribute(v.attrs, v.nc_type, ad, scan_data.
-            conventions);
+        extract_from_variable_attribute(v, ad, scan_data.conventions);
         add_to_netcdf_variables(v.name + "<!>" + ad.long_name + "<!>" + ad.units
             + "<!>" + ad.cf_keyword, scan_data);
         NetCDF::VariableData vd;
@@ -2139,8 +2134,8 @@ void scan_cf_orthogonal_profile_netcdf_file(InputNetCDFStream& istream, string
         USER);
   }
   NetCDFVariableAttributeData ad;
-  extract_from_variable_attribute(vars[dgd.indexes.time_var].attrs, vars[dgd.
-      indexes.time_var].nc_type, ad, scan_data.conventions);
+  extract_from_variable_attribute(vars[dgd.indexes.time_var], ad, scan_data.
+      conventions);
   for (const auto& v : vars) {
     if (v.name != vars[dgd.indexes.z_var].name && !v.dimids.empty() && v.dimids.
         back() == vars[dgd.indexes.z_var].dimids.front()) {
@@ -2150,8 +2145,7 @@ void scan_cf_orthogonal_profile_netcdf_file(InputNetCDFStream& istream, string
             "nc2xml", USER);
       }
       NetCDFVariableAttributeData ad;
-      extract_from_variable_attribute(v.attrs, v.nc_type, ad, scan_data.
-          conventions);
+      extract_from_variable_attribute(v, ad, scan_data.conventions);
       add_to_netcdf_variables(v.name + "<!>" + ad.long_name + "<!>" + ad.units +
           "<!>" + ad.cf_keyword, scan_data);
       for (size_t n = 0; n < tvd.size(); ++n) {
@@ -2347,8 +2341,8 @@ ityps.emplace_back("unknown");
         USER);
   }
   NetCDFVariableAttributeData td;
-  extract_from_variable_attribute(vars[dgd.indexes.time_var].attrs, vars[dgd.
-      indexes.time_var].nc_type, td, scan_data.conventions);
+  extract_from_variable_attribute(vars[dgd.indexes.time_var], td, scan_data.
+      conventions);
   if (dgd.indexes.sample_dim_var != MISSING_FLAG) {
 
     // continuous ragged array H.10
@@ -2366,8 +2360,7 @@ ityps.emplace_back("unknown");
               "nc2xml", USER);
         }
         NetCDFVariableAttributeData ad;
-        extract_from_variable_attribute(v.attrs, v.nc_type, ad, scan_data.
-            conventions);
+        extract_from_variable_attribute(v, ad, scan_data.conventions);
         add_to_netcdf_variables(v.name + "<!>" + ad.long_name + "<!>" + ad.units
             + "<!>" + ad.cf_keyword, scan_data);
         auto x = 0;
@@ -2422,8 +2415,7 @@ ityps.emplace_back("unknown");
               "nc2xml", USER);
         }
         NetCDFVariableAttributeData ad;
-        extract_from_variable_attribute(v.attrs, v.nc_type, ad, scan_data.
-            conventions);
+        extract_from_variable_attribute(v, ad, scan_data.conventions);
         add_to_netcdf_variables(v.name + "<!>" + ad.long_name + "<!>" + ad.units
             + "<!>" + ad.cf_keyword, scan_data);
         for (size_t n = 0; n < tvd.size(); ++n) {
@@ -2548,8 +2540,7 @@ ityps.emplace_back("unknown");
             "nc2xml", USER);
       }
       NetCDFVariableAttributeData ad;
-      extract_from_variable_attribute(v.attrs, v.nc_type, ad, scan_data.
-          conventions);
+      extract_from_variable_attribute(v, ad, scan_data.conventions);
       add_to_netcdf_variables(v.name + "<!>" + ad.long_name + "<!>" + ad.units +
           "<!>" + ad.cf_keyword, scan_data);
       for (size_t n = 0; n < tvd.size(); ++n) {
@@ -2680,8 +2671,7 @@ ityps.emplace_back("unknown");
               "nc2xml", USER);
         }
         NetCDFVariableAttributeData ad;
-        extract_from_variable_attribute(v.attrs, v.nc_type, ad, scan_data.
-            conventions);
+        extract_from_variable_attribute(v, ad, scan_data.conventions);
         add_to_netcdf_variables(v.name + "<!>" + ad.long_name + "<!>" + ad.units
             + "<!>" + ad.cf_keyword, scan_data);
         auto x = 0;
@@ -2730,8 +2720,7 @@ ityps.emplace_back("unknown");
               "nc2xml", USER);
         }
         NetCDFVariableAttributeData ad;
-        extract_from_variable_attribute(v.attrs, v.nc_type, ad, scan_data.
-            conventions);
+        extract_from_variable_attribute(v, ad, scan_data.conventions);
         add_to_netcdf_variables(v.name + "<!>" + ad.long_name + "<!>" + ad.units
             + "<!>" + ad.cf_keyword, scan_data);
         for (size_t n = 0; n < vd.size(); ) {
@@ -3167,7 +3156,7 @@ bool grid_is_non_centered_lambert_conformal(const unique_ptr<double[]>& lats,
     const unique_ptr<double[]>& lons, Grid::GridDimensions& dims, Grid::
     GridDefinition& def) {
   if (gatherxml::verbose_operation) {
-    cout << "         ... checking for non-centered Lambert-Conformal "
+    cout << "         ... checking for a non-centered Lambert-Conformal "
         "projection ..." << endl;
   }
   def.type = Grid::Type::not_set;
@@ -3197,7 +3186,9 @@ bool grid_is_non_centered_lambert_conformal(const unique_ptr<double[]>& lats,
     d += x * x;
   }
   auto var = d / (v.size() - 1);
-  if (var >= 1.) return false;
+  if (var >= 1.) {
+    return false;
+  }
 
   // if the variance is low, confident that we found the orientation longitude
   def.type = Grid::Type::lambertConformal;
@@ -3208,9 +3199,23 @@ bool grid_is_non_centered_lambert_conformal(const unique_ptr<double[]>& lats,
   const double DEGRAD = PI / 180.;
   const double KMDEG = 111.1;
   v.clear();
+  auto min_floor = make_pair(99., 0);
+  auto min_ceil = make_pair(99., 0);
   for (auto n = xbar; n < dims.x * dims.y; n += dims.x) {
-    auto dy = (lons[n + 1] - lons[n]) * KMDEG * cos(lats[n] * DEGRAD);
-    auto dx = (lats[n + 1] - lats[n]) * KMDEG;
+    auto dx = (lons[n+1] - lons[n]) * KMDEG * cos((lats[n] + lats[n+1]) / 2. *
+        DEGRAD);
+    auto dy = (lats[n+1] - lats[n]) * KMDEG;
+    auto dist = sqrt(dx * dx + dy * dy);
+    auto diff = dist - floor(dist);
+    min_floor.first = std::min(diff, min_floor.first);
+    if (min_floor.first == diff) {
+      min_floor.second = v.size();
+    }
+    diff = ceil(dist) - dist;
+    min_ceil.first = std::min(diff, min_ceil.first);
+    if (min_ceil.first == diff) {
+      min_ceil.second = v.size();
+    }
     v.emplace_back(sqrt(dx * dx + dy * dy));
   }
   def.dx = lround(accumulate(v.begin(), v.end(), 0.) / v.size());
@@ -3246,9 +3251,8 @@ bool grid_is_non_centered_lambert_conformal(const unique_ptr<double[]>& lats,
   }
   def.llatitude = def.stdparallel1;
   def.projection_flag = def.llatitude >= 0. ? 0 : 1;
-  auto dx = (lons[i] - lons[i - dims.x]) * KMDEG * cos(lats[i - dims.x] *
-      DEGRAD);
-  auto dy = (lats[i] - lats[i - dims.x]) * KMDEG;
+  auto dx = (lons[i] - lons[i-dims.x]) * KMDEG * cos(lats[i-dims.x] * DEGRAD);
+  auto dy = (lats[i] - lats[i-dims.x]) * KMDEG;
   def.dy = lround(sqrt(dx * dx + dy * dy));
   if (gatherxml::verbose_operation) {
     cout << "            ... confirmed a non-centered Lambert-conformal "
@@ -4511,13 +4515,11 @@ void scan_raf_aircraft_netcdf_file(InputNetCDFStream& istream, ScanData&
     auto l = to_lower(v.name);
     if (regex_search(l, regex("lat")) && cset.find(v.name) != cset.end()) {
       istream.variable_data(v.name, yvd);
-      extract_from_variable_attribute(v.attrs, v.nc_type, ltad, scan_data.
-          conventions);
+      extract_from_variable_attribute(v, ltad, scan_data.conventions);
     } else if (regex_search(l, regex("lon")) && cset.find(v.name) != cset.
         end()) {
       istream.variable_data(v.name, xvd);
-      extract_from_variable_attribute(v.attrs, v.nc_type, lnad, scan_data.
-          conventions);
+      extract_from_variable_attribute(v, lnad, scan_data.conventions);
     } else if (regex_search(l, regex("alt")) && cset.find(v.name) != cset.
         end()) {
       for (const auto& a : v.attrs) {
@@ -4785,8 +4787,7 @@ void scan_npn_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data,
         auto d = scan_data.datatype_map.description(v.name);
         if (d.empty()) {
           NetCDFVariableAttributeData ad;
-          extract_from_variable_attribute(v.attrs, vd.type(), ad, scan_data.
-              conventions);
+          extract_from_variable_attribute(v, ad, scan_data.conventions);
           if (ad.units.length() == 1 && ad.units.front() == 0x1) {
             ad.units = "";
           }
@@ -5029,9 +5030,8 @@ void scan_idd_metar_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data,
         log_error2("unable to get data for variable '" + v.name + "'", F,
             "nc2xml", USER);
       }
-      auto a = v.attrs;
       NetCDFVariableAttributeData ad;
-      extract_from_variable_attribute(a, vd.type(), ad, scan_data.conventions);
+      extract_from_variable_attribute(v,ad, scan_data.conventions);
       if (gatherxml::verbose_operation) {
         cout << "    - attributes extracted" << endl;
       }
@@ -5126,9 +5126,8 @@ void scan_idd_buoy_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data,
         log_error2("unable to get data for variable '" + v.name + "'", F,
             "nc2xml", USER);
       }
-      auto a = v.attrs;
       NetCDFVariableAttributeData ad;
-      extract_from_variable_attribute(a, vd.type(), ad, scan_data.conventions);
+      extract_from_variable_attribute(v, ad, scan_data.conventions);
       auto nm = 0;
       for (size_t m = 0; m < tvd.size(); ++m) {
         if (!found_missing(tvd[m], &tfv, vd[m], ad.missing_value)) {
@@ -5215,9 +5214,8 @@ void scan_idd_surface_synoptic_netcdf_file(InputNetCDFStream& istream, ScanData&
         log_error2("unable to get data for variable '" + v.name + "'", F,
             "nc2xml", USER);
       }
-      auto a = v.attrs;
       NetCDFVariableAttributeData ad;
-      extract_from_variable_attribute(a, vd.type(), ad, scan_data.conventions);
+      extract_from_variable_attribute(v, ad, scan_data.conventions);
       auto nm = 0;
       for (size_t m = 0; m < tvd.size(); ++m) {
         if (!found_missing(tvd[m], &tfv, vd[m], ad.missing_value)) {
@@ -5306,8 +5304,7 @@ void scan_idd_upper_air_netcdf_file(InputNetCDFStream& istream, ScanData&
         }
       }
     } else if (v.name == "wmoStaNum") {
-      auto a = v.attrs;
-      extract_from_variable_attribute(a, wvd.type(), nc_wmoid_a_data, scan_data.
+      extract_from_variable_attribute(v, nc_wmoid_a_data, scan_data.
           conventions);
     } else if (v.is_rec && (v.name == "numMand" || v.name == "numSigT" || v.name
         == "numSigW" || v.name == "numMwnd" || v.name == "numTrop")) {
@@ -5316,9 +5313,8 @@ void scan_idd_upper_air_netcdf_file(InputNetCDFStream& istream, ScanData&
         log_error2("unable to get data for variable '" + v.name + "'", F,
             "nc2xml", USER);
       }
-      auto a = v.attrs;
       NetCDFVariableAttributeData ad;
-      extract_from_variable_attribute(a, vd.type(), ad, scan_data.conventions);
+      extract_from_variable_attribute(v, ad, scan_data.conventions);
       if (gatherxml::verbose_operation) {
         cout << "    - attributes extracted" << endl;
       }
@@ -5485,8 +5481,7 @@ void scan_samos_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data,
   for (const auto& v : vars) {
     if (v.name != tvn && v.name != yvn && v.name != xvn) {
       NetCDFVariableAttributeData ad;
-      extract_from_variable_attribute(v.attrs, v.nc_type, ad, scan_data.
-          conventions);
+      extract_from_variable_attribute(v, ad, scan_data.conventions);
       NetCDF::VariableData vd;
       if (istream.variable_data(v.name, vd) == NetCDF::NCType::_NULL) {
         log_error2("unable to get data for variable '" + v.name + "'", F,
