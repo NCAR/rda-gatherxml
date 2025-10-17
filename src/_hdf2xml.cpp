@@ -4526,7 +4526,7 @@ void scan_hdf5nc4_file(ScanData& scan_data, gatherxml::markup::ObML::
   if (gatherxml::verbose_operation) {
     cout << "Feature type is '" << ftype << "'." << endl;
   }
-  if (ftype.empty()) {
+  if (ftype.empty() || ftype == "grid") {
     scan_gridded_hdf5nc4_file(scan_data);
   } else {
     auto l_ftype = to_lower(ftype);
