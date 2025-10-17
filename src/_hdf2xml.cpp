@@ -1837,7 +1837,7 @@ void add_gridded_netcdf_parameter(const InputHDF5Stream::DatasetEntry& dse,
     }
   }
   if (description.empty()) {
-    description = var_name;
+    description = dse.key;
   }
   replace_all(description, "\n", " ");
   string standard_name;
