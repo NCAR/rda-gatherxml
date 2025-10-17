@@ -56,10 +56,12 @@ using std::vector;
 using strutils::capitalize;
 using strutils::ftos;
 using strutils::itos;
+using strutils::join;
 using strutils::replace_all;
 using strutils::split;
 using strutils::to_lower;
 using strutils::trim;
+using strutils::trimmed;
 using strutils::vector_to_string;
 using unixutils::mysystem2;
 
@@ -1838,6 +1840,14 @@ void add_gridded_netcdf_parameter(const InputHDF5Stream::DatasetEntry& dse,
   }
   if (description.empty()) {
     description = dse.key;
+  }
+  auto parts = split(description, "\n");
+  if (parts.size() > 1) {
+    vector<string> v;
+    for (const auto& part : parts) {
+      v.emplace_back(trimmed(part));
+    }
+    description = join(v, " ");
   }
   replace_all(description, "\n", " ");
   string standard_name;
