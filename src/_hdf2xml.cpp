@@ -56,6 +56,7 @@ using std::vector;
 using strutils::capitalize;
 using strutils::ftos;
 using strutils::itos;
+using strutils::replace_all;
 using strutils::split;
 using strutils::to_lower;
 using strutils::trim;
@@ -878,7 +879,7 @@ void scan_ispd_hdf5_file(ScanData& scan_data, gatherxml::markup::ObML::
                 is->size_of_lengths(),
                 cpd.members[4].datatype, ds->dataspace);
             string ispd_id = reinterpret_cast<char *>(coll_val.get());
-            strutils::replace_all(ispd_id, " ", "0");
+            replace_all(ispd_id, " ", "0");
             std::get<1>(entry->second) = ispd_id;
           } else {
             log_error2("no entry for '" + key + "' in station library", F,
@@ -1835,6 +1836,10 @@ void add_gridded_netcdf_parameter(const InputHDF5Stream::DatasetEntry& dse,
       }
     }
   }
+  if (description.empty()) {
+    description = var_name;
+  }
+  replace_all(description, "\n", " ");
   string standard_name;
   attr_it = attributes.find("standard_name");
   if (attr_it != attributes.end() && attr_it->second._class_ == 3) {
@@ -2692,7 +2697,7 @@ void scan_cf_orthogonal_time_series_hdf5nc4_file(const DiscreteGeometriesData&
         stringstream id_ss;
         attr_it->second.print(id_ss, nullptr);
         auto id = id_ss.str();
-        strutils::replace_all(id, "\"", "");
+        replace_all(id, "\"", "");
         auto id_parts = split(id, "-");
         if (id_parts.front() != "999999") {
           id_types.emplace_back("WMO+6");
@@ -2932,8 +2937,8 @@ id_types.emplace_back("unknown");
   attr_it->second.print(val_ss, is->reference_table_pointer());
   auto var_list = is->datasets_with_attribute("DIMENSION_LIST");
   auto dims = split(val_ss.str(), ",");
-  strutils::replace_all(dims.front(), "[", "");
-  strutils::replace_all(dims.front(), "]", "");
+  replace_all(dims.front(), "[", "");
+  replace_all(dims.front(), "]", "");
   trim(dims.front());
   ds = is->dataset("/" + dgd.indexes.sample_dim_vars.at(dims.front()));
   if (ds == nullptr) {
@@ -2949,8 +2954,8 @@ id_types.emplace_back("unknown");
       dse.p_ds->attributes["DIMENSION_LIST"].print(val_ss, is->
           reference_table_pointer());
       auto dims = split(val_ss.str(), ",");
-      strutils::replace_all(dims.front(), "[", "");
-      strutils::replace_all(dims.front(), "]", "");
+      replace_all(dims.front(), "[", "");
+      replace_all(dims.front(), "]", "");
       trim(dims.front());
       if (dgd.indexes.sample_dim_vars.find(dims.front()) !=
           dgd.indexes.sample_dim_vars.end() && var_name != dgd.indexes.z_var) {
