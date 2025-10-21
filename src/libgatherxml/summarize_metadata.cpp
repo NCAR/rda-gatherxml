@@ -1383,6 +1383,8 @@ void write_grml_parameters(string file_type, string tindex, ofstream& ofs,
   for (const auto& t : parameter_data) {
     string param, sd, ed, file_code;
     tie(param, sd, ed, file_code) = t;
+    sd.insert(0, 12-sd.length(), '0');
+    ed.insert(0, 12-ed.length(), '0');
     auto itm = ffmap[fkey].find(file_code); 
     if (itm != ffmap[fkey].end()) {
       auto uu = itm->second + "!" + param;
@@ -1529,8 +1531,8 @@ void create_file_list_cache(string file_type, string caller, string user, string
           "datasets/" + metautils::args.dsid + "/metadata/inv")) {
         ofs << "curl_subset=Y" << endl;
       }
-      string min = "99999999999999";
-      string max = "0";
+      string min = "999999999999";
+      string max = "000000000000";
       string s;
       write_grml_parameters(file_type, tindex, ofs, caller, user, min, max, s);
       ofs << min << " " << max;
@@ -1928,9 +1930,11 @@ void create_file_list_cache(string file_type, string caller, string user, string
       ofs << endl;
     }
     ofs.close();
+    system(("gzip " + tdir.name() + "/metadata/" + f).c_str());
     string e;
     if (gdex_upload_dir(tdir.name(), "metadata/", "/data/web/datasets/" +
-        metautils::args.dsid, metautils::directives.gdex_upload_key, e) < 0) {
+        metautils::args.dsid, metautils::directives.gdex_upload_key, e,
+        "gunzip=true") < 0) {
       metautils::log_warning(F + "() couldn't sync '" + f + "' - "
           "gdex_upload_dir() error(s): '" + e + "'", caller, user);
     }
