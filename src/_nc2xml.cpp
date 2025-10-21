@@ -3152,6 +3152,30 @@ bool grid_is_centered_lambert_conformal(const unique_ptr<double[]>& lats,
   return false;
 }
 
+size_t find_non_centered_lambert_conformal_stdparallel(const vector<double>& v,
+    Grid::GridDefinition& def, const Grid::GridDimensions& dims, size_t xbar,
+    const unique_ptr<double[]>& lats) {
+  size_t i = 0; // return value
+  def.stdparallel1 = def.stdparallel2 = -99.;
+  for (size_t n = 0; n < v.size(); ++n) {
+    if (myequalf(v[n], def.dx, 0.001)) {
+      auto p = lround(lats[n  * dims.x + xbar]);
+      if (def.stdparallel1 < -90.) {
+        def.stdparallel1 = p;
+        i = xbar + n * dims.x;
+      } else if (def.stdparallel2 < -90.) {
+        if (p != def.stdparallel1) {
+          def.stdparallel2 = p;
+        }
+      } else if (p != def.stdparallel2) {
+        def.stdparallel1 = def.stdparallel2 = -99.;
+        return 0;
+      }
+    }
+  }
+  return i;
+}
+
 bool grid_is_non_centered_lambert_conformal(const unique_ptr<double[]>& lats,
     const unique_ptr<double[]>& lons, Grid::GridDimensions& dims, Grid::
     GridDefinition& def) {
@@ -3219,33 +3243,21 @@ bool grid_is_non_centered_lambert_conformal(const unique_ptr<double[]>& lats,
     v.emplace_back(sqrt(dx * dx + dy * dy));
   }
   def.dx = lround(accumulate(v.begin(), v.end(), 0.) / v.size());
-  def.stdparallel1 = def.stdparallel2 = -99.;
-  size_t i = 0;
-  for (size_t n = 0; n < v.size(); ++n) {
-    if (myequalf(v[n], def.dx, 0.001)) {
-      auto p = lround(lats[xbar + n  * dims.x]);
-      if (def.stdparallel1 < -90.) {
-        def.stdparallel1 = p;
-        i = xbar + n * dims.x;
-      } else if (def.stdparallel2 < -90.) {
-        if (p != def.stdparallel1) def.stdparallel2 = p;
-      } else if (p != def.stdparallel2) {
-        if (gatherxml::verbose_operation) {
-          cout << "            ... check for a non-centered projection "
-              "failed. Too many tangent latitudes." << endl;
-        }
-        def.type = Grid::Type::not_set;
-        return false;
-      }
-    }
-  }
+  auto i = find_non_centered_lambert_conformal_stdparallel(v, def, dims, xbar,
+      lats);
   if (def.stdparallel1 < -90.) {
-    if (gatherxml::verbose_operation) {
-      cout << "            ... check for a non-centered projection failed. "
-          "No tangent latitude could be identified." << endl;
+    def.dx = (min_floor.first <= min_ceil.first) ? lround(v[min_floor.second]) :
+        lround(v[min_ceil.second]);
+    i = find_non_centered_lambert_conformal_stdparallel(v, def, dims, xbar,
+        lats);
+    if (def.stdparallel1 < -90.) {
+      if (gatherxml::verbose_operation) {
+        cout << "            ... check for a non-centered projection failed. "
+            "No tangent latitude could be identified." << endl;
+      }
+      def.type = Grid::Type::not_set;
+      return false;
     }
-    def.type = Grid::Type::not_set;
-    return false;
   } else if (def.stdparallel2 < -90.) {
     def.stdparallel2 = def.stdparallel1;
   }
