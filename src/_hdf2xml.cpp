@@ -4126,13 +4126,13 @@ void scan_gridded_hdf5nc4_file(ScanData& scan_data) {
     e.instantaneous.first_valid_datetime = actual_date_time(grid_data.
         valid_time.data_array.value(0), *coord_vars.nc_time, err);
     if (!err.empty()) {
-      log_error2(err, F, g_util_ident);
+      log_error2("actual_date_time(): " + err, F, g_util_ident);
     }
     e.num_steps = grid_data.valid_time.data_array.num_values;
     e.instantaneous.last_valid_datetime = actual_date_time(grid_data.valid_time.
         data_array.value(e.num_steps-1), *coord_vars.nc_time, err);
     if (!err.empty()) {
-      log_error2(err, F, g_util_ident);
+      log_error2("actual_date_time(): " + err, F, g_util_ident);
     }
   }
   get_forecast_data(grid_data);
@@ -4450,7 +4450,7 @@ void scan_gridded_hdf5nc4_file(ScanData& scan_data) {
     }
     auto e = metautils::NcLevel::write_level_map(coord_vars.level_info);
     if (!e.empty()) {
-      log_error2(e, F, g_util_ident);
+      log_error2("write_level_map(): " + e, F, g_util_ident);
     }
   }
   scan_data.write_type = ScanData::GrML_type;
