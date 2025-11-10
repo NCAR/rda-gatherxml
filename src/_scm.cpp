@@ -1849,7 +1849,9 @@ void summarize_markup(string markup_type, unordered_map<string, vector<
       mtypv.emplace_back(e.first);
     }
   }
+  g_progress_bitmap[4] = 'a';
   for (const auto& t : mtypv) {
+    g_progress_bitmap[4] += 1;
     MarkupParameters *mp = nullptr;
     if (t == "GrML") {
       mp = new GrMLParameters;
@@ -1865,26 +1867,35 @@ void summarize_markup(string markup_type, unordered_map<string, vector<
       log_error2("could not connect to metadata database - error: '" + mp->
           server.error() + "'", F, "scm", USER);
     }
+    g_progress_bitmap[4] += 1;
     Timer tm;
     for (auto& f : file_list[t]) {
       if (local_args.verbose) {
         tm.start();
       }
+      g_progress_bitmap[4] += 1;
       open_markup_file(mp->xdoc, f);
+      g_progress_bitmap[4] += 1;
       initialize_file(mp);
+      g_progress_bitmap[4] += 1;
       process_data_format(mp);
+      g_progress_bitmap[4] += 1;
       insert_filename(mp);
+      g_progress_bitmap[4] += 1;
       clear_tables(mp);
       if (t == "ObML") {
         reinterpret_cast<ObMLParameters *>(mp)->metadata_path = f.substr(0, f.
             rfind("/") + 1);
       }
+      g_progress_bitmap[4] += 1;
       process_markup(mp);
+      g_progress_bitmap[4] += 1;
       mp->xdoc.close();
       if (t == "FixML") {
         reinterpret_cast<FixMLParameters *>(mp)->markup_path = f;
       }
       update_database(mp);
+      g_progress_bitmap[4] += 1;
       if (local_args.verbose) {
         tm.stop();
         cout << mp->filename << " summarized in " << tm.elapsed_time() <<
@@ -1894,6 +1905,7 @@ void summarize_markup(string markup_type, unordered_map<string, vector<
     mp->server._delete("search.data_types", "dsid in " + local_args.ds_set +
         " and vocabulary = 'dssmm'");
     string err;
+    g_progress_bitmap[4] += 1;
     if (t == "GrML") {
       auto gp = reinterpret_cast<GrMLParameters *>(mp);
       for (const auto& p : gp->prod_set) {
@@ -1944,6 +1956,7 @@ void summarize_markup(string markup_type, unordered_map<string, vector<
           "scm", USER);
     }
     mp->server.disconnect();
+    g_progress_bitmap[4] += 1;
   }
   g_progress_bitmap[4] = '2';
 }
