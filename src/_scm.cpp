@@ -100,7 +100,7 @@ struct LocalArgs {
 
 TempDir g_temp_dir;
 char g_progress_bitmap[]={'0', '0', '0', '0', '0', '0', '0', '0', '0', '0',
-    '0', '0', '0', '0', '0', '0', '0', '0', 0x0};
+    '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', 0x0};
 
 void parse_args(const char arg_delimiter) {
   auto args = split(metautils::args.args_string, string(1, arg_delimiter));
@@ -1363,6 +1363,7 @@ struct ObMLParameters : public MarkupParameters {
 };
 
 void process_obml_markup(void *markup_parameters) {
+  g_progress_bitmap[18] = '0';
   auto op = reinterpret_cast<ObMLParameters *>(markup_parameters);
   static const string F = this_function_label(__func__);
   string mndt = "30001231";
@@ -1374,6 +1375,7 @@ void process_obml_markup(void *markup_parameters) {
   auto dt_tbl = "WObML." + metautils::args.dsid + "_data_types";
   auto dt_pkey = metautils::args.dsid + "_data_types_pkey";
   for (const auto& o : op->xdoc.element_list("ObML/" + op->element)) {
+    g_progress_bitmap[18] += 1;
     auto obs = o.attribute_value("value");
     if (obs_map.find(obs) == obs_map.end()) {
       auto c = table_code(op->server, "WObML.obs_types", "obs_type = '" + obs +
@@ -1384,6 +1386,7 @@ void process_obml_markup(void *markup_parameters) {
       obs_map.emplace(obs, c);
     }
     for (const auto& platform : o.element_addresses()) {
+      g_progress_bitmap[19] = '1';
       auto plat = (platform.p)->attribute_value("type");
       if (plat_map.find(plat) == plat_map.end()) {
         auto c = table_code(op->server, "WObML.platform_types", "platform_type "
@@ -1394,6 +1397,7 @@ void process_obml_markup(void *markup_parameters) {
         plat_map.emplace(plat, c);
       }
       for (const auto& e : (platform.p)->element_list("dataType")) {
+        g_progress_bitmap[20] = '1';
         auto dtyp = e.attribute_value("map");
         append(dtyp, e.attribute_value("value"), ":");
         auto dtyp_k = obs_map[obs] + "|" + plat_map[plat] + "|" + dtyp;
@@ -1434,12 +1438,15 @@ void process_obml_markup(void *markup_parameters) {
           log_error2("'" + op->server.error() + "' while trying to insert '" +
               inserts + "' into " + dt_tbl, F, "scm", USER);
         }
+        g_progress_bitmap[20] = '2';
       }
+      g_progress_bitmap[19] = '2';
       cnt += stoi((platform.p)->attribute_value("numObs"));
       string ts, te;
       vector<pthread_t> tv;
       list<pair<vector<string>, unordered_map<string, string> *>> id_args;
       list<vector<string>> loc_args;
+      g_progress_bitmap[19] = '3';
       for (const auto& e : platform.p->element_addresses()) {
         if (e.p->name() == "IDs") {
           id_args.emplace_back(make_pair(vector<string>(), nullptr));
@@ -1487,8 +1494,11 @@ void process_obml_markup(void *markup_parameters) {
       for (const auto& t : tv) {
         pthread_join(t, nullptr);
       }
+      g_progress_bitmap[19] = '4';
     }
+    g_progress_bitmap[18] += 1;
   }
+  g_progress_bitmap[18] = 'y';
   op->server._delete(dt_tbl, "file_code = " + op->file_map[op->filename] + " "
       "and uflg != '" + uflag + "'");
   op->server._delete("WObML." + metautils::args.dsid + "_frequencies",
@@ -1506,6 +1516,7 @@ void process_obml_markup(void *markup_parameters) {
     log_error2("error: '" + op->server.error() + "' while updating " + tb_nam +
         " with '" + s + "'", F, "scm", USER);
   }
+  g_progress_bitmap[18] = 'z';
 }
 
 struct SatMLParameters : public MarkupParameters {
