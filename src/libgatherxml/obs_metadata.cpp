@@ -32,6 +32,7 @@ using std::unordered_set;
 using std::vector;
 using strutils::ds_aliases;
 using strutils::ftos;
+using strutils::occurs;
 using strutils::split;
 using strutils::strand;
 using strutils::substitute;
@@ -120,9 +121,9 @@ void check_point(double latp, double lonp, Server& server, unordered_set<
   }
 }
 
-void compress_locations(unordered_set<string>& location_list, my::map<
-    ParentLocation>& parent_location_table, vector<string>& sorted_array, string
-    caller, string user) {
+void compress_locations(unordered_set<string>& location_list, unordered_map<
+    string, ParentLocation>& parent_location_table, vector<string>&
+    sorted_array, string caller, string user) {
   Server mysrv(metautils::directives.metadb_config);
   LocalQuery q("select path from search.gcmd_locations where path like "
       "'% > % > %'");
@@ -130,21 +131,18 @@ void compress_locations(unordered_set<string>& location_list, my::map<
     myerror = "Error getting GCMD locations";
     exit(1);
   }
-  ParentLocation pl;
   for (const auto& r : q) {
-    pl.key = r[0];
-    while (strutils::occurs(pl.key, " > ") > 1) {
-      auto c = pl.key;
-      pl.key = pl.key.substr(0, pl.key.rfind(" > "));
-      if (!parent_location_table.found(pl.key, pl)) {
-        pl.children_set.reset(new unordered_set<string>);
-        pl.children_set->emplace(c);
-        pl.matched_set = nullptr;
-        pl.consolidated_parent_set.reset(new unordered_set<string>);
-        parent_location_table.insert(pl);
+    auto key = r[0];
+    while (occurs(key, " > ") > 1) {
+      auto c = key;
+      key = key.substr(0, key.rfind(" > "));
+      if (parent_location_table.find(key) == parent_location_table.end()) {
+        parent_location_table.emplace(key, make_tuple(unordered_set<string>(),
+            unordered_set<string>{c}, unordered_set<string>()));
       } else {
-        if (pl.children_set->find(c) == pl.children_set->end()) {
-          pl.children_set->emplace(c);
+        auto children_set = std::get<1>(parent_location_table[key]);
+        if (children_set.find(c) == children_set.end()) {
+          std::get<1>(parent_location_table[key]).emplace(c);
         }
       }
     }
@@ -152,36 +150,28 @@ void compress_locations(unordered_set<string>& location_list, my::map<
   mysrv.disconnect();
 
   //special handling for Antarctica since it has no children
-  pl.key = "Continent > Antarctica";
-  pl.children_set.reset(new unordered_set<string>);
-  pl.matched_set = nullptr;
-  pl.consolidated_parent_set.reset(new unordered_set<string>);
-  parent_location_table.insert(pl);
+  parent_location_table.emplace("Continent > Antarctica", make_tuple(
+      unordered_set<string>(), unordered_set<string>(), unordered_set<
+      string>()));
 
   // match location keywords to their parents
   for (auto e : location_list) {
-    if (strutils::occurs(e, " > ") > 1) {
-      pl.key = e.substr(0, e.rfind(" > "));
-    } else {
-      pl.key = e;
+    auto key = e;
+    if (occurs(key, " > ") > 1) {
+      key = key.substr(0, key.rfind(" > "));
     }
-    parent_location_table.found(pl.key, pl);
-    if (pl.matched_set == nullptr) {
-      pl.matched_set.reset(new unordered_set<string>);
-      parent_location_table.replace(pl);
-    }
-    pl.matched_set->emplace(e);
+    std::get<0>(parent_location_table[key]).emplace(e);
   }
   sorted_array.clear();
   sorted_array.reserve(parent_location_table.size());
-  for (auto& k : parent_location_table.keys()) {
-    sorted_array.emplace_back(k);
+  for (auto& e : parent_location_table) {
+    sorted_array.emplace_back(e.first);
   }
   binary_sort(sorted_array,
   [](const string& left, const string& right) -> bool {
-    if (strutils::occurs(left, " > ") > strutils::occurs(right, " > ")) {
+    if (occurs(left, " > ") > occurs(right, " > ")) {
       return true;
-    } else if (strutils::occurs(left, " > ") < strutils::occurs(right, " > ")) {
+    } else if (occurs(left, " > ") < occurs(right, " > ")) {
       return false;
     } else {
       if (left <= right) {
@@ -196,31 +186,25 @@ void compress_locations(unordered_set<string>& location_list, my::map<
   while (b) {
     b = false;
     for (size_t n = 0; n < parent_location_table.size(); ++n) {
-      pl.key = sorted_array[n];
-      if (strutils::occurs(pl.key, " > ") > 1) {
-        parent_location_table.found(pl.key, pl);
-        if (pl.matched_set != nullptr) {
-          ParentLocation pl2;
-          pl2.key = pl.key.substr(0, pl.key.rfind(" > "));
-          parent_location_table.found(pl2.key, pl2);
-          if (pl2.matched_set == nullptr) {
-            pl2.matched_set.reset(new unordered_set<string>);
-            parent_location_table.replace(pl2);
+      auto key = sorted_array[n];
+      if (occurs(key, " > ") > 1) {
+        auto matched_set = std::get<0>(parent_location_table[key]);
+        if (!matched_set.empty()) {
+          auto children_set = std::get<1>(parent_location_table[key]);
+          auto consolidated_parent_set = std::get<2>(parent_location_table[
+              key]);
+          auto key2 = key.substr(0, key.rfind(" > "));
+          for (const auto& e : matched_set) {
+            std::get<0>(parent_location_table[key2]).emplace(e);
           }
-          for (const auto& e : *pl.children_set) {
-            pl2.children_set->emplace(e);
+          for (const auto& e : children_set) {
+            std::get<1>(parent_location_table[key2]).emplace(e);
           }
-          for (const auto& e : *pl.matched_set) {
-            pl2.matched_set->emplace(e);
+          for (const auto& e : consolidated_parent_set) {
+            std::get<2>(parent_location_table[key2]).emplace(e);
           }
-          for (const auto& e : *pl.consolidated_parent_set) {
-            pl2.consolidated_parent_set->emplace(e);
-          }
-          pl2.consolidated_parent_set->emplace(pl.key);
-          pl.matched_set->clear();
-          pl.matched_set.reset();
-          pl.matched_set = nullptr;
-          parent_location_table.replace(pl);
+          std::get<2>(parent_location_table[key2]).emplace(key);
+          std::get<0>(parent_location_table[key]).clear();
           b = true;
         }
       }

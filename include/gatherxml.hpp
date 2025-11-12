@@ -79,14 +79,8 @@ struct CodeEntry {
   std::string code;
 };
 
-struct ParentLocation {
-  ParentLocation() : key(), children_set(nullptr), matched_set(nullptr),
-      consolidated_parent_set(nullptr) { }
-
-  std::string key;
-  std::shared_ptr<std::unordered_set<std::string>> children_set, matched_set,
-      consolidated_parent_set;
-};
+typedef std::tuple<std::unordered_set<std::string>, std::unordered_set<std::
+    string>, std::unordered_set<std::string>> ParentLocation;
 
 struct SummaryEntry {
   SummaryEntry() : key(), start_date(), end_date(), box1d_bitmap() { }
@@ -101,8 +95,9 @@ extern void aggregate_grids(std::string database, std::string caller, std::
 extern void check_point(double latp, double lonp, PostgreSQL::Server& server,
     my::map<CodeEntry>& location_table);
 extern void compress_locations(std::unordered_set<std::string>& location_list,
-    my::map<ParentLocation>& parent_location_table, std::vector<std::string>&
-    sorted_array, std::string caller, std::string user);
+    std::unordered_map<std::string, ParentLocation>& parent_location_table,
+    std::vector<std::string>& sorted_array, std::string caller, std::string
+    user);
 extern void create_file_list_cache(std::string file_type, std::string caller,
     std::string user, std::string gindex = "");
 extern void create_non_cmd_file_list_cache(std::string file_type, std::

@@ -100,7 +100,7 @@ struct LocalArgs {
 
 TempDir g_temp_dir;
 char g_progress_bitmap[]={'0', '0', '0', '0', '0', '0', '0', '0', '0', '0',
-    '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', 0x0};
+    '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', 0x0};
 
 void parse_args(const char arg_delimiter) {
   auto args = split(metautils::args.args_string, string(1, arg_delimiter));
@@ -868,13 +868,16 @@ void process_grml_markup(void *markup_parameters) {
 
 void *thread_summarize_IDs(void *args) {
   static const string F = this_function_label(__func__);
+  g_progress_bitmap[21] = 'A';
   auto &p_args = *(reinterpret_cast<pair<vector<string>, unordered_map<string,
       string> *> *>(args));
+  g_progress_bitmap[21] += 1;
   Server srv(metautils::directives.metadb_config);
   if (!srv) {
     log_error2("could not connect to database server - error: '" + srv.error() +
         "'", F, "scm", USER);
   }
+  g_progress_bitmap[21] += 1;
 
   // read in the IDs from the separate XML file
   auto f = remote_web_file("https://" + metautils::directives.web_server +
@@ -884,6 +887,7 @@ void *thread_summarize_IDs(void *args) {
     log_error2("unable to open '" + p_args.first[0] + p_args.first[1] + "'", F,
         "scm", USER);
   }
+  g_progress_bitmap[21] += 1;
   char l[32768];
   double avgd = 0., navgd = 0., avgm = 0., navgm = 0.;
   size_t obs_count = 0;
@@ -1159,11 +1163,13 @@ void *thread_summarize_IDs(void *args) {
         + "'");
   }
   srv.disconnect();
+  g_progress_bitmap[21] = 'z';
   return nullptr;
 }
 
 void *thread_summarize_file_ID_locations(void *args) {
   static const string F = this_function_label(__func__);
+  g_progress_bitmap[22] = '1';
   static unordered_map<string, vector<string>> lmap;
   auto &a = *reinterpret_cast<vector<string> *>(args);
   Server srv(metautils::directives.metadb_config);
@@ -1264,9 +1270,10 @@ void *thread_summarize_file_ID_locations(void *args) {
     del_s += " and uflg != '" + uflg + "'";
     srv._delete(tbl, del_s);
     if (!lset.empty()) {
-      my::map<gatherxml::summarizeMetadata::ParentLocation> pmap;
+      unordered_map<string, gatherxml::summarizeMetadata::ParentLocation> pmap;
       vector<string> v;
-      compress_locations(lset, pmap, v, "scm", USER);
+      gatherxml::summarizeMetadata::compress_locations(lset, pmap, v, "scm",
+          USER);
       auto loc_tbl = a[7] + "." + metautils::args.dsid + "_location_names";
       auto loc_pkey = metautils::args.dsid + "_location_names_pkey";
       string cols;
@@ -1276,16 +1283,16 @@ void *thread_summarize_file_ID_locations(void *args) {
       } else if (a[7] == "WFixML") {
         cols = "file_code, classification_code, gcmd_keyword, include, uflg";
       }
-      for (const auto& i : v) {
-        gatherxml::summarizeMetadata::ParentLocation pl;
-        pmap.found(i, pl);
-        if (pl.matched_set != nullptr) {
-          if (pl.matched_set->size() > pl.children_set->size() / 2) {
+      for (const auto& key : v) {
+        auto matched_set = std::get<0>(pmap[key]);
+        if (!matched_set.empty()) {
+          if (std::get<0>(pmap[key]).size() > (std::get<1>(
+              pmap[key]).size()/2)) {
             string inserts = a[2] + ", " + a[3] + ", ";
             if (!a[4].empty()) {
               inserts +=  a[4] + ", ";
             }
-            inserts += "'" + sql_ready(pl.key) + "', 'Y', '" + uflg + "'";
+            inserts += "'" + sql_ready(key) + "', 'Y', '" + uflg + "'";
             if (srv.insert(
                   loc_tbl,
                   cols,
@@ -1296,15 +1303,17 @@ void *thread_summarize_file_ID_locations(void *args) {
               log_error2("'" + srv.error() + "' while inserting '" + inserts +
                   "' into " + loc_tbl, F, "scm", USER);
             }
-            for (auto key : *pl.children_set) {
-              if (pl.matched_set->find(key) == pl.matched_set->end() && pl.
-                  consolidated_parent_set->find(key) == pl.
-                  consolidated_parent_set->end()) {
+            auto consolidated_parent_set = std::get<2>(pmap[key]);
+            for (auto child_key : std::get<1>(pmap[key])) {
+              if (matched_set.find(child_key) == matched_set.end() &&
+                  consolidated_parent_set.find(child_key) ==
+                  consolidated_parent_set.end()) {
                 inserts = a[2] + ", " + a[3] + ", ";
                 if (!a[4].empty()) {
                   inserts += a[4] + ", ";
                 }
-                inserts += "'" + sql_ready(key) + "', 'N', '" + uflg + "'";
+                inserts += "'" + sql_ready(child_key) + "', 'N', '" + uflg +
+                    "'";
                 if (srv.insert(
                       loc_tbl,
                       cols,
@@ -1318,12 +1327,12 @@ void *thread_summarize_file_ID_locations(void *args) {
               }
             }
           } else {
-            for (auto key : *pl.matched_set) {
+            for (auto e : matched_set) {
               string inserts = a[2] + ", " + a[3] + ", ";
               if (!a[4].empty()) {
                 inserts += a[4] + ", ";
               }
-              inserts += "'" + sql_ready(key) + "', 'Y', '" + uflg + "'";
+              inserts += "'" + sql_ready(e) + "', 'Y', '" + uflg + "'";
               if (srv.insert(
                     loc_tbl,
                     cols,
@@ -1336,10 +1345,10 @@ void *thread_summarize_file_ID_locations(void *args) {
               }
             }
           }
-          pl.matched_set.reset();
+          std::get<0>(pmap[key]).clear();
         }
-        pl.children_set.reset();
-        pl.consolidated_parent_set.reset();
+        std::get<1>(pmap[key]).clear();
+        std::get<2>(pmap[key]).clear();
       }
       srv._delete(loc_tbl, del_s);
     }
@@ -1349,6 +1358,7 @@ void *thread_summarize_file_ID_locations(void *args) {
         USER);
   }
   srv.disconnect();
+  g_progress_bitmap[22] = '2';
   return nullptr;
 }
 
