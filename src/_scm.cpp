@@ -99,8 +99,8 @@ struct LocalArgs {
 } local_args;
 
 TempDir g_temp_dir;
-char g_progress_bitmap[]={'0', '0', '0', '0', '0', '0', '0', '0', '0', '0',
-    '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', 0x0};
+char g_progress_bitmap[] = {'0', '0', '0', '0', '0', '0', '0', '0', '0', '0',
+    '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', 0x0};
 
 void parse_args(const char arg_delimiter) {
   auto args = split(metautils::args.args_string, string(1, arg_delimiter));
@@ -1983,7 +1983,6 @@ void summarize_markup(string markup_type, unordered_map<string, vector<
 }
 
 void *thread_generate_detailed_metadata_view(void *args) {
-  g_progress_bitmap[13] = '1';
   auto &a = *(reinterpret_cast<vector<string> *>(args));
 //PROBLEM!!
   for (const auto& g : local_args.gindex_list) {
@@ -1993,17 +1992,16 @@ void *thread_generate_detailed_metadata_view(void *args) {
     }
   }
   if (local_args.summarized_web_file || local_args.refresh_web) {
-    gatherxml::detailedMetadata::generate_detailed_metadata_view("scm", USER);
+    gatherxml::detailedMetadata::generate_detailed_metadata_view(
+        g_progress_bitmap[13], "scm", USER);
   }
-  g_progress_bitmap[13] = '2';
   return nullptr;
 }
 
 void *thread_create_file_list_cache(void *args) {
-  g_progress_bitmap[16] = '1';
   auto &a = *(reinterpret_cast<vector<string> *>(args));
-  gatherxml::summarizeMetadata::create_file_list_cache(a[0], "scm", USER, a[1]);
-  g_progress_bitmap[16] = '2';
+  gatherxml::summarizeMetadata::create_file_list_cache(a[0],
+      g_progress_bitmap[stoi(a[2])], "scm", USER, a[1]);
   return nullptr;
 }
 
@@ -2382,12 +2380,13 @@ int main(int argc, char **argv) {
         }
       }
       g_progress_bitmap[12] = '1';
+      char progress_flag;
       for (const auto& g : local_args.gindex_list) {
-        gatherxml::summarizeMetadata::create_file_list_cache("Web", "scm", USER,
-            g);
+        gatherxml::summarizeMetadata::create_file_list_cache("Web",
+            progress_flag, "scm", USER, g);
         if (!local_args.summarized_web_file) {
-          gatherxml::summarizeMetadata::create_file_list_cache("inv", "scm",
-              USER, g);
+          gatherxml::summarizeMetadata::create_file_list_cache("inv",
+              progress_flag, "scm", USER, g);
         }
       }
       g_progress_bitmap[12] = '2';
@@ -2404,12 +2403,14 @@ int main(int argc, char **argv) {
       targs.emplace_back(vector<string>());
       targs.back().emplace_back("Web");
       targs.back().emplace_back("");
+      targs.back().emplace_back("16");
       pthread_create(&t, nullptr, thread_create_file_list_cache, &targs.back());
       tv.emplace_back(t);
       if (!local_args.summarized_web_file) {
         targs.emplace_back(vector<string>());
         targs.back().emplace_back("inv");
         targs.back().emplace_back("");
+        targs.back().emplace_back("23");
         pthread_create(&t, nullptr, thread_create_file_list_cache, &targs.
             back());
         tv.emplace_back(t);
@@ -2429,11 +2430,13 @@ int main(int argc, char **argv) {
           }
         }
       }
+      char progress_flag;
       for (const auto& g : local_args.gindex_list) {
-        gatherxml::summarizeMetadata::create_file_list_cache("inv", "scm", USER,
-            g);
+        gatherxml::summarizeMetadata::create_file_list_cache("inv",
+            progress_flag, "scm", USER, g);
       }
-      gatherxml::summarizeMetadata::create_file_list_cache("inv", "scm", USER);
+      gatherxml::summarizeMetadata::create_file_list_cache("inv", progress_flag,
+          "scm", USER);
     }
   }
   mysrv.disconnect();

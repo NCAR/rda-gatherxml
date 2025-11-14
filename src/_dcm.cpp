@@ -549,7 +549,9 @@ extern "C" void *t_summarize_grid_resolutions(void *) {
 }
 
 extern "C" void *t_generate_detailed_metadata_view(void *) {
-  gatherxml::detailedMetadata::generate_detailed_metadata_view("dcm", USER);
+  char flag;
+  gatherxml::detailedMetadata::generate_detailed_metadata_view(flag, "dcm",
+      USER);
   return nullptr;
 }
 
@@ -730,19 +732,22 @@ int main(int argc, char **argv) {
     }
     generate_dataset_home_page();
   }
+  char progress_flag,
   if (g_create_web_filelist_cache) {
-    gatherxml::summarizeMetadata::create_file_list_cache("Web", "dcm", USER);
+    gatherxml::summarizeMetadata::create_file_list_cache("Web", progress_flag,
+        "dcm", USER);
   }
   for (const auto& tindex : g_web_tindex_set) {
-    gatherxml::summarizeMetadata::create_file_list_cache("Web", "dcm", USER,
-        tindex);
+    gatherxml::summarizeMetadata::create_file_list_cache("Web", progress_flag,
+        "dcm", USER, tindex);
   }
   if (create_inv_filelist_cache) {
-    gatherxml::summarizeMetadata::create_file_list_cache("inv", "dcm", USER);
+    gatherxml::summarizeMetadata::create_file_list_cache("inv", progress_flag,
+        "dcm", USER);
   }
   for (const auto& tindex : g_inv_tindex_set) {
-    gatherxml::summarizeMetadata::create_file_list_cache("inv", "dcm", USER,
-        tindex);
+    gatherxml::summarizeMetadata::create_file_list_cache("inv", progress_flag,
+        "dcm", USER, tindex);
   }
   for (auto it = g_files.begin(); it != g_files.end(); ++it) {
     if (it->empty()) {
