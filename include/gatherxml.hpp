@@ -14,8 +14,8 @@ extern void parse_args(char arg_delimiter);
 
 namespace detailedMetadata {
 
-extern void generate_detailed_metadata_view(std::string caller, std::string
-    user);
+extern void generate_detailed_metadata_view(char& progress_flag, std::string
+    caller, std::string user);
 extern void generate_group_detailed_metadata_view(std::string group_index, std::
     string file_type, std::string caller, std::string user);
 
@@ -98,8 +98,8 @@ extern void compress_locations(std::unordered_set<std::string>& location_list,
     std::unordered_map<std::string, ParentLocation>& parent_location_table,
     std::vector<std::string>& sorted_array, std::string caller, std::string
     user);
-extern void create_file_list_cache(std::string file_type, std::string caller,
-    std::string user, std::string gindex = "");
+extern void create_file_list_cache(std::string file_type, char& progress_flag,
+    std::string caller, std::string user, std::string gindex = "");
 extern void create_non_cmd_file_list_cache(std::string file_type, std::
     unordered_set<std::string>& files_with_cmd_table, std::string caller, std::
     string user);
