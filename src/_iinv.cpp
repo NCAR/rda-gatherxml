@@ -1887,10 +1887,12 @@ int main(int argc, char **argv) {
   temp_dir.create(metautils::directives.temp_path);
   insert_inventory();
   if (local_args.create_cache) {
-    gatherxml::summarizeMetadata::create_file_list_cache("inv", "iinv", USER);
+    char progress_flag;
+    gatherxml::summarizeMetadata::create_file_list_cache("inv", progress_flag,
+        "iinv", USER);
     if (!tindex.empty() && tindex != "0") {
-      gatherxml::summarizeMetadata::create_file_list_cache("inv", "iinv", USER,
-          tindex);
+      gatherxml::summarizeMetadata::create_file_list_cache("inv", progress_flag,
+         "iinv", USER, tindex);
     }
   }
   if (local_args.notify) {
