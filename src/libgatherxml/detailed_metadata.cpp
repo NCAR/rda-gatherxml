@@ -109,12 +109,13 @@ struct ParameterData {
 };
 
 struct TypeEntry {
-  TypeEntry() : key(),start(),end(),type_table(nullptr),type_table_keys(nullptr),type_table_keys_2(nullptr) {}
+  TypeEntry() : key(), start(), end(), type_table(nullptr), type_table_keys(
+      nullptr), type_table_keys_2(nullptr) { }
 
   string key;
-  string start,end;
+  string start, end;
   shared_ptr<my::map<TypeEntry>> type_table;
-  shared_ptr<list<string>> type_table_keys,type_table_keys_2;
+  shared_ptr<list<string>> type_table_keys, type_table_keys_2;
 };
 
 bool compare_parameter_data(const ParameterMetadata& left, const
@@ -264,8 +265,8 @@ void generate_parameter_cross_reference(string format, string title, string
   }
   LocalQuery q("select distinct parameter from \"WGrML\".summary as s left "
       "join \"WGrML\".formats as f on f.code = s.format_code where s.dsid in " +
-      to_sql_tuple_string(ds_aliases(metautils::args.dsid)) + " and f.format = '"
-      + format + "'");
+      to_sql_tuple_string(ds_aliases(metautils::args.dsid)) + " and f.format "
+      "= '" + format + "'");
 #ifdef DUMP_QUERIES
   {
   Timer tm;
@@ -649,8 +650,8 @@ string time_range_query(Server& mysrv, string format_code) {
   return "select distinct t.time_range, d.definition, d.def_params from "
       "\"WGrML\".summary as s left join \"WGrML\".time_ranges as t on t.code = "
       "s.time_range_code left join \"WGrML\".grid_definitions as d on d.code = "
-      "s.grid_definition_code where s.dsid in " + to_sql_tuple_string(ds_aliases(
-      metautils::args.dsid)) + " and format_code = " + format_code;
+      "s.grid_definition_code where s.dsid in " + to_sql_tuple_string(
+      ds_aliases(metautils::args.dsid)) + " and format_code = " + format_code;
 }
 
 void write_grid_html(ofstream& ofs, size_t num_products) {
@@ -821,8 +822,8 @@ void generate_gridded_product_detail(Server& mysrv, string file_type, const
     Query qs;
     if (format_list.size() > 1) {
       qs.set("select a.time_range_codes, a.grid_definition_codes, min(a."
-          "start_date), max(a.end_date) from \"WGrML\"." + metautils::args.dsid +
-          "_agrids2 as a left join \"WGrML\"." + metautils::args.dsid +
+          "start_date), max(a.end_date) from \"WGrML\"." + metautils::args.dsid
+          + "_agrids2 as a left join \"WGrML\"." + metautils::args.dsid +
           "_webfiles2 as p on p.code = a.file_code where p.format_code = " + fp.
           second + " group by a.time_range_codes, a.grid_definition_codes");
     } else {
@@ -1485,10 +1486,10 @@ void generate_detailed_observation_summary(string file_type, ofstream& ofs,
         "_data_types_list as l on l.code = d.data_type_code left join \"WObML\"."
         + metautils::args.dsid + "_webfiles2 as p on p.code = d.file_code left "
         "join \"WObML\".platform_types as t on t.code = l.platform_type_code "
-        "left join \"WObML\".obs_types as o on o.code = l.observation_type_code "
-        "where p.format_code = " + fp.second + " group by t.platform_type, o."
-        "obs_type, l.data_type order by t.platform_type, o.obs_type, l."
-        "data_type");
+        "left join \"WObML\".obs_types as o on o.code = l."
+        "observation_type_code where p.format_code = " + fp.second + " group "
+        "by t.platform_type, o.obs_type, l.data_type order by t.platform_type, "
+        "o.obs_type, l.data_type");
     if (query.submit(srv) < 0) {
       log_error2("'" + query.error() + "' for '" + query.show() + "'", F,
           caller, user);
@@ -1661,12 +1662,24 @@ void generate_detailed_fix_summary(string file_type, ofstream& ofs, const
   my::map<TypeEntry> platform_table;
   for (const auto& fp : format_list) {
     platform_table.clear();
-    auto format=fp.first;
-    replace_all(format,"proprietary_","");
-    ofs << "<br><center><table class=\"insert\" width=\"95%\" cellspacing=\"1\" cellpadding=\"5\" border=\"0\"><tr><th class=\"headerRow\" colspan=\"3\" align=\"center\">Summary for Cyclone Fixes in " << to_capital(format) << " Format</th></tr>" << endl;
-    auto cindex=0;
-    ofs << "<tr class=\"bg2\" valign=\"top\"><th align=\"left\">Cyclone Classification</th><td align=\"left\"><b>Average Frequency of Data</b><br>(may vary by individual cyclone ID)</td><td align=\"left\"><b>Temporal/Geographical Coverage</b><br>(each dot represents a 3&deg; box containing one or more fixes)</td></tr>" << endl;
-    Query query("select distinct classification,min(l.start_date),max(l.end_date) from WFixML."+metautils::args.dsid+"_locations as l left join WFixML."+metautils::args.dsid+"_webfiles2 as p on p.code = l.file_code left join WFixML.classifications as c on c.code = l.classification_code where p.format_code = "+fp.second+" group by classification order by classification");
+    auto format = fp.first;
+    replace_all(format, "proprietary_","");
+    ofs << R"(<br><center><table class="insert" width="95%" cellspacing="1" "
+        "cellpadding="5" border="0"><tr><th class="headerRow" colspan="3" "
+        "align="center">Summary for Cyclone Fixes in )" << to_capital(format) <<
+        " Format</th></tr>" << endl;
+    auto cindex = 0;
+    ofs << R"(<tr class="bg2" valign="top"><th align="left">Cyclone "
+        "Classification</th><td align="left"><b>Average Frequency of Data</b>"
+        "<br>(may vary by individual cyclone ID)</td><td align=\"left\"><b>"
+        "Temporal/Geographical Coverage</b><br>(each dot represents a 3&deg; "
+        "box containing one or more fixes)</td></tr>)" << endl;
+    Query query(R"(select distinct classification, min(l.start_date), max("
+        "l.end_date) from "WFixML".)" + metautils::args.dsid + R"(_locations "
+        "as l left join "WFixML".)" + metautils::args.dsid + R"(_webfiles2 as "
+        "p on p.code = l.file_code left join "WFixML".classifications as c on "
+        "c.code = l.classification_code where p.format_code = )" + fp.second +
+        " group by classification order by classification");
     if (query.submit(server) < 0) {
       log_error2("'" + query.error() + "' for '" + query.show() + "'", F,
           caller, user);
@@ -1674,23 +1687,29 @@ void generate_detailed_fix_summary(string file_type, ofstream& ofs, const
     for (const auto& res : query) {
       TypeEntry te;
       if (!platform_table.found(res[0],te)) {
-        te.key=res[0];
-        te.start=res[1];
-        te.end=res[2];
+        te.key = res[0];
+        te.start = res[1];
+        te.end = res[2];
         te.type_table_keys.reset(new list<string>);
         platform_table.insert(te);
-      }
-      else {
+      } else {
         if (res[1] < te.start) {
-          te.start=res[1];
+          te.start = res[1];
         }
         if (res[2] > te.end) {
-          te.end=res[2];
+          te.end = res[2];
         }
         platform_table.replace(te);
       }
     }
-    query.set("select any_value(c.classification),min(f.min_obs_per),max(f.max_obs_per),f.unit from \"WFixML\"."+metautils::args.dsid+"_webfiles2 as p left join \"WFixML\"."+metautils::args.dsid+"_frequencies as f on p.code = f.file_code left join \"WFixML\".classifications as c on c.code = f.classification_code left join \"WObML\".frequency_sort as s on s.keyword = f.unit where p.format_code = "+fp.second+" group by f.classification_code,f.unit,s.idx order by s.idx");
+    query.set(R"(select any_value(c.classification), min(f.min_obs_per), max(f."
+        "max_obs_per), f.unit from "WFixML".)" + metautils::args.dsid + R"(
+        _webfiles2 as p left join "WFixML".)" + metautils::args.dsid + R"(
+        _frequencies as f on p.code = f.file_code left join "WFixML"."
+        "classifications as c on c.code = f.classification_code left join "
+        "WObML".frequency_sort as s on s.keyword = f.unit where p.format_code "
+        "= )" + fp.second + " group by f.classification_code,f.unit,s.idx "
+        "order by s.idx");
     if (query.submit(server) < 0) {
       log_error2("'" + query.error() + "' for '" + query.show() + "'", F,
           caller, user);
@@ -1699,25 +1718,30 @@ void generate_detailed_fix_summary(string file_type, ofstream& ofs, const
       TypeEntry te;
       if (platform_table.found(res[0],te)) {
         if (res[1] == res[2]) {
-          te.type_table_keys->emplace_back("<nobr>"+res[1]+" per "+res[3]+"</nobr>");
-        }
-        else {
-          te.type_table_keys->emplace_back("<nobr>"+res[1]+" to "+res[2]+"</nobr> per "+res[3]);
+          te.type_table_keys->emplace_back("<nobr>" + res[1] + " per " + res[3]
+              + "</nobr>");
+        } else {
+          te.type_table_keys->emplace_back("<nobr>" + res[1] + " to " + res[2] +
+              "</nobr> per " + res[3]);
         }
       }
     }
     for (const auto& key : platform_table.keys()) {
       TypeEntry te;
       platform_table.found(key,te);
-      ofs << "<tr class=\"bg" << cindex << "\" valign=\"top\"><td>" << to_capital(te.key) << "</td><td><ul class=\"paneltext\">";
+      ofs << R"(<tr class="bg)" << cindex << R"( valign="top"><td>)" <<
+          to_capital(te.key) << R"(</td><td><ul class="paneltext">)";
       for (auto& key2 : *te.type_table_keys) {
         ofs << "<li>" << key2 << "</li>";
       }
-      ofs << "</ul></td><td align=\"center\">" << dateutils::string_ll_to_date_string(te.start) << " to " << dateutils::string_ll_to_date_string(te.end) << "<br><img src=\"/datasets/" << metautils::args.dsid << "/metadata/spatial_coverage.web";
-      ofs << "_" << te.key << ".gif?" << strand(5) << "\"></td></tr>" << endl;
+      ofs << R"(</ul></td><td align="center">)" << dateutils::
+          string_ll_to_date_string(te.start) << " to " << dateutils::
+          string_ll_to_date_string(te.end) << R"(<br><img src="/datasets/)" <<
+          metautils::args.dsid << "/metadata/spatial_coverage.web";
+      ofs << "_" << te.key << ".gif?" << strand(5) << R"("></td></tr>)" << endl;
       te.type_table_keys->clear();
       te.type_table_keys.reset();
-      cindex=1-cindex;
+      cindex = 1 - cindex;
     }
     ofs << "</table></center>" << endl;
   }
@@ -1750,7 +1774,7 @@ void generate_detailed_metadata_view(string caller, string user) {
       string, string>>&, string, string)>> svec{
     make_tuple("WGrML", "Grids", generate_detailed_grid_summary),
     make_tuple("WObML", "Platform Observations",
-    generate_detailed_observation_summary),
+        generate_detailed_observation_summary),
     make_tuple("WFixML", "Cyclone Fix", generate_detailed_fix_summary),
   };
   vector<vector<pair<string, string>>> vv(svec.size());
@@ -1769,98 +1793,139 @@ void generate_detailed_metadata_view(string caller, string user) {
   xdoc.open(f);
   if (!xdoc) {
     if (f.empty()) {
-      metautils::log_warning(F + " returned warning: unable to access dsOverview.xml from the web server",caller,user);
+      metautils::log_warning(F + " returned warning: unable to access "
+          "dsOverview.xml from the web server", caller, user);
     } else {
-      metautils::log_warning(F + " returned warning: unable to open "+f+" - error: '"+xdoc.parse_error()+"'",caller,user);
+      metautils::log_warning(F + " returned warning: unable to open " + f +
+          " - error: '" + xdoc.parse_error() + "'", caller, user);
     }
   } else {
     string root = "OAI-PMH/GetRecord/record/metadata/dsOverview";
-    auto e=xdoc.element(root + "/title");
+    auto e = xdoc.element(root + "/title");
     Server server_d(metautils::directives.rdadb_config);
     if (!b) {
-      auto elist=xdoc.element_list(root + "/contentMetadata/dataType");
+      auto elist = xdoc.element_list(root + "/contentMetadata/dataType");
       for (const auto& element : elist) {
-        dtyps+="<li>";
+        dtyps += "<li>";
         auto data_type=element.content();
         if (data_type == "grid") {
-          dtyps+="Grids";
+          dtyps += "Grids";
         } else if (data_type == "platform_observation") {
-          dtyps+="Platform Observations";
+          dtyps += "Platform Observations";
         } else {
-          dtyps+=to_capital(data_type);
+          dtyps += to_capital(data_type);
         }
-        dtyps+="</li>";
+        dtyps += "</li>";
       }
-      elist=xdoc.element_list(root + "/contentMetadata/format");
+      elist = xdoc.element_list(root + "/contentMetadata/format");
       for (auto element : elist) {
-        auto format=element.content();
-        replace_all(format,"proprietary_","");
-        fmts+="<li>"+to_capital(format)+"</li>";
+        auto format = element.content();
+        replace_all(format, "proprietary_", "");
+        fmts += "<li>" + to_capital(format) + "</li>";
       }
     }
 // create the metadata directory tree in the temp directory
-    stringstream oss,ess;
-    if (mysystem2("/bin/mkdir -m 0755 -p "+t.name()+"/metadata",oss,ess) != 0) {
-      metautils::log_error(F + ": unable to create metadata directory tree - '"+ess.str()+"'",caller,user);
+    stringstream oss, ess;
+    if (mysystem2("/bin/mkdir -m 0755 -p " + t.name() + "/metadata", oss, ess)
+        != 0) {
+      metautils::log_error2("unable to create metadata directory tree - '" +
+          ess.str() + "'", F, caller, user);
     }
     ofstream ofs;
-    open_output(ofs, t.name()+"/metadata/detailed.html");
+    open_output(ofs, t.name() + "/metadata/detailed.html");
     if (!ofs.is_open()) {
-      metautils::log_error(F + ": unable to open output for detailed.html",caller,user);
+      metautils::log_error2("unable to open output for detailed.html", F,
+          caller, user);
     }
-    ofs << "<style id=\"detail\">" << endl;
+    ofs << R"(<style id="detail">)" << endl;
     ofs << "  @import url(/css/transform.css);" << endl;
     ofs << "</style>" << endl;
     ofs << "<?php" << endl;
-    ofs << "  include_once(\"MyDBI.inc\");" << endl;
-    ofs << "  default_dbinfo(\"\",\"metadata\",\"metadata\");" << endl;
+    ofs << R"(  include_once("MyDBI.inc");)" << endl;
+    ofs << R"(  default_dbinfo("","metadata","metadata");)" << endl;
     auto ds_set = to_sql_tuple_string(ds_aliases(metautils::args.dsid));
-    ofs << "  $title=myget(\"search.datasets\",\"title\",\"dsid in " << ds_set << "\");" << endl;
-    ofs << "  $contributors=mymget(\"\",\"\",\"select g.path from search.contributors_new as c left join search.gcmd_providers as g on g.uuid = c.keyword where dsid in " << ds_set << " order by disp_order\");" << endl;
-    ofs << "  $projects=mymget(\"\",\"\",\"select g.path from search.projects_new as p left join search.gcmd_projects as g on g.uuid = p.keyword  where dsid in " << ds_set << "\");" << endl;
-    ofs << "  $supportedProjects=mymget(\"\",\"\",\"select g.path from search.supported_projects as p left join search.gcmd_projects as g on g.uuid = p.keyword where dsid in " << ds_set << "\");" << endl;
+    ofs << R"(  $title=myget("search.datasets","title","dsid in )" << ds_set <<
+        R"(");)" << endl;
+    ofs << R"(  $contributors=mymget("","","select g.path from search."
+        "contributors_new as c left join search.gcmd_providers as g on g.uuid "
+        "= c.keyword where dsid in )" << ds_set << R"( order by disp_order");)"
+        << endl;
+    ofs << R"(  $projects=mymget("","","select g.path from search.projects_new "
+        "as p left join search.gcmd_projects as g on g.uuid = p.keyword where "
+        "dsid in )" << ds_set << R"(");)" << endl;
+    ofs << R"(  $supportedProjects=mymget("","","select g.path from search."
+        "supported_projects as p left join search.gcmd_projects as g on g.uuid "
+        "= p.keyword where dsid in )" << ds_set << R"(");)" << endl;
     ofs << "?>" << endl;
-    ofs << "<p>The information presented here summarizes the data in the primary (NCAR HPSS) archive of "+metautils::args.dsid+".  Some or all of these data may not be directly accessible from our web server.  If you have questions about data access, please contact the dataset specialist named above.</p>" << endl;
     ofs << "<br>" << endl;
-    ofs << "<center><table class=\"insert\" width=\"95%\" cellspacing=\"1\" cellpadding=\"5\" border=\"0\">" << endl;
-    ofs << "<tr><th class=\"headerRow\" align=\"center\" colspan=\"2\">Overview</th></tr>" << endl;
-    ofs << "<tr><td class=\"bg0\" align=\"left\" colspan=\"2\"><b>Dataset Title:</b>&nbsp;<?php print $title[\"title\"]; ?></td></tr>" << endl;
-// citation
-    ofs << "<tr><td class=\"bg0\" align=\"left\" colspan=\"2\"><b>Dataset Citation:</b><br /><div id=\"citation\" style=\"margin-bottom: 5px\"><img src=\"/images/transpace.gif\" width=\"1\" height=\"1\" onLoad=\"getAjaxContent('GET',null,'/cgi-bin/datasets/citation?dsnum=" << metautils::args.dsid << "&style=esip','citation')\" /></div><div style=\"display: inline; background-color: #2a70ae; color: white; padding: 1px 8px 1px 8px; font-size: 16px; font-weight: bold; border-radius: 5px 5px 5px 5px; text-align: center; cursor: pointer\" onClick=\"javascript:location='/cgi-bin/datasets/citation?dsnum=" << metautils::args.dsid << "&style=ris'\" title=\"download citation in RIS format\">RIS</div><div style=\"display: inline; background-color: #2a70ae; color: white; width: 60px; padding: 2px 8px 1px 8px; font-size: 16px; font-weight: bold; font-family: serif; border-radius: 5px 5px 5px 5px; text-align: center; cursor: pointer; margin-left: 7px\" onClick=\"location='/cgi-bin/datasets/citation?dsnum=" << metautils::args.dsid << "&style=bibtex'\" title=\"download citation in BibTeX format\">BibTeX</div></td></tr>" << endl;
-    ofs << "<tr valign=\"top\">" << endl;
+    ofs << R"(<center><table class="insert" width="95%" cellspacing="1" "
+        "cellpadding="5" border="0">)" << endl;
+    ofs << R"(<tr><th class="headerRow" align="center" colspan="2">Overview"
+        "</th></tr>)" << endl;
+    ofs << R"(<tr><td class="bg0" align="left" colspan="2"><b>Dataset Title:"
+        "</b>&nbsp;<?php print $title["title"]; ?></td></tr>)" << endl;
+
+    // citation
+    ofs << R"(<tr><td class="bg0" align="left" colspan="2"><b>Dataset Citation:"        "</b><br /><div id="citation" style="margin-bottom: 5px"><img src="
+        ""/images/transpace.gif" width="1" height="1" onLoad="getAjaxContent("
+        "'GET',null,'/cgi-bin/datasets/citation?dsnum=)" << metautils::args.dsid
+        << "&style=esip','citation')" << R"( /></div><div style="display: "
+        "inline; background-color: #2a70ae; color: white; padding: 1px 8px 1px "
+        "8px; font-size: 16px; font-weight: bold; border-radius: 5px 5px 5px "
+        "5px; text-align: center; cursor: pointer" onClick="javascript:"
+        "location='/cgi-bin/datasets/citation?dsnum=)" << metautils::args.dsid
+        << R"(&style=ris'" title="download citation in RIS format">RIS</div>"
+        "<div style="display: inline; background-color: #2a70ae; color: white; "
+        "width: 60px; padding: 2px 8px 1px 8px; font-size: 16px; font-weight: "
+        "bold; font-family: serif; border-radius: 5px 5px 5px 5px; text-align: "
+        "center; cursor: pointer; margin-left: 7px" onClick="location="
+        "'/cgi-bin/datasets/citation?dsnum=)" << metautils::args.dsid << R"(
+        &style=bibtex'" title="download citation in BibTeX format">BibTeX</div>"
+        "</td></tr>)" << endl;
+    ofs << R"(<tr valign="top">)" << endl;
     if (!dtyps.empty()) {
-      ofs << "<td width=\"50%\" class=\"bg0\" align=\"left\"><b>Types of data:</b><ul class=\"paneltext\">"+dtyps+"</ul></td>" << endl;
+      ofs << R"(<td width="50%" class="bg0" align="left"><b>Types of data:</b>"
+          "<ul class="paneltext">)" + dtyps + "</ul></td>" << endl;
     }
     if (!fmts.empty()) {
-      ofs << "<td class=\"bg0\" align=\"left\"><b>Data formats:</b><ul class=\"paneltext\">"+fmts+"</ul></td>" << endl;
+      ofs << R"(<td class="bg0" align="left"><b>Data formats:</b><ul class=""
+          "paneltext">)" + fmts + "</ul></td>" << endl;
     }
     ofs << "</tr>" << endl;
-    ofs  << "<tr valign=\"top\"><td class=\"bg0\" colspan=\"2\"><b>Data contributors:</b><ul class=\"paneltext\">" << endl;
+    ofs  << R"(<tr valign="top"><td class="bg0" colspan="2"><b>Data "
+        "contributors:</b><ul class="paneltext">)" << endl;
     ofs << "<?php" << endl;
-    ofs << "  for ($n=0; $n < count($contributors[\"path\"]); $n++) {" << endl;
-    ofs << "    print \"<li>\" . $contributors[\"path\"][$n] . \"</li>\n\";" << endl;
+    ofs << R"(  for ($n=0; $n < count($contributors["path"]); $n++) {)" << endl;
+    ofs << R"(    print "<li>" . $contributors["path"][$n] . "</li>\n";)" <<
+        endl;
     ofs << "  }" << endl;
     ofs << "?>" << endl;
     ofs << "</ul></td></tr>" << endl;
     ofs << "<?php" << endl;
     ofs << "  if ($projects) {" << endl;
-    ofs << "    print \"<tr valign=\\\"top\\\"><td class=\\\"bg0\\\" colspan=\\\"2\\\"><b>Programs/Experiments that collected the data:</b><ul class=\\\"paneltext\\\">\\n\";" << endl;
-    ofs << "    for ($n=0; $n < count($projects[\"path\"]); $n++) {" << endl;
-    ofs << "      print \"<li>\" . $projects[\"path\"][$n] . \"</li>\n\";" << endl;
+    ofs << R"(    print '<tr valign="top"><td class="bg0" colspan="2"><b>"
+        "Programs/Experiments that collected the data:</b><ul class="
+        ""paneltext">\n';)" << endl;
+    ofs << R"(    for ($n=0; $n < count($projects["path"]); $n++) {)" << endl;
+    ofs << R"(      print "<li>" . $projects["path"][$n] . "</li>\n";)" << endl;
     ofs << "    }" << endl;
-    ofs << "    print \"</ul></td></tr>\\n\";" << endl;
+    ofs << R"(    print "</ul></td></tr>\n";)" << endl;
     ofs << "  }" << endl;
     ofs << "?>" << endl;
     ofs << "<?php" << endl;
     ofs << "  if ($supportedProjects) {" << endl;
-    ofs << "    print \"<tr valign=\\\"top\\\"><td class=\\\"bg0\\\" colspan=\\\"2\\\"><b>Projects that are supported by the data:</b><ul class=\\\"paneltext\\\">\\n\";" << endl;
-    ofs << "    for ($n=0; $n < count($supportedProjects[\"path\"]); $n++) {" << endl;
-    ofs << "      print \"<li>\" . $supportedProjects[\"path\"][$n] . \"</li>\n\";" << endl;
+    ofs << R"(    print '<tr valign="top"><td class="bg0" colspan="2"><b>"
+        "Projects that are supported by the data:</b><ul class="
+        ""paneltext">\n';)" << endl;
+    ofs << R"(    for ($n=0; $n < count($supportedProjects["path"]); $n++) {)"
+        << endl;
+    ofs << R"(      print "<li>" . $supportedProjects["path"][$n] . "</li>\n";)"
+        << endl;
     ofs << "    }" << endl;
-    ofs << "    print \"</ul></td></tr>\\n\";" << endl;
+    ofs << R"(    print "</ul></td></tr>\n";)" << endl;
     ofs << "  }" << endl;
     ofs << "?>" << endl;
-    LocalQuery query("dweb_size","dssdb.dataset","dsid in "+ds_set);
+    LocalQuery query("dweb_size", "dssdb.dataset", "dsid in " + ds_set);
     if (query.submit(server_d) < 0) {
       myerror = query.error();
       exit(1);
@@ -1869,44 +1934,49 @@ void generate_detailed_metadata_view(string caller, string user) {
     Row row;
     query.fetch_row(row);
     if (!row[0].empty()) {
-      volume=stoll(row[0]);
+      volume = stoll(row[0]);
     } else {
-      volume=0.;
+      volume = 0.;
     }
-    auto n=0;
+    auto n = 0;
     while ( (volume/1000.) >= 1.) {
-      volume/=1000.;
+      volume /= 1000.;
       ++n;
     }
-    const int VUNITS_LEN=6;
-    const char *vunits[VUNITS_LEN]={"","K","M","G","T","P"};
+    const int VUNITS_LEN = 6;
+    const char *vunits[VUNITS_LEN] = {"","K","M","G","T","P"};
     if (n >= VUNITS_LEN) {
-      metautils::log_error(F + " - dataset primary size exceeds volume units specification",caller,user);
+      metautils::log_error2("dataset primary size exceeds volume units "
+          "specification", F, caller, user);
     }
-    ofs << "<tr valign=\"top\"><td class=\"bg0\" colspan=\"2\"><b>Total volume:</b>&nbsp;&nbsp;" << strutils::ftos(volume,5,3,' ') << " " << vunits[n] << "bytes</td></tr>" << endl;
+    ofs << R"(<tr valign="top"><td class="bg0" colspan="2"><b>Total volume:</b>"
+        "&nbsp;&nbsp;)" << strutils::ftos(volume, 5, 3, ' ') << " " << vunits[n]
+        << "bytes</td></tr>" << endl;
     if (!b) {
-      ofs << "<tr valign=\"top\">" << endl;
-      auto elist=xdoc.element_list(root + "/contentMetadata/temporal");
-      ofs << "<td class=\"bg0\"><b>Temporal Range(s):</b><ul>" << endl;
+      ofs << R"(<tr valign="top">)" << endl;
+      auto elist = xdoc.element_list(root + "/contentMetadata/temporal");
+      ofs << R"(<td class="bg0"><b>Temporal Range(s):</b><ul>)" << endl;
       for (const auto& element : elist) {
-        e=element;
-        auto date=e.attribute_value("start");
-        ofs << "<li>"+date+" to ";
-        date=e.attribute_value("end");
-        ofs << date+"</li>" << endl;
+        e = element;
+        auto date = e.attribute_value("start");
+        ofs << "<li>" + date + " to ";
+        date = e.attribute_value("end");
+        ofs << date + "</li>" << endl;
       }
       ofs << "</ul></td>" << endl;
-      elist=xdoc.element_list(root + "/contentMetadata/detailedVariables/detailedVariable");
+      elist = xdoc.element_list(root + "/contentMetadata/detailedVariables/"
+          "detailedVariable");
       if (elist.size() > 0) {
-        ofs << "<td class=\"bg0\"><b>Detailed Variable List:</b><ul>" << endl;
+        ofs << R"(<td class="bg0"><b>Detailed Variable List:</b><ul>)" << endl;
       } else {
-        ofs << "<td class=\"bg0\">&nbsp;" << endl;
+        ofs << R"(<td class="bg0">&nbsp;)" << endl;
       }
       for (const auto& element : elist) {
-        ofs << "<li>"+element.content();
-        auto units=element.attribute_value("units");
+        ofs << "<li>" + element.content();
+        auto units = element.attribute_value("units");
         if (!units.empty()) {
-          ofs << " <small class=\"units\">("+htmlutils::transform_superscripts(units)+")</small>";
+          ofs << R"( <small class="units">(")" + htmlutils::
+              transform_superscripts(units) + ")</small>";
         }
         ofs << "</li>" << endl;
       }
@@ -1936,38 +2006,42 @@ void generate_detailed_metadata_view(string caller, string user) {
     server_d.disconnect();
   }
   srv_m.disconnect();
-// generate parameter cross-references
-  generate_parameter_cross_reference("WMO_GRIB1","GRIB","grib.html",caller,user);
-  generate_parameter_cross_reference("WMO_GRIB2","GRIB2","grib2.html",caller,user);
-  generate_level_cross_reference("WMO_GRIB2","GRIB2","grib2_levels.html",caller,user);
-  generate_parameter_cross_reference("NCEP_ON84","ON84","on84.html",caller,user);
+
+  // generate parameter cross-references
+  generate_parameter_cross_reference("WMO_GRIB1", "GRIB", "grib.html", caller,
+      user);
+  generate_parameter_cross_reference("WMO_GRIB2", "GRIB2", "grib2.html", caller,
+      user);
+  generate_level_cross_reference("WMO_GRIB2", "GRIB2", "grib2_levels.html",
+      caller, user);
+  generate_parameter_cross_reference("NCEP_ON84", "ON84", "on84.html", caller,
+      user);
 }
 
-void generate_group_detailed_metadata_view(string group_index,string file_type,string caller,string user)
-{
-  LocalQuery query,grml_query,obml_query,fixml_query;
-  string gtitle,gsummary,output,error;
-//  list<string> formatList;
-//  bool foundDetail=false;
-
+void generate_group_detailed_metadata_view(string group_index, string file_type,
+    string caller,string user) {
+  static const string F = this_function_label(__func__);
   Server server_m(metautils::directives.metadb_config);
   Server server_d(metautils::directives.rdadb_config);
   if (!group_index.empty() || group_index == "0") {
     return;
   }
   while (group_index != "0") {
-    if (server_d.update("dsgroup","meta_link = 'X'","dsid in "+to_sql_tuple_string(ds_aliases(metautils::args.dsid))+" and gindex = "+group_index) < 0) {
-      metautils::log_warning("generate_group_detailed_metadata_view() returned warning: "+server_d.error()+" while trying to update dssdb.dsgroup",caller,user);
+    if (server_d.update("dsgroup", "meta_link = 'X'", "dsid in " +
+        to_sql_tuple_string(ds_aliases(metautils::args.dsid)) + " and gindex = "
+        + group_index) < 0) {
+      metautils::log_warning(F + " returned warning: " + server_d.error() +
+          " while trying to update dssdb.dsgroup", caller, user);
     }
-    query.set("pindex","dsgroup","gindex = "+group_index);
+    LocalQuery query("pindex", "dsgroup", "gindex = " + group_index);
     if (query.submit(server_d) < 0) {
-      metautils::log_error("generate_group_detailed_metadata_view(): "+query.error(),caller,user);
+      metautils::log_error2(query.error(), F, caller, user);
     }
     Row row;
     if (query.fetch_row(row)) {
-      group_index=row[0];
+      group_index = row[0];
     } else {
-      group_index="0";
+      group_index = "0";
     }
   }
   server_m.disconnect();
