@@ -1439,21 +1439,25 @@ void write_grml_parameters(string file_type, string tindex, ofstream& ofs,
   }
 }
 
-void create_file_list_cache(string file_type, string caller, string user, string
-    tindex) {
+void create_file_list_cache(string file_type, char& progress_flag, string
+    caller, string user, string tindex) {
   static const string F = this_function_label(__func__);
+  progress_flag = '0';
   Server srv(metautils::directives.metadb_config);
   if (!srv) {
     log_error2("unable to connect to the database: '" + srv.error() + "'", F,
         caller, user);
   }
+  progress_flag = '1';
   static Mutex g_mutex;
   static unique_ptr<unordered_map<string, string>> gmap;
   fill_gindex_map(srv, g_mutex, gmap, caller, user);
+  progress_flag = '2';
   unordered_map<string, FileEntry> grmlmap, obmlmap, fixmlmap;
   LocalQuery oq, sq;
   auto b = false;
   if (file_type == "Web" || file_type == "inv") {
+    progress_flag = 'A';
     if (table_exists(srv, "WGrML." + metautils::args.dsid + "_webfiles2")) {
       if (file_type == "inv" && !table_exists(srv, "IGrML." + metautils::args.
           dsid + "_inventory_summary")) {
@@ -1464,6 +1468,7 @@ void create_file_list_cache(string file_type, string caller, string user, string
       }
       b = true;
     }
+    progress_flag += 1;
     if (table_exists(srv, "WObML." + metautils::args.dsid + "_webfiles2")) {
       if (file_type == "Web" && tindex.empty()) {
         obml_file_data(file_type, *gmap, obmlmap, caller, user);
@@ -1490,12 +1495,15 @@ void create_file_list_cache(string file_type, string caller, string user, string
         }
       }
     }
+    progress_flag += 1;
     if (table_exists(srv, "WFixML." + metautils::args.dsid + "_webfiles2")) {
       if (tindex.empty()) {
         fixml_file_data(file_type, *gmap, fixmlmap, caller, user);
       }
     }
+    progress_flag += 1;
   }
+  progress_flag = '3';
   if (b) {
     string f = "customize.";
     if (file_type == "Web") {
@@ -1563,6 +1571,7 @@ void create_file_list_cache(string file_type, string caller, string user, string
       }
     }
   }
+  progress_flag = '4';
   xmlutils::DataTypeMapper dmap(metautils::directives.parameter_map_path);
   if (oq) {
 #ifdef DUMP_QUERIES
@@ -1799,15 +1808,18 @@ void create_file_list_cache(string file_type, string caller, string user, string
       }
     }
   }
+  progress_flag = '5';
   if (file_type == "inv") {
 
     // for inventories, the work is done here and we can return
     srv.disconnect();
     return;
   }
+  progress_flag = '6';
   unordered_set<string> cmdset;
   auto num = grmlmap.size() + obmlmap.size() + sq.num_rows() + fixmlmap.size();
   if (num > 0) {
+    progress_flag = '7';
     vector<pair<string, FileEntry>> v;
     v.resize(num);
     auto n = 0;
@@ -1939,6 +1951,7 @@ void create_file_list_cache(string file_type, string caller, string user, string
           "gdex_upload_dir() error(s): '" + e + "'", caller, user);
     }
   } else if (tindex.empty()) {
+    progress_flag = '8';
     string f = "";
     if (file_type == "Web") {
       f = "getWebList.cache";
@@ -1960,13 +1973,17 @@ void create_file_list_cache(string file_type, string caller, string user, string
     }
   }
   srv.disconnect();
+  progress_flag = '9';
   if (tindex.empty() && cmdset.size() > 0) {
     create_non_cmd_file_list_cache(file_type, cmdset, caller, user);
   }
   srv.connect(metautils::directives.rdadb_config);
+  progress_flag += 1;
   srv.update("dssdb.dataset", "meta_link = 'Y', version = version + 1",
       "dsid in " + to_sql_tuple_string(ds_aliases(metautils::args.dsid)));
+  progress_flag += 1;
   srv.disconnect();
+  progress_flag += 1;
 }
 
 void summarize_locations(string database, string& error) {

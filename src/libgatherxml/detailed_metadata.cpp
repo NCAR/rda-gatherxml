@@ -1748,23 +1748,28 @@ void generate_detailed_fix_summary(string file_type, ofstream& ofs, const
   server.disconnect();
 }
 
-void generate_detailed_metadata_view(string caller, string user) {
+void generate_detailed_metadata_view(char& progress_flag, string caller, string
+    user) {
   static const string F = this_function_label(__func__);
+  progress_flag = 'A';
   TempDir t;
   if (!t.create(metautils::directives.temp_path)) {
     log_error2("unable to create temporary directory", F, caller, user);
   }
+  progress_flag += 1;
   auto f = unixutils::remote_web_file("https://" + metautils::directives.
       web_server + "/metadata/FormatReferences.xml", t.name());
   XMLDocument xdoc(f);
   if (!xdoc) {
     log_error2("unable to open FormatReferences.xml", F, caller, user);
   }
+  progress_flag += 1;
   Server srv_m(metautils::directives.metadb_config);
   if (!srv_m) {
     log_error2("unable to connect to the database: '" + srv_m.error() + "'", F,
         caller, user);
   }
+  progress_flag += 1;
   string fmts, dtyps;
   auto b = false;
 
@@ -1786,12 +1791,15 @@ void generate_detailed_metadata_view(string caller, string user) {
       add_to_formats(xdoc, get<0>(svec[n]), tbl, vv[n], fmts, caller, user);
     }
   }
+  progress_flag += 1;
   xdoc.close();
   f = unixutils::remote_web_file("https://gdex.k8s.ucar.edu/oai/?verb=GetRecord"
       "&identifier=oai:edu.ucar.edu:" + metautils::args.dsid + "metadataPrefix="
       "native", t.name());
   xdoc.open(f);
+  progress_flag += 1;
   if (!xdoc) {
+    progress_flag = '!';
     if (f.empty()) {
       metautils::log_warning(F + " returned warning: unable to access "
           "dsOverview.xml from the web server", caller, user);
@@ -1824,7 +1832,9 @@ void generate_detailed_metadata_view(string caller, string user) {
         fmts += "<li>" + to_capital(format) + "</li>";
       }
     }
-// create the metadata directory tree in the temp directory
+    progress_flag += 1;
+
+    // create the metadata directory tree in the temp directory
     stringstream oss, ess;
     if (mysystem2("/bin/mkdir -m 0755 -p " + t.name() + "/metadata", oss, ess)
         != 0) {
@@ -1837,6 +1847,7 @@ void generate_detailed_metadata_view(string caller, string user) {
       metautils::log_error2("unable to open output for detailed.html", F,
           caller, user);
     }
+    progress_flag += 1;
     ofs << R"(<style id="detail">)" << endl;
     ofs << "  @import url(/css/transform.css);" << endl;
     ofs << "</style>" << endl;
@@ -1930,6 +1941,7 @@ void generate_detailed_metadata_view(string caller, string user) {
       myerror = query.error();
       exit(1);
     }
+    progress_flag += 1;
     double volume;
     Row row;
     query.fetch_row(row);
@@ -1952,6 +1964,7 @@ void generate_detailed_metadata_view(string caller, string user) {
     ofs << R"(<tr valign="top"><td class="bg0" colspan="2"><b>Total volume:</b>"
         "&nbsp;&nbsp;)" << strutils::ftos(volume, 5, 3, ' ') << " " << vunits[n]
         << "bytes</td></tr>" << endl;
+    progress_flag += 1;
     if (!b) {
       ofs << R"(<tr valign="top">)" << endl;
       auto elist = xdoc.element_list(root + "/contentMetadata/temporal");
@@ -1987,6 +2000,7 @@ void generate_detailed_metadata_view(string caller, string user) {
       }
       ofs << "</tr>" << endl;
     }
+    progress_flag += 1;
     ofs << "</table></center>" << endl;
     for (size_t n = 0; n < svec.size(); ++n) {
       if (!vv[n].empty()) {
@@ -1995,6 +2009,7 @@ void generate_detailed_metadata_view(string caller, string user) {
       }
     }
     ofs.close();
+    progress_flag += 1;
     string error;
     if (unixutils::gdex_upload_dir(t.name(), "metadata/", "/data/web/datasets/"
         + metautils::args.dsid, metautils::directives.gdex_upload_key, error) <
@@ -2004,18 +2019,23 @@ void generate_detailed_metadata_view(string caller, string user) {
     }
     xdoc.close();
     server_d.disconnect();
+    progress_flag += 1;
   }
   srv_m.disconnect();
 
   // generate parameter cross-references
   generate_parameter_cross_reference("WMO_GRIB1", "GRIB", "grib.html", caller,
       user);
+  progress_flag += 1;
   generate_parameter_cross_reference("WMO_GRIB2", "GRIB2", "grib2.html", caller,
       user);
+  progress_flag += 1;
   generate_level_cross_reference("WMO_GRIB2", "GRIB2", "grib2_levels.html",
       caller, user);
+  progress_flag += 1;
   generate_parameter_cross_reference("NCEP_ON84", "ON84", "on84.html", caller,
       user);
+  progress_flag += 1;
 }
 
 void generate_group_detailed_metadata_view(string group_index, string file_type,
