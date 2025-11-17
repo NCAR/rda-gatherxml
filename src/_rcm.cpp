@@ -495,7 +495,9 @@ int main(int argc, char **argv) {
           "'", "main()", "rcm", USER);
     }
     if (!no_cache) {
-      gatherxml::summarizeMetadata::create_file_list_cache("Web", "rcm", USER);
+      char progress_flag;
+      gatherxml::summarizeMetadata::create_file_list_cache("Web", progress_flag,
+          "rcm", USER);
     }
     return 0;
   }
