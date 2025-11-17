@@ -177,7 +177,7 @@ void clear_grid_cache(Server& server, string db) {
   auto tbl_ref = metautils::args.dsid + "_agrids_cache";
   auto tbl = db + "." + tbl_ref;
   auto lock_it = gatherxml::pglocks::pglocks.find(substitute(tbl, metautils::
-      args.dsid, "nnnn"));
+      args.dsid, "dnnnnnn"));
   if (lock_it == gatherxml::pglocks::pglocks.end()) {
     log_error2("can't find lock ID for '" + tbl + "'", F, "dcm", USER);
   }
