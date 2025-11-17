@@ -732,7 +732,7 @@ int main(int argc, char **argv) {
     }
     generate_dataset_home_page();
   }
-  char progress_flag,
+  char progress_flag;
   if (g_create_web_filelist_cache) {
     gatherxml::summarizeMetadata::create_file_list_cache("Web", progress_flag,
         "dcm", USER);
