@@ -1442,17 +1442,17 @@ void write_grml_parameters(string file_type, string tindex, ofstream& ofs,
 void create_file_list_cache(string file_type, char& progress_flag, string
     caller, string user, string tindex) {
   static const string F = this_function_label(__func__);
-  progress_flag = '0';
+  progress_flag = '1';
   Server srv(metautils::directives.metadb_config);
   if (!srv) {
     log_error2("unable to connect to the database: '" + srv.error() + "'", F,
         caller, user);
   }
-  progress_flag = '1';
+  progress_flag = '2';
   static Mutex g_mutex;
   static unique_ptr<unordered_map<string, string>> gmap;
   fill_gindex_map(srv, g_mutex, gmap, caller, user);
-  progress_flag = '2';
+  progress_flag = '3';
   unordered_map<string, FileEntry> grmlmap, obmlmap, fixmlmap;
   LocalQuery oq, sq;
   auto b = false;
@@ -1503,8 +1503,9 @@ void create_file_list_cache(string file_type, char& progress_flag, string
     }
     progress_flag += 1;
   }
-  progress_flag = '3';
+  progress_flag = '4';
   if (b) {
+    progress_flag = 'a';
     string f = "customize.";
     if (file_type == "Web") {
       f += "W";
@@ -1514,6 +1515,7 @@ void create_file_list_cache(string file_type, char& progress_flag, string
       f = "";
     }
     if (!f.empty()) {
+      progress_flag += 1;
       f += "GrML";
       if (!tindex.empty()) {
         f += "." + tindex;
@@ -1522,6 +1524,7 @@ void create_file_list_cache(string file_type, char& progress_flag, string
       if (!tdir.create(metautils::directives.temp_path)) {
         log_error2("unable to create temporary directory (1)", F, caller, user);
       }
+      progress_flag += 1;
 
       // create the directory tree in the temp directory
       stringstream oss, ess;
@@ -1530,25 +1533,30 @@ void create_file_list_cache(string file_type, char& progress_flag, string
         log_error2("unable to create a temporary directory tree (1) - '" + ess.
             str() + "'", F, caller, user);
       }
+      progress_flag += 1;
       ofstream ofs;
       open_output(ofs, tdir.name() + "/metadata/" + f);
       if (!ofs.is_open()) {
         log_error2("unable to open temporary file for " + f, F, caller, user);
       }
+      progress_flag += 1;
       if (exists_on_server(metautils::directives.web_server, "/data/web/"
           "datasets/" + metautils::args.dsid + "/metadata/inv")) {
         ofs << "curl_subset=Y" << endl;
       }
+      progress_flag += 1;
       string min = "999999999999";
       string max = "000000000000";
       string s;
       write_grml_parameters(file_type, tindex, ofs, caller, user, min, max, s);
+      progress_flag += 1;
       ofs << min << " " << max;
       if (!s.empty()) {
         ofs << " " << s;
       }
       ofs << endl;
       ofs.close();
+      progress_flag += 1;
       if (max == "0") {
         auto rfile = "/data/web/datasets/" + metautils::args.dsid + "/metadata/"
             + f;
@@ -1569,9 +1577,10 @@ void create_file_list_cache(string file_type, char& progress_flag, string
               "gdex_upload_dir() error(s): '" + e + "'", caller, user);
         }
       }
+      progress_flag += 1;
     }
   }
-  progress_flag = '4';
+  progress_flag = '5';
   xmlutils::DataTypeMapper dmap(metautils::directives.parameter_map_path);
   if (oq) {
 #ifdef DUMP_QUERIES
@@ -1808,18 +1817,18 @@ void create_file_list_cache(string file_type, char& progress_flag, string
       }
     }
   }
-  progress_flag = '5';
+  progress_flag = '6';
   if (file_type == "inv") {
 
     // for inventories, the work is done here and we can return
     srv.disconnect();
     return;
   }
-  progress_flag = '6';
+  progress_flag = '7';
   unordered_set<string> cmdset;
   auto num = grmlmap.size() + obmlmap.size() + sq.num_rows() + fixmlmap.size();
   if (num > 0) {
-    progress_flag = '7';
+    progress_flag = '8';
     vector<pair<string, FileEntry>> v;
     v.resize(num);
     auto n = 0;
@@ -1951,7 +1960,7 @@ void create_file_list_cache(string file_type, char& progress_flag, string
           "gdex_upload_dir() error(s): '" + e + "'", caller, user);
     }
   } else if (tindex.empty()) {
-    progress_flag = '8';
+    progress_flag = '9';
     string f = "";
     if (file_type == "Web") {
       f = "getWebList.cache";
@@ -1973,7 +1982,7 @@ void create_file_list_cache(string file_type, char& progress_flag, string
     }
   }
   srv.disconnect();
-  progress_flag = '9';
+  progress_flag = ':';
   if (tindex.empty() && cmdset.size() > 0) {
     create_non_cmd_file_list_cache(file_type, cmdset, caller, user);
   }

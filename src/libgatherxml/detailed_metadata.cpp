@@ -1751,7 +1751,7 @@ void generate_detailed_fix_summary(string file_type, ofstream& ofs, const
 void generate_detailed_metadata_view(char& progress_flag, string caller, string
     user) {
   static const string F = this_function_label(__func__);
-  progress_flag = 'A';
+  progress_flag += 1;
   TempDir t;
   if (!t.create(metautils::directives.temp_path)) {
     log_error2("unable to create temporary directory", F, caller, user);
@@ -1799,7 +1799,7 @@ void generate_detailed_metadata_view(char& progress_flag, string caller, string
   xdoc.open(f);
   progress_flag += 1;
   if (!xdoc) {
-    progress_flag = '!';
+    progress_flag = 'a';
     if (f.empty()) {
       metautils::log_warning(F + " returned warning: unable to access "
           "dsOverview.xml from the web server", caller, user);
