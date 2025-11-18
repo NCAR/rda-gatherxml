@@ -868,7 +868,7 @@ void process_grml_markup(void *markup_parameters) {
 
 void *thread_summarize_IDs(void *args) {
   static const string F = this_function_label(__func__);
-  g_progress_bitmap[21] = 'A';
+  g_progress_bitmap[21] += 1;
   auto &p_args = *(reinterpret_cast<pair<vector<string>, unordered_map<string,
       string> *> *>(args));
   g_progress_bitmap[21] += 1;
@@ -1358,7 +1358,7 @@ void *thread_summarize_file_ID_locations(void *args) {
         USER);
   }
   srv.disconnect();
-  g_progress_bitmap[22] = '2';
+  g_progress_bitmap[22] = 'z';
   return nullptr;
 }
 
@@ -1448,7 +1448,7 @@ void process_obml_markup(void *markup_parameters) {
           log_error2("'" + op->server.error() + "' while trying to insert '" +
               inserts + "' into " + dt_tbl, F, "scm", USER);
         }
-        g_progress_bitmap[20] = '2';
+        g_progress_bitmap[20] = 'z';
       }
       g_progress_bitmap[19] = '2';
       cnt += stoi((platform.p)->attribute_value("numObs"));
@@ -1504,7 +1504,7 @@ void process_obml_markup(void *markup_parameters) {
       for (const auto& t : tv) {
         pthread_join(t, nullptr);
       }
-      g_progress_bitmap[19] = '4';
+      g_progress_bitmap[19] = 'z';
     }
     g_progress_bitmap[18] += 1;
   }
@@ -1870,7 +1870,7 @@ void summarize_markup(string markup_type, unordered_map<string, vector<
       mtypv.emplace_back(e.first);
     }
   }
-  g_progress_bitmap[4] = 'a';
+  g_progress_bitmap[4] += 1;
   for (const auto& t : mtypv) {
     g_progress_bitmap[4] += 1;
     MarkupParameters *mp = nullptr;
@@ -1979,7 +1979,7 @@ void summarize_markup(string markup_type, unordered_map<string, vector<
     mp->server.disconnect();
     g_progress_bitmap[4] += 1;
   }
-  g_progress_bitmap[4] = '2';
+  g_progress_bitmap[4] = 'z';
 }
 
 void *thread_generate_detailed_metadata_view(void *args) {
@@ -1994,6 +1994,7 @@ void *thread_generate_detailed_metadata_view(void *args) {
   if (local_args.summarized_web_file || local_args.refresh_web) {
     gatherxml::detailedMetadata::generate_detailed_metadata_view(
         g_progress_bitmap[13], "scm", USER);
+    g_progress_bitmap[13] = 'z';
   }
   return nullptr;
 }
@@ -2002,6 +2003,7 @@ void *thread_create_file_list_cache(void *args) {
   auto &a = *(reinterpret_cast<vector<string> *>(args));
   gatherxml::summarizeMetadata::create_file_list_cache(a[0],
       g_progress_bitmap[stoi(a[2])], "scm", USER, a[1]);
+  g_progress_bitmap[stoi(a[2])] = 'z';
   return nullptr;
 }
 
@@ -2013,7 +2015,7 @@ void *thread_summarize_obs_data(void *) {
     mysystem2(metautils::directives.local_root + "/bin/gsi " + metautils::args.
         dsid, oss, ess);
   }
-  g_progress_bitmap[5] = '2';
+  g_progress_bitmap[5] = 'z';
   return nullptr;
 }
 
@@ -2040,7 +2042,7 @@ void *thread_index_variables(void *) {
     log_error2(e, "thread_index_variables()", "scm", USER);
   }
   srv.disconnect();
-  g_progress_bitmap[7] = '2';
+  g_progress_bitmap[7] = 'z';
   return nullptr;
 }
 
@@ -2057,14 +2059,14 @@ void *thread_index_locations(void *) {
     log_error2(e, "thread_index_locations()", "scm", USER);
   }
   srv.disconnect();
-  g_progress_bitmap[6] = '2';
+  g_progress_bitmap[6] = 'z';
   return nullptr;
 }
 
 void *thread_summarize_dates(void *) {
   g_progress_bitmap[14] = '1';
   gatherxml::summarizeMetadata::summarize_dates("scm", USER);
-  g_progress_bitmap[14] = '2';
+  g_progress_bitmap[14] = 'z';
   return nullptr;
 }
 
@@ -2076,14 +2078,14 @@ void *thread_summarize_frequencies(void *) {
 void *thread_summarize_grid_resolutions(void *) {
   g_progress_bitmap[10] = '1';
   gatherxml::summarizeMetadata::summarize_grid_resolutions("scm", USER);
-  g_progress_bitmap[10] = '2';
+  g_progress_bitmap[10] = 'z';
   return nullptr;
 }
 
 void *thread_summarize_data_formats(void *) {
   g_progress_bitmap[15] = '1';
   gatherxml::summarizeMetadata::summarize_data_formats("scm", USER);
-  g_progress_bitmap[15] = '2';
+  g_progress_bitmap[15] = 'z';
   return nullptr;
 }
 
@@ -2091,7 +2093,7 @@ void *thread_aggregate_grids(void *args) {
   g_progress_bitmap[9] = '1';
   auto &a = *(reinterpret_cast<vector<string> *>(args));
   gatherxml::summarizeMetadata::aggregate_grids(a[0], "scm", USER);
-  g_progress_bitmap[9] = '2';
+  g_progress_bitmap[9] = 'z';
   return nullptr;
 }  
 
@@ -2176,7 +2178,7 @@ int main(int argc, char **argv) {
   // read the metadata configuration
   g_progress_bitmap[0] = '1';
   metautils::read_config("scm", USER);
-  g_progress_bitmap[0] = '2';
+  g_progress_bitmap[0] = 'z';
 
   // parse the arguments to scm
   const char ARG_DELIMITER = '`';
@@ -2184,14 +2186,14 @@ int main(int argc, char **argv) {
       ARG_DELIMITER);
   g_progress_bitmap[1] = '1';
   parse_args(ARG_DELIMITER);
-  g_progress_bitmap[1] = '2';
+  g_progress_bitmap[1] = 'z';
 
   // create the global temporary working directory
   g_progress_bitmap[2] = '1';
   if (!g_temp_dir.create(metautils::directives.temp_path)) {
     log_error2("unable to create temporary directory", F, "scm", USER);
   }
-  g_progress_bitmap[2] = '2';
+  g_progress_bitmap[2] = 'z';
 
   // container to hold thread IDs
   vector<pthread_t> tv;
@@ -2209,7 +2211,7 @@ int main(int argc, char **argv) {
     log_error2("unable to connect to database server at startup", F, "scm",
         USER);
   }
-  g_progress_bitmap[3] = '2';
+  g_progress_bitmap[3] = 'z';
   unordered_map<string, vector<string>> mmap{
       { "GrML", vector<string>() },
       { "ObML", vector<string>() },
@@ -2333,7 +2335,7 @@ int main(int argc, char **argv) {
             "_agrids_cache")) {
           g_progress_bitmap[8] = '1';
           gatherxml::summarizeMetadata::summarize_grids("WGrML", "scm", USER);
-          g_progress_bitmap[8] = '2';
+          g_progress_bitmap[8] = 'z';
           targs.emplace_back(vector<string>());
           targs.back().emplace_back("WGrML");
           pthread_t t;
@@ -2347,7 +2349,7 @@ int main(int argc, char **argv) {
             "_locations")) {
           g_progress_bitmap[11] = '1';
           gatherxml::summarizeMetadata::summarize_obs_data("scm", USER);
-          g_progress_bitmap[11] = '2';
+          g_progress_bitmap[11] = 'z';
         }
         if (local_args.gindex_list.size() == 1) {
           if (local_args.gindex_list.front() == "all") {
@@ -2389,7 +2391,7 @@ int main(int argc, char **argv) {
               progress_flag, "scm", USER, g);
         }
       }
-      g_progress_bitmap[12] = '2';
+      g_progress_bitmap[12] = 'z';
       targs.emplace_back(vector<string>());
       targs.back().emplace_back("Web");
       pthread_t t;
@@ -2446,7 +2448,7 @@ int main(int argc, char **argv) {
   for (const auto& t : tv) {
     pthread_join(t, nullptr);
   }
-  g_progress_bitmap[17] = '2';
+  g_progress_bitmap[17] = 'z';
 
   // if this is not a test run, then clean up the temporary directory
   if (metautils::args.dsid != "test" && !local_args.temp_directory.empty()) {
