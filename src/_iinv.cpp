@@ -47,6 +47,7 @@ using strutils::append;
 using strutils::chop;
 using strutils::ds_aliases;
 using strutils::ftos;
+using strutils::join;
 using strutils::lltos;
 using strutils::ng_gdex_id;
 using strutils::replace_all;
@@ -807,114 +808,81 @@ void process_grml_header(Server& server, string header, InventoryData&
   }
 }
 
-void insert_into_db(Server& server, int line_number, const stringstream&
-    insert_stream, string table, string uflg, const stringstream&
-    dupe_where_conditions, InventoryData& inv_data) {
+void insert_into_db(Server& server, string table, const vector<string>&
+    insert_values) {
   static const string F = this_function_label(__func__);
   if (server.insert(
-        table,
+        "IGrML." + table,
         "file_code, byte_offset, byte_length, valid_date, init_date, "
             "time_range_code, grid_definition_code, level_code, process, "
             "ensemble, uflag",
-        insert_stream.str(),
+        join(insert_values, "), ("),
         "(file_code, valid_date, time_range_code, grid_definition_code, "
-            "level_code, process, ensemble) do nothing"
+            "level_code, process, ensemble) do update set byte_offset = case "
+            "when " + table + ".uflag != excluded.uflag then excluded."
+            "byte_offset else " + table + ".byte_offset end, byte_length = "
+            "case when " + table + ".uflag != excluded.uflag then excluded."
+            "byte_length else " + table + ".byte_length end, uflag = excluded."
+            "uflag"
         ) < 0) {
-      log_error2("error: '" + server.error() + "' while inserting row '" +
-          insert_stream.str() + "'", F, "iinv", USER);
-  }
-  LocalQuery q("uflag", table, dupe_where_conditions.str());
-  Row row;
-  if (q.submit(server) < 0 || !q.fetch_row(row)) {
-    log_error2("error: '" + server.error() + "' while trying to get flag for "
-        "duplicate row: '" + dupe_where_conditions.str() + "'", F, "iinv",
-        USER);
-  }
-  if (row[0] == uflg) {
-    inv_data.is_dupe = true;
-    if (local_args.verbose) {
-      cout << "**duplicate ignored - line " << line_number << endl;
-    }
-  } else {
-    if (server.update(table, "byte_offset = " + inv_data.byte_offset + ", "
-        "byte_length = " + inv_data.byte_length + ", init_date = " + inv_data.
-        init_date + ", uflag = '" + uflg + "'", dupe_where_conditions.str()) <
-        0) {
-      log_error2("error: '" + server.error() + "' while updating duplicate "
-          "row: '" + dupe_where_conditions.str() + "'", F, "iinv", USER);
-    }
+    log_error2("error: '" + server.error() + "' while inserting entries", F,
+        "iinv", USER);
   }
 }
 
-long long process_grml_inventory_entry(Server& server, int line_number, string
-    inventory_entry, InventoryData& inv_data, string& dupe_dates, string uflg) {
-  static const string F = this_function_label(__func__);
-  auto sp = split(inventory_entry, "|");
-  inv_data.byte_offset = sp[0];
-  inv_data.byte_length = sp[1];
-  inv_data.valid_date = sp[2];
-  inv_data.is_dupe = false;
-  auto u = stoi(sp[3]);
-  if (inv_data.trv[u].second != 0x7fffffff) {
-    inv_data.init_date = DateTime(stoll(sp[2]) * 100).hours_subtracted(inv_data.
-        trv[u].second).to_string("%Y%m%d%H%MM");
-    if (dupe_dates == "N") {
-      InitTimeEntry ite;
-      ite.key = inv_data.init_date;
-      if (!inv_data.idates.found(ite.key, ite)) {
-        ite.time_range_codes.reset(new my::map<StringEntry>);
-        inv_data.idates.insert(ite);
-      }
-      StringEntry se;
-      se.key = inv_data.trv[u].first;
-      if (!ite.time_range_codes->found(se.key, se)) {
-        ite.time_range_codes->insert(se);
-      } else if (ite.time_range_codes->size() > 1) {
-        dupe_dates = "Y";
-      }
+void process_grml_entries_by_parameter(Server& server, string code, const
+    vector<deque<string>>& entries, InventoryData& inv_data, string&
+    dupe_vdates, string uflag) {
+  auto param = inv_data.format_code + "!" + inv_data.plst.at(code);
+  auto tbl = metautils::args.dsid + "_inventory_" + inv_data.pclst.at(param);
+  vector<string> insert_values(100);
+  auto n = 0;
+  for (const auto& e : entries) {
+    if (n == 100) {
+      insert_into_db(server, tbl, insert_values);
+      n = 0;
     }
-  } else {
-    inv_data.init_date = "0";
+    auto u = stoi(e[3]);
+    string init_date = "0";
+    if (inv_data.trv[u].second != 0x7fffffff) {
+      init_date = DateTime(stoll(e[2]) * 100).hours_subtracted(inv_data.
+          trv[u].second).to_string("%Y%m%d%H%MM");
+      if (dupe_vdates == "N") {
+        InitTimeEntry ite;
+        ite.key = inv_data.init_date;
+        if (!inv_data.idates.found(ite.key, ite)) {
+          ite.time_range_codes.reset(new my::map<StringEntry>);
+          inv_data.idates.insert(ite);
+        }
+        StringEntry se;
+        se.key = inv_data.trv[u].first;
+        if (!ite.time_range_codes->found(se.key, se)) {
+          ite.time_range_codes->insert(se);
+        } else if (ite.time_range_codes->size() > 1) {
+          dupe_vdates = "Y";
+        }
+    }
+    }
+    insert_values[n] = inv_data.file_code + ", " + e[0] + ", " + e[1] + ", " +
+        e[2] + ", " + init_date + ", " + inv_data.trv[u].first + ", " +
+        inv_data.glst.at(e[4]) + ", " + inv_data.llst.at(e[5]) + ", ";
+    if (e.size() > 7 && !e[7].empty()) {
+      insert_values[n] += "'" + inv_data.rlst.at(e[7]) + "', ";
+    } else {
+      insert_values[n] += "'', ";
+    }
+    if (e.size() > 8 && !e[8].empty()) {
+      insert_values[n] += "'" + inv_data.elst.at(e[8]) + "'";
+    } else {
+      insert_values[n] += "''";
+    }
+    insert_values[n] += ", '" + uflag + "'";
+    ++n;
   }
-
-  // insert string
-  stringstream iss;
-  iss << inv_data.file_code << ", " << sp[0] << ", " << sp[1] << ", " << sp[2]
-      << ", " << inv_data.init_date << ", " << inv_data.trv[u].first << ", " <<
-      inv_data.glst[sp[4]] << ", " << inv_data.llst[sp[5]] << ", ";
-  if (sp.size() > 7 && !sp[7].empty()) {
-    iss << "'" << inv_data.rlst[sp[7]] << "',";
-  } else {
-    iss << "'', ";
+  if (n < 100) {
+    insert_values.resize(n);
   }
-  if (sp.size() > 8 && !sp[8].empty()) {
-    iss << "'" << inv_data.elst[sp[8]] << "'";
-  } else {
-    iss << "''";
-  }
-  iss << ", '" << uflg << "'";
-
-  // where conditions for duplicate
-  stringstream wss;
-  wss << "file_code = " << inv_data.file_code << " and valid_date = " <<
-      inv_data.valid_date << " and time_range_code = " << inv_data.trv[stoi(sp[
-      3])].first << " and grid_definition_code = " << inv_data.glst[sp[4]] <<
-      " and level_code = " << inv_data.llst[sp[5]];
-  if (sp.size() > 7 && !sp[7].empty()) {
-    wss << " and process = '" << inv_data.rlst[sp[7]] << "'";
-  } else {
-    wss << " and process = ''";
-  }
-  if (sp.size() > 8 && !sp[8].empty()) {
-    wss << " and ensemble = '" << inv_data.elst[sp[8]] << "'";
-  } else {
-    wss << " and ensemble = ''";
-  }
-  auto param = inv_data.format_code + "!" + inv_data.plst[sp[6]];
-  auto tbl = "IGrML." + metautils::args.dsid + "_inventory_" + inv_data.pclst[
-      param];
-  insert_into_db(server, line_number, iss, tbl, uflg, wss, inv_data);
-  return stoll(inv_data.byte_length);
+  insert_into_db(server, tbl, insert_values);
 }
 
 void insert_grml_inventory() {
@@ -944,31 +912,32 @@ void insert_grml_inventory() {
   InventoryData inv_data;
   inv_data.file_code = row[0];
   inv_data.format_code = row[1];
+  unordered_map<string, vector<deque<string>>> inv_entries;
   tindex = row[2];
-  string dup = "N";
   string uflg = strand(3);
-  int nlin = 0, ndup = 0;
   long long tbyts = 0;
   char line[32768];
-  auto hdr_re = regex("<!>");
-  auto inv_re = regex("\\|");
   ifs.getline(line, 32768);
   while (!ifs.eof()) {
-    ++nlin;
     string s = line;
-    if (regex_search(s, hdr_re)) {
+    if (s.find("<!>") != string::npos) {
       process_grml_header(server, s, inv_data);
-    } else if (regex_search(s, inv_re)) {
-      auto nbyts = process_grml_inventory_entry(server, nlin, s, inv_data, dup,
-          uflg);
-      tbyts += nbyts;
-      if (inv_data.is_dupe) {
-        ++ndup;
+    } else if (s.find("|") != string::npos) {
+      auto inv_entry = split(s, "|");
+      if (inv_entries.find(inv_entry[6]) == inv_entries.end()) {
+        inv_entries.emplace(inv_entry[6], vector<deque<string>>{inv_entry});
+      } else {
+        inv_entries[inv_entry[6]].emplace_back(inv_entry);
       }
     }
     ifs.getline(line, 32768);
   }
   ifs.close();
+  string dupe_vdates = "N";
+  for (const auto& e : inv_entries) {
+    process_grml_entries_by_parameter(server, e.first, e.second, inv_data,
+        dupe_vdates, uflg);
+  }
   for (const auto& pc : inv_data.pclst) {
     server._delete("IGrML." + metautils::args.dsid + "_inventory_" + pc.second,
         "file_code = " + inv_data.file_code + " and uflag != '" + uflg + "'");
@@ -984,19 +953,15 @@ void insert_grml_inventory() {
   if (server.insert(
         "IGrML." + metautils::args.dsid + "_inventory_summary",
         "file_code, byte_length, dupe_vdates",
-        inv_data.file_code + ", " + lltos(tbyts) + ", '" + dup + "'",
+        inv_data.file_code + ", " + lltos(tbyts) + ", '" + dupe_vdates + "'",
         "(file_code) do update set byte_length = excluded.byte_length, "
             "dupe_vdates = excluded.dupe_vdates"
         ) < 0) {
     log_error2("error: '" + server.error() + "' while inserting row '" +
-        inv_data.file_code + ", " + lltos(tbyts) + ", '" + dup + "''", F,
-        "iinv", USER);
+        inv_data.file_code + ", " + lltos(tbyts) + ", '" + dupe_vdates + "''",
+        F, "iinv", USER);
   }
   server.disconnect();
-  if (ndup > 0) {
-    metautils::log_warning(to_string(ndup) + " duplicate grids were ignored",
-        "iinv_dupes", USER);
-  }
 }
 
 void check_for_times_table(Server& server, string type, string last_decade) {
@@ -1892,7 +1857,7 @@ int main(int argc, char **argv) {
         "iinv", USER);
     if (!tindex.empty() && tindex != "0") {
       gatherxml::summarizeMetadata::create_file_list_cache("inv", progress_flag,
-         "iinv", USER, tindex);
+          "iinv", USER, tindex);
     }
   }
   if (local_args.notify) {
