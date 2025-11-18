@@ -21,6 +21,7 @@ using std::cout;
 using std::endl;
 using std::regex;
 using std::regex_search;
+using std::stoi;
 using std::string;
 using std::stringstream;
 using std::unique_ptr;
@@ -183,7 +184,7 @@ void clear_grid_cache(Server& server, string db) {
   }
   Transaction tx;
   tx.start(server);
-  tx.get_lock(lock_it->second + stof(metautils::args.dsid) * 10, 120);
+  tx.get_lock(lock_it->second + stoi(metautils::args.dsid.substr(1)), 120);
   auto uflg = strand(3);
   for (const auto& row : query) {
     if (server.insert(
