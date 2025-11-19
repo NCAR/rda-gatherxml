@@ -813,9 +813,9 @@ void insert_into_db(Server& server, string table, const vector<string>&
   static const string F = this_function_label(__func__);
   if (server.insert(
         "IGrML." + table,
-        "file_code, byte_offset, byte_length, valid_date, init_date, "
-            "time_range_code, grid_definition_code, level_code, process, "
-            "ensemble, uflag",
+        "file_code, valid_date, init_date, time_range_code, "
+            "grid_definition_code, level_code, process, ensemble, byte_offset, "
+            "byte_length, uflag",
         join(insert_values, "), ("),
         "(file_code, valid_date, time_range_code, grid_definition_code, "
             "level_code, process, ensemble) do update set byte_offset = case "
@@ -830,17 +830,20 @@ void insert_into_db(Server& server, string table, const vector<string>&
   }
 }
 
-void process_grml_entries_by_parameter(Server& server, string code, const
+size_t process_grml_entries_by_parameter(Server& server, string code, const
     vector<deque<string>>& entries, InventoryData& inv_data, string&
     dupe_vdates, string uflag) {
+  size_t ndupes = 0;
   auto param = inv_data.format_code + "!" + inv_data.plst.at(code);
   auto tbl = metautils::args.dsid + "_inventory_" + inv_data.pclst.at(param);
   vector<string> insert_values(100);
+  unordered_set<string> unique_inserts;
   auto n = 0;
   for (const auto& e : entries) {
     if (n == 100) {
       insert_into_db(server, tbl, insert_values);
       n = 0;
+      unique_inserts.clear();
     }
     auto u = stoi(e[3]);
     string init_date = "0";
@@ -863,9 +866,9 @@ void process_grml_entries_by_parameter(Server& server, string code, const
         }
     }
     }
-    insert_values[n] = inv_data.file_code + ", " + e[0] + ", " + e[1] + ", " +
-        e[2] + ", " + init_date + ", " + inv_data.trv[u].first + ", " +
-        inv_data.glst.at(e[4]) + ", " + inv_data.llst.at(e[5]) + ", ";
+    insert_values[n] = inv_data.file_code + ", " + e[2] + ", " + init_date +
+        ", " + inv_data.trv[u].first + ", " + inv_data.glst.at(e[4]) + ", " +
+        inv_data.llst.at(e[5]) + ", ";
     if (e.size() > 7 && !e[7].empty()) {
       insert_values[n] += "'" + inv_data.rlst.at(e[7]) + "', ";
     } else {
@@ -876,13 +879,19 @@ void process_grml_entries_by_parameter(Server& server, string code, const
     } else {
       insert_values[n] += "''";
     }
-    insert_values[n] += ", '" + uflag + "'";
-    ++n;
+    if (unique_inserts.find(insert_values[n]) == unique_inserts.end()) {
+      unique_inserts.emplace(insert_values[n]);
+      insert_values[n] += ", " + e[0] + ", " + e[1] + ", '" + uflag + "'";
+      ++n;
+    } else {
+      ++ndupes;
+    }
   }
   if (n < 100) {
     insert_values.resize(n);
   }
   insert_into_db(server, tbl, insert_values);
+  return ndupes;
 }
 
 void insert_grml_inventory() {
@@ -933,10 +942,11 @@ void insert_grml_inventory() {
     ifs.getline(line, 32768);
   }
   ifs.close();
+  size_t ndupes = 0;
   string dupe_vdates = "N";
   for (const auto& e : inv_entries) {
-    process_grml_entries_by_parameter(server, e.first, e.second, inv_data,
-        dupe_vdates, uflg);
+    ndupes += process_grml_entries_by_parameter(server, e.first, e.second,
+        inv_data, dupe_vdates, uflg);
   }
   for (const auto& pc : inv_data.pclst) {
     server._delete("IGrML." + metautils::args.dsid + "_inventory_" + pc.second,
@@ -960,6 +970,10 @@ void insert_grml_inventory() {
     log_error2("error: '" + server.error() + "' while inserting row '" +
         inv_data.file_code + ", " + lltos(tbyts) + ", '" + dupe_vdates + "''",
         F, "iinv", USER);
+  }
+  if (ndupes > 0) {
+    metautils::log_warning("# duplicates ignored: " + to_string(ndupes),
+       "iinv_dupes", USER);
   }
   server.disconnect();
 }
