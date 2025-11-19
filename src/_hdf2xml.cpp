@@ -2328,7 +2328,8 @@ void update_inventory(string pkey, string gkey, const GridData& grid_data) {
       stringstream inv_line;
       DateTime vt;
       string error;
-      if (grid_data.reference_time.id == grid_data.valid_time.id) {
+      if (grid_data.reference_time.id.empty() || grid_data.reference_time.id ==
+          grid_data.valid_time.id) {
         vt = actual_date_time(data_array_value(grid_data.valid_time.data_array,
             n, grid_data.valid_time.ds.get()), *grid_data.time_data, error);
       } else {
