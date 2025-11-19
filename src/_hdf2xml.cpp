@@ -1588,29 +1588,31 @@ string gridded_time_method(const DatasetPointer ds, string valid_time_id) {
   return "";
 }
 
-void update_grid_entry_set(string key_start, string time_method, const
-    GridData& grid_data, unordered_set<string>& grid_entry_set) {
+string update_grid_entry_set(string key_start, string time_method, const
+    TimeRangeEntry2& time_range_entry, const GridData& grid_data,
+    unordered_set<string>& grid_entry_set) {
   static const string F = this_function_label(__func__);
-  for (const auto& e : grid_data.time_range_entries) {
-    string err;
-    auto d = metautils::NcTime::gridded_netcdf_time_range_description2(e.second,
-        *grid_data.time_data, capitalize(time_method), err);
-    if (!err.empty()) {
-      log_error2(err, F, g_util_ident);
-    }
-    auto k = key_start + d;
-    if (grid_entry_set.find(k) == grid_entry_set.end()) {
-      grid_entry_set.emplace(k);
-    }
-    if (g_inv.stream.is_open() && g_inv.U.map.find(d) == g_inv.U.map.end()) {
-      g_inv.U.map.emplace(d, make_pair(g_inv.U.map.size(), 0));
-    }
+  string grid_entry; // return value
+  string err;
+  auto d = metautils::NcTime::gridded_netcdf_time_range_description2(
+      time_range_entry, *grid_data.time_data, capitalize(time_method), err);
+  if (!err.empty()) {
+    log_error2(err, F, g_util_ident);
   }
+  grid_entry = key_start + d;
+  if (grid_entry_set.find(grid_entry) == grid_entry_set.end()) {
+    grid_entry_set.emplace(grid_entry);
+  }
+  if (g_inv.stream.is_open() && g_inv.U.map.find(d) == g_inv.U.map.end()) {
+    g_inv.U.map.emplace(d, make_pair(g_inv.U.map.size(), 0));
+  }
+  return grid_entry;
 }
 
-void add_gridded_time_range(string key_start, unordered_set<string>&
-    grid_entry_set, const GridData& grid_data) {
+string add_gridded_time_range(string key_start, const TimeRangeEntry2& tre,
+    unordered_set<string>& grid_entry_set, const GridData& grid_data) {
   static const string F = this_function_label(__func__);
+  string grid_entry; // return value
   auto is = sget_hdf5();
   auto b = false;
   auto vars = is->datasets_with_attribute("DIMENSION_LIST");
@@ -1677,16 +1679,21 @@ void add_gridded_time_range(string key_start, unordered_set<string>&
     if (tm.empty()) {
       b = true;
     } else {
-      update_grid_entry_set(key_start, tm, grid_data, grid_entry_set);
+      grid_entry = update_grid_entry_set(key_start, tm, tre, grid_data,
+          grid_entry_set);
     }
   }
   if (b) {
-    update_grid_entry_set(key_start, "", grid_data, grid_entry_set);
+    grid_entry = update_grid_entry_set(key_start, "", tre, grid_data,
+        grid_entry_set);
   }
+  return grid_entry;
 }
 
-void add_gridded_lat_lon_keys(unordered_set<string>& grid_entry_set, Grid::
-    GridDimensions dim, Grid::GridDefinition def, const GridData& grid_data) {
+string get_grid_entry(Grid::GridDimensions dim, Grid::GridDefinition def, const
+    TimeRangeEntry2& time_range_entry, const GridData& grid_data) {
+  static unordered_set<string> grid_entry_set;
+  string grid_entry; // return value
   string key_start;
   switch (def.type) {
     case Grid::Type::latitudeLongitude: {
@@ -1698,7 +1705,8 @@ void add_gridded_lat_lon_keys(unordered_set<string>& grid_entry_set, Grid::
           ftos(def.slatitude, 3) + "<!>" + ftos(def.slongitude, 3) + "<!>" +
           ftos(def.elatitude, 3) + "<!>" + ftos(def.elongitude, 3) + "<!>" +
           ftos(def.loincrement, 3) + "<!>" + ftos(def.laincrement, 3) + "<!>";
-      add_gridded_time_range(key_start, grid_entry_set, grid_data);
+      grid_entry = add_gridded_time_range(key_start, time_range_entry,
+          grid_entry_set, grid_data);
       break;
     }
     case Grid::Type::polarStereographic: {
@@ -1713,7 +1721,8 @@ void add_gridded_lat_lon_keys(unordered_set<string>& grid_entry_set, Grid::
         key_start += "S";
       }
       key_start += "<!>";
-      add_gridded_time_range(key_start, grid_entry_set, grid_data);
+      grid_entry = add_gridded_time_range(key_start, time_range_entry,
+          grid_entry_set, grid_data);
       break;
     }
     case Grid::Type::lambertConformal: {
@@ -1729,7 +1738,8 @@ void add_gridded_lat_lon_keys(unordered_set<string>& grid_entry_set, Grid::
       }
       key_start += "<!>" + ftos(def.stdparallel1, 3) + "<!>" + ftos(
           def.stdparallel2, 3) + "<!>";
-      add_gridded_time_range(key_start, grid_entry_set, grid_data);
+      grid_entry = add_gridded_time_range(key_start, time_range_entry,
+          grid_entry_set, grid_data);
       break;
     }
     default: { }
@@ -1739,6 +1749,7 @@ void add_gridded_lat_lon_keys(unordered_set<string>& grid_entry_set, Grid::
   if (g_inv.stream.is_open() && g_inv.G.map.find(key) == g_inv.G.map.end()) {
     g_inv.G.map.emplace(key, make_pair(g_inv.G.map.size(), 0));
   }
+  return grid_entry;
 }
 
 double data_array_value(const HDF5::DataArray& data_array, size_t index,
@@ -2315,10 +2326,20 @@ void update_inventory(string pkey, string gkey, const GridData& grid_data) {
   for (size_t n = 0; n < grid_data.valid_time.data_array.num_values; ++n) {
     for (const auto& e : g_grml_data->l.entry.parameter_code_table) {
       stringstream inv_line;
+      DateTime vt;
       string error;
-      inv_line << "0|1|" << actual_date_time(data_array_value(grid_data.
-          valid_time.data_array, n, grid_data.valid_time.ds.get()), *grid_data.
-          time_data, error).to_string("%Y%m%d%H%MM") << "|" << g_inv.U.map[
+      if (grid_data.reference_time.id == grid_data.valid_time.id) {
+        vt = actual_date_time(data_array_value(grid_data.valid_time.data_array,
+            n, grid_data.valid_time.ds.get()), *grid_data.time_data, error);
+      } else {
+        vt = actual_date_time(data_array_value(grid_data.reference_time.
+            data_array, n, grid_data.reference_time.ds.get()), *grid_data.
+            time_data, error);
+      }
+      if (grid_data.time_data->fcst_period > 0) {
+        vt.add(grid_data.time_data->units, grid_data.time_data->fcst_period);
+      }
+      inv_line << "0|1|" << vt.to_string("%Y%m%d%H%MM") << "|" << g_inv.U.map[
           pkey].first << "|" << g_inv.G.map[gkey].first << "|" << g_inv.L.map[
           g_grml_data->l.key].first << "|" << g_inv.P.map[e.first].first <<
           "|0";
@@ -4079,7 +4100,8 @@ void scan_gridded_hdf5nc4_file(ScanData& scan_data) {
   find_coordinate_variables(coord_vars, grid_data);
 
   // if the reference and valid times are different, look for forecasts
-  if (grid_data.reference_time.id != grid_data.valid_time.id) {
+//  if (grid_data.reference_time.id != grid_data.valid_time.id) {
+if (!grid_data.reference_time.id.empty()) {
     check_for_forecasts(grid_data, coord_vars.nc_time);
   }
 
@@ -4372,7 +4394,6 @@ void scan_gridded_hdf5nc4_file(ScanData& scan_data) {
       cout << "...grid was identified as type " << static_cast<int>(def.type) <<
           "..." << endl;
     }
-    unordered_set<string> grid_entry_set;
     for (const auto& e : grid_data.time_range_entries) {
       if (gatherxml::verbose_operation) {
         cout << "...processing time range entry: " << e.first << "/" <<
@@ -4380,7 +4401,11 @@ void scan_gridded_hdf5nc4_file(ScanData& scan_data) {
       }
       grid_data.time_data = grid_data.forecast_period.id.empty() ?  coord_vars.
           nc_time : coord_vars.forecast_period;
-      add_gridded_lat_lon_keys(grid_entry_set, dim, def, grid_data);
+      grid_data.time_data->fcst_period = e.first / -100;
+      auto grid_entry = get_grid_entry(dim, def, e.second, grid_data);
+      if (gatherxml::verbose_operation) {
+        cout << "...processing grid entry: " << grid_entry << " ..." << endl;
+      }
       for (size_t m = 0; m < coord_vars.level_info.size(); ++m) {
         if (gatherxml::verbose_operation) {
           cout << "...processing vertical level entry: " << coord_vars.
@@ -4412,31 +4437,23 @@ void scan_gridded_hdf5nc4_file(ScanData& scan_data) {
                 level_bounds.ds);
           }
         }
-        for (const auto& key : grid_entry_set) {
-          if (gatherxml::verbose_operation) {
-            cout << "...processing grid entry: " << key << " ..." << endl;
+        g_grml_data->g.key = grid_entry;
+        auto sp = split(g_grml_data->g.key, "<!>");
+        auto& product_key = sp.back();
+        string grid_key;
+        if (g_inv.stream.is_open()) {
+          grid_key = sp[0];
+          for (size_t nn = 1; nn < sp.size() - 1; ++nn) {
+            grid_key += "," + sp[nn];
           }
-          g_grml_data->g.key = key;
-          auto sp = split(g_grml_data->g.key, "<!>");
-          auto& product_key = sp.back();
-          string grid_key;
-          if (g_inv.stream.is_open()) {
-            grid_key = sp[0];
-            for (size_t nn = 1; nn < sp.size() - 1; ++nn) {
-              grid_key += "," + sp[nn];
-            }
-          }
-          if (g_grml_data->gtb.find(g_grml_data->g.key) == g_grml_data->gtb.
-              end()) {
-            add_new_grid(grid_data, coord_vars, num_levels, m, scan_data,
-                parameter_data, product_key, grid_key);
-           } else {
-            update_existing_grid(grid_data, coord_vars, num_levels, m,
-                scan_data, parameter_data, product_key, grid_key);
-          }
-          if (gatherxml::verbose_operation) {
-            cout << "...grid entry: " << key << " done." << endl;
-          }
+        }
+        if (g_grml_data->gtb.find(g_grml_data->g.key) == g_grml_data->gtb.
+            end()) {
+          add_new_grid(grid_data, coord_vars, num_levels, m, scan_data,
+              parameter_data, product_key, grid_key);
+        } else {
+          update_existing_grid(grid_data, coord_vars, num_levels, m,
+              scan_data, parameter_data, product_key, grid_key);
         }
         if (gatherxml::verbose_operation) {
           cout << "...vertical level entry: " << coord_vars.level_info[m].ID <<
@@ -4444,6 +4461,7 @@ void scan_gridded_hdf5nc4_file(ScanData& scan_data) {
         }
       }
       if (gatherxml::verbose_operation) {
+        cout << "...grid entry: " << grid_entry << " done." << endl;
         cout << "...time range entry: " << e.first << "/" << static_cast<int>(e.
             second.key) << " done." << endl;
       }
