@@ -4402,7 +4402,7 @@ if (!grid_data.reference_time.id.empty()) {
       }
       grid_data.time_data = grid_data.forecast_period.id.empty() ?  coord_vars.
           nc_time : coord_vars.forecast_period;
-      grid_data.time_data->fcst_period = e.first / -100;
+      grid_data.time_data->fcst_period = e.second.key / -100;
       auto grid_entry = get_grid_entry(dim, def, e.second, grid_data);
       if (gatherxml::verbose_operation) {
         cout << "...processing grid entry: " << grid_entry << " ..." << endl;
@@ -4545,13 +4545,13 @@ void scan_hdf5nc4_file(ScanData& scan_data, gatherxml::markup::ObML::
   if (gatherxml::verbose_operation) {
     cout << "Feature type is '" << ftype << "'." << endl;
   }
-  if (ftype.empty() || ftype == "grid") {
+  auto l_ftype = to_lower(ftype);
+  if (ftype.empty() || l_ftype == "grid") {
     scan_gridded_hdf5nc4_file(scan_data);
   } else {
-    auto l_ftype = to_lower(ftype);
-
     // patch for ICOADS netCDF4 IDs, which may be a mix, so ignore case
     patch_icoads_netcdf4_ids(global_attributes, scan_data);
+
     if (l_ftype == "point") {
       scan_cf_point_hdf5nc4_file(global_attributes, scan_data, obs_data);
     } else if (l_ftype == "timeseries") {
