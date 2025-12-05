@@ -31,11 +31,12 @@ ifneq ($(or $(findstring casper,$(HOST))),)
 	DBLIBS = -lpq -lpostgresql
 	JASPERINCLUDEDIR = /glade/work/dattore/conda-envs/jasper/include
 	JASPERLIBDIR = /glade/u/home/dattore/cpp/lib/jasper/lib
+	GEOGRAPHICLIBLIBDIR = /glade/u/home/dattore/GeographicLib-2.7/dist/lib
 	BINDIR = /glade/u/home/rdadata/bin/dav
 	LOCALBINDIR = /ncar/rda/setuid/bin
 	RUNPATH = -Wl,-rpath,/glade/u/apps/opt/gnu/$(EXPECTEDGCCVERSION)/lib64 -Wl,-rpath,$(LIBDIR)
 	OKAY_TO_MAKE = 1
-	RDADATARUN = /ncar/rda/setuid/bin/rdadatarun
+	RDADATARUN = sudo -u gdexdata
 endif
 #
 ifneq ($(or $(findstring rda-data,$(HOST)),$(findstring rda-web-test,$(HOST)),$(findstring rda-web-dev,$(HOST))),)
@@ -105,8 +106,10 @@ ifneq ($(findstring singularity,$(HOST)),)
         LIBDIR = /usr/lib64/mylibs
         DBLIBDIR = /usr/lib/x86_64-linux-gnu
 	DBLIBS = -lpq -lpostgresql
-	JASPERINCLUDEDIR = /usr/include/jasper
-	JASPERLIBDIR = /usr/lib/x86_64-linux-gnu/lib
+	JASPERINCLUDEDIR = /usr/local/include
+	JASPERLIBDIR = /usr/local/lib
+	GEOGRAPHICLIBINCLUDEDIR = /usr/local/include
+	GEOGRAPHICLIBLIBDIR = /usr/local/lib
 	BINDIR = /usr/local/bin
 	RUNPATH = -Wl,-rpath,$(LIBDIR)
 	OKAY_TO_MAKE = 1
@@ -142,6 +145,7 @@ COMPILE_OPTIONS = -Wall -Wold-style-cast -O3 -std=c++17 -Weffc++ $(DIRECTIVES)
 # Run-path settings
 DBRUNPATH = -Wl,-rpath,$(DBLIBDIR)
 JASPERRUNPATH = -Wl,-rpath,$(JASPERLIBDIR)
+GEOGRAPHICLIBRUNPATH = -Wl,-rpath,$(GEOGRAPHICLIBLIBDIR)
 #
 EXECUTABLE =
 #
@@ -327,11 +331,11 @@ endif
 _nc2xml: CHECKDIR=$(BINDIR)
 _nc2xml: CHECK_TARGET=_nc2xml
 _nc2xml: $(SOURCEDIR)/_nc2xml.cpp builddir get_version
-	$(eval LINK_LIBS = $(DBLIBS) -lgatherxml -lio -lutils -lutilsthread -ldatetime -lmetautils -lmetahelpers -lgridutils -lsearch -lxml -lbufr -lbitmap -ls3 -lmyssl -lerror -lpthread -lz -lcurl)
+	$(eval LINK_LIBS = $(DBLIBS) -lgatherxml -lio -lutils -lutilsthread -ldatetime -lmetautils -lmetahelpers -lgridutils -lsearch -lxml -lbufr -lbitmap -ls3 -lmyssl -lerror -lpthread -lz -lcurl -lGeographicLib)
 ifneq ($(or $(findstring BUG,$(VERSION)),$(findstring MINOR,$(VERSION)),$(findstring MAJOR,$(VERSION)),$(findstring singularity,$(HOST)),$(findstring docker,$(HOST))),)
-	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(DBRUNPATH) $(JASPERRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(LIBDIR) -L$(DBLIBDIR) -L$(JASPERLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
+	$(COMPILER) $(COMPILE_OPTIONS) $(RUNPATH) $(DBRUNPATH) $(GEOGRAPHICLIBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(LIBDIR) -L$(DBLIBDIR) -L$(GEOGRAPHICLIBLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 else
-	$(COMPILER) $(COMPILE_OPTIONS) -Wl,-rpath,$(BUILDDIR) $(RUNPATH) $(DBRUNPATH) $(JASPERRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(BUILDDIR) -L$(LIBDIR) -L$(DBLIBDIR) -L$(JASPERLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
+	$(COMPILER) $(COMPILE_OPTIONS) -Wl,-rpath,$(BUILDDIR) $(RUNPATH) $(DBRUNPATH) $(JASPERRUNPATH) $(GEOGRAPHICLIBRUNPATH) $(SOURCEDIR)/$@.cpp -I$(INCLUDEDIR) -I$(GLOBALINCLUDEDIR) -I$(DBINCLUDEDIR) -L$(BUILDDIR) -L$(LIBDIR) -L$(DBLIBDIR) -L$(JASPERLIBDIR) -L$(GEOGRAPHICLIBLIBDIR) $(LINK_LIBS) -o $(BUILDDIR)/$@.$(NEW_VERSION)
 endif
 	$(MAKE) NEW_VERSION=$(NEW_VERSION) TARGET=$@ INSTALLDIR=$(BINDIR) install
 #
