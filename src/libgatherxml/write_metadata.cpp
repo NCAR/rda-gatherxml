@@ -478,6 +478,16 @@ void write_transverse_mercator_grid(deque<string>& grid_params, bool is_cell,
   } else {
     grid_params[6] += "E";
   }
+  if (grid_params[9][0] == '-') {
+    grid_params[9] = grid_params[9].substr(1) + "S";
+  } else {
+    grid_params[9] += "N";
+  }
+  if (grid_params[10][0] == '-') {
+    grid_params[10] = grid_params[10].substr(1) + "W";
+  } else {
+    grid_params[10] += "E";
+  }
   ofs << R"(  <grid timeRange=")" << grid_params[11] << R"(" definition=")"
       R"(transverseMercator" numX=")" << grid_params[1] << R"(" numY=")" <<
       grid_params[2] << R"(" startLat=")" << grid_params[3] << R"(" startLon=")"
