@@ -125,6 +125,8 @@ ifneq ($(findstring docker,$(HOST)),)
 	DBLIBS = -lpq -lpostgresql
 	JASPERINCLUDEDIR = /usr/local/include
 	JASPERLIBDIR = /usr/lib/x86_64-linux-gnu/lib
+	GEOGRAPHICLIBINCLUDEDIR = /usr/local/include
+	GEOGRAPHICLIBLIBDIR = /usr/local/lib
 	BINDIR = /usr/local/bin
 	RUNPATH = -Wl,-rpath,$(LIBDIR)
 	OKAY_TO_MAKE = 1
