@@ -455,6 +455,10 @@ void summarize_grid_resolutions(string caller, string user, string
         } else if (s == "1279") {
           xres = yres = 0.125;
         }
+      } else if (grid_definition == "transverseMercator") {
+        xres = stof(sp[6]);
+        yres = stof(sp[7]);
+        rtyp = 1;
       }
       if (myequalf(xres, 0.) && myequalf(yres, 0.)) {
         log_error2("unknown grid definition '" + grid_definition + "'", F,
