@@ -456,6 +456,37 @@ void write_mercator_grid(deque<string>& grid_params, bool is_cell, std::
       "\">" << endl;
 }
 
+void write_transverse_mercator_grid(deque<string>& grid_params, bool is_cell,
+    std::ofstream& ofs) {
+  if (grid_params[3][0] == '-') {
+    grid_params[3] = grid_params[3].substr(1) + "S";
+  } else {
+    grid_params[3] += "N";
+  }
+  if (grid_params[4][0] == '-') {
+    grid_params[4] = grid_params[4].substr(1) + "W";
+  } else {
+    grid_params[4] += "E";
+  }
+  if (grid_params[5][0] == '-') {
+    grid_params[5] = grid_params[5].substr(1) + "S";
+  } else {
+    grid_params[5] += "N";
+  }
+  if (grid_params[6][0] == '-') {
+    grid_params[6] = grid_params[6].substr(1) + "W";
+  } else {
+    grid_params[6] += "E";
+  }
+  ofs << R"(  <grid timeRange=")" << grid_params[11] << R"(" definition=")"
+      R"(transverseMercator" numX=")" << grid_params[1] << R"(" numY=")" <<
+      grid_params[2] << R"(" startLat=")" << grid_params[3] << R"(" startLon=")"
+      << grid_params[4] << R"(" endLat=")" << grid_params[5] << R"(" endLon=")"
+      << grid_params[6] << R"(" xRes=")" << grid_params[7] << R"(" yRes=")" <<
+      grid_params[8] << R"(" oLatitude=")" << grid_params[9] <<
+      R"(" cMeridian=")" << grid_params[10] << R"(">)" << endl;
+}
+
 void write_spherical_harmonics_grid(deque<string>& grid_params, bool is_cell,
     std::ofstream& ofs) {
   ofs << "  <grid timeRange=\"" << grid_params[4] << "\" definition=\""
@@ -490,6 +521,10 @@ void write_grid(string grid_entry_key, std::ofstream& ofs, string caller, string
     }
     case static_cast<int>(Grid::Type::mercator): {
       write_mercator_grid(sp, b, ofs);
+      break;
+    }
+    case static_cast<int>(Grid::Type::transverseMercator): {
+      write_transverse_mercator_grid(sp, b, ofs);
       break;
     }
     case static_cast<int>(Grid::Type::sphericalHarmonics): {
