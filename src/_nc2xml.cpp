@@ -22,6 +22,7 @@
 #include <bufr.hpp>
 #include <timer.hpp>
 #include <myerror.hpp>
+#include <GeographicLib/TransverseMercator.hpp>
 
 using namespace PostgreSQL;
 using floatutils::myequalf;
@@ -45,6 +46,7 @@ using std::stoi;
 using std::stoll;
 using std::string;
 using std::stringstream;
+using std::to_string;
 using std::tuple;
 using std::unique_ptr;
 using std::unordered_map;
@@ -759,11 +761,10 @@ void add_gridded_lat_lon_keys(vector<string>& gentry_keys, Grid::GridDimensions
     dim, Grid::GridDefinition def, string timeid, size_t timedimid, int
     levdimid, size_t latdimid, size_t londimid, const metautils::NcTime::
     TimeRangeEntry& tre) {
-  string k;
+  auto k = to_string(static_cast<int>(def.type));
   switch (def.type) {
     case Grid::Type::latitudeLongitude:
     case Grid::Type::gaussianLatitudeLongitude: {
-      k = itos(static_cast<int>(def.type));
       if (def.is_cell) {
         k += "C";
       }
@@ -780,7 +781,6 @@ void add_gridded_lat_lon_keys(vector<string>& gentry_keys, Grid::GridDimensions
       break;
     }
     case Grid::Type::polarStereographic: {
-      k = itos(static_cast<int>(def.type));
       if (def.is_cell) {
         k += "C";
       }
@@ -796,7 +796,6 @@ void add_gridded_lat_lon_keys(vector<string>& gentry_keys, Grid::GridDimensions
       break;
     }
     case Grid::Type::mercator: {
-      k = itos(static_cast<int>(def.type));
       if (def.is_cell) {
         k += "C";
       }
@@ -806,8 +805,15 @@ void add_gridded_lat_lon_keys(vector<string>& gentry_keys, Grid::GridDimensions
           loincrement, 3) + "<!>" + ftos(def.laincrement, 3);
       break;
     }
+    case Grid::Type::transverseMercator: {
+      k += "<!>" + to_string(dim.x) + "<!>" + to_string(dim.y) + "<!>" + ftos(
+          def.slatitude, 3) + "<!>" + ftos(def.slongitude, 3) + "<!>" + ftos(
+          def.elatitude, 3) + "<!>" + ftos(def.elongitude, 3) + "<!>" + ftos(
+          def.loincrement, 3) + "<!>" + ftos(def.laincrement, 3) + "<!>" + ftos(
+          def.stdparallel1, 3) + "<!>" + ftos(def.cmeridian, 3);
+      break;
+    }
     case Grid::Type::lambertConformal: {
-      k = itos(static_cast<int>(def.type));
       if (def.is_cell) {
         k += "C";
       }
@@ -3083,9 +3089,9 @@ bool found_auxiliary_lat_lon_coordinates(GridData& grid_data) {
       size();
 }
 
-bool grid_is_centered_lambert_conformal(const unique_ptr<double[]>& lats,
-    const unique_ptr<double[]>& lons, Grid::GridDimensions& dims, Grid::
-    GridDefinition& def) {
+bool grid_is_centered_lambert_conformal(const vector<double>& lats, const
+    vector<double>& lons, Grid::GridDimensions& dims, Grid::GridDefinition&
+    def) {
   if (gatherxml::verbose_operation) {
     cout << "         ... checking for centered Lambert-Conformal projection "
         "..." << endl;
@@ -3154,7 +3160,7 @@ bool grid_is_centered_lambert_conformal(const unique_ptr<double[]>& lats,
 
 size_t find_non_centered_lambert_conformal_stdparallel(const vector<double>& v,
     Grid::GridDefinition& def, const Grid::GridDimensions& dims, size_t xbar,
-    const unique_ptr<double[]>& lats) {
+    const vector<double>& lats) {
   size_t i = 0; // return value
   def.stdparallel1 = def.stdparallel2 = -99.;
   for (size_t n = 0; n < v.size(); ++n) {
@@ -3176,9 +3182,9 @@ size_t find_non_centered_lambert_conformal_stdparallel(const vector<double>& v,
   return i;
 }
 
-bool grid_is_non_centered_lambert_conformal(const unique_ptr<double[]>& lats,
-    const unique_ptr<double[]>& lons, Grid::GridDimensions& dims, Grid::
-    GridDefinition& def) {
+bool grid_is_non_centered_lambert_conformal(const vector<double>& lats, const
+    vector<double>& lons, Grid::GridDimensions& dims, Grid::GridDefinition&
+    def) {
   if (gatherxml::verbose_operation) {
     cout << "         ... checking for a non-centered Lambert-Conformal "
         "projection ..." << endl;
@@ -3274,9 +3280,8 @@ bool grid_is_non_centered_lambert_conformal(const unique_ptr<double[]>& lats,
   return true;
 }
 
-bool grid_is_lambert_conformal(const unique_ptr<double[]>& lats, const
-    unique_ptr<double[]>& lons, Grid::GridDimensions& dims, Grid::
-    GridDefinition& def) {
+bool grid_is_lambert_conformal(const vector<double>& lats, const vector<
+    double>& lons, Grid::GridDimensions& dims, Grid::GridDefinition& def) {
   if (gatherxml::verbose_operation) {
     cout << "      ... checking for Lambert-Conformal projection ..." << endl;
   }
@@ -3297,6 +3302,104 @@ bool grid_is_lambert_conformal(const unique_ptr<double[]>& lats, const
   return false;
 }
 
+bool grid_is_transverse_mercator(const vector<double>& lats, const vector<
+    double>& lons, const vector<int>& eastings, const vector<int>& northings,
+    Grid::GridDimensions& dims, Grid::GridDefinition& def) {
+  if (gatherxml::verbose_operation) {
+    cout << "      ... checking for Transverse Mercator projection ..." << endl;
+  }
+  auto xoff = 0;
+  auto yoff = 0;
+  while (xoff < dims.x) {
+    auto lon_zero_diff = true;
+    auto max_lat_diff = 0.;
+    for (auto n = 1; n < dims.y; ++n) {
+      auto b = xoff + n * dims.x;
+      auto a = b - dims.x;
+      if (!myequalf(lons[b], lons[a])) {
+        lon_zero_diff = false;
+        yoff = 0;
+        break;
+      }
+      auto lat_diff = lats[b] - lats[a];
+      if (lat_diff > max_lat_diff) {
+        max_lat_diff = lat_diff;
+        yoff = n;
+      }
+    }
+    if (lon_zero_diff) {
+      break;
+    }
+    ++xoff;
+  }
+  if (xoff == dims.x) {
+    return false;
+  }
+  def.dx = 0.;
+  for (auto n = 1; n < dims.x; ++n) {
+    float diff = eastings[n] - eastings[n-1];
+    if (def.dx == 0.) {
+      def.dx = diff;
+    }
+    if (diff != def.dx) {
+      def.dx = 0.;
+      break;
+    }
+  }
+  if (def.dx == 0.) {
+    return false;
+  }
+  def.dx /= 1000.;
+  def.dy = 0.;
+  for (auto n = 1; n < dims.y; ++n) {
+    float diff = northings[n] - northings[n-1];
+    if (def.dy == 0.) {
+      def.dy = diff;
+    }
+    if (diff != def.dy) {
+      def.dy = 0.;
+      break;
+    }
+  }
+  if (def.dy == 0.) {
+    return false;
+  }
+  def.dy /= 1000.;
+  def.elatitude = lats[dims.size-1];
+  def.elongitude = lons[dims.size-1];
+  if (def.elongitude > 180.) {
+    def.elongitude -= 360.;
+  }
+  def.cmeridian = lons[xoff];
+  if (def.cmeridian > 180.) {
+    def.cmeridian -= 360.;
+  }
+  def.stdparallel1 = lats[yoff*dims.x+xoff];
+  GeographicLib::TransverseMercator tm(GeographicLib::Constants::WGS84_a(),
+      GeographicLib::Constants::WGS84_f(), 1., true, true);
+double x, noff;
+tm.Forward(def.cmeridian, def.stdparallel1, def.cmeridian, x, noff);
+/*
+for (auto n = 0; n < dims.y; ++n) {
+for (auto m = 0; m < dims.x; ++m) {
+double lat, lon;
+tm.Reverse(def.cmeridian, eastings[m]-eastings[xoff], northings[n]+noff-northings[yoff], lat, lon);
+auto off = n * dims.x + m;
+std::cerr << n << " " << m << " " << off << " " << northings[n] << " " << eastings[m] << " " << lats[off] << " " << lons[off]-360. << " " << lat << " " << lon << " " << lats[off]-lat << " " << lons[off]-360.-lon << std::endl;
+}
+}
+*/
+  if (gatherxml::verbose_operation) {
+    cout << "          ...central meridian = " << def.cmeridian << endl;
+    cout << "          ...latitude of origin = " << def.stdparallel1 << endl;
+    cout << "          ...false easting = " << eastings[xoff] << endl;
+    cout << "          ...false northing = " << northings[yoff] << endl;
+    cout << "          ...resolution = " << def.dx << ", " << def.dy << endl;
+  }
+  def.type = Grid::Type::transverseMercator;
+  return true;
+}
+
 bool found_grid_projection(bool b) {
   if (gatherxml::verbose_operation) {
     cout << "   ... done." << endl;
@@ -3304,12 +3407,29 @@ bool found_grid_projection(bool b) {
   return b;
 }
 
-bool filled_grid_projection(const unique_ptr<double[]>& lats, const unique_ptr<
-    double[]>& lons, Grid::GridDimensions& d, Grid::GridDefinition& f, size_t
-    nlats, size_t nlons) {
+bool filled_grid_projection(InputNetCDFStream& istream, string lat_id, string
+    lon_id, Grid::GridDimensions& d, Grid::GridDefinition& f) {
   static const string F = this_function_label(__func__);
   if (gatherxml::verbose_operation) {
     cout << "   ... trying to fill grid projection ..." << endl;
+  }
+  NetCDF::VariableData vd;
+  istream.variable_data(lat_id, vd);
+  f.slatitude = vd.front();
+  auto nlats = vd.size();
+  vector<double> lats(nlats);
+  for (size_t n = 0; n < nlats; ++n) {
+    lats[n] = vd[n];
+  }
+  istream.variable_data(lon_id, vd);
+  f.slongitude = vd.front();
+  if (f.slongitude > 180.) {
+    f.slongitude -= 360.;
+  }
+  auto nlons = vd.size();
+  vector<double> lons(nlons);
+  for (size_t n = 0; n < nlons; ++n) {
+    lons[n] = vd[n];
   }
 
   // check as one-dimensional coordinates
@@ -3493,7 +3613,47 @@ bool filled_grid_projection(const unique_ptr<double[]>& lats, const unique_ptr<
   }
 
   // check for a lambert-conformal grid
-  return found_grid_projection(grid_is_lambert_conformal(lats, lons, d, f));
+  if (grid_is_lambert_conformal(lats, lons, d, f)) {
+    return found_grid_projection(true);
+  }
+  auto units_re = regex("^m(eter(s){0,1}){0,1}$");
+  vector<int> eastings, northings;
+  for (const auto& v : vars) {
+    if (v.is_coord) {
+      string axis, units;
+      for (const auto& a : v.attrs) {
+        if (a.name == "axis") {
+          axis = to_lower(*(reinterpret_cast<string *>(a.values)));
+        } else if (a.name == "units") {
+          units = *(reinterpret_cast<string *>(a.values));
+          if (!regex_search(units, units_re)) {
+            units = "";
+          }
+        }
+      }
+      if (!units.empty()) {
+        if (axis == "x") {
+          istream.variable_data(v.name, vd);
+          eastings.reserve(vd.size());
+          for (size_t n = 0; n < vd.size(); ++n) {
+            eastings.emplace_back(vd[n]);
+          }
+        } else if (axis == "y") {
+          istream.variable_data(v.name, vd);
+          northings.reserve(vd.size());
+          for (size_t n = 0; n < vd.size(); ++n) {
+            northings.emplace_back(vd[n]);
+          }
+        }
+      }
+    }
+  }
+  if (!eastings.empty() && !northings.empty()) {
+    if (grid_is_transverse_mercator(lats, lons, eastings, northings, d, f)) {
+      return found_grid_projection(true);
+    }
+  }
+  return found_grid_projection(false);
 }
 
 void process_time_bounds(InputNetCDFStream& istream, string time_bounds_id,
@@ -3680,26 +3840,11 @@ void scan_cf_grid_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data) {
         grid_dims.back().y = grid_data.lats[n].dim / 10000 - 1;
         grid_dims.back().x = (grid_data.lats[n].dim % 10000) / 100 - 1;
         grid_defs.emplace_back();
-        NetCDF::VariableData vd;
-        istream.variable_data(grid_data.lats[n].id, vd);
-        grid_defs.back().slatitude = vd.front();
-        auto nlats = vd.size();
-        unique_ptr<double[]> lats(new double[nlats]);
-        for (size_t m = 0; m < nlats; ++m) {
-          lats[m] = vd[m];
-        }
-        istream.variable_data(grid_data.lons[n].id, vd);
-        grid_defs.back().slongitude = vd.front();
-        auto nlons = vd.size();
-        unique_ptr<double[]> lons(new double[nlons]);
-        for (size_t m = 0; m < nlons; ++m) {
-          lons[m] = vd[m];
-        }
         Grid::GridDimensions d;
         d.x = dims[grid_dims.back().x].length;
         d.y = dims[grid_dims.back().y].length;
-        if (filled_grid_projection(lats, lons, d, grid_defs.back(), nlats,
-            nlons)) {
+        if (filled_grid_projection(istream, grid_data.lats[n].id, grid_data.
+            lons[n].id, d, grid_defs.back())) {
           grid_dims.back() = d;
         } else {
           log_error2("unable to determine grid projection", F, "nc2xml", USER);
