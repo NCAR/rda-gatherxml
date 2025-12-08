@@ -808,9 +808,8 @@ void add_gridded_lat_lon_keys(vector<string>& gentry_keys, Grid::GridDimensions
     case Grid::Type::transverseMercator: {
       k += "<!>" + to_string(dim.x) + "<!>" + to_string(dim.y) + "<!>" + ftos(
           def.slatitude, 3) + "<!>" + ftos(def.slongitude, 3) + "<!>" + ftos(
-          def.elatitude, 3) + "<!>" + ftos(def.elongitude, 3) + "<!>" + ftos(
-          def.loincrement, 3) + "<!>" + ftos(def.laincrement, 3) + "<!>" + ftos(
-          def.stdparallel1, 3) + "<!>" + ftos(def.cmeridian, 3);
+          def.llatitude, 3) + "<!>" + ftos(def.olongitude, 3) + "<!>" + ftos(
+          def.loincrement, 3) + "<!>" + ftos(def.laincrement, 3);
       break;
     }
     case Grid::Type::lambertConformal: {
@@ -3365,20 +3364,15 @@ bool grid_is_transverse_mercator(const vector<double>& lats, const vector<
     return false;
   }
   def.dy /= 1000.;
-  def.elatitude = lats[dims.size-1];
-  def.elongitude = lons[dims.size-1];
-  if (def.elongitude > 180.) {
-    def.elongitude -= 360.;
+  def.llatitude = lats[yoff*dims.x+xoff];
+  def.olongitude = lons[xoff];
+  if (def.olongitude > 180.) {
+    def.olongitude -= 360.;
   }
-  def.cmeridian = lons[xoff];
-  if (def.cmeridian > 180.) {
-    def.cmeridian -= 360.;
-  }
-  def.stdparallel1 = lats[yoff*dims.x+xoff];
   GeographicLib::TransverseMercator tm(GeographicLib::Constants::WGS84_a(),
       GeographicLib::Constants::WGS84_f(), 1., true, true);
 double x, noff;
-tm.Forward(def.cmeridian, def.stdparallel1, def.cmeridian, x, noff);
+tm.Forward(def.olongitude, def.stdparallel1, def.olongitude, x, noff);
 /*
 for (auto n = 0; n < dims.y; ++n) {
 for (auto m = 0; m < dims.x; ++m) {
@@ -3390,8 +3384,8 @@ std::cerr << n << " " << m << " " << off << " " << northings[n] << " " << eastin
 }
 */
   if (gatherxml::verbose_operation) {
-    cout << "          ...central meridian = " << def.cmeridian << endl;
-    cout << "          ...latitude of origin = " << def.stdparallel1 << endl;
+    cout << "          ...central meridian = " << def.olongitude << endl;
+    cout << "          ...latitude of origin = " << def.llatitude << endl;
     cout << "          ...false easting = " << eastings[xoff] << endl;
     cout << "          ...false northing = " << northings[yoff] << endl;
     cout << "          ...resolution = " << def.dx << ", " << def.dy << endl;
