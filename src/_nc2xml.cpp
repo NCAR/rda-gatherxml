@@ -809,7 +809,8 @@ void add_gridded_lat_lon_keys(vector<string>& gentry_keys, Grid::GridDimensions
       k += "<!>" + to_string(dim.x) + "<!>" + to_string(dim.y) + "<!>" + ftos(
           def.slatitude, 3) + "<!>" + ftos(def.slongitude, 3) + "<!>" + ftos(
           def.llatitude, 3) + "<!>" + ftos(def.olongitude, 3) + "<!>" + ftos(
-          def.loincrement, 3) + "<!>" + ftos(def.laincrement, 3);
+          def.loincrement, 3) + "<!>" + ftos(def.laincrement, 3) + "<!>" +
+          to_string(def.originX) + "<!>" + to_string(def.originY);
       break;
     }
     case Grid::Type::lambertConformal: {
@@ -3307,31 +3308,31 @@ bool grid_is_transverse_mercator(const vector<double>& lats, const vector<
   if (gatherxml::verbose_operation) {
     cout << "      ... checking for Transverse Mercator projection ..." << endl;
   }
-  auto xoff = 0;
-  auto yoff = 0;
-  while (xoff < dims.x) {
+  def.originX = 0;
+  def.originY = 0;
+  while (static_cast<int>(def.originX) < dims.x) {
     auto lon_zero_diff = true;
     auto max_lat_diff = 0.;
     for (auto n = 1; n < dims.y; ++n) {
-      auto b = xoff + n * dims.x;
+      auto b = def.originX + n * dims.x;
       auto a = b - dims.x;
       if (!myequalf(lons[b], lons[a])) {
         lon_zero_diff = false;
-        yoff = 0;
+        def.originY = 0;
         break;
       }
       auto lat_diff = lats[b] - lats[a];
       if (lat_diff > max_lat_diff) {
         max_lat_diff = lat_diff;
-        yoff = n;
+        def.originY = n;
       }
     }
     if (lon_zero_diff) {
       break;
     }
-    ++xoff;
+    ++def.originX;
   }
-  if (xoff == dims.x) {
+  if (static_cast<int>(def.originX) == dims.x) {
     return false;
   }
   def.dx = 0.;
@@ -3364,15 +3365,21 @@ bool grid_is_transverse_mercator(const vector<double>& lats, const vector<
     return false;
   }
   def.dy /= 1000.;
-  def.llatitude = lats[yoff*dims.x+xoff];
-  def.olongitude = lons[xoff];
+  def.llatitude = lats[def.originY*dims.x+def.originX];
+  def.olongitude = lons[def.originX];
   if (def.olongitude > 180.) {
     def.olongitude -= 360.;
   }
   GeographicLib::TransverseMercator tm(GeographicLib::Constants::WGS84_a(),
       GeographicLib::Constants::WGS84_f(), 1., true, true);
-double x, noff;
-tm.Forward(def.olongitude, def.stdparallel1, def.olongitude, x, noff);
+std::cerr.setf(std::ios::fixed);
+double x, y, noff;
+tm.Forward(def.olongitude, def.llatitude, def.olongitude, x, noff);
+std::cerr << "ORIGIN: northing: " << noff << " easting: " << x << std::endl;
+tm.Forward(def.olongitude, def.slatitude, def.slongitude, x, y);
+std::cerr << def.slatitude << " " << def.slongitude << " " << northings[0] << " " << eastings[0] << " " << y << " " << x << " " << northings[dims.y-1] << " " << eastings[dims.x-1] << std::endl;
+std::cerr << "DIMX=" << dims.x << " DIMY=" << dims.y << std::endl;
+std::cerr << "XOFF=" << def.originX << " YOFF=" << def.originY << std::endl;
 /*
 for (auto n = 0; n < dims.y; ++n) {
 for (auto m = 0; m < dims.x; ++m) {
@@ -3386,8 +3393,8 @@ std::cerr << n << " " << m << " " << off << " " << northings[n] << " " << eastin
   if (gatherxml::verbose_operation) {
     cout << "          ...central meridian = " << def.olongitude << endl;
     cout << "          ...latitude of origin = " << def.llatitude << endl;
-    cout << "          ...false easting = " << eastings[xoff] << endl;
-    cout << "          ...false northing = " << northings[yoff] << endl;
+    cout << "          ...false easting = " << eastings[def.originX] << endl;
+    cout << "          ...false northing = " << northings[def.originY] << endl;
     cout << "          ...resolution = " << def.dx << ", " << def.dy << endl;
   }
   def.type = Grid::Type::transverseMercator;
