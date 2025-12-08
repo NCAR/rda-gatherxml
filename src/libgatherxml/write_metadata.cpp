@@ -478,12 +478,13 @@ void write_transverse_mercator_grid(deque<string>& grid_params, bool is_cell,
   } else {
     grid_params[6] += "E";
   }
-  ofs << R"(  <grid timeRange=")" << grid_params[9] << R"(" definition=")"
+  ofs << R"(  <grid timeRange=")" << grid_params[11] << R"(" definition=")"
       R"(transverseMercator" numX=")" << grid_params[1] << R"(" numY=")" <<
       grid_params[2] << R"(" startLat=")" << grid_params[3] << R"(" startLon=")"
       << grid_params[4] << R"(" projLat=")" << grid_params[5] <<
       R"(" cMeridian=")" << grid_params[6] << R"(" xRes=")" << grid_params[7] <<
-      R"(" yRes=")" << grid_params[8] << R"(">)" << endl;
+      R"(" yRes=")" << grid_params[8] << R"(" originX=")" << grid_params[9] <<
+      R"(" originY=")" << grid_params[10] << R"(">)" << endl;
 }
 
 void write_spherical_harmonics_grid(deque<string>& grid_params, bool is_cell,
