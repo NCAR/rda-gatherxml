@@ -22,7 +22,6 @@
 #include <bufr.hpp>
 #include <timer.hpp>
 #include <myerror.hpp>
-#include <GeographicLib/TransverseMercator.hpp>
 
 using namespace PostgreSQL;
 using floatutils::myequalf;
