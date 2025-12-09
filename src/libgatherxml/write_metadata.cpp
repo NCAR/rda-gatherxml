@@ -469,22 +469,27 @@ void write_transverse_mercator_grid(deque<string>& grid_params, bool is_cell,
     grid_params[4] += "E";
   }
   if (grid_params[5][0] == '-') {
-    grid_params[5] = grid_params[5].substr(1) + "S";
+    grid_params[5] = grid_params[5].substr(1) + "W";
   } else {
-    grid_params[5] += "N";
+    grid_params[5] += "E";
   }
   if (grid_params[6][0] == '-') {
-    grid_params[6] = grid_params[6].substr(1) + "W";
+    grid_params[6] = grid_params[6].substr(1) + "S";
   } else {
-    grid_params[6] += "E";
+    grid_params[6] += "N";
   }
-  ofs << R"(  <grid timeRange=")" << grid_params[11] << R"(" definition=")"
+  if (grid_params[7][0] == '-') {
+    grid_params[7] = grid_params[7].substr(1) + "W";
+  } else {
+    grid_params[7] += "E";
+  }
+  ofs << R"(  <grid timeRange=")" << grid_params[10] << R"(" definition=")"
       R"(transverseMercator" numX=")" << grid_params[1] << R"(" numY=")" <<
       grid_params[2] << R"(" startLat=")" << grid_params[3] << R"(" startLon=")"
-      << grid_params[4] << R"(" projLat=")" << grid_params[5] <<
-      R"(" cMeridian=")" << grid_params[6] << R"(" xRes=")" << grid_params[7] <<
-      R"(" yRes=")" << grid_params[8] << R"(" originX=")" << grid_params[9] <<
-      R"(" originY=")" << grid_params[10] << R"(">)" << endl;
+      << grid_params[4] << R"(" cMeridian=")" << grid_params[5] <<
+      R"(" endLat=")" << grid_params[6] << R"(" endLon=")" << grid_params[7] <<
+      R"(" xRes=")" << grid_params[8] << R"(" yRes=")" << grid_params[9] <<
+      R"(">)" << endl;
 }
 
 void write_spherical_harmonics_grid(deque<string>& grid_params, bool is_cell,
