@@ -593,6 +593,38 @@ tuple<string, string> process_grml_lambert_conformal_grid_definition(deque<
   return make_tuple("lambertConformal", dp);
 }
 
+tuple<string, string> process_grml_transverse_mercator_grid_definition(deque<
+    string>& def_parts) {
+  string dp = def_parts[1] + ":" + def_parts[2] + ":";
+  if (def_parts[3][0] == '-') {
+    dp += def_parts[3].substr(1) + "S:";
+  } else {
+    dp += def_parts[3] + "N:";
+  }
+  if (def_parts[4][0] == '-') {
+    dp += def_parts[4].substr(1) + "W:";
+  } else {
+    dp += def_parts[4] + "E:";
+  }
+  if (def_parts[5][0] == '-') {
+    dp += def_parts[5].substr(1) + "W:";
+  } else {
+    dp += def_parts[5] + "E:";
+  }
+  if (def_parts[6][0] == '-') {
+    dp += def_parts[6].substr(1) + "S:";
+  } else {
+    dp += def_parts[6] + "N:";
+  }
+  if (def_parts[7][0] == '-') {
+    dp += def_parts[7].substr(1) + "W:";
+  } else {
+    dp += def_parts[7] + "E:";
+  }
+  dp += def_parts[8] + ":" + def_parts[9] + ":";
+  return make_tuple("mercator", dp);
+}
+
 tuple<string, string> process_grml_grid_definition(deque<string>& def_parts) {
   static const string F = this_function_label(__func__);
   switch (stoi(def_parts[0])) {
@@ -612,6 +644,9 @@ tuple<string, string> process_grml_grid_definition(deque<string>& def_parts) {
     case static_cast<int>(Grid::Type::sphericalHarmonics): {
       return make_tuple("sphericalHarmonics", def_parts[1] + ":" + def_parts[2]
           + ":" + def_parts[3]);
+    }
+    case static_cast<int>(Grid::Type::transverseMercator): {
+      return process_grml_transverse_mercator_grid_definition(def_parts);
     }
     default: {
       log_error2("grid type " + def_parts[0] + " not understood", F, "iinv",
