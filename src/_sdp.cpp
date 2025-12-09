@@ -452,8 +452,8 @@ int main(int argc, char **argv) {
     log_error("while updating dssdb.dsperiod: '" + server_d.error() + "'",
         "sdp", G_USER);
   }
-  mysystem2(metautils::directives.local_root + "/bin/dsgen " + metautils::args.
-      dsid, oss, ess);
+  mysystem2("/bin/bash -c 'curl -s -k https://" + metautils::directives.
+      web_server + "/redeploy/dsgen" + metautils::args.dsid + "'", oss, ess);
   server_d.disconnect();
   server_m.disconnect();
 }
