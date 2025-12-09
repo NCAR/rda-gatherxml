@@ -621,7 +621,7 @@ tuple<string, string> process_grml_transverse_mercator_grid_definition(deque<
   } else {
     dp += def_parts[7] + "E:";
   }
-  dp += def_parts[8] + ":" + def_parts[9] + ":";
+  dp += def_parts[8] + ":" + def_parts[9];
   return make_tuple("transverseMercator", dp);
 }
 
