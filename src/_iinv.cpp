@@ -622,7 +622,7 @@ tuple<string, string> process_grml_transverse_mercator_grid_definition(deque<
     dp += def_parts[7] + "E:";
   }
   dp += def_parts[8] + ":" + def_parts[9] + ":";
-  return make_tuple("mercator", dp);
+  return make_tuple("transverseMercator", dp);
 }
 
 tuple<string, string> process_grml_grid_definition(deque<string>& def_parts) {
