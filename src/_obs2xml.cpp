@@ -26,8 +26,11 @@
 using metautils::log_error;
 using std::cerr;
 using std::endl;
+using std::regex;
+using std::regex_search;
 using std::string;
 using std::stringstream;
+using std::to_string;
 using std::unique_ptr;
 using strutils::ftos;
 using strutils::is_numeric;
@@ -125,9 +128,9 @@ bool processed_isd_observation(unique_ptr<Observation>& obs, gatherxml::markup::
   return true;
 }
 
-bool processed_adp_observation(unique_ptr<Observation>& obs,gatherxml::markup::ObML::ObservationData& obs_data,string& obs_type)
-{
-  ADPObservation *o=reinterpret_cast<ADPObservation *>(obs.get());
+bool processed_adp_observation(unique_ptr<Observation>& obs, gatherxml::markup::
+    ObML::ObservationData& obs_data, string& obs_type) {
+  ADPObservation *o = reinterpret_cast<ADPObservation *>(obs.get());
   string platform_type;
   switch (o->platform_type()) {
     case 11:
@@ -135,128 +138,126 @@ bool processed_adp_observation(unique_ptr<Observation>& obs,gatherxml::markup::O
     case 13:
     case 511:
     case 512:
-    case 513:
-    {
-      platform_type="land_station";
+    case 513: {
+      platform_type = "land_station";
       break;
     }
     case 21:
-    case 521:
-    {
-      platform_type="ocean_station";
+    case 521: {
+      platform_type = "ocean_station";
       break;
     }
     case 22:
     case 23:
     case 522:
-    case 523:
-    {
-      platform_type="roving_ship";
+    case 523: {
+      platform_type = "roving_ship";
       break;
     }
     case 31:
-    case 41:
-    {
-      platform_type="aircraft";
+    case 41: {
+      platform_type = "aircraft";
       break;
     }
-    case 42:
-    {
-      platform_type="balloon";
+    case 42: {
+      platform_type = "balloon";
       break;
     }
     case 51:
-    case 551:
-    {
-      platform_type="bogus";
+    case 551: {
+      platform_type = "bogus";
       break;
     }
     case 61:
     case 62:
-    case 63:
-    {
-      platform_type="satellite";
+    case 63: {
+      platform_type = "satellite";
       break;
     }
     case 531:
-    case 532:
-    {
-      platform_type="CMAN_station";
+    case 532: {
+      platform_type = "CMAN_station";
       break;
     }
-    case 561:
-    {
-      platform_type="moored_buoy";
+    case 561: {
+      platform_type = "moored_buoy";
       break;
     }
-    case 562:
-    {
-      platform_type="drifting_buoy";
+    case 562: {
+      platform_type = "drifting_buoy";
       break;
     }
-    case 999:
-    {
-      platform_type="999";
+    case 999: {
+      platform_type = "999";
       break;
     }
-    default:
-    {
-      cerr << "Warning: unknown platform type " << o->platform_type() << " for ID '" << obs->location().ID << "'" << endl;
-      platform_type="";
+    default: {
+      cerr << "Warning: unknown platform type " << o->platform_type() << " for "
+          "ID '" << obs->location().ID << "'" << endl;
+      platform_type = "";
     }
   }
-  auto start_date=o->synoptic_date_time();
+  auto start_date = o->synoptic_date_time();
   if (start_date.year() == 0) {
     return false;
   }
-  if (obs->location().ID.length() == 5 && is_numeric(obs->location().ID) && obs->location().ID >= "01001" && obs->location().ID <= "99999") {
-    ientry.key=platform_type+"[!]WMO[!]"+obs->location().ID;
+  if (obs->location().ID.length() == 5 && is_numeric(obs->location().ID) &&
+      obs->location().ID >= "01001" && obs->location().ID <= "99999") {
+    ientry.key = platform_type + "[!]WMO[!]" + obs->location().ID;
   } else {
-    ientry.key=obs->location().ID;
-    for (size_t n=0; n < ientry.key.length(); ++n) {
-      if (static_cast<int>(ientry.key[n]) < 32 || static_cast<int>(ientry.key[n]) > 127) {
+    ientry.key = obs->location().ID;
+    for (size_t n = 0; n < ientry.key.length(); ++n) {
+      if (static_cast<int>(ientry.key[n]) < 32 || static_cast<int>(ientry.
+          key[n]) > 127) {
         if (n > 0) {
-          ientry.key=ientry.key.substr(0,n)+"/"+ientry.key.substr(n+1);
+          ientry.key = ientry.key.substr(0, n) + "/" + ientry.key.substr(n+1);
         } else {
-          ientry.key="/"+ientry.key.substr(1);
+          ientry.key = "/" + ientry.key.substr(1);
         }
       }
     }
-    if (std::regex_search(ientry.key,std::regex("&"))) {
-      replace_all(ientry.key,"&","&amp;");
+    if (regex_search(ientry.key, regex("&"))) {
+      replace_all(ientry.key, "&", "&amp;");
     }
-    if (std::regex_search(ientry.key,std::regex(">"))) {
-      replace_all(ientry.key,">","&gt;");
+    if (regex_search(ientry.key, regex(">"))) {
+      replace_all(ientry.key, ">", "&gt;");
     }
-    if (std::regex_search(ientry.key,std::regex("<"))) {
-      replace_all(ientry.key,"<","&lt;");
+    if (regex_search(ientry.key, regex("<"))) {
+      replace_all(ientry.key, "<", "&lt;");
     }
-    ientry.key=to_upper(ientry.key);
-    ientry.key=platform_type+"[!]callSign[!]"+ientry.key;
+    ientry.key = to_upper(ientry.key);
+    ientry.key = platform_type + "[!]callSign[!]" + ientry.key;
   }
-  auto ADPcategories=o->categories();
+  auto ADPcategories = o->categories();
   if (platform_type == "999") {
     for (const auto& item : ADPcategories) {
       if (item == 6) {
-        platform_type="aircraft";
+        platform_type = "aircraft";
       }
     }
   }
   if (platform_type == "999") {
 //      cerr << "Warning: unknown platform type 999 for ID '" << obs->location().ID << "'" << endl;
-    platform_type="";
+    platform_type = "";
   }
   if (metautils::args.data_format == "on29") {
-    obs_type="upper_air";
+    obs_type = "upper_air";
   } else {
-    obs_type="surface";
+    obs_type = "surface";
   }
-  if (!obs_data.added_to_platforms(obs_type,platform_type,obs->location().latitude,obs->location().longitude)) {
-    log_error("processed_adp_observation() returned error: '"+myerror+"' while adding platform "+obs_type+"-"+platform_type,"obs2xml",USER);
+  if (!obs_data.added_to_platforms(obs_type, platform_type, obs->
+      location().latitude, obs->location().longitude)) {
+    log_error("processed_adp_observation() returned error: '" + myerror +
+        "' while adding platform " + obs_type + "-" + platform_type, "obs2xml",
+        USER);
   }
   for (const auto& category : ADPcategories) {
-    if (!obs_data.added_to_ids(obs_type,ientry,strutils::itos(category),"",obs->location().latitude,obs->location().longitude,-1.,&start_date)) {
-      log_error("processed_adp_observation() returned error: '"+myerror+"' while adding ID "+ientry.key+" for "+strutils::itos(category),"obs2xml",USER);
+    if (!obs_data.added_to_ids(obs_type, ientry, to_string(category), "",
+        obs->location().latitude, obs->location().longitude, -1.,
+        &start_date)) {
+      log_error("processed_adp_observation() returned error: '" + myerror +
+          "' while adding ID " + ientry.key + " for " + to_string(category),
+          "obs2xml", USER);
     }
   }
   return true;
@@ -395,7 +396,7 @@ bool processed_imma_observation(unique_ptr<Observation>& obs,gatherxml::markup::
               break;
             }
             default: {
-              log_error("platform type "+strutils::itos(o->platform_type().atti)+"/"+strutils::itos(o->platform_type().code)+" not recognized - obs date: "+obs->date_time().to_string()+", ID type: "+strutils::itos(o->ID_type()),"obs2xml",USER);
+              log_error("platform type "+to_string(o->platform_type().atti)+"/"+to_string(o->platform_type().code)+" not recognized - obs date: "+obs->date_time().to_string()+", ID type: "+to_string(o->ID_type()),"obs2xml",USER);
             }
           }
         }
@@ -409,13 +410,13 @@ bool processed_imma_observation(unique_ptr<Observation>& obs,gatherxml::markup::
           break;
         }
         default: {
-          log_error("platform type "+strutils::itos(o->platform_type().atti)+"/"+strutils::itos(o->platform_type().code)+" not recognized","obs2xml",USER);
+          log_error("platform type "+to_string(o->platform_type().atti)+"/"+to_string(o->platform_type().code)+" not recognized","obs2xml",USER);
         }
       }
       break;
     }
     default: {
-      log_error("platform type "+strutils::itos(o->platform_type().atti)+"/"+strutils::itos(o->platform_type().code)+" not recognized","obs2xml",USER);
+      log_error("platform type "+to_string(o->platform_type().atti)+"/"+to_string(o->platform_type().code)+" not recognized","obs2xml",USER);
     }
   }
   auto start_date=obs->date_time();
@@ -491,7 +492,7 @@ bool processed_imma_observation(unique_ptr<Observation>& obs,gatherxml::markup::
       break;
     }
     default: {
-      log_error("ID type "+strutils::itos(o->ID_type())+" not recognized - obs date: "+obs->date_time().to_string(),"obs2xml",USER);
+      log_error("ID type "+to_string(o->ID_type())+" not recognized - obs date: "+obs->date_time().to_string(),"obs2xml",USER);
     }
   }
   ientry.key+="[!]"+id;
@@ -502,8 +503,8 @@ bool processed_imma_observation(unique_ptr<Observation>& obs,gatherxml::markup::
   std::list<short> attm_ids=reinterpret_cast<IMMAObservation *>(obs.get())->attachment_ID_list();
   attm_ids.emplace_front(0);
   for (const auto& attm_id : attm_ids) {
-    if (!obs_data.added_to_ids(obs_type,ientry,strutils::itos(attm_id),"",obs->location().latitude,obs->location().longitude,-1.,&start_date)) {
-      log_error("processed_imma_observation() returned error: '"+myerror+"' while adding ID "+ientry.key+" for "+strutils::itos(attm_id),"obs2xml",USER);
+    if (!obs_data.added_to_ids(obs_type,ientry,to_string(attm_id),"",obs->location().latitude,obs->location().longitude,-1.,&start_date)) {
+      log_error("processed_imma_observation() returned error: '"+myerror+"' while adding ID "+ientry.key+" for "+to_string(attm_id),"obs2xml",USER);
     }
   }
   return true;
@@ -564,7 +565,7 @@ bool processed_td32_observation(unique_ptr<Observation>& obs,gatherxml::markup::
   for (size_t n=0; n < reports.size(); ++n) {
     if (reports[n].flag1 != 'M') {
       if (!obs_data.added_to_platforms(obs_type,"land_station",reports[n].loc.latitude,reports[n].loc.longitude)) {
-        log_error("processed_td32_observation() returned error: '"+myerror+"' while adding platform ("+strutils::itos(n)+")","obs2xml",USER);
+        log_error("processed_td32_observation() returned error: '"+myerror+"' while adding platform ("+to_string(n)+")","obs2xml",USER);
       }
       DateTime start_date;
       if (header.type == "DLY") {
@@ -625,7 +626,7 @@ bool processed_td32_observation(unique_ptr<Observation>& obs,gatherxml::markup::
 bool processed_dss_tsr_observation(unique_ptr<Observation>& obs,gatherxml::markup::ObML::ObservationData& obs_data,string& obs_type)
 {
   string id=obs->location().ID;
-  if (std::regex_search(id,std::regex("^0"))) {
+  if (regex_search(id,regex("^0"))) {
     id=id.substr(1);
   }
   auto source=reinterpret_cast<Tsraob *>(obs.get())->flags().source;
@@ -656,7 +657,7 @@ bool processed_dss_tsr_observation(unique_ptr<Observation>& obs,gatherxml::marku
         platform_type="land_station";
         ientry.key=platform_type+"[!]WMO[!]"+id;
       } else
-        log_error("no platform and station mapping for source "+strutils::itos(source)+" and ID '"+id+"'","obs2xml",USER);
+        log_error("no platform and station mapping for source "+to_string(source)+" and ID '"+id+"'","obs2xml",USER);
       break;
     }
     case 37:
@@ -668,7 +669,7 @@ bool processed_dss_tsr_observation(unique_ptr<Observation>& obs,gatherxml::marku
     }
     default:
     {
-      log_error("no platform and station mapping for source "+strutils::itos(source),"obs2xml","x","x");
+      log_error("no platform and station mapping for source "+to_string(source),"obs2xml","x","x");
     }
   }
   obs_type="upper_air";
@@ -680,8 +681,8 @@ bool processed_dss_tsr_observation(unique_ptr<Observation>& obs,gatherxml::marku
   if (fmt_code >= 9 && fmt_code <= 14) {
     fmt_code-=8;
   }
-  if (!obs_data.added_to_ids(obs_type,ientry,strutils::itos(fmt_code),"",obs->location().latitude,obs->location().longitude,-1.,&start_date)) {
-    log_error("processed_dss_tsr_observation() returned error: '"+myerror+"' while adding ID "+ientry.key+" for "+strutils::itos(fmt_code),"obs2xml",USER);
+  if (!obs_data.added_to_ids(obs_type,ientry,to_string(fmt_code),"",obs->location().latitude,obs->location().longitude,-1.,&start_date)) {
+    log_error("processed_dss_tsr_observation() returned error: '"+myerror+"' while adding ID "+ientry.key+" for "+to_string(fmt_code),"obs2xml",USER);
   }
   return true;
 }
@@ -742,7 +743,7 @@ bool processed_uadb_observation(unique_ptr<Observation>& obs,gatherxml::markup::
     }
     default:
     {
-      log_error("no platform and station mapping for observation type "+strutils::itos(reinterpret_cast<UADBRaob *>(obs.get())->ID_type()),"obs2xml","x","x");
+      log_error("no platform and station mapping for observation type "+to_string(reinterpret_cast<UADBRaob *>(obs.get())->ID_type()),"obs2xml","x","x");
     }
   }
   obs_type="upper_air";
@@ -750,8 +751,8 @@ bool processed_uadb_observation(unique_ptr<Observation>& obs,gatherxml::markup::
     log_error("processed_uadb_observation() returned error: '"+myerror+"' while adding platform "+obs_type+"-"+platform_type,"obs2xml",USER);
   }
   auto start_date=obs->date_time();
-  if (!obs_data.added_to_ids(obs_type,ientry,strutils::itos(reinterpret_cast<UADBRaob *>(obs.get())->observation_type()),"",obs->location().latitude,obs->location().longitude,-1.,&start_date)) {
-    log_error("processed_uadb_observation() returned error: '"+myerror+"' while adding ID "+ientry.key+" for "+strutils::itos(reinterpret_cast<UADBRaob *>(obs.get())->observation_type()),"obs2xml",USER);
+  if (!obs_data.added_to_ids(obs_type,ientry,to_string(reinterpret_cast<UADBRaob *>(obs.get())->observation_type()),"",obs->location().latitude,obs->location().longitude,-1.,&start_date)) {
+    log_error("processed_uadb_observation() returned error: '"+myerror+"' while adding ID "+ientry.key+" for "+to_string(reinterpret_cast<UADBRaob *>(obs.get())->observation_type()),"obs2xml",USER);
   }
   return true;
 }
@@ -773,9 +774,9 @@ bool processed_wmssc_observation(unique_ptr<Observation>& obs,gatherxml::markup:
   }
   auto sta_name=o->station_name();
   string platform_type;
-  if (std::regex_search(sta_name,std::regex("SHIP"))) {
+  if (regex_search(sta_name,regex("SHIP"))) {
     platform_type="ocean_station";
-  } else if (std::regex_search(sta_name,std::regex("DRIFTING"))) {
+  } else if (regex_search(sta_name,regex("DRIFTING"))) {
     platform_type="roving_ship";
   } else {
     platform_type="land_station";
@@ -844,7 +845,7 @@ bool processed_observation(unique_ptr<Observation>& obs,gatherxml::markup::ObML:
     return processed_imma_observation(obs,obs_data,obs_type);
   } else if (metautils::args.data_format == "nodcbt") {
     return processed_nodc_bt_observation(obs,obs_data,obs_type);
-  } else if (std::regex_search(metautils::args.data_format,std::regex("^td32"))) {
+  } else if (regex_search(metautils::args.data_format,regex("^td32"))) {
     return processed_td32_observation(obs,obs_data,obs_type);
   } else if (metautils::args.data_format == "tsr") {
     return processed_dss_tsr_observation(obs,obs_data,obs_type);
@@ -869,7 +870,7 @@ bool open_file(void *istream,string filename)
     return (reinterpret_cast<InputNODCBTObservationStream *>(istream))->open(filename);
   } else if (metautils::args.data_format == "on29" || metautils::args.data_format == "on124") {
     return (reinterpret_cast<InputADPStream *>(istream))->open(filename);
-  } else if (std::regex_search(metautils::args.data_format,std::regex("^td32"))) {
+  } else if (regex_search(metautils::args.data_format,regex("^td32"))) {
     return (reinterpret_cast<InputTD32Stream *>(istream))->open(filename);
   } else if (metautils::args.data_format == "tsr") {
     return (reinterpret_cast<InputTsraobStream *>(istream))->open(filename);
@@ -908,7 +909,7 @@ void scan_file(gatherxml::markup::ObML::ObservationData& obs_data)
   } else if (metautils::args.data_format == "on29" || metautils::args.data_format == "on124") {
     istream.reset(new InputADPStream);
     obs.reset(new ADPObservation);
-  } else if (std::regex_search(metautils::args.data_format,std::regex("^td32"))) {
+  } else if (regex_search(metautils::args.data_format,regex("^td32"))) {
     if (metautils::args.data_format == "td3200" || metautils::args.data_format == "td3210" || metautils::args.data_format == "td3220" || metautils::args.data_format == "td3240" || metautils::args.data_format == "td3260" || metautils::args.data_format == "td3280") {
       istream.reset(new InputTD32Stream);
     } else {
@@ -1002,7 +1003,7 @@ void scan_file(gatherxml::markup::ObML::ObservationData& obs_data)
           }
         }
       } else {
-        log_error("unable to read observation "+strutils::itos(istream->number_read()+1)+"; error: '"+myerror+"'","obs2xml",USER);
+        log_error("unable to read observation "+to_string(istream->number_read()+1)+"; error: '"+myerror+"'","obs2xml",USER);
       }
     }
     istream->close();
@@ -1089,7 +1090,7 @@ int main(int argc,char **argv)
   metautils::read_config("obs2xml",USER);
   gatherxml::parse_args(arg_delimiter);
   flags="-f";
-  if (!metautils::args.inventory_only && std::regex_search(metautils::args.path,std::regex("^https://rda.ucar.edu"))) {
+  if (!metautils::args.inventory_only && regex_search(metautils::args.path,regex("^https://rda.ucar.edu"))) {
     flags="-wf";
   }
   metautils::cmd_register("obs2xml",USER);
