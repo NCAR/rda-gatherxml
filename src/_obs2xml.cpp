@@ -812,75 +812,89 @@ bool processed_uadb_observation(unique_ptr<Observation>& obs,gatherxml::markup::
   return true;
 }
 
-bool processed_wmssc_observation(unique_ptr<Observation>& obs,gatherxml::markup::ObML::ObservationData& obs_data,string& obs_type)
-{
-  auto *o=reinterpret_cast<WMSSCObservation *>(obs.get());
-  auto can_continue=false;
-  for (size_t n=1; n <= 12; ++n) {
-    auto report=o->monthly_report(n);
-    auto addl_data=o->monthly_additional_data(n);
-    if (report.data.slp > 0. || report.data.stnp > 0. || report.data.tdry > -99. || addl_data.data.pcp_amt >= 0.) {
-      can_continue=true;
+bool processed_wmssc_observation(unique_ptr<Observation>& obs, gatherxml::
+    markup::ObML::ObservationData& obs_data, string& obs_type) {
+  auto *o = reinterpret_cast<WMSSCObservation *>(obs.get());
+  auto can_continue = false;
+  for (size_t n = 1; n <= 12; ++n) {
+    auto report = o->monthly_report(n);
+    auto addl_data = o->monthly_additional_data(n);
+    if (report.data.slp > 0. || report.data.stnp > 0. || report.data.tdry > -99.
+        || addl_data.data.pcp_amt >= 0.) {
+      can_continue = true;
       break;
     }
   }
   if (!can_continue) {
     return false;
   }
-  auto sta_name=o->station_name();
+  auto sta_name = o->station_name();
   string platform_type;
-  if (regex_search(sta_name,regex("SHIP"))) {
-    platform_type="ocean_station";
-  } else if (regex_search(sta_name,regex("DRIFTING"))) {
-    platform_type="roving_ship";
+  if (sta_name.find("SHIP") != string::npos) {
+    platform_type = "ocean_station";
+  } else if (sta_name.find("DRIFTING") != string::npos) {
+    platform_type = "roving_ship";
   } else {
-    platform_type="land_station";
+    platform_type = "land_station";
   }
   if (o->format() == 0x3f) {
-    ientry.key=platform_type+"[!]COOP[!]"+obs->location().ID;
+    ientry.key = platform_type + "[!]COOP[!]" + obs->location().ID;
   } else {
-    ientry.key=platform_type+"[!]WMO+6[!]"+obs->location().ID;
+    ientry.key = platform_type + "[!]WMO + 6[!]" + obs->location().ID;
   }
-  auto climo_ind=obs->date_time().year();
+  auto climo_ind = obs->date_time().year();
   if (climo_ind < 2200) {
-// monthly climatology
-    obs_type="surface";
+    // monthly climatology
+    obs_type = "surface";
   } else if (climo_ind < 3200) {
-// 10-year monthly climatology
-    obs_type="surface_10-year_climatology";
+    // 10-year monthly climatology
+    obs_type = "surface_10-year_climatology";
   } else {
-// 30-year monthly climatology
-    obs_type="surface_30-year_climatology";
+    // 30-year monthly climatology
+    obs_type = "surface_30-year_climatology";
   }
-  if (!obs_data.added_to_platforms(obs_type,platform_type,obs->location().latitude,obs->location().longitude)) {
-    log_error("processed_wmssc_observation() returned error: '"+myerror+"' while adding platform "+obs_type+"-"+platform_type,"obs2xml",USER);
+  if (!obs_data.added_to_platforms(obs_type, platform_type, obs->
+      location().latitude, obs->location().longitude)) {
+    log_error("processed_wmssc_observation() returned error: '" + myerror +
+        "' while adding platform " + obs_type + "-" + platform_type, "obs2xml",
+        USER);
   }
-  for (size_t n=1; n <= 12; ++n) {
-    auto report=o->monthly_report(n);
-    auto addl_data=o->monthly_additional_data(n);
-    if (report.data.slp > 0. || report.data.stnp > 0. || report.data.tdry > -99. || addl_data.data.pcp_amt >= 0.) {
-      DateTime start_date,end_date;
-      start_date.set(obs->date_time().year(),n,1,0);
-      end_date.set(obs->date_time().year(),n,dateutils::days_in_month(obs->date_time().year(),n),235959);
+  for (size_t n = 1; n <= 12; ++n) {
+    auto report = o->monthly_report(n);
+    auto addl_data = o->monthly_additional_data(n);
+    if (report.data.slp > 0. || report.data.stnp > 0. || report.data.tdry > -99.
+        || addl_data.data.pcp_amt >= 0.) {
+      DateTime start_date, end_date;
+      start_date.set(obs->date_time().year(), n, 1, 0);
+      end_date.set(obs->date_time().year(), n, dateutils::days_in_month(obs->
+          date_time().year(), n), 235959);
       if (climo_ind >= 3200) {
-        start_date.set_year(start_date.year()-2029);
-        end_date.set_year(end_date.year()-2000);
+        start_date.set_year(start_date.year() - 2029);
+        end_date.set_year(end_date.year() - 2000);
       } else if (climo_ind >= 2200) {
-        start_date.set_year(start_date.year()-1009);
-        end_date.set_year(end_date.year()-1000);
+        start_date.set_year(start_date.year() - 1009);
+        end_date.set_year(end_date.year() - 1000);
       }
-      if (!obs_data.added_to_ids(obs_type,ientry,"standard_parameters","",obs->location().latitude,obs->location().longitude,-1.,&start_date,&end_date)) {
-        log_error("processed_wmssc_observation() returned error: '"+myerror+"' while adding ID "+ientry.key+" for standard_parameters","obs2xml",USER);
+      if (!obs_data.added_to_ids(obs_type, ientry, "standard_parameters", "",
+          obs->location().latitude, obs->location().longitude, -1., &start_date,
+          &end_date)) {
+        log_error("processed_wmssc_observation() returned error: '" + myerror +
+            "' while adding ID " + ientry.key + " for standard_parameters",
+            "obs2xml", USER);
       }
       if (o->has_additional_data()) {
         string data_type;
         if (obs->date_time().year() < 1961) {
-          data_type="height_data";
+          data_type = "height_data";
         } else {
-          data_type="additional_parameters";
+          data_type = "additional_parameters";
         }
-        if (!obs_data.added_to_ids(obs_type,ientry,data_type,"",obs->location().latitude,obs->location().longitude,-1.,&start_date,&end_date)) {
-          log_error("processed_wmssc_observation() returned error: '"+myerror+"' while adding ID "+ientry.key+" for "+data_type,"obs2xml",USER);
+        if (!obs_data.added_to_ids(obs_type, ientry, data_type, "", obs->
+            location().latitude, obs->location().longitude, -1., &start_date,
+            &end_date)) {
+          log_error("processed_wmssc_observation() returned error: '" + myerror
+              + "' while adding ID " + ientry.key + " for " + data_type,
+              "obs2xml", USER);
         }
       }
     }
@@ -888,53 +902,61 @@ bool processed_wmssc_observation(unique_ptr<Observation>& obs,gatherxml::markup:
   return true;
 }
 
-bool processed_observation(unique_ptr<Observation>& obs,gatherxml::markup::ObML::ObservationData& obs_data,string& obs_type)
-{
+bool processed_observation(unique_ptr<Observation>& obs, gatherxml::markup::
+    ObML::ObservationData& obs_data, string& obs_type) {
   if (metautils::args.data_format == "isd") {
-    return processed_isd_observation(obs,obs_data,obs_type);
-  } else if (metautils::args.data_format == "on29" || metautils::args.data_format == "on124") {
-    return processed_adp_observation(obs,obs_data,obs_type);
+    return processed_isd_observation(obs, obs_data, obs_type);
+  } else if (metautils::args.data_format == "on29" || metautils::args.
+      data_format == "on124") {
+    return processed_adp_observation(obs, obs_data, obs_type);
   } else if (metautils::args.data_format == "cpcsumm") {
-    return processed_cpc_summary_observation(obs,obs_data,obs_type);
+    return processed_cpc_summary_observation(obs, obs_data, obs_type);
   } else if (metautils::args.data_format == "imma") {
-    return processed_imma_observation(obs,obs_data,obs_type);
+    return processed_imma_observation(obs, obs_data, obs_type);
   } else if (metautils::args.data_format == "nodcbt") {
-    return processed_nodc_bt_observation(obs,obs_data,obs_type);
-  } else if (regex_search(metautils::args.data_format,regex("^td32"))) {
-    return processed_td32_observation(obs,obs_data,obs_type);
+    return processed_nodc_bt_observation(obs, obs_data, obs_type);
+  } else if (regex_search(metautils::args.data_format, regex("^td32"))) {
+    return processed_td32_observation(obs, obs_data, obs_type);
   } else if (metautils::args.data_format == "tsr") {
-    return processed_dss_tsr_observation(obs,obs_data,obs_type);
+    return processed_dss_tsr_observation(obs, obs_data, obs_type);
   } else if (metautils::args.data_format == "uadb") {
-    return processed_uadb_observation(obs,obs_data,obs_type);
+    return processed_uadb_observation(obs, obs_data, obs_type);
   } else if (metautils::args.data_format == "wmssc") {
-    return processed_wmssc_observation(obs,obs_data,obs_type);
+    return processed_wmssc_observation(obs, obs_data, obs_type);
   }
-  cerr << "Error: unable to scan format " << metautils::args.data_format << endl;
+  cerr << "Error: unable to scan format " << metautils::args.data_format <<
+      endl;
   exit(1);
 }
 
-bool open_file(void *istream,string filename)
-{
+bool open_file(void *istream, string filename) {
   if (metautils::args.data_format == "cpcsumm") {
-    return (reinterpret_cast<InputCPCSummaryObservationStream *>(istream))->open(filename);
+    return (reinterpret_cast<InputCPCSummaryObservationStream *>(istream))->
+        open(filename);
   } else if (metautils::args.data_format == "imma") {
-    return (reinterpret_cast<InputIMMAObservationStream *>(istream))->open(filename);
+    return (reinterpret_cast<InputIMMAObservationStream *>(istream))->open(
+        filename);
   } else if (metautils::args.data_format == "isd") {
-    return (reinterpret_cast<InputISDObservationStream *>(istream))->open(filename);
+    return (reinterpret_cast<InputISDObservationStream *>(istream))->open(
+        filename);
   } else if (metautils::args.data_format == "nodcbt") {
-    return (reinterpret_cast<InputNODCBTObservationStream *>(istream))->open(filename);
-  } else if (metautils::args.data_format == "on29" || metautils::args.data_format == "on124") {
+    return (reinterpret_cast<InputNODCBTObservationStream *>(istream))->open(
+        filename);
+  } else if (metautils::args.data_format == "on29" || metautils::args.
+      data_format == "on124") {
     return (reinterpret_cast<InputADPStream *>(istream))->open(filename);
-  } else if (regex_search(metautils::args.data_format,regex("^td32"))) {
+  } else if (regex_search(metautils::args.data_format, regex("^td32"))) {
     return (reinterpret_cast<InputTD32Stream *>(istream))->open(filename);
   } else if (metautils::args.data_format == "tsr") {
     return (reinterpret_cast<InputTsraobStream *>(istream))->open(filename);
   } else if (metautils::args.data_format == "uadb") {
     return (reinterpret_cast<InputUADBRaobStream *>(istream))->open(filename);
   } else if (metautils::args.data_format == "wmssc") {
-    return (reinterpret_cast<InputWMSSCObservationStream *>(istream))->open(filename);
+    return (reinterpret_cast<InputWMSSCObservationStream *>(istream))->open(
+        filename);
   }
-  log_error("open_file(): "+metautils::args.data_format+"-formatted file not recognized","obs2xml",USER);
+  log_error("open_file(): " + metautils::args.data_format + "-formatted file "
+      "not recognized", "obs2xml", USER);
   return false;
 }
 
