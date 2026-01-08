@@ -73,47 +73,59 @@ string clean_imma_id(string id) {
   return to_upper(sp[0]);
 }
 
-bool processed_isd_observation(std::unique_ptr<Observation>& obs,gatherxml::markup::ObML::ObservationData& obs_data,string& obs_type)
-{
+bool processed_isd_observation(unique_ptr<Observation>& obs, gatherxml::markup::
+    ObML::ObservationData& obs_data, string& obs_type) {
   ISDObservation *o=reinterpret_cast<ISDObservation *>(obs.get());
-  string rpt_type=o->report_type();
+  string rpt_type = o->report_type();
   string platform_type;
-  if (rpt_type == "FM-12" || rpt_type == "FM-15" || rpt_type == "FM-16" || rpt_type == "AUTO " || rpt_type == "SAO  " || rpt_type == "SAOSP" || rpt_type == "SY-AE" || rpt_type == "SY-SA" || rpt_type == "SY-MT" || rpt_type == "S-S-A" || rpt_type == "SMARS" || rpt_type == "AERO " || rpt_type == "NSRDB" || rpt_type == "SURF " || rpt_type == "MEXIC" || rpt_type == "BRAZ " || rpt_type == "AUST ") {
-    platform_type="land_station";
+  if (rpt_type == "FM-12" || rpt_type == "FM-15" || rpt_type == "FM-16" ||
+      rpt_type == "AUTO " || rpt_type == "SAO  " || rpt_type == "SAOSP" ||
+      rpt_type == "SY-AE" || rpt_type == "SY-SA" || rpt_type == "SY-MT" ||
+      rpt_type == "S-S-A" || rpt_type == "SMARS" || rpt_type == "AERO " ||
+      rpt_type == "NSRDB" || rpt_type == "SURF " || rpt_type == "MEXIC" ||
+      rpt_type == "BRAZ " || rpt_type == "AUST ") {
+    platform_type = "land_station";
   } else if (rpt_type == "FM-13") {
-    platform_type="roving_ship";
+    platform_type = "roving_ship";
   } else if (rpt_type == "FM-18") {
-    platform_type="drifting_buoy";
+    platform_type = "drifting_buoy";
   } else if (rpt_type == "99999") {
-    platform_type="unknown";
+    platform_type = "unknown";
   } else {
-    log_error("no platform and station mapping for report type '"+rpt_type+"'","obs2xml",USER);
+    log_error("no platform and station mapping for report type '" + rpt_type +
+        "'", "obs2xml", USER);
   }
-  std::deque<string> sp=split(o->location().ID,"-");
+  auto sp = split(o->location().ID, "-");
   if (sp[0] != "999999") {
-    ientry.key=platform_type+"[!]WMO+6[!]"+sp[0];
+    ientry.key = platform_type + "[!]WMO + 6[!]" + sp[0];
   } else if (sp[1] != "99999") {
-    ientry.key=platform_type+"[!]WBAN[!]"+sp[1];
+    ientry.key = platform_type + "[!]WBAN[!]" + sp[1];
   } else {
     trim(sp[2]);
-    ientry.key=platform_type+"[!]callSign[!]"+sp[2];
+    ientry.key = platform_type + "[!]callSign[!]" + sp[2];
   }
-  obs_type="surface";
-  if (!obs_data.added_to_platforms(obs_type,platform_type,obs->location().latitude,obs->location().longitude)) {
-    log_error("processed_isd_observation() returned error: '"+myerror+"' while adding platform "+obs_type+"-"+platform_type,"obs2xml",USER);
+  obs_type = "surface";
+  if (!obs_data.added_to_platforms(obs_type, platform_type, obs->
+      location().latitude, obs->location().longitude)) {
+    log_error("processed_isd_observation() returned error: '" + myerror +
+        "' while adding platform " + obs_type + "-" + platform_type, "obs2xml",
+        USER);
   }
-  auto start_date=o->date_time();
-  std::list<string> addl_data_codes=reinterpret_cast<ISDObservation *>(obs.get())->additional_data_codes();
+  auto start_date = o->date_time();
+  auto addl_data_codes = reinterpret_cast<ISDObservation *>(obs.get())->
+      additional_data_codes();
   addl_data_codes.push_front("MAN");
   for (const auto& code : addl_data_codes) {
-    if (!obs_data.added_to_ids(obs_type,ientry,code,"",obs->location().latitude,obs->location().longitude,-1.,&start_date)) {
-      log_error("processed_isd_observation() returned error: '"+myerror+"' while adding ID "+ientry.key+" for "+code,"obs2xml",USER);
+    if (!obs_data.added_to_ids(obs_type, ientry, code, "", obs->
+        location().latitude, obs->location().longitude, -1., &start_date)) {
+      log_error("processed_isd_observation() returned error: '" + myerror +
+          "' while adding ID " + ientry.key + " for " + code, "obs2xml", USER);
     }
   }
   return true;
 }
 
-bool processed_adp_observation(std::unique_ptr<Observation>& obs,gatherxml::markup::ObML::ObservationData& obs_data,string& obs_type)
+bool processed_adp_observation(unique_ptr<Observation>& obs,gatherxml::markup::ObML::ObservationData& obs_data,string& obs_type)
 {
   ADPObservation *o=reinterpret_cast<ADPObservation *>(obs.get());
   string platform_type;
@@ -250,7 +262,7 @@ bool processed_adp_observation(std::unique_ptr<Observation>& obs,gatherxml::mark
   return true;
 }
 
-bool processed_cpc_summary_observation(std::unique_ptr<Observation>& obs,gatherxml::markup::ObML::ObservationData& obs_data,string& obs_type)
+bool processed_cpc_summary_observation(unique_ptr<Observation>& obs,gatherxml::markup::ObML::ObservationData& obs_data,string& obs_type)
 {
   auto ID=obs->location().ID;
   if (ID.length() == 5) {
@@ -263,7 +275,7 @@ bool processed_cpc_summary_observation(std::unique_ptr<Observation>& obs,gatherx
     log_error("processed_cpc_summary_observation() returned error: '"+myerror+"' while adding platform","obs2xml",USER);
   }
   auto start_date=obs->date_time();
-  std::unique_ptr<DateTime> end_date;
+  unique_ptr<DateTime> end_date;
   if (start_date.day() == 0) {
     start_date.set_day(1);
     end_date.reset(new DateTime(start_date));
@@ -302,7 +314,7 @@ bool processed_cpc_summary_observation(std::unique_ptr<Observation>& obs,gatherx
   return true;
 }
 
-bool processed_imma_observation(std::unique_ptr<Observation>& obs,gatherxml::markup::ObML::ObservationData& obs_data,string& obs_type)
+bool processed_imma_observation(unique_ptr<Observation>& obs,gatherxml::markup::ObML::ObservationData& obs_data,string& obs_type)
 {
   IMMAObservation *o=reinterpret_cast<IMMAObservation *>(obs.get());
   auto id = clean_imma_id(obs->location().ID);
@@ -497,7 +509,7 @@ bool processed_imma_observation(std::unique_ptr<Observation>& obs,gatherxml::mar
   return true;
 }
 
-bool processed_nodc_bt_observation(std::unique_ptr<Observation>& obs,gatherxml::markup::ObML::ObservationData& obs_data,string& obs_type)
+bool processed_nodc_bt_observation(unique_ptr<Observation>& obs,gatherxml::markup::ObML::ObservationData& obs_data,string& obs_type)
 {
   ientry.key="roving_ship[!]NODC[!]"+obs->location().ID;
   obs_type="underwater";
@@ -535,7 +547,7 @@ bool processed_nodc_bt_observation(std::unique_ptr<Observation>& obs,gatherxml::
   return true;
 }
 
-bool processed_td32_observation(std::unique_ptr<Observation>& obs,gatherxml::markup::ObML::ObservationData& obs_data,string& obs_type)
+bool processed_td32_observation(unique_ptr<Observation>& obs,gatherxml::markup::ObML::ObservationData& obs_data,string& obs_type)
 {
   auto *o=reinterpret_cast<TD32Data *>(obs.get());
   auto id=obs->location().ID;
@@ -567,7 +579,7 @@ bool processed_td32_observation(std::unique_ptr<Observation>& obs,gatherxml::mar
           start_date.add_days(1);
         }
       }
-      std::unique_ptr<DateTime> end_date;
+      unique_ptr<DateTime> end_date;
       if (start_date.month() == 13) {
         start_date.set_month(1);
         end_date.reset(new DateTime(start_date));
@@ -610,7 +622,7 @@ bool processed_td32_observation(std::unique_ptr<Observation>& obs,gatherxml::mar
   return true;
 }
 
-bool processed_dss_tsr_observation(std::unique_ptr<Observation>& obs,gatherxml::markup::ObML::ObservationData& obs_data,string& obs_type)
+bool processed_dss_tsr_observation(unique_ptr<Observation>& obs,gatherxml::markup::ObML::ObservationData& obs_data,string& obs_type)
 {
   string id=obs->location().ID;
   if (std::regex_search(id,std::regex("^0"))) {
@@ -674,7 +686,7 @@ bool processed_dss_tsr_observation(std::unique_ptr<Observation>& obs,gatherxml::
   return true;
 }
 
-bool processed_uadb_observation(std::unique_ptr<Observation>& obs,gatherxml::markup::ObML::ObservationData& obs_data,string& obs_type)
+bool processed_uadb_observation(unique_ptr<Observation>& obs,gatherxml::markup::ObML::ObservationData& obs_data,string& obs_type)
 {
   string id=obs->location().ID;
   string platform_type;
@@ -744,7 +756,7 @@ bool processed_uadb_observation(std::unique_ptr<Observation>& obs,gatherxml::mar
   return true;
 }
 
-bool processed_wmssc_observation(std::unique_ptr<Observation>& obs,gatherxml::markup::ObML::ObservationData& obs_data,string& obs_type)
+bool processed_wmssc_observation(unique_ptr<Observation>& obs,gatherxml::markup::ObML::ObservationData& obs_data,string& obs_type)
 {
   auto *o=reinterpret_cast<WMSSCObservation *>(obs.get());
   auto can_continue=false;
@@ -820,7 +832,7 @@ bool processed_wmssc_observation(std::unique_ptr<Observation>& obs,gatherxml::ma
   return true;
 }
 
-bool processed_observation(std::unique_ptr<Observation>& obs,gatherxml::markup::ObML::ObservationData& obs_data,string& obs_type)
+bool processed_observation(unique_ptr<Observation>& obs,gatherxml::markup::ObML::ObservationData& obs_data,string& obs_type)
 {
   if (metautils::args.data_format == "isd") {
     return processed_isd_observation(obs,obs_data,obs_type);
@@ -879,8 +891,8 @@ struct InvEntry {
 
 void scan_file(gatherxml::markup::ObML::ObservationData& obs_data)
 {
-  std::unique_ptr<idstream> istream;
-  std::unique_ptr<Observation> obs;
+  unique_ptr<idstream> istream;
+  unique_ptr<Observation> obs;
   if (metautils::args.data_format == "cpcsumm") {
     istream.reset(new InputCPCSummaryObservationStream);
     obs.reset(new CPCSummaryObservation);
