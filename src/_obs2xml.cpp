@@ -678,136 +678,141 @@ bool processed_td32_observation(unique_ptr<Observation>& obs,gatherxml::markup::
   return true;
 }
 
-bool processed_dss_tsr_observation(unique_ptr<Observation>& obs,gatherxml::markup::ObML::ObservationData& obs_data,string& obs_type)
-{
-  string id=obs->location().ID;
-  if (regex_search(id,regex("^0"))) {
-    id=id.substr(1);
+bool processed_dss_tsr_observation(unique_ptr<Observation>& obs, gatherxml::
+    markup::ObML::ObservationData& obs_data, string& obs_type) {
+  auto id = obs->location().ID;
+  if (!id.empty() && id[0] == '0') {
+    id = id.substr(1);
   }
-  auto source=reinterpret_cast<Tsraob *>(obs.get())->flags().source;
+  auto source = reinterpret_cast<Tsraob *>(obs.get())->flags().source;
   string platform_type;
   switch (source) {
-    case 15:
-    {
+    case 15: {
       if (id.length() == 5 && id < "03000") {
         if (id < "00026" || id == "00091" || id == "00092") {
-          platform_type="ocean_station";
-          ientry.key=platform_type+"[!]WBAN[!]"+id;
+          platform_type = "ocean_station";
+          ientry.key = platform_type + "[!]WBAN[!]" + id;
         } else {
-          platform_type="roving_ship";
-          ientry.key=platform_type+"[!]other[!]"+id;
+          platform_type = "roving_ship";
+          ientry.key = platform_type + "[!]other[!]" + id;
         }
       } else if (id.length() == 6 && id >= "116000") {
-        platform_type="roving_ship";
-        ientry.key=platform_type+"[!]other[!]"+id;
+        platform_type = "roving_ship";
+        ientry.key = platform_type + "[!]other[!]" + id;
       } else {
-        platform_type="land_station";
-        ientry.key=platform_type+"[!]WBAN[!]"+id;
+        platform_type = "land_station";
+        ientry.key = platform_type + "[!]WBAN[!]" + id;
       }
       break;
     }
-    case 36:
-    {
+    case 36: {
       if (id >= "47000" && id <= "47999") {
-        platform_type="land_station";
-        ientry.key=platform_type+"[!]WMO[!]"+id;
+        platform_type = "land_station";
+        ientry.key = platform_type + "[!]WMO[!]" + id;
       } else
-        log_error("no platform and station mapping for source "+to_string(source)+" and ID '"+id+"'","obs2xml",USER);
+        log_error("no platform and station mapping for source " + to_string(
+            source) + " and ID '" + id + "'", "obs2xml", USER);
       break;
     }
     case 37:
-    case 38:
-    {
-      platform_type="land_station";
-      ientry.key=platform_type+"[!]WMO[!]"+id;
+    case 38: {
+      platform_type = "land_station";
+      ientry.key = platform_type + "[!]WMO[!]" + id;
       break;
     }
-    default:
-    {
-      log_error("no platform and station mapping for source "+to_string(source),"obs2xml","x","x");
+    default: {
+      log_error("no platform and station mapping for source " + to_string(
+          source), "obs2xml", "x", "x");
     }
   }
-  obs_type="upper_air";
-  if (!obs_data.added_to_platforms(obs_type,platform_type,obs->location().latitude,obs->location().longitude)) {
-    log_error("processed_dss_tsr_observation() returned error: '"+myerror+"' while adding platform "+obs_type+"-"+platform_type,"obs2xml",USER);
+  obs_type = "upper_air";
+  if (!obs_data.added_to_platforms(obs_type, platform_type, obs->
+      location().latitude, obs->location().longitude)) {
+    log_error("processed_dss_tsr_observation() returned error: '" + myerror +
+        "' while adding platform " + obs_type + "-" + platform_type, "obs2xml",
+        USER);
   }
-  auto start_date=obs->date_time();
-  auto fmt_code=reinterpret_cast<Tsraob *>(obs.get())->flags().format;
+  auto start_date = obs->date_time();
+  auto fmt_code = reinterpret_cast<Tsraob *>(obs.get())->flags().format;
   if (fmt_code >= 9 && fmt_code <= 14) {
-    fmt_code-=8;
+    fmt_code -= 8;
   }
-  if (!obs_data.added_to_ids(obs_type,ientry,to_string(fmt_code),"",obs->location().latitude,obs->location().longitude,-1.,&start_date)) {
-    log_error("processed_dss_tsr_observation() returned error: '"+myerror+"' while adding ID "+ientry.key+" for "+to_string(fmt_code),"obs2xml",USER);
+  if (!obs_data.added_to_ids(obs_type, ientry, to_string(fmt_code), "", obs->
+      location().latitude, obs->location().longitude, -1., &start_date)) {
+    log_error("processed_dss_tsr_observation() returned error: '" + myerror +
+        "' while adding ID " + ientry.key + " for " + to_string(fmt_code),
+        "obs2xml", USER);
   }
   return true;
 }
 
-bool processed_uadb_observation(unique_ptr<Observation>& obs,gatherxml::markup::ObML::ObservationData& obs_data,string& obs_type)
-{
-  string id=obs->location().ID;
+bool processed_uadb_observation(unique_ptr<Observation>& obs, gatherxml::
+    markup::ObML::ObservationData& obs_data, string& obs_type) {
+  string id = obs->location().ID;
   string platform_type;
   switch (reinterpret_cast<UADBRaob *>(obs.get())->ID_type()) {
-    case 1:
-    {
-      platform_type="land_station";
-      ientry.key=platform_type+"[!]WMO[!]"+id;
+    case 1: {
+      platform_type = "land_station";
+      ientry.key = platform_type + "[!]WMO[!]" + id;
       break;
     }
-    case 2:
-    {
-      platform_type="land_station";
-      ientry.key=platform_type+"[!]WBAN[!]"+id;
+    case 2: {
+      platform_type = "land_station";
+      ientry.key = platform_type + "[!]WBAN[!]" + id;
       break;
     }
-    case 3:
-    {
-      platform_type="land_station";
-      ientry.key=platform_type+"[!]callSign[!]"+id;
+    case 3: {
+      platform_type = "land_station";
+      ientry.key = platform_type + "[!]callSign[!]" + id;
       break;
     }
-    case 4:
-    {
-      platform_type="land_station";
-      ientry.key=platform_type+"[!]COOP[!]"+id;
+    case 4: {
+      platform_type = "land_station";
+      ientry.key = platform_type + "[!]COOP[!]" + id;
       break;
     }
-    case 5:
-    {
-      platform_type="land_station";
-      ientry.key=platform_type+"[!]name[!]"+id;
+    case 5: {
+      platform_type = "land_station";
+      ientry.key = platform_type + "[!]name[!]" + id;
       break;
     }
-    case 6:
-    {
-      platform_type="land_station";
-      ientry.key=platform_type+"[!]other[!]"+id;
+    case 6: {
+      platform_type = "land_station";
+      ientry.key = platform_type + "[!]other[!]" + id;
       break;
     }
     case 7:
-    case 8:
-    {
-      platform_type="land_station";
-      ientry.key=platform_type+"[!]WMO+6[!]"+id;
+    case 8: {
+      platform_type = "land_station";
+      ientry.key = platform_type + "[!]WMO + 6[!]" + id;
       break;
     }
-    case 9:
-    {
-      platform_type="land_station";
-      ientry.key=platform_type+"[!]CHUAN[!]"+id;
+    case 9: {
+      platform_type = "land_station";
+      ientry.key = platform_type + "[!]CHUAN[!]" + id;
       break;
     }
-    default:
-    {
-      log_error("no platform and station mapping for observation type "+to_string(reinterpret_cast<UADBRaob *>(obs.get())->ID_type()),"obs2xml","x","x");
+    default: {
+      log_error("no platform and station mapping for observation type " +
+          to_string(reinterpret_cast<UADBRaob *>(obs.get())->ID_type()),
+          "obs2xml", "x", "x");
     }
   }
-  obs_type="upper_air";
-  if (!obs_data.added_to_platforms(obs_type,platform_type,obs->location().latitude,obs->location().longitude)) {
-    log_error("processed_uadb_observation() returned error: '"+myerror+"' while adding platform "+obs_type+"-"+platform_type,"obs2xml",USER);
+  obs_type = "upper_air";
+  if (!obs_data.added_to_platforms(obs_type, platform_type, obs->
+      location().latitude, obs->location().longitude)) {
+    log_error("processed_uadb_observation() returned error: '" + myerror +
+        "' while adding platform " + obs_type + "-" + platform_type, "obs2xml",
+        USER);
   }
-  auto start_date=obs->date_time();
-  if (!obs_data.added_to_ids(obs_type,ientry,to_string(reinterpret_cast<UADBRaob *>(obs.get())->observation_type()),"",obs->location().latitude,obs->location().longitude,-1.,&start_date)) {
-    log_error("processed_uadb_observation() returned error: '"+myerror+"' while adding ID "+ientry.key+" for "+to_string(reinterpret_cast<UADBRaob *>(obs.get())->observation_type()),"obs2xml",USER);
+  auto start_date = obs->date_time();
+  if (!obs_data.added_to_ids(obs_type, ientry, to_string(reinterpret_cast<
+      UADBRaob *>(obs.get())->observation_type()), "", obs->location().latitude,
+      obs->location().longitude, -1., &start_date)) {
+    log_error("processed_uadb_observation() returned error: '" + myerror +
+        "' while adding ID " + ientry.key + " for " + to_string(
+        reinterpret_cast<UADBRaob *>(obs.get())->observation_type()), "obs2xml",
+        USER);
   }
   return true;
 }
