@@ -263,51 +263,88 @@ bool processed_adp_observation(unique_ptr<Observation>& obs, gatherxml::markup::
   return true;
 }
 
-bool processed_cpc_summary_observation(unique_ptr<Observation>& obs,gatherxml::markup::ObML::ObservationData& obs_data,string& obs_type)
-{
-  auto ID=obs->location().ID;
+bool processed_cpc_summary_observation(unique_ptr<Observation>& obs, gatherxml::
+    markup::ObML::ObservationData& obs_data, string& obs_type) {
+  auto ID = obs->location().ID;
   if (ID.length() == 5) {
-    ientry.key="land_station[!]WMO[!]"+ID;
+    ientry.key = "land_station[!]WMO[!]" + ID;
   } else {
-    ientry.key="land_station[!]callSign[!]"+ID;
+    ientry.key = "land_station[!]callSign[!]" + ID;
   }
-  obs_type="surface";
-  if (!obs_data.added_to_platforms(obs_type,"land_station",obs->location().latitude,obs->location().longitude)) {
-    log_error("processed_cpc_summary_observation() returned error: '"+myerror+"' while adding platform","obs2xml",USER);
+  obs_type = "surface";
+  if (!obs_data.added_to_platforms(obs_type, "land_station", obs->
+      location().latitude, obs->location().longitude)) {
+    log_error("processed_cpc_summary_observation() returned error: '" + myerror
+        + "' while adding platform", "obs2xml", USER);
   }
-  auto start_date=obs->date_time();
-  unique_ptr<DateTime> end_date;
+  auto start_date = obs->date_time();
+  unique_ptr<DateTime> end_date(nullptr);
   if (start_date.day() == 0) {
     start_date.set_day(1);
     end_date.reset(new DateTime(start_date));
-    end_date->set_day(dateutils::days_in_month(end_date->year(),end_date->month()));
+    end_date->set_day(dateutils::days_in_month(end_date->year(),
+        end_date->month()));
   }
-  if (!end_date) {
-    auto *cpcobs=reinterpret_cast<CPCSummaryObservation *>(obs.get());
-    const size_t NUM_DATA_TYPES=16;
-    static const string data_types[NUM_DATA_TYPES]={"RMAX","RMIN","RPRCP","EPRCP","VP","POTEV","VPD","SLP06","SLP12","SLP18","SLP00","APTMX","CHILLM","RAD","MXRH","MNRH"};
-    auto cpcrpt=cpcobs->CPC_daily_summary_data();
-    auto addl_data=cpcobs->additional_data();
-    float data_type_values[NUM_DATA_TYPES]={addl_data.data.tmax,addl_data.data.tmin,addl_data.data.pcp_amt,cpcrpt.eprcp,cpcrpt.vp,cpcrpt.potev,cpcrpt.vpd,cpcrpt.slp06,cpcrpt.slp12,cpcrpt.slp18,cpcrpt.slp00,cpcrpt.aptmx,cpcrpt.chillm,cpcrpt.rad,static_cast<float>(cpcrpt.mxrh),static_cast<float>(cpcrpt.mnrh)};
-    float missing[NUM_DATA_TYPES]={-99.,-99.,-99.,-99.,-9.,-9.,-9.,-99.,-99.,-99,-99.,-99.,-99.,-9.,-90.,-90.};
-    for (size_t n=0; n < NUM_DATA_TYPES; ++n) {
+  if (end_date == nullptr) {
+    auto *cpcobs = reinterpret_cast<CPCSummaryObservation *>(obs.get());
+    const size_t NUM_DATA_TYPES = 16;
+    static const string data_types[NUM_DATA_TYPES] = {
+        "RMAX", "RMIN", "RPRCP", "EPRCP", "VP", "POTEV", "VPD", "SLP06",
+        "SLP12", "SLP18", "SLP00", "APTMX", "CHILLM", "RAD", "MXRH", "MNRH"
+    };
+    auto cpcrpt = cpcobs->CPC_daily_summary_data();
+    auto addl_data = cpcobs->additional_data();
+    float data_type_values[NUM_DATA_TYPES] = {
+        addl_data.data.tmax, addl_data.data.tmin, addl_data.data.pcp_amt,
+        cpcrpt.eprcp, cpcrpt.vp, cpcrpt.potev, cpcrpt.vpd, cpcrpt.slp06,
+        cpcrpt.slp12, cpcrpt.slp18, cpcrpt.slp00, cpcrpt.aptmx, cpcrpt.chillm,
+        cpcrpt.rad, static_cast<float>(cpcrpt.mxrh),
+        static_cast<float>(cpcrpt.mnrh)
+    };
+    float missing[NUM_DATA_TYPES] = {
+        -99., -99., -99., -99., -9., -9., -9., -99., -99., -99, -99., -99.,
+        -99., -9., -90., -90.
+    };
+    for (size_t n = 0; n < NUM_DATA_TYPES; ++n) {
       if (data_type_values[n] > missing[n]) {
-        if (!obs_data.added_to_ids(obs_type,ientry,data_types[n],"",obs->location().latitude,obs->location().longitude,-1.,&start_date)) {
-          log_error("processed_cpc_summary_observation() returned error: '"+myerror+"' while adding daily ID "+ientry.key,"obs2xml",USER);
+        if (!obs_data.added_to_ids(obs_type, ientry, data_types[n], "", obs->
+            location().latitude, obs->location().longitude, -1., &start_date)) {
+          log_error("processed_cpc_summary_observation() returned error: '" +
+              myerror + "' while adding daily ID " + ientry.key, "obs2xml",
+              USER);
         }
       }
     }
   } else {
-    auto *cpcobs=reinterpret_cast<CPCSummaryObservation *>(obs.get());
-    const size_t NUM_DATA_TYPES=24;
-    static const string data_types[NUM_DATA_TYPES]={"TMEAN","TMAX","TMIN","HMAX","RMINL","CTMEAN","APTMAX","WCMIN","HMAXAPT","WCLMINL","RPCP","EPCP","CPCP","EPCPMX","AHS","AVP","APET","AVPD","TRAD","AMAXRH","AMINRH","IHDD","ICDD","IGDD"};
-    auto cpcrpt=cpcobs->CPC_monthly_summary_data();
-    float data_type_values[NUM_DATA_TYPES]={cpcrpt.tmean,cpcrpt.tmax,cpcrpt.tmin,cpcrpt.hmax,cpcrpt.rminl,cpcrpt.ctmean,cpcrpt.aptmax,cpcrpt.wcmin,cpcrpt.hmaxapt,cpcrpt.wclminl,cpcrpt.rpcp,cpcrpt.epcp,cpcrpt.cpcp,cpcrpt.epcpmax,cpcrpt.ahs,cpcrpt.avp,cpcrpt.apet,cpcrpt.avpd,cpcrpt.trad,static_cast<float>(cpcrpt.amaxrh),static_cast<float>(cpcrpt.aminrh),static_cast<float>(cpcrpt.ihdd),static_cast<float>(cpcrpt.icdd),static_cast<float>(cpcrpt.igdd)};
-    float missing[NUM_DATA_TYPES]={-99.,-99.,-99.,-99.,-99.,-99.,-99.,-99.,-99.,-99.,-99.,-99.,-99.,-99.,-9.,-9.,-9.,-9.,-9.,-990.,-990.,-990.,-990.,-990.};
-    for (size_t n=0; n < NUM_DATA_TYPES; ++n) {
+    auto *cpcobs = reinterpret_cast<CPCSummaryObservation *>(obs.get());
+    const size_t NUM_DATA_TYPES = 24;
+    static const string data_types[NUM_DATA_TYPES] = {
+        "TMEAN", "TMAX", "TMIN", "HMAX", "RMINL", "CTMEAN", "APTMAX", "WCMIN",
+        "HMAXAPT", "WCLMINL", "RPCP", "EPCP", "CPCP", "EPCPMX", "AHS", "AVP",
+        "APET", "AVPD", "TRAD", "AMAXRH", "AMINRH", "IHDD", "ICDD", "IGDD"
+    };
+    auto cpcrpt = cpcobs->CPC_monthly_summary_data();
+    float data_type_values[NUM_DATA_TYPES] = {
+        cpcrpt.tmean, cpcrpt.tmax, cpcrpt.tmin, cpcrpt.hmax, cpcrpt.rminl,
+        cpcrpt.ctmean, cpcrpt.aptmax, cpcrpt.wcmin, cpcrpt.hmaxapt,
+        cpcrpt.wclminl, cpcrpt.rpcp, cpcrpt.epcp, cpcrpt.cpcp, cpcrpt.epcpmax,
+        cpcrpt.ahs, cpcrpt.avp, cpcrpt.apet, cpcrpt.avpd, cpcrpt.trad,
+        static_cast<float>(cpcrpt.amaxrh), static_cast<float>(cpcrpt.aminrh),
+        static_cast<float>(cpcrpt.ihdd), static_cast<float>(cpcrpt.icdd),
+        static_cast<float>(cpcrpt.igdd)
+    };
+    float missing[NUM_DATA_TYPES] = {
+        -99., -99., -99., -99., -99., -99., -99., -99., -99., -99., -99., -99.,
+        -99., -99., -9., -9., -9., -9., -9., -990., -990., -990., -990., -990.
+    };
+    for (size_t n = 0; n < NUM_DATA_TYPES; ++n) {
       if (data_type_values[n] > missing[n]) {
-        if (!obs_data.added_to_ids(obs_type,ientry,data_types[n],"",obs->location().latitude,obs->location().longitude,-1.,&start_date,end_date.get())) {
-          log_error("processed_cpc_summary_observation() returned error: '"+myerror+"' while adding monthly ID "+ientry.key,"obs2xml",USER);
+        if (!obs_data.added_to_ids(obs_type, ientry, data_types[n], "", obs->
+            location().latitude, obs->location().longitude, -1., &start_date,
+            end_date.get())) {
+          log_error("processed_cpc_summary_observation() returned error: '" +
+              myerror + "' while adding monthly ID " + ientry.key, "obs2xml",
+              USER);
         }
       }
     }
