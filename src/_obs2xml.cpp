@@ -43,12 +43,12 @@ string myoutput = "";
 string mywarning = "";
 
 gatherxml::markup::ObML::IDEntry ientry;
-unique_ptr<TempFile> tfile;
-string inv_file;
-unique_ptr<TempDir> tdir;
-unique_ptr<TempDir> inv_dir(nullptr);
-std::ofstream inv_stream;
-bool verbose_operation=false;
+unique_ptr<TempFile> g_tfile;
+string g_inv_file;
+unique_ptr<TempDir> g_tdir;
+unique_ptr<TempDir> g_inv_dir(nullptr);
+std::ofstream g_inv_stream;
+bool verbose_operation = false;
 
 extern "C" void clean_up()
 {
@@ -915,23 +915,23 @@ void scan_file(gatherxml::markup::ObML::ObservationData& obs_data)
     std::cerr << "Error: format " << metautils::args.data_format << " not recognized" << std::endl;
     exit(1);
   }
-  tfile.reset(new TempFile);
-  tfile->open(metautils::args.temp_loc);
-  tdir.reset(new TempDir);
-  tdir->create(metautils::args.temp_loc);
+  g_tfile.reset(new TempFile);
+  g_tfile->open(metautils::args.temp_loc);
+  g_tdir.reset(new TempDir);
+  g_tdir->create(metautils::args.temp_loc);
   std::list<string> filelist;
   if (verbose_operation) {
     std::cout << "Preparing file for metadata scanning ..." << std::endl;
   }
   string file_format,error;
-  if (!metautils::primaryMetadata::prepare_file_for_metadata_scanning(*tfile,*tdir,&filelist,file_format,error)) {
+  if (!metautils::primaryMetadata::prepare_file_for_metadata_scanning(*g_tfile,*g_tdir,&filelist,file_format,error)) {
     metautils::log_error("prepare_file_for_metadata_scanning(): '"+error+"'","obs2xml",USER);
   }
   if (verbose_operation) {
     std::cout << "... preparation complete." << std::endl;
   }
   if (filelist.size() == 0) {
-    filelist.emplace_back(tfile->name());
+    filelist.emplace_back(g_tfile->name());
   }
   if (verbose_operation) {
     std::cout << "Ready to scan " << filelist.size() << " files." << std::endl;
@@ -942,11 +942,11 @@ void scan_file(gatherxml::markup::ObML::ObservationData& obs_data)
     if (verbose_operation) {
       std::cout << "Beginning scan of " << file << "..." << std::endl;
     }
-    if (!open_file(istream.get(),tfile->name())) {
+    if (!open_file(istream.get(),g_tfile->name())) {
       metautils::log_error("scan_file(): unable to open file for input","obs2xml",USER);
     }
     if (file_format.empty() && metautils::args.data_format == "isd") {
-      gatherxml::fileInventory::open(inv_file,inv_dir,inv_stream,"ObML","obs2xml",USER);
+      gatherxml::fileInventory::open(g_inv_file,g_inv_dir,g_inv_stream,"ObML","obs2xml",USER);
     } else if (metautils::args.inventory_only) {
       metautils::log_error("scan_file(): unable to inventory "+metautils::args.path+"/"+metautils::args.filename+" because archive format is '"+file_format+"' and data format is '"+metautils::args.data_format+"'","obs2xml",USER);
     }
@@ -959,7 +959,7 @@ void scan_file(gatherxml::markup::ObML::ObservationData& obs_data)
         if (obs->location().latitude > -99. && obs->location().longitude > -199.) {
           string obs_type,platform_type;
           if (processed_observation(obs,obs_data,obs_type)) {
-            if (inv_stream.is_open()) {
+            if (g_inv_stream.is_open()) {
               stringstream inv_line;
               inv_line << istream->current_record_offset() << "|" << num_bytes << "|" << obs->date_time().to_string("%Y%m%d%H%MM");
               InvEntry ie;
@@ -1001,19 +1001,19 @@ void scan_file(gatherxml::markup::ObML::ObservationData& obs_data)
     InvEntry ie;
     for (auto& key : inv_O_table.keys()) {
       inv_O_table.found(key,ie);
-      inv_stream << "O<!>" << ie.num << "<!>" << key << std::endl;
+      g_inv_stream << "O<!>" << ie.num << "<!>" << key << std::endl;
     }
     for (auto& key : inv_P_table.keys()) {
       inv_P_table.found(key,ie);
-      inv_stream << "P<!>" << ie.num << "<!>" << key << std::endl;
+      g_inv_stream << "P<!>" << ie.num << "<!>" << key << std::endl;
     }
     for (auto& key : inv_I_table.keys()) {
       inv_I_table.found(key,ie);
-      inv_stream << "I<!>" << ie.num << "<!>" << key << std::endl;
+      g_inv_stream << "I<!>" << ie.num << "<!>" << key << std::endl;
     }
-    inv_stream << "-----" << std::endl;
+    g_inv_stream << "-----" << std::endl;
     for (auto& line : inv_lines) {
-      inv_stream << line << std::endl;
+      g_inv_stream << line << std::endl;
     }
   }
 }
@@ -1108,8 +1108,8 @@ int main(int argc,char **argv)
       std::cerr << ess.str() << std::endl;
     }
   }
-  if (inv_stream.is_open()) {
-    gatherxml::fileInventory::close(inv_file,inv_dir,inv_stream,"ObML",metautils::args.update_summary,true,"obs2xml",USER);
+  if (g_inv_stream.is_open()) {
+    gatherxml::fileInventory::close(g_inv_file,g_inv_dir,g_inv_stream,"ObML",metautils::args.update_summary,true,"obs2xml",USER);
   }
   tmr.stop();
   metautils::log_warning("execution time: " + ftos(tmr.elapsed_time()) +
