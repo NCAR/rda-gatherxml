@@ -38,13 +38,14 @@ metautils::Args metautils::args;
 bool gatherxml::verbose_operation;
 auto env = getenv("USER");
 extern const string USER = (env == nullptr) ? "unknown" : env;
-string myerror="";
-string mywarning="";
+string myerror = "";
+string myoutput = "";
+string mywarning = "";
 
 gatherxml::markup::ObML::IDEntry ientry;
-std::unique_ptr<TempFile> tfile;
+unique_ptr<TempFile> tfile;
 string inv_file;
-std::unique_ptr<TempDir> tdir;
+unique_ptr<TempDir> tdir;
 unique_ptr<TempDir> inv_dir(nullptr);
 std::ofstream inv_stream;
 bool verbose_operation=false;
