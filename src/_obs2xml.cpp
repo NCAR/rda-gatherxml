@@ -38,6 +38,7 @@ using strutils::replace_all;
 using strutils::split;
 using strutils::to_upper;
 using strutils::trim;
+using unixutils::mysystem2;
 
 metautils::Directives metautils::directives;
 metautils::Args metautils::args;
@@ -938,14 +939,13 @@ bool open_file(void *istream,string filename)
 }
 
 struct InvEntry {
-  InvEntry() : key(),num(0) {}
+  InvEntry() : key(), num(0) { }
 
   string key;
   int num;
 };
 
-void scan_file(gatherxml::markup::ObML::ObservationData& obs_data)
-{
+void scan_file(gatherxml::markup::ObML::ObservationData& obs_data) {
   unique_ptr<idstream> istream;
   unique_ptr<Observation> obs;
   if (metautils::args.data_format == "cpcsumm") {
@@ -960,14 +960,19 @@ void scan_file(gatherxml::markup::ObML::ObservationData& obs_data)
   } else if (metautils::args.data_format == "nodcbt") {
     istream.reset(new InputNODCBTObservationStream);
     obs.reset(new NODCBTObservation);
-  } else if (metautils::args.data_format == "on29" || metautils::args.data_format == "on124") {
+  } else if (metautils::args.data_format == "on29" || metautils::args.
+      data_format == "on124") {
     istream.reset(new InputADPStream);
     obs.reset(new ADPObservation);
   } else if (regex_search(metautils::args.data_format,regex("^td32"))) {
-    if (metautils::args.data_format == "td3200" || metautils::args.data_format == "td3210" || metautils::args.data_format == "td3220" || metautils::args.data_format == "td3240" || metautils::args.data_format == "td3260" || metautils::args.data_format == "td3280") {
+    if (metautils::args.data_format == "td3200" || metautils::args.data_format
+        == "td3210" || metautils::args.data_format == "td3220" || metautils::
+        args.data_format == "td3240" || metautils::args.data_format == "td3260"
+        || metautils::args.data_format == "td3280") {
       istream.reset(new InputTD32Stream);
     } else {
-      cerr << "Error: format " << metautils::args.data_format << " not recognized" << endl;
+      cerr << "Error: format " << metautils::args.data_format << " not "
+          "recognized" << endl;
       exit(1);
     }
     obs.reset(new TD32Data);
@@ -981,7 +986,8 @@ void scan_file(gatherxml::markup::ObML::ObservationData& obs_data)
     istream.reset(new InputWMSSCObservationStream);
     obs.reset(new WMSSCObservation);
   } else {
-    cerr << "Error: format " << metautils::args.data_format << " not recognized" << endl;
+    cerr << "Error: format " << metautils::args.data_format << " not recognized"
+        << endl;
     exit(1);
   }
   g_tfile.reset(new TempFile);
@@ -993,8 +999,10 @@ void scan_file(gatherxml::markup::ObML::ObservationData& obs_data)
     std::cout << "Preparing file for metadata scanning ..." << endl;
   }
   string file_format,error;
-  if (!metautils::primaryMetadata::prepare_file_for_metadata_scanning(*g_tfile,*g_tdir,&filelist,file_format,error)) {
-    log_error("prepare_file_for_metadata_scanning(): '"+error+"'","obs2xml",USER);
+  if (!metautils::primaryMetadata::prepare_file_for_metadata_scanning(*g_tfile,
+      *g_tdir, &filelist, file_format, error)) {
+    log_error("prepare_file_for_metadata_scanning(): '" + error + "'",
+        "obs2xml", USER);
   }
   if (verbose_operation) {
     std::cout << "... preparation complete." << endl;
@@ -1005,60 +1013,69 @@ void scan_file(gatherxml::markup::ObML::ObservationData& obs_data)
   if (verbose_operation) {
     std::cout << "Ready to scan " << filelist.size() << " files." << endl;
   }
-  my::map<InvEntry> inv_O_table,inv_P_table,inv_I_table;
+  my::map<InvEntry> inv_O_table, inv_P_table, inv_I_table;
   std::list<string> inv_lines;
   for (const auto& file : filelist) {
     if (verbose_operation) {
       std::cout << "Beginning scan of " << file << "..." << endl;
     }
-    if (!open_file(istream.get(),g_tfile->name())) {
-      log_error("scan_file(): unable to open file for input","obs2xml",USER);
+    if (!open_file(istream.get(), g_tfile->name())) {
+      log_error("scan_file(): unable to open file for input", "obs2xml", USER);
     }
     if (file_format.empty() && metautils::args.data_format == "isd") {
-      gatherxml::fileInventory::open(g_inv_file,g_inv_dir,g_inv_stream,"ObML","obs2xml",USER);
+      gatherxml::fileInventory::open(g_inv_file, g_inv_dir, g_inv_stream,
+          "ObML", "obs2xml", USER);
     } else if (metautils::args.inventory_only) {
-      log_error("scan_file(): unable to inventory "+metautils::args.path+"/"+metautils::args.filename+" because archive format is '"+file_format+"' and data format is '"+metautils::args.data_format+"'","obs2xml",USER);
+      log_error("scan_file(): unable to inventory " + metautils::args.path + "/"
+          + metautils::args.filename + " because archive format is '" +
+          file_format + "' and data format is '" + metautils::args.data_format +
+          "'", "obs2xml", USER);
     }
-    const size_t BUF_LEN=80000;
+    const size_t BUF_LEN = 80000;
     unsigned char buffer[BUF_LEN];
-    int num_bytes;
-    while ( (num_bytes=istream->read(buffer,BUF_LEN)) != bfstream::eof) {
+    auto num_bytes = istream->read(buffer, BUF_LEN);
+    while (num_bytes != bfstream::eof) {
       if (num_bytes > 0) {
-        obs->fill(buffer,Observation::full_report);
-        if (obs->location().latitude > -99. && obs->location().longitude > -199.) {
-          string obs_type,platform_type;
-          if (processed_observation(obs,obs_data,obs_type)) {
+        obs->fill(buffer, Observation::full_report);
+        if (obs->location().latitude > -99. && obs->location().longitude >
+            -199.) {
+          string obs_type, platform_type;
+          if (processed_observation(obs, obs_data, obs_type)) {
             if (g_inv_stream.is_open()) {
               stringstream inv_line;
-              inv_line << istream->current_record_offset() << "|" << num_bytes << "|" << obs->date_time().to_string("%Y%m%d%H%MM");
+              inv_line << istream->current_record_offset() << "|" << num_bytes
+                  << "|" << obs->date_time().to_string("%Y%m%d%H%MM");
               InvEntry ie;
               if (!inv_O_table.found(obs_type,ie)) {
-                ie.key=obs_type;
-                ie.num=inv_O_table.size();
+                ie.key = obs_type;
+                ie.num = inv_O_table.size();
                 inv_O_table.insert(ie);
               }
               inv_line << "|" << ie.num;
-              auto iparts=split(ientry.key,"[!]");
-              if (!inv_P_table.found(iparts[0],ie)) {
-                ie.key=iparts[0];
-                ie.num=inv_P_table.size();
+              auto iparts = split(ientry.key, "[!]");
+              if (!inv_P_table.found(iparts[0], ie)) {
+                ie.key = iparts[0];
+                ie.num = inv_P_table.size();
                 inv_P_table.insert(ie);
               }
               inv_line << "|" << ie.num;
-              ie.key=iparts[1]+"|"+iparts[2];
+              ie.key = iparts[1] + "|" + iparts[2];
               if (!inv_I_table.found(ie.key,ie)) {
-                ie.num=inv_I_table.size();
+                ie.num = inv_I_table.size();
                 inv_I_table.insert(ie);
               }
               inv_line << "|" << ie.num;
-              inv_line << "|" << ftos(obs->location().latitude,4) << "|" << ftos(obs->location().longitude,4);
+              inv_line << "|" << ftos(obs->location().latitude,4) << "|" <<
+                  ftos(obs->location().longitude,4);
               inv_lines.emplace_back(inv_line.str());
             }
           }
         }
       } else {
-        log_error("unable to read observation "+to_string(istream->number_read()+1)+"; error: '"+myerror+"'","obs2xml",USER);
+        log_error("unable to read observation " + to_string(istream->
+            number_read() + 1) + "; error: '" + myerror + "'", "obs2xml", USER);
       }
+      num_bytes = istream->read(buffer, BUF_LEN);
     }
     istream->close();
     if (verbose_operation) {
@@ -1087,28 +1104,25 @@ void scan_file(gatherxml::markup::ObML::ObservationData& obs_data)
   }
 }
 
-extern "C" void segv_handler(int)
-{
+extern "C" void segv_handler(int) {
   clean_up();
   metautils::cmd_unregister();
-  log_error("core dump","obs2xml",USER);
+  log_error("core dump", "obs2xml", USER);
 }
 
-extern "C" void int_handler(int)
-{
+extern "C" void int_handler(int) {
   clean_up();
   metautils::cmd_unregister();
 }
 
-int main(int argc,char **argv)
-{
-  string web_home,flags,key;
-
+int main(int argc, char **argv) {
   if (argc < 4) {
-    cerr << "usage: obs2xml -f format -d [ds]nnn.n [-l local_name] [options...] path" << endl << endl;
+    cerr << "usage: obs2xml -f format -d [ds]nnn.n [-l local_name] "
+        "[options...] path" << endl << endl;
     cerr << "required (choose one):" << endl;
     cerr << "-f cpcsumm   CPC Summary of Day/Month format" << endl;
-    cerr << "-f imma      International Maritime Meteorological Archive format" << endl;
+    cerr << "-f imma      International Maritime Meteorological Archive format"
+        << endl;
     cerr << "-f isd       NCDC ISD format" << endl;
     cerr << "-f nodcbt    NODC BT format" << endl;
     cerr << "-f on29      ADP ON29 format" << endl;
@@ -1121,33 +1135,41 @@ int main(int argc,char **argv)
     cerr << "-f td3280    NCDC TD3280 format" << endl;
     cerr << "-f tsr       DSS Tsraob format" << endl;
     cerr << "-f uadb      Upper Air Database ASCII format" << endl;
-    cerr << "-f wmssc     DSS World Monthly Surface Station Climatology format" << endl;
+    cerr << "-f wmssc     DSS World Monthly Surface Station Climatology format"
+        << endl;
     cerr << "\nrequired:" << endl;
-    cerr << "-d <nnn.n> nnn.n is the dataset number to which this data file belongs" << endl;
+    cerr << "-d <nnn.n> nnn.n is the dataset number to which this data file "
+        "belongs" << endl;
     cerr << "\nrequired:" << endl;
-    cerr << "<path>     full MSS path or URL of file to read" << endl;
+    cerr << "<path>     URL of file to read" << endl;
     cerr << "options:" << endl;
     if (USER == "dattore") {
-      cerr << "-NC              don't check to see if the MSS file is a primary for the dataset" << endl;
+      cerr << "-NC              don't check to see if the MSS file is a "
+          "primary for the dataset" << endl;
     }
-    cerr << "-g/-G            update/don't update graphics (default is -g)" << endl;
-    cerr << "-I               inventory only; no content metadata generated" << endl;
+    cerr << "-g/-G            update/don't update graphics (default is -g)" <<
+        endl;
+    cerr << "-I               inventory only; no content metadata generated" <<
+        endl;
     cerr << "-l <local_name>  name of the MSS file on local disk (this avoids an MSS read)" << endl;
-    cerr << "-u/-U            update/don't update the database (default is -u)" << endl;
+    cerr << "-u/-U            update/don't update the database (default is -u)"
+        << endl;
     exit(1);
   }
-  signal(SIGSEGV,segv_handler);
-  signal(SIGINT,int_handler);
+  signal(SIGSEGV, segv_handler);
+  signal(SIGINT, int_handler);
   atexit(clean_up);
-  auto arg_delimiter='!';
-  metautils::args.args_string=unixutils::unix_args_string(argc,argv,arg_delimiter);
-  metautils::read_config("obs2xml",USER);
+  auto arg_delimiter = '!';
+  metautils::args.args_string = unixutils::unix_args_string(argc, argv,
+      arg_delimiter);
+  metautils::read_config("obs2xml", USER);
   gatherxml::parse_args(arg_delimiter);
-  flags="-f";
-  if (!metautils::args.inventory_only && regex_search(metautils::args.path,regex("^https://rda.ucar.edu"))) {
-    flags="-wf";
+  string flags = "-f";
+  if (!metautils::args.inventory_only && regex_search(metautils::args.path,
+      regex("^https://(gdex|rda).ucar.edu"))) {
+    flags = "-wf";
   }
-  metautils::cmd_register("obs2xml",USER);
+  metautils::cmd_register("obs2xml", USER);
   if (!metautils::args.inventory_only) {
     metautils::check_for_existing_cmd("ObML", "obs2xml", USER);
   }
@@ -1157,28 +1179,33 @@ int main(int argc,char **argv)
   scan_file(obs_data);
   if (!metautils::args.inventory_only) {
     if (!obs_data.is_empty) {
-      gatherxml::markup::ObML::write(obs_data,"obs2xml",USER);
+      gatherxml::markup::ObML::write(obs_data, "obs2xml", USER);
     } else {
-      log_error("all stations have missing location information - no usable data found; no content metadata will be saved for this file","obs2xml",USER);
+      log_error("all stations have missing location information - no usable "
+          "data found; no content metadata will be saved for this file",
+          "obs2xml", USER);
     }
   }
   if (metautils::args.update_db) {
     if (!metautils::args.update_graphics) {
-      flags="-G "+flags;
+      flags = "-G " + flags;
     }
     if (!metautils::args.regenerate) {
-      flags="-R "+flags;
+      flags = "-R " + flags;
     }
     if (!metautils::args.update_summary) {
-      flags="-S "+flags;
+      flags = "-S " + flags;
     }
-    stringstream oss,ess;
-    if (unixutils::mysystem2(metautils::directives.local_root+"/bin/scm -d "+metautils::args.dsid+" "+flags+" "+metautils::args.filename+".ObML",oss,ess) < 0) {
+    stringstream oss, ess;
+    if (mysystem2(metautils::directives.local_root + "/bin/scm -d " +
+        metautils::args.dsid + " " + flags + " " + metautils::args.filename +
+        ".ObML", oss, ess) < 0) {
       cerr << ess.str() << endl;
     }
   }
   if (g_inv_stream.is_open()) {
-    gatherxml::fileInventory::close(g_inv_file,g_inv_dir,g_inv_stream,"ObML",metautils::args.update_summary,true,"obs2xml",USER);
+    gatherxml::fileInventory::close(g_inv_file, g_inv_dir, g_inv_stream, "ObML",
+        metautils::args.update_summary, true, "obs2xml", USER);
   }
   tmr.stop();
   metautils::log_warning("execution time: " + ftos(tmr.elapsed_time()) +
