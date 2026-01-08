@@ -565,77 +565,92 @@ bool processed_imma_observation(unique_ptr<Observation>& obs, gatherxml::
   return true;
 }
 
-bool processed_nodc_bt_observation(unique_ptr<Observation>& obs,gatherxml::markup::ObML::ObservationData& obs_data,string& obs_type)
-{
-  ientry.key="roving_ship[!]NODC[!]"+obs->location().ID;
-  obs_type="underwater";
-  if (!obs_data.added_to_platforms(obs_type,"roving_ship",obs->location().latitude,obs->location().longitude)) {
-    log_error("processed_nodc_bt_observation() returned error: '"+myerror+"' while adding platform","obs2xml",USER);
+bool processed_nodc_bt_observation(unique_ptr<Observation>& obs, gatherxml::
+    markup::ObML::ObservationData& obs_data, string& obs_type) {
+  ientry.key = "roving_ship[!]NODC[!]" + obs->location().ID;
+  obs_type = "underwater";
+  if (!obs_data.added_to_platforms(obs_type, "roving_ship", obs->
+      location().latitude, obs->location().longitude)) {
+    log_error("processed_nodc_bt_observation() returned error: '" + myerror +
+        "' while adding platform", "obs2xml", USER);
   }
-  auto start_date=obs->date_time();
-  NODCBTObservation *nodcobs=reinterpret_cast<NODCBTObservation *>(obs.get());
-  auto data_type=nodcobs->data_type();
+  auto start_date = obs->date_time();
+  NODCBTObservation *nodcobs = reinterpret_cast<NODCBTObservation *>(obs.get());
+  auto data_type = nodcobs->data_type();
   trim(data_type);
-  if (!obs_data.added_to_ids(obs_type,ientry,data_type,"",obs->location().latitude,obs->location().longitude,-1.,&start_date)) {
-    log_error("processed_nodc_bt_observation() returned error: '"+myerror+"' while adding ID "+ientry.key+"for "+data_type,"obs2xml",USER);
+  if (!obs_data.added_to_ids(obs_type, ientry, data_type, "", obs->
+      location().latitude, obs->location().longitude, -1., &start_date)) {
+    log_error("processed_nodc_bt_observation() returned error: '" + myerror +
+        "' while adding ID " + ientry.key + "for " + data_type, "obs2xml",
+        USER);
   }
   gatherxml::markup::ObML::DataTypeEntry dte;
   ientry.data->data_types_table.found(data_type,dte);
   if (dte.data->vdata == nullptr) {
-    dte.data->vdata.reset(new gatherxml::markup::ObML::DataTypeEntry::Data::VerticalData);
+    dte.data->vdata.reset(new gatherxml::markup::ObML::DataTypeEntry::Data::
+        VerticalData);
   }
-  short nlev=nodcobs->number_of_levels();
-  NODCBTObservation::Level lmin=nodcobs->level(0);
-  lmin.depth=-lmin.depth;
-  NODCBTObservation::Level lmax=nodcobs->level(nlev-1);
-  lmax.depth=-lmax.depth;
+  short nlev = nodcobs->number_of_levels();
+  auto lmin = nodcobs->level(0);
+  lmin.depth =- lmin.depth;
+  auto lmax = nodcobs->level(nlev - 1);
+  lmax.depth =- lmax.depth;
   if (lmin.depth > dte.data->vdata->max_altitude) {
-    dte.data->vdata->max_altitude=lmin.depth;
+    dte.data->vdata->max_altitude = lmin.depth;
   }
   if (lmax.depth < dte.data->vdata->min_altitude) {
-    dte.data->vdata->min_altitude=lmax.depth;
+    dte.data->vdata->min_altitude = lmax.depth;
   }
-  dte.data->vdata->avg_nlev+=nlev;
+  dte.data->vdata->avg_nlev += nlev;
   if (nlev > 1) {
-    dte.data->vdata->avg_res+=fabs(lmax.depth-lmin.depth)/static_cast<float>(nlev-1);
+    dte.data->vdata->avg_res += fabs(lmax.depth-lmin.depth) / static_cast<
+        float>(nlev - 1);
     ++(dte.data->vdata->res_cnt);
   }
   return true;
 }
 
-bool processed_td32_observation(unique_ptr<Observation>& obs,gatherxml::markup::ObML::ObservationData& obs_data,string& obs_type)
-{
-  auto *o=reinterpret_cast<TD32Data *>(obs.get());
-  auto id=obs->location().ID;
-  auto header=o->header();
-  if (metautils::args.data_format == "td3210" || metautils::args.data_format == "td3280") {
-    id=id.substr(3);
-    ientry.key="land_station[!]WBAN[!]"+id;
+bool processed_td32_observation(unique_ptr<Observation>& obs, gatherxml::
+    markup::ObML::ObservationData& obs_data, string& obs_type) {
+  auto *o = reinterpret_cast<TD32Data *>(obs.get());
+  auto id = obs->location().ID;
+  auto header = o->header();
+  if (metautils::args.data_format == "td3210" || metautils::args.data_format ==
+      "td3280") {
+    id = id.substr(3);
+    ientry.key = "land_station[!]WBAN[!]" + id;
   } else {
-    id=id.substr(0,6);
-    ientry.key="land_station[!]COOP[!]"+id;
+    id = id.substr(0, 6);
+    ientry.key = "land_station[!]COOP[!]" + id;
   }
-  obs_type="surface";
-  auto reports=o->reports();
-  for (size_t n=0; n < reports.size(); ++n) {
+  obs_type = "surface";
+  auto reports = o->reports();
+  for (size_t n = 0; n < reports.size(); ++n) {
     if (reports[n].flag1 != 'M') {
-      if (!obs_data.added_to_platforms(obs_type,"land_station",reports[n].loc.latitude,reports[n].loc.longitude)) {
-        log_error("processed_td32_observation() returned error: '"+myerror+"' while adding platform ("+to_string(n)+")","obs2xml",USER);
+      if (!obs_data.added_to_platforms(obs_type, "land_station", reports[n].loc.
+          latitude, reports[n].loc.longitude)) {
+        log_error("processed_td32_observation() returned error: '" + myerror +
+            "' while adding platform (" + to_string(n) + ")", "obs2xml", USER);
       }
       DateTime start_date;
       if (header.type == "DLY") {
-        start_date.set(reports[n].date_time.year(),reports[n].date_time.month(),reports[n].date_time.day(),reports[n].date_time.time()/10000+9999);
+        start_date.set(reports[n].date_time.year(), reports[n].date_time.
+            month(), reports[n].date_time.day(), (reports[n].date_time.time() /
+            10000 + 9999));
         start_date.set_utc_offset(-2400);
       } else if (header.type == "MLY") {
-        start_date.set(reports[n].date_time.year(),reports[n].date_time.month(),reports[n].date_time.day(),999999);
+        start_date.set(reports[n].date_time.year(), reports[n].date_time.
+            month(), reports[n].date_time.day(), 999999);
       } else {
-        start_date.set(reports[n].date_time.year(),reports[n].date_time.month(),reports[n].date_time.day(),reports[n].date_time.time()/10000+99);
+        start_date.set(reports[n].date_time.year(), reports[n].date_time.
+            month(), reports[n].date_time.day(), (reports[n].date_time.time() /
+            10000 + 99));
         if (start_date.time() == 240099 || start_date.time() == 250099) {
           start_date.set_time(99);
           start_date.add_days(1);
         }
       }
-      unique_ptr<DateTime> end_date;
+      unique_ptr<DateTime> end_date(nullptr);
       if (start_date.month() == 13) {
         start_date.set_month(1);
         end_date.reset(new DateTime(start_date));
@@ -643,34 +658,45 @@ bool processed_td32_observation(unique_ptr<Observation>& obs,gatherxml::markup::
       }
       if (start_date.day() == 0) {
         start_date.set_day(1);
-        if (!end_date) {
+        if (end_date == nullptr) {
           end_date.reset(new DateTime(start_date));
         }
-        end_date->set_day(dateutils::days_in_month(end_date->year(),end_date->month()));
+        end_date->set_day(dateutils::days_in_month(end_date->year(), end_date->
+            month()));
       }
       if (header.type == "HPD") {
-        if (reports[n].date_time.time()/100 == 2500) {
+        if ( (reports[n].date_time.time() / 100) == 2500) {
           start_date.subtract_minutes(1439);
         } else {
           start_date.subtract_minutes(59);
         }
       } else if (header.type == "15M") {
-        if (reports[n].date_time.time()/100 == 2500) {
+        if ( (reports[n].date_time.time() / 100) == 2500) {
           start_date.subtract_minutes(1439);
         } else {
           start_date.subtract_minutes(14);
         }
       }
-      if (!obs_data.added_to_ids(obs_type,ientry,header.elem,"",reports[n].loc.latitude,reports[n].loc.longitude,-1.,&start_date,end_date.get())) {
-        log_error("processed_td32_observation() returned error: '"+myerror+"' while adding ID "+ientry.key+" for "+header.elem,"obs2xml",USER);
+      if (!obs_data.added_to_ids(obs_type,ientry, header.elem, "", reports[n].
+          loc.latitude, reports[n].loc.longitude, -1., &start_date, end_date.
+          get())) {
+        log_error("processed_td32_observation() returned error: '" + myerror +
+            "' while adding ID " + ientry.key + " for " + header.elem,
+            "obs2xml", USER);
       }
       if (header.elem == "HPCP" && reports[n].date_time.time() == 2500) {
-        if (!obs_data.added_to_ids(obs_type,ientry,"DPCP","",reports[n].loc.latitude,reports[n].loc.longitude,-1.,&start_date)) {
-          log_error("processed_td32_observation() returned error: '"+myerror+"' while adding ID "+ientry.key+" for DPCP","obs2xml",USER);
+        if (!obs_data.added_to_ids(obs_type, ientry, "DPCP", "", reports[n].loc.
+            latitude, reports[n].loc.longitude, -1., &start_date)) {
+          log_error("processed_td32_observation() returned error: '" + myerror +
+              "' while adding ID " + ientry.key + " for DPCP", "obs2xml", USER);
         }
       } else if (header.type == "MLY" && reports[n].date_time.month() == 13) {
-        if (!obs_data.added_to_ids(obs_type,ientry,header.elem+"_y","",reports[n].loc.latitude,reports[n].loc.longitude,-1.,&start_date,end_date.get())) {
-          log_error("processed_td32_observation() returned error: '"+myerror+"' while adding ID "+ientry.key+" for "+header.elem+"_y","obs2xml",USER);
+        if (!obs_data.added_to_ids(obs_type, ientry, header.elem+"_y", "",
+            reports[n].loc.latitude, reports[n].loc.longitude, -1., &start_date,
+            end_date.get())) {
+          log_error("processed_td32_observation() returned error: '" + myerror +
+              "' while adding ID " + ientry.key + " for " + header.elem + "_y",
+              "obs2xml", USER);
         }
       }
     }
