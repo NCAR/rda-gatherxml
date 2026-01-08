@@ -352,9 +352,9 @@ bool processed_cpc_summary_observation(unique_ptr<Observation>& obs, gatherxml::
   return true;
 }
 
-bool processed_imma_observation(unique_ptr<Observation>& obs,gatherxml::markup::ObML::ObservationData& obs_data,string& obs_type)
-{
-  IMMAObservation *o=reinterpret_cast<IMMAObservation *>(obs.get());
+bool processed_imma_observation(unique_ptr<Observation>& obs, gatherxml::
+    markup::ObML::ObservationData& obs_data, string& obs_type) {
+  IMMAObservation *o = reinterpret_cast<IMMAObservation *>(obs.get());
   auto id = clean_imma_id(obs->location().ID);
   if (id.empty()) {
     return false;
@@ -433,7 +433,10 @@ bool processed_imma_observation(unique_ptr<Observation>& obs,gatherxml::markup::
               break;
             }
             default: {
-              log_error("platform type "+to_string(o->platform_type().atti)+"/"+to_string(o->platform_type().code)+" not recognized - obs date: "+obs->date_time().to_string()+", ID type: "+to_string(o->ID_type()),"obs2xml",USER);
+              log_error("platform type " + to_string(o->platform_type().atti) +
+                  "/" + to_string(o->platform_type().code) + " not recognized "
+                  "- obs date: " + obs->date_time().to_string() + ", ID type: "
+                  + to_string(o->ID_type()), "obs2xml", USER);
             }
           }
         }
@@ -447,17 +450,23 @@ bool processed_imma_observation(unique_ptr<Observation>& obs,gatherxml::markup::
           break;
         }
         default: {
-          log_error("platform type "+to_string(o->platform_type().atti)+"/"+to_string(o->platform_type().code)+" not recognized","obs2xml",USER);
+          log_error("platform type " + to_string(o->platform_type().atti) + "/"
+              + to_string(o->platform_type().code) + " not recognized",
+              "obs2xml", USER);
         }
       }
       break;
     }
     default: {
-      log_error("platform type "+to_string(o->platform_type().atti)+"/"+to_string(o->platform_type().code)+" not recognized","obs2xml",USER);
+      log_error("platform type " + to_string(o->platform_type().atti) + "/" +
+          to_string(o->platform_type().code) + " not recognized", "obs2xml",
+          USER);
     }
   }
-  auto start_date=obs->date_time();
-  if (start_date.day() < 1 || static_cast<size_t>(start_date.day()) > dateutils::days_in_month(start_date.year(),start_date.month()) || start_date.time() > 235959) {
+  auto start_date = obs->date_time();
+  if (start_date.day() < 1 || static_cast<size_t>(start_date.day()) >
+      dateutils::days_in_month(start_date.year(),start_date.month()) ||
+      start_date.time() > 235959) {
     return false;
   }
   ientry.key = platform_type + "[!]";
@@ -529,19 +538,27 @@ bool processed_imma_observation(unique_ptr<Observation>& obs,gatherxml::markup::
       break;
     }
     default: {
-      log_error("ID type "+to_string(o->ID_type())+" not recognized - obs date: "+obs->date_time().to_string(),"obs2xml",USER);
+      log_error("ID type " + to_string(o->ID_type()) + " not recognized - obs "
+          "date: " + obs->date_time().to_string(), "obs2xml", USER);
     }
   }
-  ientry.key+="[!]"+id;
-  obs_type="surface";
-  if (!obs_data.added_to_platforms(obs_type,platform_type,obs->location().latitude,obs->location().longitude)) {
-    log_error("processed_imma_observation() returned error: '"+myerror+"' while adding platform "+obs_type+"-"+platform_type,"obs2xml",USER);
+  ientry.key += "[!]" + id;
+  obs_type = "surface";
+  if (!obs_data.added_to_platforms(obs_type, platform_type, obs->
+      location().latitude, obs->location().longitude)) {
+    log_error("processed_imma_observation() returned error: '" + myerror +
+        "' while adding platform " + obs_type + "-" + platform_type, "obs2xml",
+        USER);
   }
-  std::list<short> attm_ids=reinterpret_cast<IMMAObservation *>(obs.get())->attachment_ID_list();
+  auto attm_ids = reinterpret_cast<IMMAObservation *>(obs.get())->
+      attachment_ID_list();
   attm_ids.emplace_front(0);
   for (const auto& attm_id : attm_ids) {
-    if (!obs_data.added_to_ids(obs_type,ientry,to_string(attm_id),"",obs->location().latitude,obs->location().longitude,-1.,&start_date)) {
-      log_error("processed_imma_observation() returned error: '"+myerror+"' while adding ID "+ientry.key+" for "+to_string(attm_id),"obs2xml",USER);
+    if (!obs_data.added_to_ids(obs_type, ientry, to_string(attm_id), "", obs->
+        location().latitude, obs->location().longitude, -1., &start_date)) {
+      log_error("processed_imma_observation() returned error: '" + myerror +
+          "' while adding ID " + ientry.key + " for " + to_string(attm_id),
+          "obs2xml", USER);
     }
   }
   return true;
