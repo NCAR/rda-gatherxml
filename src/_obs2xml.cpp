@@ -217,13 +217,13 @@ bool processed_adp_observation(unique_ptr<Observation>& obs, gatherxml::markup::
         }
       }
     }
-    if (regex_search(ientry.key, regex("&"))) {
+    if (ientry.key.find("&") != string::npos) {
       replace_all(ientry.key, "&", "&amp;");
     }
-    if (regex_search(ientry.key, regex(">"))) {
+    if (ientry.key.find(">") != string::npos) {
       replace_all(ientry.key, ">", "&gt;");
     }
-    if (regex_search(ientry.key, regex("<"))) {
+    if (ientry.key.find("<") != string::npos) {
       replace_all(ientry.key, "<", "&lt;");
     }
     ientry.key = to_upper(ientry.key);
@@ -466,7 +466,7 @@ bool processed_imma_observation(unique_ptr<Observation>& obs, gatherxml::
   }
   auto start_date = obs->date_time();
   if (start_date.day() < 1 || static_cast<size_t>(start_date.day()) >
-      dateutils::days_in_month(start_date.year(),start_date.month()) ||
+      dateutils::days_in_month(start_date.year(), start_date.month()) ||
       start_date.time() > 235959) {
     return false;
   }
@@ -585,7 +585,7 @@ bool processed_nodc_bt_observation(unique_ptr<Observation>& obs, gatherxml::
         USER);
   }
   gatherxml::markup::ObML::DataTypeEntry dte;
-  ientry.data->data_types_table.found(data_type,dte);
+  ientry.data->data_types_table.found(data_type, dte);
   if (dte.data->vdata == nullptr) {
     dte.data->vdata.reset(new gatherxml::markup::ObML::DataTypeEntry::Data::
         VerticalData);
@@ -677,7 +677,7 @@ bool processed_td32_observation(unique_ptr<Observation>& obs, gatherxml::
           start_date.subtract_minutes(14);
         }
       }
-      if (!obs_data.added_to_ids(obs_type,ientry, header.elem, "", reports[n].
+      if (!obs_data.added_to_ids(obs_type, ientry, header.elem, "", reports[n].
           loc.latitude, reports[n].loc.longitude, -1., &start_date, end_date.
           get())) {
         log_error("processed_td32_observation() returned error: '" + myerror +
@@ -691,7 +691,7 @@ bool processed_td32_observation(unique_ptr<Observation>& obs, gatherxml::
               "' while adding ID " + ientry.key + " for DPCP", "obs2xml", USER);
         }
       } else if (header.type == "MLY" && reports[n].date_time.month() == 13) {
-        if (!obs_data.added_to_ids(obs_type, ientry, header.elem+"_y", "",
+        if (!obs_data.added_to_ids(obs_type, ientry, header.elem + "_y", "",
             reports[n].loc.latitude, reports[n].loc.longitude, -1., &start_date,
             end_date.get())) {
           log_error("processed_td32_observation() returned error: '" + myerror +
@@ -946,7 +946,7 @@ bool processed_observation(unique_ptr<Observation>& obs, gatherxml::markup::
     return processed_imma_observation(obs, obs_data, obs_type);
   } else if (metautils::args.data_format == "nodcbt") {
     return processed_nodc_bt_observation(obs, obs_data, obs_type);
-  } else if (regex_search(metautils::args.data_format, regex("^td32"))) {
+  } else if (metautils::args.data_format.substr(0, 4) == "td32") {
     return processed_td32_observation(obs, obs_data, obs_type);
   } else if (metautils::args.data_format == "tsr") {
     return processed_dss_tsr_observation(obs, obs_data, obs_type);
@@ -976,7 +976,7 @@ bool open_file(void *istream, string filename) {
   } else if (metautils::args.data_format == "on29" || metautils::args.
       data_format == "on124") {
     return (reinterpret_cast<InputADPStream *>(istream))->open(filename);
-  } else if (regex_search(metautils::args.data_format, regex("^td32"))) {
+  } else if (metautils::args.data_format.substr(0, 4) == "td32") {
     return (reinterpret_cast<InputTD32Stream *>(istream))->open(filename);
   } else if (metautils::args.data_format == "tsr") {
     return (reinterpret_cast<InputTsraobStream *>(istream))->open(filename);
@@ -1017,7 +1017,7 @@ void scan_file(gatherxml::markup::ObML::ObservationData& obs_data) {
       data_format == "on124") {
     istream.reset(new InputADPStream);
     obs.reset(new ADPObservation);
-  } else if (regex_search(metautils::args.data_format,regex("^td32"))) {
+  } else if (metautils::args.data_format.substr(0, 4) == "td32") {
     if (metautils::args.data_format == "td3200" || metautils::args.data_format
         == "td3210" || metautils::args.data_format == "td3220" || metautils::
         args.data_format == "td3240" || metautils::args.data_format == "td3260"
@@ -1051,7 +1051,7 @@ void scan_file(gatherxml::markup::ObML::ObservationData& obs_data) {
   if (verbose_operation) {
     std::cout << "Preparing file for metadata scanning ..." << endl;
   }
-  string file_format,error;
+  string file_format, error;
   if (!metautils::primaryMetadata::prepare_file_for_metadata_scanning(*g_tfile,
       *g_tdir, &filelist, file_format, error)) {
     log_error("prepare_file_for_metadata_scanning(): '" + error + "'",
@@ -1099,7 +1099,7 @@ void scan_file(gatherxml::markup::ObML::ObservationData& obs_data) {
               inv_line << istream->current_record_offset() << "|" << num_bytes
                   << "|" << obs->date_time().to_string("%Y%m%d%H%MM");
               InvEntry ie;
-              if (!inv_O_table.found(obs_type,ie)) {
+              if (!inv_O_table.found(obs_type, ie)) {
                 ie.key = obs_type;
                 ie.num = inv_O_table.size();
                 inv_O_table.insert(ie);
@@ -1113,13 +1113,13 @@ void scan_file(gatherxml::markup::ObML::ObservationData& obs_data) {
               }
               inv_line << "|" << ie.num;
               ie.key = iparts[1] + "|" + iparts[2];
-              if (!inv_I_table.found(ie.key,ie)) {
+              if (!inv_I_table.found(ie.key, ie)) {
                 ie.num = inv_I_table.size();
                 inv_I_table.insert(ie);
               }
               inv_line << "|" << ie.num;
-              inv_line << "|" << ftos(obs->location().latitude,4) << "|" <<
-                  ftos(obs->location().longitude,4);
+              inv_line << "|" << ftos(obs->location().latitude, 4) << "|" <<
+                  ftos(obs->location().longitude, 4);
               inv_lines.emplace_back(inv_line.str());
             }
           }
@@ -1139,15 +1139,15 @@ void scan_file(gatherxml::markup::ObML::ObservationData& obs_data) {
   if (inv_lines.size() > 0) {
     InvEntry ie;
     for (auto& key : inv_O_table.keys()) {
-      inv_O_table.found(key,ie);
+      inv_O_table.found(key, ie);
       g_inv_stream << "O<!>" << ie.num << "<!>" << key << endl;
     }
     for (auto& key : inv_P_table.keys()) {
-      inv_P_table.found(key,ie);
+      inv_P_table.found(key, ie);
       g_inv_stream << "P<!>" << ie.num << "<!>" << key << endl;
     }
     for (auto& key : inv_I_table.keys()) {
-      inv_I_table.found(key,ie);
+      inv_I_table.found(key, ie);
       g_inv_stream << "I<!>" << ie.num << "<!>" << key << endl;
     }
     g_inv_stream << "-----" << endl;
