@@ -1072,8 +1072,6 @@ void scan_file(gatherxml::markup::ObML::ObservationData& obs_data) {
     if (verbose_operation) {
       std::cout << "Beginning scan of " << file << "..." << endl;
     }
-g_tfile->set_keep();
-std::cerr << g_tfile->name() << std::endl;
     if (!open_file(istream.get(), g_tfile->name())) {
       log_error("scan_file(): unable to open file for input", "obs2xml", USER);
     }
@@ -1090,7 +1088,6 @@ std::cerr << g_tfile->name() << std::endl;
     unsigned char buffer[BUF_LEN];
     auto num_bytes = istream->read(buffer, BUF_LEN);
     while (num_bytes != bfstream::eof) {
-std::cerr << "num_bytes=" << num_bytes << std::endl;
       if (num_bytes > 0) {
         obs->fill(buffer, Observation::full_report);
         if (obs->location().latitude > -99. && obs->location().longitude >
