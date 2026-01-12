@@ -1072,6 +1072,7 @@ void scan_file(gatherxml::markup::ObML::ObservationData& obs_data) {
     if (verbose_operation) {
       std::cout << "Beginning scan of " << file << "..." << endl;
     }
+g_tfile->set_keep();
 std::cerr << g_tfile->name() << std::endl;
     if (!open_file(istream.get(), g_tfile->name())) {
       log_error("scan_file(): unable to open file for input", "obs2xml", USER);
