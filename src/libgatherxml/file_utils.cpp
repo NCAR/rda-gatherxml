@@ -69,6 +69,7 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile, TempDir& tdir, list<
       }
       if (q.num_rows() != 0) {
         file_format = row[1];
+        args.file_format = row[1];
         loc = row[2][0];
       }
     }
@@ -158,7 +159,7 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile, TempDir& tdir, list<
   }
   auto tf = tfile.name();
   auto bufr_re = regex("bufr");
-  if (file_format.empty()) {
+  if (args.file_format.empty()) {
     if (args.data_format == "grib" ||  args.data_format == "grib2" ||
         regex_search(args.data_format, bufr_re) || args.data_format ==
         "mcidas") {
@@ -178,15 +179,15 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile, TempDir& tdir, list<
         error = "unable to open '" + tf + "'; error: " + ess.str();
         return false;
       }
-      while (expand_file(tdir.name(), tf, &file_format)) { }
+      while (expand_file(tdir.name(), tf, &args.file_format)) { }
     } else {
-      while (expand_file(tdir.name(), tf, &file_format)) { }
+      while (expand_file(tdir.name(), tf, &args.file_format)) { }
     }
     if (filelist != nullptr) {
       filelist->emplace_back(tf);
     }
   } else {
-    auto ff = split(file_format, ".");
+    auto ff = split(args.file_format, ".");
     if (ff.size() > 3) {
       error = "archive file format is too complicated";
       return false;
