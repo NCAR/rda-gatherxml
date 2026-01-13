@@ -89,7 +89,7 @@ CMDDateRange cmd_date_range(string start, string end, string gindex, size_t&
   return d;
 }
 
-void cmd_dates(string database, size_t date_left_padding, vector<CMDDateRange>&
+void cmd_dates(string database, size_t date_length, vector<CMDDateRange>&
      ranges, size_t& precision) {
   static const string F = this_function_label(__func__);
   Server srv(metautils::directives.metadb_config);
@@ -146,8 +146,9 @@ void cmd_dates(string database, size_t date_left_padding, vector<CMDDateRange>&
     if (q.num_rows() < 2 && ((!b && !has_climate_model_simulation) || row[2] ==
         "0")) {
       // check files table for new additions/deletions
-      q.set("start_date, end_date", tbl, "start_date > 160000000000 order by "
-          "start_date, end_date");
+      string min_start = "1600" + string(date_length-4, '0');
+      q.set("start_date, end_date", tbl, "start_date > " + min_start + " order "
+          "by start_date, end_date");
 #ifdef DUMP_QUERIES
       {
       Timer tm;
