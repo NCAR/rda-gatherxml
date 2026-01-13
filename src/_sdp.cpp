@@ -453,7 +453,7 @@ int main(int argc, char **argv) {
         "sdp", G_USER);
   }
   mysystem2("/bin/bash -c 'curl -s -k https://" + metautils::directives.
-      web_server + "/redeploy/dsgen" + metautils::args.dsid + "'", oss, ess);
+      web_server + "/redeploy/dsgen" + metautils::args.dsid + "/'", oss, ess);
   server_d.disconnect();
   server_m.disconnect();
 }

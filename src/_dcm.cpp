@@ -507,7 +507,7 @@ void generate_graphics() {
 void generate_dataset_home_page() {
   stringstream oss, ess;
   mysystem2("/bin/bash -c 'curl -s -k https://" + metautils::directives.
-      web_server + "/redeploy/dsgen" + metautils::args.dsid + "'", oss, ess);
+      web_server + "/redeploy/dsgen" + metautils::args.dsid + "/'", oss, ess);
 }
 
 extern "C" void *t_index_variables(void *) {
