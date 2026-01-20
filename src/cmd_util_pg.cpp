@@ -36,12 +36,20 @@ string myerror = "";
 string mywarning = "";
 const char ARG_DELIMITER = '!';
 
-string whereis_lmod() {
+string whereis_lmod(stringstream& ess) {
   string s; // return value
-  stringstream oss, ess;
+  stringstream oss;
   if (mysystem2("/bin/tcsh -c 'echo $LMOD_CMD'", oss, ess) == 0) {
-    s = oss.str();
-    trim(s);
+    auto lines = split(oss.str(), "\n");
+    while (lines.back().empty()) {
+      lines.pop_back();
+    }
+    if (lines.back()[0] == '/' && lines.back().find("lmod") != string::npos) {
+      s = lines.back();
+      trim(s);
+    } else {
+      ess << oss.str();
+    }
   }
   return s;
 }
@@ -49,8 +57,9 @@ string whereis_lmod() {
 string whereis_singularity(stringstream& ess) {
   string s; // return value
   stringstream oss;
+  ess.str("");
   if (mysystem2("/bin/tcsh -c 'which singularity'", oss, ess) != 0) {
-    auto m = whereis_lmod();
+    auto m = whereis_lmod(ess);
     if (!m.empty()) {
       if (mysystem2("/bin/tcsh -c 'eval `" + m + " tcsh load apptainer`; which "
           "singularity'", oss, ess) == 0) {
