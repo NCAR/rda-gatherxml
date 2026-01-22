@@ -149,7 +149,7 @@ void clear_tables_by_file_id(string db, string file_id_code, bool
         + file_id_code + " from " + db, F, "dcm", USER);
   }
   if (is_version_controlled) {
-    copy_version_controlled_data(local_server, db, file_id_code);
+//    copy_version_controlled_data(local_server, db, file_id_code);
   }
   string error;
   auto tnames = table_names(local_server, db, metautils::args.dsid + "%",
