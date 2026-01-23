@@ -915,6 +915,10 @@ int main(int argc, char **argv) {
   metautils::read_config("grid2xml", USER);
   gatherxml::parse_args(d);
   metautils::cmd_register("grid2xml", USER);
+  if (metautils::args.path.find("https://rda.ucar.edu") != 0) {
+    log_error2("Terminating - invalid path '" + metautils::args.path + "'",
+        "main()", "grid2xml", USER);
+  }
   if (!metautils::args.overwrite_only && !metautils::args.inventory_only) {
     metautils::check_for_existing_cmd("GrML", "grid2xml", USER);
   }
@@ -934,12 +938,7 @@ int main(int argc, char **argv) {
       if (!tdir.empty()) {
         flags += " -t " + tdir;
       }
-      if (regex_search(metautils::args.path, regex("^https://rda.ucar.edu"))) {
-        flags += " -wf";
-      } else {
-        log_error2("Terminating - invalid path '" + metautils::args.path + "'",
-            "main()", "grid2xml", USER);
-      }
+      flags += " -wf";
       stringstream oss, ess;
       if (mysystem2(metautils::directives.local_root + "/bin/scm -d " +
           metautils::args.dsid + " " + flags + " " + metautils::args.filename +
