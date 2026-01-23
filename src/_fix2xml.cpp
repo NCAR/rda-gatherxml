@@ -13,6 +13,7 @@
 #include <tempfile.hpp>
 #include <metadata.hpp>
 #include <datetime.hpp>
+#include <timer.hpp>
 #include <myerror.hpp>
 
 namespace FixML = gatherxml::markup::FixML;
@@ -22,6 +23,7 @@ using std::endl;
 using std::string;
 using std::stringstream;
 using std::unique_ptr;
+using strutils::ftos;
 using strutils::is_numeric;
 using strutils::itos;
 using strutils::replace_all;
@@ -136,8 +138,8 @@ void process_HURDAT(unique_ptr<Cyclone>& c) {
         sentry.data->boxflags.npole = 1;
       } else {
         size_t lat_idx, lon_idx;
-        geoutils::convert_lat_lon_to_box(1, fix.latitude, fix.longitude, lat_idx,
-            lon_idx);
+        geoutils::convert_lat_lon_to_box(1, fix.latitude, fix.longitude,
+            lat_idx, lon_idx);
         sentry.data->boxflags.flags[lat_idx - 1][lon_idx] = 1;
         sentry.data->boxflags.flags[lat_idx - 1][360] = 1;
       }
@@ -151,8 +153,8 @@ void process_HURDAT(unique_ptr<Cyclone>& c) {
         sentry.data->boxflags.npole = 1;
       } else {
         size_t lat_idx, lon_idx;
-        geoutils::convert_lat_lon_to_box(1, fix.latitude, fix.longitude, lat_idx,
-            lon_idx);
+        geoutils::convert_lat_lon_to_box(1, fix.latitude, fix.longitude,
+            lat_idx, lon_idx);
         sentry.data->boxflags.flags[lat_idx - 1][lon_idx] = 1;
         sentry.data->boxflags.flags[lat_idx - 1][360] = 1;
       }
@@ -292,7 +294,8 @@ void process_CXML(XMLDocument& xdoc) {
   }
   replace_all(production_center, "<subCenter>", "_");
   replace_all(production_center, "</subCenter>", "");
-  auto model_name = xdoc.element("cxml/header/generatingApplication/model/name");
+  auto model_name = xdoc.element("cxml/header/generatingApplication/model/"
+      "name");
   if (!model_name.name().empty()) {
     production_center += "_" + model_name.content();
   }
@@ -573,8 +576,8 @@ void scan_file() {
     string file_format, error;
     if (!metautils::primaryMetadata::prepare_file_for_metadata_scanning(*tfile,
         *tdir, nullptr, file_format, error)) {
-      log_error2("prepare_file_for_metadata_scanning() returned '" + error + "'",
-          THIS_FUNC, "fix2xml", USER);
+      log_error2("prepare_file_for_metadata_scanning() returned '" + error +
+          "'", THIS_FUNC, "fix2xml", USER);
     }
     if (!open_file(istream.get(), tfile->name())) {
       log_error2("unable to open file for input", THIS_FUNC, "fix2xml", USER);
@@ -634,8 +637,7 @@ int main(int argc, char **argv) {
         "(default is -s)" << endl;
     cerr << endl;
     cerr << "required:" << endl;
-    cerr << "<path>      full MSS path or URL of the file to read" << endl;
-    cerr << "            - MSS paths must begin with \"/FS/DECS\"" << endl;
+    cerr << "<path>      URL of the file to read" << endl;
     cerr << "            - URLs must begin with \"https://rda.ucar.edu\"" <<
         endl;
     exit(1);
@@ -648,23 +650,27 @@ int main(int argc, char **argv) {
       arg_delimiter);
   metautils::read_config("fix2xml", USER);
   gatherxml::parse_args(arg_delimiter);
-  string flags = "-f";
-  if (strutils::has_beginning(metautils::args.path, "https://rda.ucar.edu")) {
-    flags = "-wf";
+  if (metautils::args.path.find("https://rda.ucar.edu") != 0) {
+    log_error2("Terminating - invalid path '" + metautils::args.path + "'",
+        "main()", "fix2xml", USER);
   }
   metautils::cmd_register("fix2xml", USER);
   if (!metautils::args.overwrite_only) {
     metautils::check_for_existing_cmd("FixML", "fix2xml", USER);
   }
+  Timer timer;
+  timer.start();
   scan_file();
   FixML::write(feature_table, stage_table, "fix2xml", USER);
   if (metautils::args.update_db) {
+    string flags;
     if (!metautils::args.update_graphics) {
-      flags = "-G " + flags;
+      flags += " -G";
     }
     if (!metautils::args.update_summary) {
-      flags = "-S " + flags;
+      flags += " -S";
     }
+    flags += " -wf";
     stringstream oss, ess;
     if (unixutils::mysystem2(metautils::directives.local_root + "/bin/scm -d " +
         metautils::args.dsid + " " + flags + " " + metautils::args.filename +
@@ -672,4 +678,8 @@ int main(int argc, char **argv) {
       cerr << ess.str() << endl;
     }
   }
+  timer.stop();
+  metautils::log_warning("execution time: " + ftos(timer.elapsed_time()) +
+      " seconds", "gatherxml.time", USER);
+  return 0;
 }
