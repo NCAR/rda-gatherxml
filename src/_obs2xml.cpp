@@ -1239,7 +1239,9 @@ int main(int argc, char **argv) {
           "obs2xml", USER);
     }
   }
+metautils::log_info("A", "obs2xml", USER);
   if (metautils::args.update_db) {
+metautils::log_info("B", "obs2xml", USER);
     if (!metautils::args.update_graphics) {
       flags = "-G " + flags;
     }
@@ -1250,6 +1252,7 @@ int main(int argc, char **argv) {
       flags = "-S " + flags;
     }
     stringstream oss, ess;
+metautils::log_info(metautils::directives.local_root + "/bin/scm -d " + metautils::args.dsid + " " + flags + " " + metautils::args.filename + ".ObML", "obs2xml", USER);
     if (mysystem2(metautils::directives.local_root + "/bin/scm -d " +
         metautils::args.dsid + " " + flags + " " + metautils::args.filename +
         ".ObML", oss, ess) != 0) {
