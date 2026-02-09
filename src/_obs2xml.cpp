@@ -1252,7 +1252,7 @@ int main(int argc, char **argv) {
     stringstream oss, ess;
     if (mysystem2(metautils::directives.local_root + "/bin/scm -d " +
         metautils::args.dsid + " " + flags + " " + metautils::args.filename +
-        ".ObML", oss, ess) < 0) {
+        ".ObML", oss, ess) != 0) {
       cerr << ess.str() << endl;
     }
   }
