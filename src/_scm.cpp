@@ -1042,9 +1042,9 @@ void *thread_summarize_IDs(void *args) {
             }
           }
         }
-        auto dtyp_key = p_args.first[3] + "|" + p_args.first[4] + "|" +
-            element.attribute_value("map") + ":" + element.attribute_value(
-            "value");
+        auto dtyp_key = element.attribute_value("map");
+        append(dtyp_key, element.attribute_value("value"), ":");
+        dtyp_key = p_args.first[3] + "|" + p_args.first[4] + "|" + dtyp_key;
         id_data_type_values.emplace_back(id_code + ", " + p_args.second->at(
             dtyp_key) + ", " + p_args.first[2] + ", " + num_obs + ", '" +
             p_args.first[7] + "'");
@@ -2113,6 +2113,11 @@ extern "C" void segv_handler(int) {
       "segv_handler()", "scm", USER);
 }
 
+extern "C" void abrt_handler(int) {
+  log_error2("abort: " + string(g_progress_bitmap), "abrt_handler()", "scm",
+      USER);
+}
+
 void show_usage() {
   cerr << "usage: (1) scm -d [ds]<nnn.n> { -rw | -ri } [ <tindex> | all ]" <<
       endl;
@@ -2172,6 +2177,7 @@ int main(int argc, char **argv) {
 
   // set exit handlers
   signal(SIGSEGV, segv_handler);
+  signal(SIGABRT, abrt_handler);
   atexit(clean_up);
   auto ex_stat = 0;
 
