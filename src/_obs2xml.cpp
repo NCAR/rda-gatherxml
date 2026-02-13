@@ -101,7 +101,7 @@ bool processed_isd_observation(unique_ptr<Observation>& obs, gatherxml::markup::
   }
   auto sp = split(o->location().ID, "-");
   if (sp[0] != "999999") {
-    ientry.key = platform_type + "[!]WMO + 6[!]" + sp[0];
+    ientry.key = platform_type + "[!]WMO+6[!]" + sp[0];
   } else if (sp[1] != "99999") {
     ientry.key = platform_type + "[!]WBAN[!]" + sp[1];
   } else {
@@ -810,7 +810,7 @@ bool processed_uadb_observation(unique_ptr<Observation>& obs, gatherxml::
     case 7:
     case 8: {
       platform_type = "land_station";
-      ientry.key = platform_type + "[!]WMO + 6[!]" + id;
+      ientry.key = platform_type + "[!]WMO+6[!]" + id;
       break;
     }
     case 9: {
@@ -871,7 +871,7 @@ bool processed_wmssc_observation(unique_ptr<Observation>& obs, gatherxml::
   if (o->format() == 0x3f) {
     ientry.key = platform_type + "[!]COOP[!]" + obs->location().ID;
   } else {
-    ientry.key = platform_type + "[!]WMO + 6[!]" + obs->location().ID;
+    ientry.key = platform_type + "[!]WMO+6[!]" + obs->location().ID;
   }
   auto climo_ind = obs->date_time().year();
   if (climo_ind < 2200) {
