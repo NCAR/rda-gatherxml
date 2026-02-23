@@ -335,6 +335,17 @@ void extract_from_hdf5_variable_attributes(unordered_map<string,
   }
 }
 
+double decode_hdf5_float(InputHDF5Stream::DataValue& dv, double bad_val, size_t
+    index = 0) {
+  if (dv.precision_ == 32) {
+    return (reinterpret_cast<float *>(dv.array))[index];
+  }
+  if (dv.precision_ == 64) {
+    return (reinterpret_cast<double *>(dv.array))[index];
+  }
+  return bad_val;
+}
+
 bool found_missing(const double& time, HDF5::DataArray::Type time_type,
     const InputHDF5Stream::DataValue *time_missing_value,
     const HDF5::DataArray &var_vals, size_t var_val_index,
@@ -4285,6 +4296,10 @@ if (!grid_data.reference_time.id.empty()) {
             // "This is a netCDF dimension but not a netCDF variable.xxxxxxxxxx"
             //     where xxxxxxxxxx is a right-justified integer of width 10
             dim.y = stoi(attr_parts[10]);
+          } else if (attr_parts.size() == 1 && string(reinterpret_cast<char *>(
+              attr_it->second.array)) == rtp_it[0]->second && ds->data.sizes.
+              size() == 1) {
+            dim.y = ds->data.sizes[0];
           } else {
             log_error2("(2)unable to determine grid definition from '" +
                 coord_vars.lat_ids[n] + "' and '" + coord_vars.lon_ids[n] + "'",
@@ -4306,6 +4321,10 @@ if (!grid_data.reference_time.id.empty()) {
             // "This is a netCDF dimension but not a netCDF variable.xxxxxxxxxx"
             //     where xxxxxxxxxx is a right-justified integer of width 10
             dim.x = stoi(attr_parts[10]);
+          } else if (attr_parts.size() == 1 && string(reinterpret_cast<char *>(
+              attr_it->second.array)) == rtp_it[2]->second && ds->data.sizes.
+              size() == 1) {
+            dim.x = ds->data.sizes[0];
           } else {
             log_error2("(4)unable to determine grid definition from '" +
                 coord_vars.lat_ids[n] + "' and '" + coord_vars.lon_ids[n] + "'",
@@ -4320,6 +4339,39 @@ if (!grid_data.reference_time.id.empty()) {
             def);
         if (!determined_grid_type) {
           determined_grid_type = grid_is_lambert_conformal(grid_data, dim, def);
+        }
+        if (!determined_grid_type && def.dx > 0. && def.dy > 0. && dim.x > 0 &&
+            dim.y > 0) {
+          auto ds = is->dataset("/lambert_conformal_conic");
+          if (ds != nullptr) {
+            auto attr_it = ds->attributes.find("longitude_of_central_meridian");
+            if (attr_it != ds->attributes.end() && attr_it->second._class_ ==
+                1) {
+              def.olongitude = decode_hdf5_float(attr_it->second, -999.);
+            }
+            attr_it = ds->attributes.find("standard_parallel");
+            if (attr_it != ds->attributes.end() && attr_it->second._class_ ==
+                1) {
+              def.stdparallel1 = -99.;
+              if (attr_it->second.dim_sizes.size() == 1) {
+                if (attr_it->second.dim_sizes[0] == 1) {
+                  def.stdparallel1 = decode_hdf5_float(attr_it->second, -99.);
+                  def.stdparallel2 = def.stdparallel1;
+                } else if (attr_it->second.dim_sizes[0] == 2) {
+                  def.stdparallel1 = decode_hdf5_float(attr_it->second, -99.,
+                      0);
+                  def.stdparallel2 = decode_hdf5_float(attr_it->second, -99.,
+                      1);
+                }
+              }
+            }
+            if (def.olongitude > -999. && def.stdparallel1 > -99.) {
+              def.llatitude = def.stdparallel1;
+              def.projection_flag = def.llatitude >= 0. ? 0 : 1;
+              def.type = Grid::Type::lambertConformal;
+              determined_grid_type = true;
+            }
+          }
         }
         if (!determined_grid_type ) {
           log_error2("(6)unable to determine grid definition from '" +
