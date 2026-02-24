@@ -3827,7 +3827,11 @@ bool grid_is_non_centered_lambert_conformal(const HDF5::DataArray& lats, const
     }
   }
   if (v.empty()) {
-    return false;
+    for (auto n = 0; n < dims.y; ++n) {
+      auto xoff = n * dims.x;
+      v.emplace_back(0);
+      s += lons.value(xoff);
+    }
   }
 
   // find the variance in the x-offsets
