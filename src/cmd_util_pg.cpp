@@ -36,16 +36,24 @@ string myerror = "";
 string mywarning = "";
 const char ARG_DELIMITER = '!';
 
+
+string get_last_line(stringstream& oss, string search) {
+  auto lines = split(oss.str(), "\n");
+  while (lines.back().empty()) {
+    lines.pop_back();
+  }
+  if (lines.back()[0] == '/' && lines.back().find(search) != string::npos) {
+    return lines.back();
+  }
+  return "";
+}
+
 string whereis_lmod(stringstream& ess) {
   string s; // return value
   stringstream oss;
   if (mysystem2("/bin/tcsh -c 'echo $LMOD_CMD'", oss, ess) == 0) {
-    auto lines = split(oss.str(), "\n");
-    while (lines.back().empty()) {
-      lines.pop_back();
-    }
-    if (lines.back()[0] == '/' && lines.back().find("lmod") != string::npos) {
-      s = lines.back();
+    s = get_last_line(oss, "lmod");
+    if (!s.empty()) {
       trim(s);
     } else {
       ess << oss.str();
@@ -63,16 +71,18 @@ string whereis_singularity(stringstream& ess) {
     if (!m.empty()) {
       if (mysystem2("/bin/tcsh -c 'eval `" + m + " tcsh load apptainer`; which "
           "singularity'", oss, ess) == 0) {
-        s = oss.str();
+        s = get_last_line(oss, "singularity");
       } else if (mysystem2("/bin/tcsh -c 'eval `" + m + " tcsh load "
           "singularity`; which singularity'", oss, ess) == 0) {
-        s = oss.str();
+        s = get_last_line(oss, "singularity");
       }
     }
   } else {
-    s = oss.str();
+    s = get_last_line(oss, "singularity");
   }
-  trim(s);
+  if (!s.empty()) {
+    trim(s);
+  }
   return s;
 }
 
@@ -302,6 +312,12 @@ int command_execute(string command) {
 }
 
 int main(int argc, char **argv) {
+  auto env = getenv("USER");
+  if (env == nullptr) {
+    cerr << "Terminating - unknown user" << endl;
+    exit(1);
+  }
+  auto u = string(env);
   metautils::args.args_string = unixutils::unix_args_string(argc, argv,
       ARG_DELIMITER);
   string util = argv[0];
@@ -309,12 +325,6 @@ int main(int argc, char **argv) {
   if (idx != string::npos) {
     util = util.substr(idx + 1);
   }
-  auto env = getenv("USER");
-  if (env == nullptr) {
-    cerr << "Terminating - unknown user" << endl;
-    exit(1);
-  }
-  auto u = string(env);
   if (!metautils::read_config(util, u)) {
     log_error2("configuration error: '" + myerror + "'", "main()", util, u);
   }
@@ -370,35 +380,34 @@ int main(int argc, char **argv) {
   if (s.empty()) {
     log_error2("unable to find singularity: '" + ess.str() + "'", "main()",
         util, u);
-  } else {
-    string binds;
-    struct stat buf;
-    for (const auto& bind : metautils::directives.singularity_binds) {
-      if (stat(bind.c_str(), &buf) == 0) {
-        append(binds, bind, ",");
-      }
+  }
+  string binds;
+  struct stat buf;
+  for (const auto& bind : metautils::directives.singularity_binds) {
+    if (stat(bind.c_str(), &buf) == 0) {
+      append(binds, bind, ",");
     }
-    auto sp = split(metautils::args.args_string, "!");
-    if (sp.size() > 0 && sp.back()[0] == '/') {
+  }
+  auto sp = split(metautils::args.args_string, "!");
+  if (sp.size() > 0 && sp.back()[0] == '/') {
 
-      // test run must specify full path, so bind that path
-      auto idx = sp.back().rfind("/");
-      append(binds, sp.back().substr(0, idx), ",");
-    }
-    cmd = s + " -s exec --env PYTHONPATH=x -B " + binds + " /glade/u/home/"
-        "rdadata/";
-    if (is_test) {
-        cmd += "lib/singularity/gatherxml_pg-5-test.sif";
-    } else {
-        cmd += "bin/singularity/gatherxml_pg-exec.sif";
-    }
-    cmd += " /usr/local/bin/_" + util;
-    if (!metautils::args.args_string.empty()) {
-      cmd += " " + substitute(metautils::args.args_string, "!", " ");
-    }
+    // test run must specify full path, so bind that path
+    auto idx = sp.back().rfind("/");
+    append(binds, sp.back().substr(0, idx), ",");
+  }
+  cmd = s + " -s exec --env PYTHONPATH=x -B " + binds + " /glade/u/home/"
+      "rdadata/";
+  if (is_test) {
+      cmd += "lib/singularity/gatherxml_pg-5-test.sif";
+  } else {
+      cmd += "bin/singularity/gatherxml_pg-exec.sif";
+  }
+  cmd += " /usr/local/bin/_" + util;
+  if (!metautils::args.args_string.empty()) {
+    cmd += " " + substitute(metautils::args.args_string, "!", " ");
+  }
 if (is_test) {
 std::cerr << cmd << std::endl;
 }
-    return command_execute(cmd);
-  }
+  return command_execute(cmd);
 }
