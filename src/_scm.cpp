@@ -1006,7 +1006,10 @@ void *thread_summarize_IDs(void *args) {
             "id_code, observation_type_code, platform_type_code, file_code, "
                 "num_observations, start_date, end_date, time_zone, uflg",
             inserts,
-            "on constraint " + pkey + " do update set uflg = excluded.uflg"
+            "on constraint " + pkey + " do update set num_observations = "
+            "excluded.num_observations, start_date = excluded.start_date, "
+            "end_date = excluded.end_date, time_zone = excluded.time_zone, "
+            "uflg = excluded.uflg"
             ) < 0) {
         log_error2("'" + srv.error() + "' while inserting '" + inserts +
             "' into " + tbl, F, "scm", USER);
