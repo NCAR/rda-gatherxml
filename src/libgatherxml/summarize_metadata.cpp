@@ -366,7 +366,7 @@ void summarize_dates(string caller, string user) {
   }
   if (updated_dsperiod) {
     srv.update("search.datasets", "timestamp_utc = '" + dateutils::
-        current_date_time().to_string("%Y-%m-%d %T") + "'", "dsid = '" +
+        current_date_time(true).to_string("%Y-%m-%d %T") + "'", "dsid = '" +
         metautils::args.dsid + "'");
   }
   srv.disconnect();
