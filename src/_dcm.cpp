@@ -425,10 +425,12 @@ bool remove_from(string database, string table_ext, string file_field_name,
             }
           }
         }
-        if (gdex_unlink("/data/web/datasets/" + metautils::args.dsid +
-            "/metadata/" + md_directory + "/" + md_file, metautils::directives.
-            gdex_unlink_key, error) < 0) {
-          metautils::log_warning("unable to unsync " + md_file, "dcm", USER);
+        if (file_ext != ".GrML") {
+          if (gdex_unlink("/data/web/datasets/" + metautils::args.dsid +
+              "/metadata/" + md_directory + "/" + md_file, metautils::
+              directives.gdex_unlink_key, error) < 0) {
+            metautils::log_warning("unable to unsync " + md_file, "dcm", USER);
+          }
         }
       }
       return true;
