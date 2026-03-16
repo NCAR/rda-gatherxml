@@ -388,9 +388,9 @@ bool renamed_cmd() {
         if (d[0] == 'W') {
           d = d.substr(1);
         }
-        if (server_d.update(dcol, "meta_link = '" + d + "'", "dsid in " +
-            to_sql_tuple_string(ds_aliases(metautils::args.dsid)) + " and " +
-            dcol + " = '" + nname + "'") < 0) {
+        if (server_d.update("dssdb.wfile_" + g_new_dsid, "meta_link = '" + d +
+            "'", "dsid in " + to_sql_tuple_string(ds_aliases(metautils::args.
+            dsid)) + " and " + dcol + " = '" + nname + "'") < 0) {
           metautils::log_warning("renamed_cmd() returned warning: " +
               server_d.error(), "rcm", USER);
         }
