@@ -2233,7 +2233,6 @@ void add_new_time_range_entry(const TimeBounds2& time_bounds, const TimeData&
     log_error2(err, F, g_util_ident);
   }
   e.bounded.first_valid_datetime = e.instantaneous.first_valid_datetime;
-  e.num_steps = 1;
 }
 
 void add_time_range_entries(const TimeData& time_data, const HDF5::DataArray&
@@ -2243,9 +2242,8 @@ void add_time_range_entries(const TimeData& time_data, const HDF5::DataArray&
   tb.t1 = data_array.value(0);
   tb.diff = data_array.value(1) - tb.t1;
   add_new_time_range_entry(tb, time_data, grid_data);
-  auto nsteps = 0;
+  auto nsteps = 1;
   for (size_t n = 2; n < data_array.num_values; n += 2) {
-    ++nsteps;
     auto curr_diff = data_array.value(n+1) - data_array.value(n);
     if (!myequalf(curr_diff, tb.diff)) {
       auto new_time_range = true;
@@ -2271,7 +2269,7 @@ void add_time_range_entries(const TimeData& time_data, const HDF5::DataArray&
         if (!err.empty()) {
           log_error2(err, F, g_util_ident);
         }
-        e.num_steps += nsteps;
+        e.num_steps = nsteps;
         tb.t1 = data_array.value(n);
         tb.diff = curr_diff;
         if (grid_data.time_range_entries.find(tb.diff) == grid_data.
@@ -2281,6 +2279,7 @@ void add_time_range_entries(const TimeData& time_data, const HDF5::DataArray&
         nsteps = 0;
       }
     }
+    ++nsteps;
   }
   auto& e = grid_data.time_range_entries[tb.diff];
   e.time_bounds.t2 = data_array.value(data_array.num_values-1);
@@ -2295,7 +2294,7 @@ void add_time_range_entries(const TimeData& time_data, const HDF5::DataArray&
   if (!err.empty()) {
     log_error2(err, F, g_util_ident);
   }
-  e.num_steps += nsteps;
+  e.num_steps = nsteps;
 }
 
 DateTime compute_nc_time(const HDF5::DataArray& times, const TimeData&
