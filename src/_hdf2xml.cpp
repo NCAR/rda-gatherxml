@@ -2238,24 +2238,33 @@ void add_new_time_range_entry(const TimeBounds2& time_bounds, const TimeData&
 void add_time_range_entries(const TimeData& time_data, const HDF5::DataArray&
     data_array, GridData& grid_data) {
   static const string F = this_function_label(__func__);
+  static const double MONTH_INCREMENT = 5.e6;
   TimeBounds2 tb;
   tb.t1 = data_array.value(0);
   tb.diff = data_array.value(1) - tb.t1;
+  if (time_data.units == "days") {
+    string err;
+    auto adt = actual_date_time(tb.t1, time_data, err);
+    // use floor(tb.diff) for inexact but practical months
+    if (dateutils::days_in_month(adt.year(), adt.month(), time_data.calendar) ==
+        floor(tb.diff)) {
+      tb.diff = MONTH_INCREMENT;
+    }
+  }
   add_new_time_range_entry(tb, time_data, grid_data);
   auto nsteps = 1;
   for (size_t n = 2; n < data_array.num_values; n += 2) {
     auto curr_diff = data_array.value(n+1) - data_array.value(n);
     if (!myequalf(curr_diff, tb.diff)) {
-      auto new_time_range = true;
       if (time_data.units == "days") {
         string err;
-        auto a = actual_date_time(tb.t1, time_data, err);
-        if (dateutils::days_in_month(a.year(), a.month(), time_data.calendar) ==
-            tb.diff) {
-          new_time_range = false;
+        auto adt = actual_date_time(data_array.value(n), time_data, err);
+        if (dateutils::days_in_month(adt.year(), adt.month(), time_data.
+            calendar) == floor(curr_diff)) {
+          curr_diff = MONTH_INCREMENT;
        }
       }
-      if (new_time_range) {
+      if (!myequalf(curr_diff, tb.diff)) {
         auto& e = grid_data.time_range_entries[tb.diff];
         e.time_bounds.t2 = data_array.value(n-1); 
         string err;
