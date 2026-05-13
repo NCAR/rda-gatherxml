@@ -145,6 +145,10 @@ void parse_args(int argc, char **argv) {
   }
 }
 
+extern "C" void abrt_handler(int) {
+  log_error2("Error: abort", "abrt_handler()", "iinv", USER);
+}
+
 extern "C" void segv_handler(int) {
   log_error2("Error: core dump", this_function_label(__func__), "iinv", USER);
 }
@@ -899,7 +903,7 @@ size_t process_grml_entries_by_parameter(Server& server, string code, const
         } else if (ite.time_range_codes->size() > 1) {
           dupe_vdates = "Y";
         }
-    }
+      }
     }
     insert_values[n] = inv_data.file_code + ", " + e[2] + ", " + init_date +
         ", " + inv_data.trv[u].first + ", " + inv_data.glst.at(e[4]) + ", " +
@@ -1894,6 +1898,7 @@ int main(int argc, char **argv) {
     exit(0);
   }
   auto t1 = time(nullptr);
+  signal(SIGABRT, abrt_handler);
   signal(SIGSEGV, segv_handler);
   metautils::read_config("iinv", USER);
   parse_args(argc, argv);
