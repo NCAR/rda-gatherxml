@@ -3603,6 +3603,61 @@ void find_alternate_lat_lon_coordinates(GridData& grid_data, vector<string>&
   }
 }
 
+bool grid_is_2d_lat_lon(const GridData& grid_data, Grid::GridDimensions& dim,
+    Grid::GridDefinition& def) {
+  if (gatherxml::verbose_operation) {
+    cout << "    ...checking for a 2-dimensional latitude-longitude grid..." <<
+        endl;
+  }
+  auto& lat = grid_data.lat.data_array;
+  auto lat_ds = grid_data.lat.ds.get();
+  auto lat_diff = data_array_value(lat, dim.x, lat_ds) - data_array_value(lat,
+      0, lat_ds);
+  for (short x = 0; x < dim.x; ++x) {
+    for (short y = 1; y < dim.y; ++y) {
+      auto off = y * dim.x + x;
+      auto diff = data_array_value(lat, off, lat_ds) - data_array_value(lat,
+          off-dim.x, lat_ds);
+      if (!myequalf(diff, lat_diff, 0.0001)) {
+        if (gatherxml::verbose_operation) {
+          cout << "    ...grid is not a 2-dimensional latitude-longitude grid."
+              << endl;
+        }
+        return false;
+      }
+    }
+  }
+  auto& lon = grid_data.lon.data_array;
+  auto lon_ds = grid_data.lon.ds.get();
+  auto lon_diff = data_array_value(lon, 1, lon_ds) - data_array_value(lon, 0,
+      lon_ds);
+  for (short y = 0; y < dim.y; ++y) {
+    for (short x = 1; x < dim.x; ++x) {
+      auto off = y * dim.x + x;
+      auto diff = data_array_value(lon, off, lon_ds) - data_array_value(lon,
+          off-1, lon_ds);
+      if (!myequalf(diff, lon_diff, 0.0001)) {
+        if (gatherxml::verbose_operation) {
+          cout << "    ...grid is not a 2-dimensional latitude-longitude grid."
+              << endl;
+        }
+        return false;
+      }
+    }
+  }
+  def.type = Grid::Type::latitudeLongitude;
+  def.slatitude = data_array_value(lat, 0, lat_ds);
+  def.slongitude = data_array_value(lon, 0, lon_ds);
+  def.elatitude = data_array_value(lat, lat.num_values-1, lat_ds);
+  def.elongitude = data_array_value(lon, lon.num_values-1, lon_ds);
+  def.loincrement = lon_diff;
+  def.laincrement = lat_diff;
+  if (gatherxml::verbose_operation) {
+    cout << "    ...confirmed a 2-dimensional latitude-longitude grid." << endl;
+  }
+  return true;
+}
+
 bool grid_is_polar_stereographic(const GridData& grid_data,
     Grid::GridDimensions& dim, Grid::GridDefinition& def) {
   auto center_x = dim.x / 2;
@@ -4341,8 +4396,11 @@ if (!grid_data.reference_time.id.empty()) {
               coord_vars.lat_ids[n] + "' and '" + coord_vars.lon_ids[n] + "'",
               F, g_util_ident);
         }
-        auto determined_grid_type = grid_is_polar_stereographic(grid_data, dim,
-            def);
+        auto determined_grid_type = grid_is_2d_lat_lon(grid_data, dim, def);
+        if (!determined_grid_type) {
+            determined_grid_type = grid_is_polar_stereographic(grid_data, dim,
+                def);
+        }
         if (!determined_grid_type) {
           determined_grid_type = grid_is_lambert_conformal(grid_data, dim, def);
         }
