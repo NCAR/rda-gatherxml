@@ -1620,10 +1620,10 @@ string update_grid_entry_set(string key_start, string time_method, const
   return grid_entry;
 }
 
-string add_gridded_time_range(string key_start, const TimeRangeEntry2& tre,
-    unordered_set<string>& grid_entry_set, const GridData& grid_data) {
+vector<string> add_gridded_time_range(string key_start, const TimeRangeEntry2&
+    tre, unordered_set<string>& grid_entry_set, const GridData& grid_data) {
   static const string F = this_function_label(__func__);
-  string grid_entry; // return value
+  vector<string> grid_entries; // return value
   auto is = sget_hdf5();
   auto b = false;
   auto vars = is->datasets_with_attribute("DIMENSION_LIST");
@@ -1690,21 +1690,21 @@ string add_gridded_time_range(string key_start, const TimeRangeEntry2& tre,
     if (tm.empty()) {
       b = true;
     } else {
-      grid_entry = update_grid_entry_set(key_start, tm, tre, grid_data,
-          grid_entry_set);
+      grid_entries.emplace_back(update_grid_entry_set(key_start, tm, tre,
+          grid_data, grid_entry_set));
     }
   }
   if (b) {
-    grid_entry = update_grid_entry_set(key_start, "", tre, grid_data,
-        grid_entry_set);
+    grid_entries.emplace_back(update_grid_entry_set(key_start, "", tre,
+        grid_data, grid_entry_set));
   }
-  return grid_entry;
+  return grid_entries;
 }
 
-string get_grid_entry(Grid::GridDimensions dim, Grid::GridDefinition def, const
-    TimeRangeEntry2& time_range_entry, const GridData& grid_data) {
+vector<string> get_grid_entries(Grid::GridDimensions dim, Grid::GridDefinition
+    def, const TimeRangeEntry2& time_range_entry, const GridData& grid_data) {
   static unordered_set<string> grid_entry_set;
-  string grid_entry; // return value
+  vector<string> grid_entries; // return value
   string key_start;
   switch (def.type) {
     case Grid::Type::latitudeLongitude: {
@@ -1716,7 +1716,7 @@ string get_grid_entry(Grid::GridDimensions dim, Grid::GridDefinition def, const
           ftos(def.slatitude, 3) + "<!>" + ftos(def.slongitude, 3) + "<!>" +
           ftos(def.elatitude, 3) + "<!>" + ftos(def.elongitude, 3) + "<!>" +
           ftos(def.loincrement, 3) + "<!>" + ftos(def.laincrement, 3) + "<!>";
-      grid_entry = add_gridded_time_range(key_start, time_range_entry,
+      grid_entries = add_gridded_time_range(key_start, time_range_entry,
           grid_entry_set, grid_data);
       break;
     }
@@ -1732,7 +1732,7 @@ string get_grid_entry(Grid::GridDimensions dim, Grid::GridDefinition def, const
         key_start += "S";
       }
       key_start += "<!>";
-      grid_entry = add_gridded_time_range(key_start, time_range_entry,
+      grid_entries = add_gridded_time_range(key_start, time_range_entry,
           grid_entry_set, grid_data);
       break;
     }
@@ -1749,7 +1749,7 @@ string get_grid_entry(Grid::GridDimensions dim, Grid::GridDefinition def, const
       }
       key_start += "<!>" + ftos(def.stdparallel1, 3) + "<!>" + ftos(
           def.stdparallel2, 3) + "<!>";
-      grid_entry = add_gridded_time_range(key_start, time_range_entry,
+      grid_entries = add_gridded_time_range(key_start, time_range_entry,
           grid_entry_set, grid_data);
       break;
     }
@@ -1760,7 +1760,7 @@ string get_grid_entry(Grid::GridDimensions dim, Grid::GridDefinition def, const
   if (g_inv.stream.is_open() && g_inv.G.map.find(key) == g_inv.G.map.end()) {
     g_inv.G.map.emplace(key, make_pair(g_inv.G.map.size(), 0));
   }
-  return grid_entry;
+  return grid_entries;
 }
 
 double data_array_value(const HDF5::DataArray& data_array, size_t index,
@@ -4519,66 +4519,71 @@ if (!grid_data.reference_time.id.empty()) {
       grid_data.time_data = grid_data.forecast_period.id.empty() ?  coord_vars.
           nc_time : coord_vars.forecast_period;
       grid_data.time_data->fcst_period = e.second.key / -100;
-      auto grid_entry = get_grid_entry(dim, def, e.second, grid_data);
-      if (gatherxml::verbose_operation) {
-        cout << "...processing grid entry: " << grid_entry << " ..." << endl;
-      }
-      for (size_t m = 0; m < coord_vars.level_info.size(); ++m) {
+      auto grid_entries = get_grid_entries(dim, def, e.second, grid_data);
+      for (const auto& grid_entry : grid_entries) {
         if (gatherxml::verbose_operation) {
-          cout << "...processing vertical level entry: " << coord_vars.
-          level_info[m].ID << " ..." << endl;
+          cout << "...processing grid entry: " << grid_entry << " ..." << endl;
         }
-        grid_data.level.id = coord_vars.level_info[m].ID;
-        size_t num_levels;
-        if (m == (coord_vars.level_info.size() - 1) && grid_data.level.id ==
-            "sfc") {
-          num_levels = 1;
-        } else {
-          grid_data.level.ds = is->dataset("/" + grid_data.level.id);
-          if (grid_data.level.ds == nullptr) {
-            log_error2("unable to access the /" + grid_data.level.id +
-                " dataset for level information", F, g_util_ident);
+        for (size_t m = 0; m < coord_vars.level_info.size(); ++m) {
+          if (gatherxml::verbose_operation) {
+            cout << "...processing vertical level entry: " << coord_vars.
+            level_info[m].ID << " ..." << endl;
           }
-          grid_data.level.data_array.fill(*is, *grid_data.level.ds);
-          num_levels = grid_data.level.data_array.num_values;
-          auto attr_it = grid_data.level.ds->attributes.find("bounds");
-          if (attr_it != grid_data.level.ds->attributes.end() && attr_it->
-              second._class_ == 3) {
-            string attr_value = reinterpret_cast<char *>(attr_it->second.array);
-            grid_data.level_bounds.ds = is->dataset("/" + attr_value);
-            if (grid_data.level_bounds.ds == nullptr) {
-              log_error2("unable to get bounds for level '" + grid_data.level.id
-                  + "'", F, g_util_ident);
+          grid_data.level.id = coord_vars.level_info[m].ID;
+          size_t num_levels;
+          if (m == (coord_vars.level_info.size() - 1) && grid_data.level.id ==
+              "sfc") {
+            num_levels = 1;
+          } else {
+            grid_data.level.ds = is->dataset("/" + grid_data.level.id);
+            if (grid_data.level.ds == nullptr) {
+              log_error2("unable to access the /" + grid_data.level.id +
+                  " dataset for level information", F, g_util_ident);
             }
-            grid_data.time_bounds.data_array.fill(*is, *grid_data.
-                level_bounds.ds);
+            grid_data.level.data_array.fill(*is, *grid_data.level.ds);
+            num_levels = grid_data.level.data_array.num_values;
+            auto attr_it = grid_data.level.ds->attributes.find("bounds");
+            if (attr_it != grid_data.level.ds->attributes.end() && attr_it->
+                second._class_ == 3) {
+              string attr_value = reinterpret_cast<char *>(attr_it->second.
+                  array);
+              grid_data.level_bounds.ds = is->dataset("/" + attr_value);
+              if (grid_data.level_bounds.ds == nullptr) {
+                log_error2("unable to get bounds for level '" + grid_data.level.
+                    id + "'", F, g_util_ident);
+              }
+              grid_data.time_bounds.data_array.fill(*is, *grid_data.
+                  level_bounds.ds);
+            }
           }
-        }
-        g_grml_data->g.key = grid_entry;
-        auto sp = split(g_grml_data->g.key, "<!>");
-        auto& product_key = sp.back();
-        string grid_key;
-        if (g_inv.stream.is_open()) {
-          grid_key = sp[0];
-          for (size_t nn = 1; nn < sp.size() - 1; ++nn) {
-            grid_key += "," + sp[nn];
+          g_grml_data->g.key = grid_entry;
+          auto sp = split(g_grml_data->g.key, "<!>");
+          auto& product_key = sp.back();
+          string grid_key;
+          if (g_inv.stream.is_open()) {
+            grid_key = sp[0];
+            for (size_t nn = 1; nn < sp.size() - 1; ++nn) {
+              grid_key += "," + sp[nn];
+            }
           }
-        }
-        if (g_grml_data->gtb.find(g_grml_data->g.key) == g_grml_data->gtb.
-            end()) {
-          add_new_grid(grid_data, coord_vars, num_levels, m, scan_data,
-              parameter_data, product_key, grid_key);
-        } else {
-          update_existing_grid(grid_data, coord_vars, num_levels, m,
-              scan_data, parameter_data, product_key, grid_key);
+          if (g_grml_data->gtb.find(g_grml_data->g.key) == g_grml_data->gtb.
+              end()) {
+            add_new_grid(grid_data, coord_vars, num_levels, m, scan_data,
+                parameter_data, product_key, grid_key);
+          } else {
+            update_existing_grid(grid_data, coord_vars, num_levels, m,
+                scan_data, parameter_data, product_key, grid_key);
+          }
+          if (gatherxml::verbose_operation) {
+            cout << "...vertical level entry: " << coord_vars.level_info[m].ID
+                << " done." << endl;
+          }
         }
         if (gatherxml::verbose_operation) {
-          cout << "...vertical level entry: " << coord_vars.level_info[m].ID <<
-              " done." << endl;
+          cout << "...grid entry: " << grid_entry << " done." << endl;
         }
       }
       if (gatherxml::verbose_operation) {
-        cout << "...grid entry: " << grid_entry << " done." << endl;
         cout << "...time range entry: " << e.first << "/" << static_cast<int>(e.
             second.key) << " done." << endl;
       }
