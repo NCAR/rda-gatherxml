@@ -606,8 +606,14 @@ void aggregate_grids(string database, string caller, string user, string
                     "level_type_first, level_type_last, level_type_codes, "
                     "start_date, end_date, uflg",
                 ss.str(),
-                "(file_code, parameter, level_type_codes) do update set uflg = "
-                    "excluded.uflg"
+                "(file_code, parameter, level_type_codes) do update set "
+                    "time_range_first = excluded.time_range_first, "
+                    "time_range_last = excluded.time_range_last, "
+                    "time_range_codes = excluded.time_range_codes, "
+                    "grid_definition_first = excluded.grid_definition_first, "
+                    "grid_definition_last = excluded.grid_definition_last, "
+                    "grid_definition_codes = excluded.grid_definition_codes, "
+                    "uflg = excluded.uflg"
                 ) < 0) {
             log_error2(srv.error() + " while trying to insert '" + ss.str() +
                 "' into " + database + "." + metautils::args.dsid + "_agrids2",
@@ -688,8 +694,14 @@ void aggregate_grids(string database, string caller, string user, string
                 "grid_definition_codes, parameter, level_type_first, "
                 "level_type_last, level_type_codes, start_date, end_date, uflg",
             ss.str(),
-            "(file_code, parameter, level_type_codes) do update set uflg = "
-                "excluded.uflg"
+            "(file_code, parameter, level_type_codes) do update set "
+                "time_range_first = excluded.time_range_first, "
+                "time_range_last = excluded.time_range_last, "
+                "time_range_codes = excluded.time_range_codes, "
+                "grid_definition_first = excluded.grid_definition_first, "
+                "grid_definition_last = excluded.grid_definition_last, "
+                "grid_definition_codes = excluded.grid_definition_codes, "
+                "uflg = excluded.uflg"
             ) < 0) {
         log_error2(srv.error() + " while trying to insert '" + ss.str() +
             "' into " + database + "." + metautils::args.dsid + "_agrids2", F,
