@@ -20,10 +20,13 @@
 #include <surface.hpp>
 #include <td32.hpp>
 #include <raob.hpp>
+#include <ascent.hpp>
 #include <timer.hpp>
 #include <myerror.hpp>
 
 using metautils::log_error;
+using metautils::log_error2;
+using miscutils::this_function_label;
 using std::cerr;
 using std::endl;
 using std::regex;
@@ -258,6 +261,26 @@ bool processed_adp_observation(unique_ptr<Observation>& obs, gatherxml::markup::
         &start_date)) {
       log_error("processed_adp_observation() returned error: '" + myerror +
           "' while adding ID " + ientry.key + " for " + to_string(category),
+          "obs2xml", USER);
+    }
+  }
+  return true;
+}
+
+bool processed_ascent_observation(unique_ptr<Observation>& obs, gatherxml::
+    markup::ObML::ObservationData& obs_data, string& obs_type) {
+  static const string F = this_function_label(__func__);
+  auto o = reinterpret_cast<ASCENTObservation *>(obs.get());
+  if (o->qc_outcome() == "1") {
+    ientry.key = "land_station[!]ASCENT[!]" + obs->location().ID;
+    if (!obs_data.added_to_platforms("surface", "land_station", obs->
+        location().latitude, obs->location().longitude)) {
+      log_error2("'" + myerror + "' while adding platform", F, "obs2xml", USER);
+    }
+    auto start_date = obs->date_time();
+    if (!obs_data.added_to_ids("surface", ientry, o->instrument(), "", obs->
+        location().latitude, obs->location().longitude, -1., &start_date)) {
+      log_error2("'" + myerror + "' while adding ID " + ientry.key, F,
           "obs2xml", USER);
     }
   }
@@ -940,6 +963,8 @@ bool processed_observation(unique_ptr<Observation>& obs, gatherxml::markup::
   } else if (metautils::args.data_format == "on29" || metautils::args.
       data_format == "on124") {
     return processed_adp_observation(obs, obs_data, obs_type);
+  } else if (metautils::args.data_format == "ascent") {
+    return processed_ascent_observation(obs, obs_data, obs_type);
   } else if (metautils::args.data_format == "cpcsumm") {
     return processed_cpc_summary_observation(obs, obs_data, obs_type);
   } else if (metautils::args.data_format == "imma") {
@@ -1001,7 +1026,10 @@ struct InvEntry {
 void scan_file(gatherxml::markup::ObML::ObservationData& obs_data) {
   unique_ptr<idstream> istream;
   unique_ptr<Observation> obs;
-  if (metautils::args.data_format == "cpcsumm") {
+  if (metautils::args.data_format == "ascent") {
+    istream.reset(new InputASCENTObservationStream);
+    obs.reset(new ASCENTObservation);
+  } else if (metautils::args.data_format == "cpcsumm") {
     istream.reset(new InputCPCSummaryObservationStream);
     obs.reset(new CPCSummaryObservation);
   } else if (metautils::args.data_format == "imma") {
@@ -1173,6 +1201,7 @@ int main(int argc, char **argv) {
     cerr << "usage: obs2xml -f format -d [ds]nnn.n [-l local_name] "
         "[options...] path" << endl << endl;
     cerr << "required (choose one):" << endl;
+    cerr << "-f ascent    ASCENT CSV format" << endl;
     cerr << "-f cpcsumm   CPC Summary of Day/Month format" << endl;
     cerr << "-f imma      International Maritime Meteorological Archive format"
         << endl;
@@ -1250,7 +1279,6 @@ int main(int argc, char **argv) {
       flags = "-S " + flags;
     }
     stringstream oss, ess;
-metautils::log_info(metautils::directives.local_root + "/bin/scm -d " + metautils::args.dsid + " " + flags + " " + metautils::args.filename + ".ObML", "obs2xml", USER);
     if (mysystem2(metautils::directives.local_root + "/bin/scm -d " +
         metautils::args.dsid + " " + flags + " " + metautils::args.filename +
         ".ObML", oss, ess) != 0) {
