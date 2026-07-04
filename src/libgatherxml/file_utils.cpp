@@ -426,7 +426,7 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile, TempDir& tdir, list<
         // no action needed for these archive formats
       } else {
         error = "don't recognize '" + ff[n] + "' in archive format field for "
-            "this HPSS file";
+            "this file";
         return false;
       }
     }
