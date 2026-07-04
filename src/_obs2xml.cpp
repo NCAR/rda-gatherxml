@@ -58,7 +58,6 @@ string g_inv_file;
 unique_ptr<TempDir> g_tdir;
 unique_ptr<TempDir> g_inv_dir(nullptr);
 std::ofstream g_inv_stream;
-bool verbose_operation = false;
 
 extern "C" void clean_up() {
   if (!myerror.empty()) {
@@ -1076,7 +1075,7 @@ void scan_file(gatherxml::markup::ObML::ObservationData& obs_data) {
   g_tdir.reset(new TempDir);
   g_tdir->create(metautils::args.temp_loc);
   std::list<string> filelist;
-  if (verbose_operation) {
+  if (gatherxml::verbose_operation) {
     std::cout << "Preparing file for metadata scanning ..." << endl;
   }
   string file_format, error;
@@ -1085,19 +1084,19 @@ void scan_file(gatherxml::markup::ObML::ObservationData& obs_data) {
     log_error("prepare_file_for_metadata_scanning(): '" + error + "'",
         "obs2xml", USER);
   }
-  if (verbose_operation) {
+  if (gatherxml::verbose_operation) {
     std::cout << "... preparation complete." << endl;
   }
   if (filelist.size() == 0) {
     filelist.emplace_back(g_tfile->name());
   }
-  if (verbose_operation) {
+  if (gatherxml::verbose_operation) {
     std::cout << "Ready to scan " << filelist.size() << " files." << endl;
   }
   my::map<InvEntry> inv_O_table, inv_P_table, inv_I_table;
   std::list<string> inv_lines;
   for (const auto& file : filelist) {
-    if (verbose_operation) {
+    if (gatherxml::verbose_operation) {
       std::cout << "Beginning scan of " << file << "..." << endl;
     }
     if (!open_file(istream.get(), g_tfile->name())) {
@@ -1159,7 +1158,7 @@ void scan_file(gatherxml::markup::ObML::ObservationData& obs_data) {
       num_bytes = istream->read(buffer, BUF_LEN);
     }
     istream->close();
-    if (verbose_operation) {
+    if (gatherxml::verbose_operation) {
       std::cout << "  ...scan of " << file << " completed." << endl;
     }
   }
