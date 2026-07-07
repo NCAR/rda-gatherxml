@@ -285,6 +285,17 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile, TempDir& tdir, list<
           error = "archive file format is too complicated";
           return false;
         }
+      } else if (ff[n] == "ZIP") {
+        if (ff[n] == ff.front() && ff[n] == ff.back()) {
+          if (system(("mv " + tf + " " + tf + ".zip; unzip -qq -d " +
+              tdir.name() + " " + tf + ".zip").c_str()) != 0) {
+            error = "error uncompressing " + tf;
+            return false;
+          }
+        } else {
+          error = "archive file format is too complicated";
+          return false;
+        }
       } else if (ff[n] == "TAR" || ff[n] == "TGZ") {
         if (n == 0 && args.data_format != "cxml" && args.data_format !=
             "tcvitals" && !regex_search(args.data_format, netcdf_re) &&
