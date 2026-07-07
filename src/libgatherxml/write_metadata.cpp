@@ -924,6 +924,8 @@ void write(ObservationData& obs_data, string caller, string user) {
     ofs << "HDF5";
   } else if (metautils::args.data_format == "little_r") {
     ofs << "LITTLE_R";
+  } else if (metautils::args.data_format == "ascent") {
+    ofs << "ASCENT";
   } else {
     ofs << metautils::args.data_format;
   }
