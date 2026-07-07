@@ -39,6 +39,7 @@ using strutils::ftos;
 using strutils::is_numeric;
 using strutils::replace_all;
 using strutils::split;
+using strutils::substitute;
 using strutils::to_upper;
 using strutils::trim;
 using unixutils::mysystem2;
@@ -277,8 +278,9 @@ bool processed_ascent_observation(unique_ptr<Observation>& obs, gatherxml::
       log_error2("'" + myerror + "' while adding platform", F, "obs2xml", USER);
     }
     auto start_date = obs->date_time();
-    if (!obs_data.added_to_ids("surface", ientry, o->instrument(), "", obs->
-        location().latitude, obs->location().longitude, -1., &start_date)) {
+    if (!obs_data.added_to_ids("surface", ientry, o->instrument() + "-" + o->
+        processing_level(), "", obs->location().latitude, obs->location().
+        longitude, -1., &start_date)) {
       log_error2("'" + myerror + "' while adding ID " + ientry.key, F,
           "obs2xml", USER);
     }
@@ -985,7 +987,10 @@ bool processed_observation(unique_ptr<Observation>& obs, gatherxml::markup::
 }
 
 bool open_file(void *istream, string filename) {
-  if (metautils::args.data_format == "cpcsumm") {
+  if (metautils::args.data_format == "ascent") {
+    return (reinterpret_cast<InputASCENTObservationStream *>(istream))->open(
+        filename);
+  } else if (metautils::args.data_format == "cpcsumm") {
     return (reinterpret_cast<InputCPCSummaryObservationStream *>(istream))->
         open(filename);
   } else if (metautils::args.data_format == "imma") {
@@ -1023,6 +1028,7 @@ struct InvEntry {
 };
 
 void scan_file(gatherxml::markup::ObML::ObservationData& obs_data) {
+  static const string F = this_function_label(__func__);
   unique_ptr<idstream> istream;
   unique_ptr<Observation> obs;
   if (metautils::args.data_format == "ascent") {
@@ -1087,7 +1093,10 @@ void scan_file(gatherxml::markup::ObML::ObservationData& obs_data) {
   if (gatherxml::verbose_operation) {
     std::cout << "... preparation complete." << endl;
   }
-  if (filelist.size() == 0) {
+  if (metautils::args.data_format == "ascent") {
+    filelist.emplace_back(g_tdir->name() + "/" + substitute(metautils::args.
+        filename, "zip", "csv"));
+  } else if (filelist.empty()) {
     filelist.emplace_back(g_tfile->name());
   }
   if (gatherxml::verbose_operation) {
@@ -1099,17 +1108,17 @@ void scan_file(gatherxml::markup::ObML::ObservationData& obs_data) {
     if (gatherxml::verbose_operation) {
       std::cout << "Beginning scan of " << file << "..." << endl;
     }
-    if (!open_file(istream.get(), g_tfile->name())) {
-      log_error("scan_file(): unable to open file for input", "obs2xml", USER);
+    if (!open_file(istream.get(), file)) {
+      log_error2("unable to open file for input", F, "obs2xml", USER);
     }
     if (file_format.empty() && metautils::args.data_format == "isd") {
       gatherxml::fileInventory::open(g_inv_file, g_inv_dir, g_inv_stream,
           "ObML", "obs2xml", USER);
     } else if (metautils::args.inventory_only) {
-      log_error("scan_file(): unable to inventory " + metautils::args.path + "/"
-          + metautils::args.filename + " because archive format is '" +
-          file_format + "' and data format is '" + metautils::args.data_format +
-          "'", "obs2xml", USER);
+      log_error2("unable to inventory " + metautils::args.path + "/" + metautils::
+          args.filename + " because archive format is '" + file_format + "' and "
+          "data format is '" + metautils::args.data_format + "'", F, "obs2xml",
+          USER);
     }
     const size_t BUF_LEN = 80000;
     unsigned char buffer[BUF_LEN];
@@ -1163,7 +1172,7 @@ void scan_file(gatherxml::markup::ObML::ObservationData& obs_data) {
     }
   }
   clean_up();
-  if (inv_lines.size() > 0) {
+  if (!inv_lines.empty()) {
     InvEntry ie;
     for (auto& key : inv_O_table.keys()) {
       inv_O_table.found(key, ie);
