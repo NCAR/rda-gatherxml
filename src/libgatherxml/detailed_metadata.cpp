@@ -998,10 +998,9 @@ void generate_gridded_product_detail(Server& mysrv, string file_type, const
 }
 
 void generate_detailed_grid_summary(string file_type, ofstream& ofs, const
-    vector<pair<string, string>>& format_list, char& progress_flag, string caller,
-    string user) {
+    vector<pair<string, string>>& format_list, string caller, string user) {
   static const string F = this_function_label(__func__);
-  progress_flag = 'A';
+metautils::log_info("start generate_detailed_grid_summary...", caller, user);
   TempDir t;
   if (!t.create(metautils::directives.temp_path)) {
     log_error2("unable to create temporary directory", F, caller, user);
@@ -1026,7 +1025,7 @@ void generate_detailed_grid_summary(string file_type, ofstream& ofs, const
   }
   xmlutils::ParameterMapper pmap(metautils::directives.parameter_map_path);
   xmlutils::LevelMapper lmap(metautils::directives.level_map_path);
-  progress_flag = 'B';
+metautils::log_info("generate_detailed_grid_summary A", caller, user);
   vector<string> pfv;
   unordered_map<string, ParameterData> pdmap;
   unordered_map<size_t, LevelSummary> lsmap;
@@ -1038,8 +1037,10 @@ void generate_detailed_grid_summary(string file_type, ofstream& ofs, const
         caller, user);
   }
   LocalQuery q;
+metautils::log_info("generate_detailed_grid_summary B " + std::to_string(format_list.size()), caller, user);
   for (const auto& fp : format_list) {
     q.set(parameter_query(srv, fp.second, format_list.size()));
+metautils::log_info("generate_detailed_grid_summary query " + q.show(), caller, user);
 #ifdef DUMP_QUERIES
     {
     Timer tm;
@@ -1054,8 +1055,8 @@ void generate_detailed_grid_summary(string file_type, ofstream& ofs, const
         show() << endl;
     }
 #endif
-    progress_flag += 1;
     unordered_map<string, string> m;
+metautils::log_info("generate_detailed_grid_summary C " + std::to_string(q.num_rows()), caller, user);
     for (const auto& r : q) {
       if (m.find(r[0]) == m.end())  {
         m.emplace(r[0], metatranslations::detailed_parameter(pmap, fp.first,
@@ -1126,7 +1127,7 @@ void generate_detailed_grid_summary(string file_type, ofstream& ofs, const
         }
       }
     }
-    progress_flag += 1;
+metautils::log_info("generate_detailed_grid_summary D", caller, user);
     ofs_p << "<div id=\"" << fp.first << "_anchor\"></div>";
     ofs_l << "<div id=\"" << fp.first << "_anchor\"></div>";
     if (format_list.size() > 1) {
@@ -1149,7 +1150,7 @@ void generate_detailed_grid_summary(string file_type, ofstream& ofs, const
       ofs_p << "</td></tr></table>" << endl;
       ofs_l << "</td></tr></table>" << endl;
     }
-    progress_flag += 1;
+metautils::log_info("generate_detailed_grid_summary E", caller, user);
     auto f = fp.first;
     replace_all(f, "proprietary", "dataset-specific");
     auto ncols = 2;
@@ -1179,7 +1180,7 @@ void generate_detailed_grid_summary(string file_type, ofstream& ofs, const
         show() << endl;
     }
 #endif
-    progress_flag += 1;
+metautils::log_info("generate_detailed_grid_summary F " + q.show(), caller, user);
     ofs_p << "<tr class=\"bg0\"><td align=\"left\" colspan=\"" << ncols <<
         "\"><b>Product and Coverage Information:</b><br>";
     ofs_l << "<tr class=\"bg0\"><td align=\"left\" colspan=\"" << ncols <<
@@ -1231,7 +1232,7 @@ void generate_detailed_grid_summary(string file_type, ofstream& ofs, const
     [](const string& left, const string& right) -> bool {
       return metacompares::default_compare(left, right);
     });
-    progress_flag += 1;
+metautils::log_info("generate_detailed_grid_summary G", caller, user);
     auto cidx = 0;
     unordered_map<size_t, string> ldmap;
     for (const auto& k : pd_keys) {
@@ -1316,7 +1317,7 @@ void generate_detailed_grid_summary(string file_type, ofstream& ofs, const
       ofs_p << "</table></div></td></tr>" << endl;
       cidx = 1 - cidx;
     }
-    progress_flag += 1;
+metautils::log_info("generate_detailed_grid_summary H", caller, user);
     unordered_map<string, CombinedLevelSummary> clmap;
     for (auto& ls : lsmap) {
       auto key = metatranslations::detailed_level(lmap, fp.first, ls.second.map,
@@ -1359,8 +1360,8 @@ void generate_detailed_grid_summary(string file_type, ofstream& ofs, const
         v.clear();
       }
     }
+metautils::log_info("generate_detailed_grid_summary I", caller, user);
     lsmap.clear();
-    progress_flag += 1;
     vector<string> clv;
     for (const auto& e : clmap) {
       clv.emplace_back(e.first);
@@ -1425,35 +1426,32 @@ void generate_detailed_grid_summary(string file_type, ofstream& ofs, const
       ofs_l << "</table></div></td></tr>" << endl;
       cidx = 1 - cidx;
     }
+metautils::log_info("generate_detailed_grid_summary J", caller, user);
     clmap.clear();
     pdmap.clear();
     ofs_p << "</table>" << endl;
     ofs_l << "</table>" << endl;
-    progress_flag += 1;
   }
-  progress_flag = 'W';
   ofs_p.close();
   ofs_l.close();
   if (pfv.size() > 0) {
     generate_gridded_product_detail(srv, file_type, format_list, t, caller,
         user);
   }
+metautils::log_info("generate_detailed_grid_summary K", caller, user);
   srv.disconnect();
-  progress_flag = 'X';
   string e;
   if (unixutils::gdex_upload_dir(t.name(), "metadata/", "/data/web/datasets/" +
       metautils::args.dsid, metautils::directives.gdex_upload_key, e) < 0) {
     metautils::log_warning(F + " couldn't sync detail files - "
         "gdex_upload_dir() error(s): '" + e + "'", caller, user);
   }
-  progress_flag = 'Y';
   write_grid_html(ofs, pfv.size());
-  progress_flag = 'Z';
+metautils::log_info("generate_detailed_grid_summary L", caller, user);
 }
 
 void generate_detailed_observation_summary(string file_type, ofstream& ofs,
-    const vector<pair<string, string>>& format_list, char& progress_flag, string
-    caller, string user) {
+    const vector<pair<string, string>>& format_list, string caller, string user) {
   static const string F = this_function_label(__func__);
   TempDir t;
   if (!t.create(metautils::directives.temp_path)) {
@@ -1667,8 +1665,7 @@ void generate_detailed_observation_summary(string file_type, ofstream& ofs,
 }
 
 void generate_detailed_fix_summary(string file_type, ofstream& ofs, const
-    vector<pair<string, string>>& format_list, char& progress_flag, string caller,
-    string user) {
+    vector<pair<string, string>>& format_list, string caller, string user) {
   static const string F = this_function_label(__func__);
   Server server(metautils::directives.metadb_config);
   if (!server) {
@@ -1792,7 +1789,7 @@ void generate_detailed_metadata_view(char& progress_flag, string caller, string
   // svec contains the database, the data type description, and a function
   //  that generates an appropriate summary
   vector<tuple<string, string, void(*)(string, ofstream&, const vector<pair<
-      string, string>>&, char&, string, string)>> svec{
+      string, string>>&, string, string)>> svec{
     make_tuple("WGrML", "Grids", generate_detailed_grid_summary),
     make_tuple("WObML", "Platform Observations",
         generate_detailed_observation_summary),
@@ -2021,7 +2018,7 @@ void generate_detailed_metadata_view(char& progress_flag, string caller, string
     for (size_t n = 0; n < svec.size(); ++n) {
       if (!vv[n].empty()) {
         auto& generate_summary = get<2>(svec[n]);
-        generate_summary("Web", ofs, vv[n], progress_flag, caller, user);
+        generate_summary("Web", ofs, vv[n], caller, user);
       }
     }
     ofs.close();
