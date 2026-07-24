@@ -1475,8 +1475,17 @@ void create_file_list_cache(string file_type, char& progress_flag, string
         obml_file_data(file_type, *gmap, obmlmap, caller, user);
       }
       if (file_type == "Web") {
-        oq.set("select min(start_date), max(end_date) from \"WObML\"." +
-            metautils::args.dsid + "_webfiles2 where start_date > 0");
+        string oqval = R"(select min(w.start_date), max(w.end_date) from "WObML".)"
+            + metautils::args.dsid + "_webfiles2 as w";
+        if (!tindex.empty()) {
+          oqval += " left join dssdb.wfile_" + metautils::args.dsid + " as wf on "
+              "wf.wfile = w.id";
+        }
+        oqval += " where w.start_date > 0";
+        if (!tindex.empty()) {
+          oqval += " and wf.tindex = " + tindex;
+        }
+        oq.set(oqval);
       } else if (file_type == "inv") {
         if (table_exists(srv, "IObML." + metautils::args.dsid +
             "_data_types")) {
