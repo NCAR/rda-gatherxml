@@ -1456,10 +1456,11 @@ void create_file_list_cache(string file_type, char& progress_flag, string
   progress_flag = '3';
   unordered_map<string, FileEntry> grmlmap, obmlmap, fixmlmap;
   LocalQuery oq, sq;
-  auto b = false;
+  auto wgrml = false;
   if (file_type == "Web" || file_type == "inv") {
     progress_flag = 'A';
-    if (table_exists(srv, "WGrML." + metautils::args.dsid + "_webfiles2")) {
+    wgrml = table_exists(srv, "WGrML." + metautils::args.dsid + "_webfiles2");
+    if (wgrml) {
       if (file_type == "inv" && !table_exists(srv, "IGrML." + metautils::args.
           dsid + "_inventory_summary")) {
         return;
@@ -1467,7 +1468,6 @@ void create_file_list_cache(string file_type, char& progress_flag, string
       if (file_type == "Web" && tindex.empty()) {
         grml_file_data(file_type, *gmap, grmlmap, caller, user);
       }
-      b = true;
     }
     progress_flag += 1;
     if (table_exists(srv, "WObML." + metautils::args.dsid + "_webfiles2")) {
@@ -1505,7 +1505,7 @@ void create_file_list_cache(string file_type, char& progress_flag, string
     progress_flag += 1;
   }
   progress_flag = '4';
-  if (b) {
+  if (wgrml) {
     progress_flag = 'a';
     string f = "customize.";
     if (file_type == "Web") {
