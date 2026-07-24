@@ -1641,19 +1641,35 @@ void create_file_list_cache(string file_type, char& progress_flag, string
 
       // platform types
       if (file_type == "Web") {
-        oq.set("select distinct l.platform_type_code, p.platform_type from "
-            "\"WObML\"." + metautils::args.dsid + "_data_types as d left join "
-            "\"WObML\"." + metautils::args.dsid + "_data_types_list as l on l."
-            "code = d.data_type_code left join \"WObML\".platform_types as p on "
-            "p.code = l.platform_type_code");
+        string oqval = "select distinct l.platform_type_code, p.platform_type from "
+            R"("WObML".)" + metautils::args.dsid + "_data_types as d left join "
+            R"("WObML".)" + metautils::args.dsid + "_data_types_list as l on l."
+            R"(code = d.data_type_code left join "WObML".platform_types as p on )"
+            "p.code = l.platform_type_code";
+        if (!tindex.empty()) {
+          oqval += R"( left join "WObML".)" + metautils::args.dsid + "_webfiles2 "
+              "as w on w.code = d.file_code left join dssdb.wfile_" + metautils::
+              args.dsid + " as wf on wf.wfile = w.id where wf.tindex = " + tindex;
+        }
+        oq.set(oqval);
       } else if (file_type == "inv") {
-        oq.set("select distinct l.platform_type_code, p.platform_type from "
-            "\"WObML\"." + metautils::args.dsid + "_data_types as d left join "
-            "\"WObML\"." + metautils::args.dsid + "_data_types_list as l on l."
-            "code = d.data_type_code left join \"WObML\".platform_types as p on "
+        string oqval = "select distinct l.platform_type_code, p.platform_type from "
+            R"("WObML".)" + metautils::args.dsid + "_data_types as d left join "
+            R"("WObML".)" + metautils::args.dsid + "_data_types_list as l on l."
+            R"(code = d.data_type_code left join "WObML".platform_types as p on )"
             "p.code = l.platform_type_code left join (select distinct file_code "
-            "from \"IObML\"." + metautils::args.dsid + "_data_types) as dt on "
-            "dt.file_code = d.file_code where dt.file_code is not null");
+            R"(from "IObML"." + metautils::args.dsid + "_data_types) as dt on )"
+            "dt.file_code = d.file_code";
+        if (!tindex.empty()) {
+          oqval += R"( left join "WObML".)" + metautils::args.dsid + "_webfiles2 "
+              "as w on w.code = d.file_code left join dssdb.wfile_" + metautils::
+              args.dsid + " as wf on wf.wfile = w.id";
+        }
+        oqval += " where dt.file_code is not null";
+        if (!tindex.empty()) {
+          " and wf.tindex = " + tindex;
+        }
+        oq.set(oqval);
       }
 #ifdef DUMP_QUERIES
       {
@@ -1678,12 +1694,21 @@ void create_file_list_cache(string file_type, char& progress_flag, string
       // data types and formats
       LocalQuery q;
       if (file_type == "Web" || file_type == "inv") {
-        q.set("select distinct f.format from \"WObML\"." + metautils::args.dsid +
-            "_webfiles2 as w left join \"WObML\".formats as f on f.code = w."
-            "format_code");
-        oq.set("select distinct l.data_type from \"WObML\"." + metautils::args.
-            dsid + "_data_types as d left join \"WObML\"." + metautils::args.
-            dsid + "_data_types_list as l on l.code = d.data_type_code");
+        string qval = R"(select distinct f.format from "WObML".)" + metautils::args.
+            dsid + R"(_webfiles2 as w left join "WObML".formats as f on f.code = )"
+            "w.format_code";
+        string oqval = R"(select distinct l.data_type from "WObML".)" + metautils::
+            args.dsid + R"(_data_types as d left join "WObML".)" + metautils::args.
+            dsid + "_data_types_list as l on l.code = d.data_type_code";
+        if (!tindex.empty()) {
+          qval += " left join dssdb.wfile_" + metautils::args.dsid + " as wf on wf."
+              "wfile = w.id where wf.tindex = " + tindex;
+          oqval += R"( left join "WObML".)" + metautils::args.dsid + "_webfiles2 "
+              "as w on w.code = d.file_code left join dssdb.wfile_" + metautils::
+              args.dsid + " as wf on wf.wfile = w.id where wf.tindex = " + tindex;
+        }
+        q.set(qval);
+        oq.set(oqval);
       } else {
         q.set("");
         oq.set("");
