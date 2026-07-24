@@ -271,7 +271,7 @@ bool processed_ascent_observation(unique_ptr<Observation>& obs, gatherxml::
     markup::ObML::ObservationData& obs_data, string& obs_type) {
   static const string F = this_function_label(__func__);
   auto o = reinterpret_cast<ASCENTObservation *>(obs.get());
-  if (o->qc_outcome() != "4" && o->qc_outcome() != '9') {
+  if (o->qc_outcome() != "4" && o->qc_outcome() != "9") {
     ientry.key = "land_station[!]ASCENT[!]" + obs->location().ID;
     if (!obs_data.added_to_platforms("surface", "land_station", obs->
         location().latitude, obs->location().longitude)) {
