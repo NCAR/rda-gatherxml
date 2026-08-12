@@ -1439,7 +1439,8 @@ void write_grml_parameters(string file_type, string tindex, ofstream& ofs,
     ofs << p.second.id << "<!>" << p.first << "<!>" << p.second.short_name <<
         endl;
     if (p.second.short_name.empty()) {
-      log_info("missing parameter map(s): '" + p.second.id + "'", caller, user);
+      log_info("missing parameter map(s): '" + p.second.id + "', tindex: '" +
+          tindex + "'", caller, user);
     }
   }
 }
