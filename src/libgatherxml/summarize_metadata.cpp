@@ -18,6 +18,7 @@
 
 using namespace PostgreSQL;
 using metautils::log_error2;
+using metautils::log_info;
 using miscutils::this_function_label;
 using std::cerr;
 using std::endl;
@@ -1437,6 +1438,9 @@ void write_grml_parameters(string file_type, string tindex, ofstream& ofs,
     replace_all(p.first, "<br />", " ");
     ofs << p.second.id << "<!>" << p.first << "<!>" << p.second.short_name <<
         endl;
+    if (p.second.short_name.empty()) {
+      log_info("missing parameter map(s): '" + p.second.id + "'", caller, user);
+    }
   }
 }
 
