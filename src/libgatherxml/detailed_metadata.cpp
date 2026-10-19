@@ -1000,12 +1000,10 @@ void generate_gridded_product_detail(Server& mysrv, string file_type, const
 void generate_detailed_grid_summary(string file_type, ofstream& ofs, const
     vector<pair<string, string>>& format_list, string caller, string user) {
   static const string F = this_function_label(__func__);
-metautils::log_info("start generate_detailed_grid_summary...", caller, user);
   TempDir t;
   if (!t.create(metautils::directives.temp_path)) {
     log_error2("unable to create temporary directory", F, caller, user);
   }
-metautils::log_info("generate_detailed_grid_summary A0", caller, user);
 
   // create the directory tree in the temp directory
   stringstream oss, ess;
@@ -1014,23 +1012,18 @@ metautils::log_info("generate_detailed_grid_summary A0", caller, user);
     log_error2("unable to create temporary directory tree - '" + ess.str() +
         "'", F, caller, user);
   }
-metautils::log_info("generate_detailed_grid_summary A1", caller, user);
   ofstream ofs_p;
   open_output(ofs_p, t.name() + "/metadata/parameter-detail.html");
   if (!ofs_p.is_open()) {
     log_error2("unable to open output for parameter detail", F, caller, user);
   }
-metautils::log_info("generate_detailed_grid_summary A2", caller, user);
   ofstream ofs_l;
   open_output(ofs_l, t.name() + "/metadata/level-detail.html");
   if (!ofs_l.is_open()) {
     log_error2("unable to open output for level detail", F, caller, user);
   }
-metautils::log_info("generate_detailed_grid_summary A3", caller, user);
   xmlutils::ParameterMapper pmap(metautils::directives.parameter_map_path);
-metautils::log_info("generate_detailed_grid_summary A4", caller, user);
   xmlutils::LevelMapper lmap(metautils::directives.level_map_path);
-metautils::log_info("generate_detailed_grid_summary A5", caller, user);
   vector<string> pfv;
   unordered_map<string, ParameterData> pdmap;
   unordered_map<size_t, LevelSummary> lsmap;
