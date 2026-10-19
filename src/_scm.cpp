@@ -892,8 +892,8 @@ void *thread_summarize_IDs(void *args) {
   double avgd = 0., navgd = 0., avgm = 0., navgm = 0.;
   size_t obs_count = 0;
   unordered_map<string, string> id_map;
-  auto tbl = p_args.first[5] + "." + metautils::args.dsid + "_id_list";
-  auto pkey = metautils::args.dsid + "_id_list_pkey";
+  auto id_list_tbl = p_args.first[5] + "." + metautils::args.dsid + "_id_list";
+  auto id_list_pkey = metautils::args.dsid + "_id_list_pkey";
   vector<string> id_data_type_values;
   ifs.getline(l, 32768);
   while (!ifs.eof()) {
@@ -951,10 +951,70 @@ void *thread_summarize_IDs(void *args) {
       if (ne_lon == "-9990000") {
         ne_lon = "-8388608";
       }
-      auto id_code = table_code(srv, p_args.first[5] + "." + metautils::args.
-          dsid + "_ids", "id_type_code = " + id_map[idtyp] + " AND id = '" + ID
-          + "' AND sw_lat = " + sw_lat + " AND sw_lon = " + sw_lon + " AND "
-          "ne_lat = " + ne_lat + " AND ne_lon = " + ne_lon);
+      LocalQuery q;
+      auto id_tbl = p_args.first[5] + "." + metautils::args.dsid + "_ids";
+      q.set("code, sw_lat, sw_lon, ne_lat, ne_lon", id_tbl, "id_type_code = " +
+          id_map[idtyp] + " AND id = '" + ID + "'");
+      if (q.submit(srv) < 0) {
+        log_error2("error: '" + q.error() + " from query: '" + q.show() + "'",
+            F, "scm", USER);
+      }
+      string id_code;
+      if (q.num_rows() == 0) {
+        string inserts = id_map[idtyp] + ", '" + ID + "', " + sw_lat + ", " +
+            sw_lon + ", " + ne_lat + ", " + ne_lon;
+        if (srv.insert(
+              id_tbl,
+              "id_type_code, id, sw_lat, sw_lon, ne_lat, ne_lon",
+              inserts,
+              ""
+              ) < 0) {
+          log_error2("'" + srv.error() + "' while inserting '" + inserts +
+              "' into " + id_tbl, F, "scm", USER);
+        }
+        Row r;
+        q.fetch_row(r);
+        id_code = r[0];
+      } else {
+        Row r;
+        q.fetch_row(r);
+        id_code = r[0];
+        string updates = "";
+        if (stoi(sw_lat) < stoi(r[1])) {
+          append(updates, "sw_lat = " + sw_lat, ", ");
+        }
+        if (stoi(ne_lat) > stoi(r[3])) {
+          append(updates, "ne_lat = " + ne_lat, ", ");
+        }
+        auto i_sw = stoi(r[2]);
+        auto i_ne = stoi(r[4]);
+        if (i_sw > i_ne) {
+          // bounding box crosses the dateline
+          auto i = stoi(sw_lon);
+          if (i >= 0 && i < i_sw) {
+            append(updates, "sw_lon = " + sw_lon, ", ");
+          }
+          i = stoi(ne_lon);
+          if (i < 0 && i > i_ne) {
+            append(updates, "ne_lon = " + ne_lon, ", ");
+          }
+        } else {
+          if (stoi(sw_lon) < i_sw) {
+            append(updates, "sw_lon = " + sw_lon, ", ");
+          }
+          if (stoi(ne_lon) > i_ne) {
+            append(updates, "ne_lon = " + ne_lon, ", ");
+          }
+        }
+        if (!updates.empty()) {
+          if (srv.update(id_tbl, updates, "code = " + r[0]) < 0) {
+/*
+            log_error2("error: '" + srv.error() + " while updating " + id_tbl,
+                F, "scm", USER);
+*/
+          }
+        }
+      }
       if (id_code.empty()) {
         log_error2("unable to get id code", F, "scm", USER);
       }
@@ -1002,17 +1062,17 @@ void *thread_summarize_IDs(void *args) {
           "%Y%m%d%H%MM%SS") + ", " + dt2.to_string("%Y%m%d%H%MM%SS") + ", " +
           tz + ", '" + p_args.first[7] + "'";
       if (srv.insert(
-            tbl,
+            id_list_tbl,
             "id_code, observation_type_code, platform_type_code, file_code, "
                 "num_observations, start_date, end_date, time_zone, uflg",
             inserts,
-            "on constraint " + pkey + " do update set num_observations = "
-            "excluded.num_observations, start_date = excluded.start_date, "
+            "on constraint " + id_list_pkey + " do update set num_observations "
+            "= excluded.num_observations, start_date = excluded.start_date, "
             "end_date = excluded.end_date, time_zone = excluded.time_zone, "
             "uflg = excluded.uflg"
             ) < 0) {
         log_error2("'" + srv.error() + "' while inserting '" + inserts +
-            "' into " + tbl, F, "scm", USER);
+            "' into " + id_list_tbl, F, "scm", USER);
       }
       for (const auto& element : e.element_list("dataType")) {
         auto num_obs = element.attribute_value("numObs");
@@ -1056,7 +1116,7 @@ void *thread_summarize_IDs(void *args) {
     ifs.getline(l, 32768);
   }
   ifs.close();
-  srv._delete(tbl, "file_code = " + p_args.first[2] + " and "
+  srv._delete(id_list_tbl, "file_code = " + p_args.first[2] + " and "
       "observation_type_code = " + p_args.first[3] + " and platform_type_code "
       "= " + p_args.first[4] + " and uflg != '" + p_args.first[7] + "'");
   if (navgd > 0.) {
@@ -1106,7 +1166,8 @@ void *thread_summarize_IDs(void *args) {
       }
     }
   }
-  tbl = p_args.first[5] + "." + metautils::args.dsid + "_id_data_types_list";
+  auto tbl = p_args.first[5] + "." + metautils::args.dsid +
+      "_id_data_types_list";
   if (srv.insert(
         tbl,
         join(id_data_type_values, "), ("),
