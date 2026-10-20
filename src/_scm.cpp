@@ -972,6 +972,9 @@ void *thread_summarize_IDs(void *args) {
           log_error2("'" + srv.error() + "' while inserting '" + inserts +
               "' into " + id_tbl, F, "scm", USER);
         }
+        if (q.submit(srv) < 0 || q.num_rows() == 0) {
+          log_error2("unable to get id code", F, "scm", USER);
+        }
         Row r;
         q.fetch_row(r);
         id_code = r[0];
@@ -1014,9 +1017,6 @@ void *thread_summarize_IDs(void *args) {
 */
           }
         }
-      }
-      if (id_code.empty()) {
-        log_error2("unable to get id code", F, "scm", USER);
       }
       v = e.attribute_value("start");
       replace_all(v, "-", "");
