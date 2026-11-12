@@ -126,10 +126,9 @@ bool prepare_file_for_metadata_scanning(TempFile& tfile, TempDir& tdir, list<
         case 'O': {
 
           // file is on object storage
-          s3::Session s3("stratus.ucar.edu", "AK06XKLYCIANHSDVOSL6",
-              "bN3i7jcp3avElZ1/cSI1zTloy50Lbqcwz04ajD5Q", "us-east-1",
-              "aws4_request");
-          if (!s3.download_file("rda-data", lnm, tfile.name())) {
+          s3::Session s3(directives.obj_server, directives.obj_access_key,
+              directives.obj_secret_key, "us-east-1", "aws4_request");
+          if (!s3.download_file(directives.obj_bucket, lnm, tfile.name())) {
             error = "Object store file '" + lnm + "' not found or unable to "
                 "transfer";
             return false;
