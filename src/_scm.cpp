@@ -2531,11 +2531,13 @@ int main(int argc, char **argv) {
     if (unixutils::mysystem2("/bin/bash -c 'curl -s -k https://" + metautils::
         directives.web_server + "/redeploy/dsgen" + metautils::args.dsid + "/'",
         oss, ess) != 0) {
-      auto e = "error regenerating the dataset description: '" + trimmed(ess.
-          str()) + "'";
-      cerr << e << endl;
-      metautils::log_info(e, "scm", USER);
-      ex_stat = 1;
+      if (ess.str().find("setlocale: LC_ALL") == string::npos) {
+        auto e = "error regenerating the dataset description: '" + trimmed(ess.
+            str()) + "'";
+        cerr << e << endl;
+        metautils::log_info(e, "scm", USER);
+        ex_stat = 1;
+      }
     }
   }
 
