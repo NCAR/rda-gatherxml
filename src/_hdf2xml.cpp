@@ -4197,6 +4197,19 @@ if (!grid_data.reference_time.id.empty()) {
         "variables" << endl;
     exit(1);
   }
+  if (coord_vars.lat_ids.size() > 1) {
+    vector<string> new_lats, new_lons;
+    new_lats.reserve(coord_vars.lat_ids.size() * coord_vars.lon_ids.size());
+    new_lons.reserve(coord_vars.lat_ids.size() * coord_vars.lon_ids.size());
+    for (size_t n = 0; n < coord_vars.lat_ids.size(); ++n) {
+      for (size_t m = 0; m < coord_vars.lon_ids.size(); ++m) {
+        new_lats.emplace_back(coord_vars.lat_ids[n]);
+        new_lons.emplace_back(coord_vars.lon_ids[m]);
+      }
+    }
+    coord_vars.lat_ids = move(new_lats);
+    coord_vars.lon_ids = move(new_lons);
+  }
   if (coord_vars.level_info.empty()) {
     find_vertical_level_coordinates(coord_vars, grid_data);
   }
