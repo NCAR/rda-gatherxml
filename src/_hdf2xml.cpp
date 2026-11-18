@@ -4414,9 +4414,13 @@ if (!grid_data.reference_time.id.empty()) {
                 F, g_util_ident);
           }
         } else {
-          log_error2("(5)unable to determine grid definition from '" +
-              coord_vars.lat_ids[n] + "' and '" + coord_vars.lon_ids[n] + "'",
-              F, g_util_ident);
+          if (coord_vars.lat_ids.size() == 1) {
+            log_error2("(5)unable to determine grid definition from '" +
+                coord_vars.lat_ids[n] + "' and '" + coord_vars.lon_ids[n] + "'",
+                F, g_util_ident);
+          } else {
+            continue;
+          }
         }
         auto determined_grid_type = grid_is_2d_lat_lon(grid_data, dim, def);
         if (!determined_grid_type) {
