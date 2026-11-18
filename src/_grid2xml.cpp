@@ -912,13 +912,24 @@ int main(int argc, char **argv) {
   atexit(clean_up);
   auto d = '!';
   metautils::args.args_string = unixutils::unix_args_string(argc, argv, d);
+// patch
+if (metautils::args.args_string.find("-d!d090004") != string::npos) {
+if (metautils::args.args_string.find("-R!") == string::npos) {
+metautils::args.args_string.insert(0, "-R!");
+}
+if (metautils::args.args_string.find("-S!") == string::npos) {
+metautils::args.args_string.insert(0, "-S!");
+}
+}
   metautils::read_config("grid2xml", USER);
   gatherxml::parse_args(d);
   metautils::cmd_register("grid2xml", USER);
+/*
   if (metautils::args.path.find("https://rda.ucar.edu") != 0) {
     log_error2("Terminating - invalid path '" + metautils::args.path + "'",
         "main()", "grid2xml", USER);
   }
+*/
   if (!metautils::args.overwrite_only && !metautils::args.inventory_only) {
     metautils::check_for_existing_cmd("GrML", "grid2xml", USER);
   }
