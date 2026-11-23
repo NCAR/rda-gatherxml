@@ -926,9 +926,7 @@ struct DiscreteGeometriesData {
 void process_units_attribute(size_t var_index, size_t attr_index,
     DiscreteGeometriesData& dgd) {
   static const string F = this_function_label(__func__);
-  auto u = *(reinterpret_cast<string *>(vars[var_index].attrs[attr_index].
-      values));
-  u = to_lower(u);
+  auto u = to_lower(vars[var_index].attrs[attr_index].to_string());
   if (regex_search(u, regex("since"))) {
     if (dgd.indexes.time_var != MISSING_FLAG) {
       log_error2("time was already identified - don't know what to do with "
