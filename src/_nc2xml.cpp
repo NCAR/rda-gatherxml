@@ -255,46 +255,6 @@ void fill_nc_time_data(string time_units) {
   }
 }
 
-DateTime compute_nc_time(NetCDF::VariableData& times, size_t index) {
-  static const string F = this_function_label(__func__);
-  static const int Y = dateutils::current_date_time().year();
-  double val = times[index];
-  if (val < 0.) {
-    log_error2("Terminating - negative time offset not allowed", F, "nc2xml",
-        USER);
-  }
-  DateTime dt; // return value
-  if (time_data.units == "seconds") {
-    dt = time_data.reference.seconds_added(val);
-  } else if (time_data.units == "minutes") {
-    if (myequalf(val, static_cast<int>(val), 0.001)) {
-      dt = time_data.reference.minutes_added(val);
-    } else {
-      dt = time_data.reference.seconds_added(lroundf(val * 60.));
-    }
-  } else if (time_data.units == "hours") {
-    if (myequalf(val, static_cast<int>(val), 0.001)) {
-      dt = time_data.reference.hours_added(val);
-    } else {
-      dt = time_data.reference.seconds_added(lroundf(val * 3600.));
-    }
-  } else if (time_data.units == "days") {
-    if (myequalf(val, static_cast<int>(val), 0.001)) {
-      dt = time_data.reference.days_added(val);
-    } else {
-      dt = time_data.reference.seconds_added(lroundf(val * 86400.));
-    }
-  } else {
-    log_error2("compute_nc_time() returned error: unable to set date/time for "
-        "units '" + time_data.units + "'", F, "nc2xml", USER);
-  }
-  if (gatherxml::verbose_operation && dt.year() > Y) {
-    cout << "Warning: " << dt.to_string() << " is in the future; time value: "
-        << val << "; time type: " << static_cast<int>(times.type()) << endl;
-  }
-  return dt;
-}
-
 void extract_from_variable_attribute(const NetCDF::Variable& var,
     NetCDFVariableAttributeData& nc_attribute_data, string conventions) {
   nc_attribute_data.long_name = "";
@@ -1231,7 +1191,8 @@ void scan_cf_point_netcdf_file(InputNetCDFStream& istream, string platform_type,
           "<!>" + ad.cf_keyword, scan_data);
       for (size_t n = 0; n < tvd.size(); ++n) {
         if (n == dtv.size()) {
-          dtv.emplace_back(compute_nc_time(tvd, n));
+          dtv.emplace_back(gatherxml::utils::compute_nc_time(tvd[n],
+              time_data, USER));
         }
         if (n == idv.size()) {
           auto lat = ftos(fabs(yvd[n]), 4);
@@ -1488,7 +1449,8 @@ void scan_cf_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,
         ientry.key = pfms[n] + "[!]" + ityps[n] + "[!]" + ids[n];
         for (size_t m = 0; m < nt; ++m) {
           if (dtv.size() != nt) {
-            dtv.emplace_back(compute_nc_time(tvd, m));
+            dtv.emplace_back(gatherxml::utils::compute_nc_time(tvd[m],
+                time_data, USER));
           }
           auto x = dims[vars[dgd.indexes.time_var].dimids[0]].is_rec ? n + m *
               ns : n * nt + m;
@@ -1671,7 +1633,8 @@ void scan_cf_non_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,
           }
           for (size_t m = off; m < end; ++m) {
             if (!found_missing(tvd[m], nullptr, vd[m], ad.missing_value)) {
-              auto dt = compute_nc_time(tvd, m);
+              auto dt = gatherxml::utils::compute_nc_time(tvd[m], time_data,
+                  USER);
               for (size_t l = 0; l < nl; ++l) {
                 if (!obs_data.added_to_ids("surface", ientry, v.name, "", yvd[n
                     * nl + l], xvd[n * nl + l], tvd[m], &dt)) {
@@ -1701,8 +1664,10 @@ void scan_cf_non_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,
     vector<DateTime> dtn, dtx;
     if (dgd.indexes.time_bounds_var != MISSING_FLAG) {
       for (size_t n = 0; n < svd.size(); ++n) {
-        dtn.emplace_back(compute_nc_time(*bvd, n * 2));
-        dtx.emplace_back(compute_nc_time(*bvd, n * 2 + 1));
+        dtn.emplace_back(gatherxml::utils::compute_nc_time((*bvd)[n*2],
+            time_data, USER));
+        dtx.emplace_back(gatherxml::utils::compute_nc_time((*bvd)[n*2+1],
+            time_data, USER));
       }
     }
     unordered_set<string> noset{ vars[dgd.indexes.time_var].name, vars[dgd.
@@ -1752,7 +1717,8 @@ void scan_cf_non_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,
                 }
               }
             } else {
-              auto dt = compute_nc_time(tvd, n);
+              auto dt = gatherxml::utils::compute_nc_time(tvd[n], time_data,
+                  USER);
               for (size_t m = 0; m < nl; ++m) {
                 auto x = idx * nl + m;
                 if (!obs_data.added_to_ids("surface", ientry, v.name, "", yvd[
@@ -1816,7 +1782,8 @@ void scan_cf_non_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,
               auto idx = n * nobs + m;
               if (!found_missing(tvd[idx], &td.missing_value, vd[idx], ad.
                   missing_value)) {
-                auto dt = compute_nc_time(tvd, idx);
+                auto dt = gatherxml::utils::compute_nc_time(tvd[idx],
+                    time_data, USER);
                 for (size_t l = 0; l < nl; ++l) {
                   auto x = n * nl + l;
                   if (!obs_data.added_to_ids("surface", ientry, v.name, "", yvd[
@@ -1847,7 +1814,8 @@ void scan_cf_non_orthogonal_time_series_netcdf_file(InputNetCDFStream& istream,
               auto idx = n * ns + m;
               if (!found_missing(tvd[idx], &td.missing_value, vd[idx], ad.
                   missing_value)) {
-                auto dt = compute_nc_time(tvd, idx);
+                auto dt = gatherxml::utils::compute_nc_time(tvd[idx],
+                    time_data, USER);
                 for (size_t l = 0; l < nl; ++l) {
                   auto x = m * nl + l;
                   if (!obs_data.added_to_ids("surface", ientry, v.name, "", yvd[
@@ -2045,7 +2013,8 @@ log_error2("continuous ragged array currently not supported", F, "nc2xml", USER)
                 ad.missing_value.get()) {
               auto idx = ovd[n];
               ientry.key = pfms[idx] + "[!]" + ityps[idx] + "[!]" + ids[idx];
-              auto dt = compute_nc_time(tvd, n);
+              auto dt = gatherxml::utils::compute_nc_time(tvd[n], time_data,
+                  USER);
               if (!obs_data.added_to_ids(obs_type, ientry, v.name, "", yvd[n],
                   xvd[n], tvd[n], &dt)) {
                 auto e = move(myerror);
@@ -2176,7 +2145,8 @@ void scan_cf_orthogonal_profile_netcdf_file(InputNetCDFStream& istream, string
             log_error2(e + "' when adding platform " + obs_type + " " +
                 platform_type, F, "nc2xml", USER);
           }
-          auto dt = compute_nc_time(tvd, n);
+          auto dt = gatherxml::utils::compute_nc_time(tvd[n], time_data,
+                  USER);
           ientry.key = platform_type + "[!]" + ityp + "[!]";
           if (ivd->type() == NetCDF::NCType::INT || ivd->type() == NetCDF::
               NCType::FLOAT || ivd->type() == NetCDF::NCType::DOUBLE) {
@@ -2375,7 +2345,8 @@ ityps.emplace_back("unknown");
             ++x;
           }
           if (!lv.empty()) {
-            auto dt = compute_nc_time(tvd, n);
+            auto dt = gatherxml::utils::compute_nc_time(tvd[n], time_data,
+                  USER);
             ientry.key = pfms[n] + "[!]" + ityps[n] + "[!]";
             if (ivd->type() == NetCDF::NCType::INT || ivd->type() == NetCDF::
                 NCType::FLOAT || ivd->type() == NetCDF::NCType::DOUBLE) {
@@ -2436,7 +2407,8 @@ ityps.emplace_back("unknown");
               ientry.key += string(&(reinterpret_cast<char *>(ivd->get()))[n *
                   ilen], ilen);
             }
-            auto dt = compute_nc_time(tvd, n);
+            auto dt = gatherxml::utils::compute_nc_time(tvd[n], time_data,
+                  USER);
             if (!obs_data.added_to_ids(obs_type, ientry, v.name, "", yvd[n],
                 xvd[n], tvd[n], &dt)) {
               auto e = move(myerror);
@@ -2545,7 +2517,7 @@ ityps.emplace_back("unknown");
       add_to_netcdf_variables(v.name + "<!>" + ad.long_name + "<!>" + ad.units +
           "<!>" + ad.cf_keyword, scan_data);
       for (size_t n = 0; n < tvd.size(); ++n) {
-        auto dt = compute_nc_time(tvd, n);
+        auto dt = gatherxml::utils::compute_nc_time(tvd[n], time_data, USER);
         size_t ns = ivd->size() / ilen;
         auto off = n * lvd.size() * ns;
         for (size_t m = 0; m < ns; ++m) {
@@ -2677,7 +2649,7 @@ ityps.emplace_back("unknown");
             + "<!>" + ad.cf_keyword, scan_data);
         auto x = 0;
         for (size_t n = 0; n < rvd.size(); ++n) {
-          auto dt = compute_nc_time(tvd, n);
+          auto dt = gatherxml::utils::compute_nc_time(tvd[n], time_data, USER);
           vector<double> lv;
           for (size_t m = 0; m < rvd[n]; ++m) {
             if (!found_missing(tvd[n], nullptr, vd[x], ad.missing_value)) {
@@ -2742,7 +2714,8 @@ ityps.emplace_back("unknown");
             if (!lv.empty()) {
               ientry.key = pfms[x] + "[!]" + ityps[x] + "[!]" + ids[x];
               if (tvd.size() == nt) {
-                auto dt = compute_nc_time(tvd, m);
+                auto dt = gatherxml::utils::compute_nc_time(tvd[m], time_data,
+                    USER);
                 if (!obs_data.added_to_ids(obs_type, ientry, v.name, "", yvd[x],
                     xvd[x], tvd[m], &dt)) {
                   auto e = move(myerror);
@@ -2751,7 +2724,8 @@ ityps.emplace_back("unknown");
                 }
               } else {
                 auto i = x * nt + m;
-                auto dt = compute_nc_time(tvd, i);
+                auto dt = gatherxml::utils::compute_nc_time(tvd[i], time_data,
+                    USER);
                 if (!obs_data.added_to_ids(obs_type, ientry, v.name, "", yvd[x],
                     xvd[x], tvd[i], &dt)) {
                   auto e = move(myerror);
@@ -4968,7 +4942,8 @@ void scan_idd_metar_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data,
           trim(id);
           auto i = fmt == 0 ? m : pvd[m];
           if (i < static_cast<int>(tvd.size())) {
-            auto dt = compute_nc_time(tvd, m);
+            auto dt = gatherxml::utils::compute_nc_time(tvd[m], time_data,
+                    USER);
             ientry.key = platform_type + "[!]callSign[!]" + metautils::clean_id(
                 id);
             auto d = scan_data.datatype_map.description(v.name);
@@ -5072,7 +5047,7 @@ void scan_idd_buoy_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data,
             platform_type = "drifting_buoy";
             ientry.key = platform_type + "[!]other[!]" + itos(bvd[m]);
           }
-          auto dt = compute_nc_time(tvd, m);
+          auto dt = gatherxml::utils::compute_nc_time(tvd[m], time_data, USER);
           auto d = scan_data.datatype_map.description(v.name);
           if (d.empty()) {
             add_to_netcdf_variables(v.name + "<!>" + ad.long_name + "<!>" + ad.
@@ -5153,7 +5128,7 @@ void scan_idd_surface_synoptic_netcdf_file(InputNetCDFStream& istream, ScanData&
           }
           ientry.key = platform_type + "[!]WMO[!]" + ftos( wvd[m], 5, 0,
               '0');
-          auto dt = compute_nc_time(tvd, m);
+          auto dt = gatherxml::utils::compute_nc_time(tvd[m], time_data, USER);
           auto d = scan_data.datatype_map.description(v.name);
           if (d.empty()) {
             add_to_netcdf_variables(v.name + "<!>" + ad.long_name + "<!>" + ad.
@@ -5266,7 +5241,7 @@ void scan_idd_upper_air_netcdf_file(InputNetCDFStream& istream, ScanData&
           } else {
             ientry.key = platform_type + "[!]WMO[!]" + ftos(wvd[m], 5, 0, '0');
           }
-          auto dt = compute_nc_time(tvd, m);
+          auto dt = gatherxml::utils::compute_nc_time(tvd[m], time_data, USER);
           auto d = scan_data.datatype_map.description(v.name);
           if (d.empty()) {
             add_to_netcdf_variables(v.name + "<!>" + ad.long_name + "<!>" + ad.
