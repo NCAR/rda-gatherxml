@@ -75,7 +75,7 @@ static const size_t MISSING_FLAG = 0xffffffff;
 struct ScanData {
   ScanData() : num_not_missing(0), num_missing_loc(0), write_type(-1),
       map_name(), parameter_map(), datatype_map(), conventions(),
-      netcdf_variables(), changed_variables(), grids(nullptr), map_filled(false)
+      netcdf_variables(), changed_variables(), grids(nullptr), found_map(false)
       { }
 
   enum { GrML_type = 1, ObML_type };
@@ -88,7 +88,7 @@ struct ScanData {
   vector<string> netcdf_variables;
   unordered_set<string> changed_variables;
   unique_ptr<unordered_map<string, gatherxml::markup::GrML::GridEntry>> grids;
-  bool map_filled;
+  bool found_map;
 };
 
 struct GridData {
@@ -4282,7 +4282,7 @@ void scan_cf_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data,
   if (!feature_type.empty()) {
     if (!scan_data.map_name.empty() && scan_data.datatype_map.fill(scan_data.
         map_name)) {
-      scan_data.map_filled = true;
+      scan_data.found_map = true;
     }
     string platform_type = "unknown";
     if (!platform.empty()) {
@@ -4323,7 +4323,7 @@ void scan_cf_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data,
   } else {
     if (!scan_data.map_name.empty() && scan_data.parameter_map.fill(scan_data.
         map_name)) {
-      scan_data.map_filled = true;
+      scan_data.found_map = true;
     }
     scan_cf_grid_netcdf_file(istream, scan_data);
   }
@@ -4360,7 +4360,7 @@ void scan_raf_aircraft_netcdf_file(InputNetCDFStream& istream, ScanData&
         "nc2xml", USER);
   }
   if (scan_data.datatype_map.fill(scan_data.map_name)) {
-    scan_data.map_filled = true;
+    scan_data.found_map = true;
   }
   NetCDF::VariableData tvd, yvd, xvd, avd;
   NetCDFVariableAttributeData ltad, lnad;
@@ -4609,7 +4609,7 @@ void scan_npn_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data,
         USER);
   }
   if (scan_data.datatype_map.fill(scan_data.map_name)) {
-    scan_data.map_filled = true;
+    scan_data.found_map = true;
   }
   short y, m, d;
   size_t t;
@@ -5283,7 +5283,7 @@ void scan_idd_observation_netcdf_file(InputNetCDFStream& istream, ScanData&
     }
   }
   if (scan_data.datatype_map.fill(scan_data.map_name)) {
-    scan_data.map_filled = true;
+    scan_data.found_map = true;
   }
   if (typ == "METAR") {
     scan_idd_metar_netcdf_file(istream, scan_data, obs_data);
@@ -5510,7 +5510,7 @@ void write_parameter_map(string tempdir_name, ScanData& scan_data) {
     log_error2("unknown map type", F, "nc2xml", USER);
   }
   vector<string> v;
-  if (scan_data.map_filled) {
+  if (scan_data.found_map) {
     std::ifstream ifs(scan_data.map_name.c_str());
     char l[32768];
     ifs.getline(l, 32768);
@@ -5536,7 +5536,7 @@ void write_parameter_map(string tempdir_name, ScanData& scan_data) {
   if (!ofs.is_open()) {
     log_error2("can't open parameter map file for output", F, "nc2xml", USER);
   }
-  if (!scan_data.map_filled) {
+  if (!scan_data.found_map) {
     ofs << "<?xml version=\"1.0\" ?>" << endl;
     ofs << "<" << mtyp << "Map>" << endl;
   } else {
