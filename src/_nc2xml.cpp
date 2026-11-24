@@ -5496,113 +5496,6 @@ void scan_samos_netcdf_file(InputNetCDFStream& istream, ScanData& scan_data,
   }
 }
 
-void write_parameter_map(string tempdir_name, ScanData& scan_data) {
-  static const string F = this_function_label(__func__);
-  if (gatherxml::verbose_operation) {
-    cout << "Writing parameter map..." << endl;
-  }
-  string mtyp;
-  if (scan_data.write_type == ScanData::GrML_type) {
-    mtyp = "parameter";
-  } else if (scan_data.write_type == ScanData::ObML_type) {
-    mtyp = "dataType";
-  } else {
-    log_error2("unknown map type", F, "nc2xml", USER);
-  }
-  vector<string> v;
-  if (scan_data.found_map) {
-    std::ifstream ifs(scan_data.map_name.c_str());
-    char l[32768];
-    ifs.getline(l, 32768);
-    while (!ifs.eof()) {
-      v.emplace_back(l);
-      ifs.getline(l, 32768);
-    }
-    ifs.close();
-    v.pop_back();
-    stringstream oss, ess;
-    mysystem2("/bin/rm " + scan_data.map_name, oss, ess);
-  }
-  stringstream oss, ess;
-  if (mysystem2("/bin/mkdir -m 0755 -p " + tempdir_name + "/metadata/"
-      "ParameterTables", oss, ess) != 0) {
-    log_error2("can't create directory tree for netCDF variables", F, "nc2xml",
-        USER);
-  }
-  scan_data.map_name = tempdir_name + "/metadata/ParameterTables/netCDF." +
-      metautils::args.dsid + ".xml";
-  std::ofstream ofs;
-  open_output(ofs, scan_data.map_name);
-  if (!ofs.is_open()) {
-    log_error2("can't open parameter map file for output", F, "nc2xml", USER);
-  }
-  if (!scan_data.found_map) {
-    ofs << "<?xml version=\"1.0\" ?>" << endl;
-    ofs << "<" << mtyp << "Map>" << endl;
-  } else {
-    auto no_write = false;
-    for (const auto& e : v) {
-      if (regex_search(e, regex(" code=\""))) {
-        auto sp = split(e, "\"");
-        if (scan_data.changed_variables.find(sp[1]) != scan_data.
-            changed_variables.end()) {
-          no_write = true;
-        }
-      }
-      if (!no_write) {
-        ofs << e << endl;
-      }
-      if (regex_search(e, regex("</" + mtyp + ">"))) {
-        no_write = false;
-      }
-    }
-  }
-  for (const auto& v : scan_data.netcdf_variables) {
-    auto sp = split(v, "<!>");
-    if (scan_data.write_type == ScanData::GrML_type) {
-      ofs << "  <parameter code=\"" << sp[0] << "\">" << endl;
-      ofs << "    <shortName>" << sp[0] << "</shortName>" << endl;
-      if (!sp[1].empty()) {
-        ofs << "    <description>" << sp[1] << "</description>" << endl;
-      }
-      if (!sp[2].empty()) {
-        ofs << "    <units>" << substitute(sp[2], "-", "^-") << "</units>" <<
-            endl;
-      }
-      if (sp.size() > 3 && !sp[3].empty()) {
-        ofs << "    <standardName>" << sp[3] << "</standardName>" << endl;
-      }
-      ofs << "  </parameter>" << endl;
-    } else if (scan_data.write_type == ScanData::ObML_type) {
-      ofs << "  <dataType code=\"" << sp[0] << "\">" << endl;
-      ofs << "    <description>" << sp[1];
-      if (!sp[2].empty()) {
-        ofs << " (" << sp[2] << ")";
-      }
-      ofs << "</description>" << endl;
-      ofs << "  </dataType>" << endl;
-    }
-  }
-  if (scan_data.write_type == ScanData::GrML_type) {
-    ofs << "</parameterMap>" << endl;
-  } else if (scan_data.write_type == ScanData::ObML_type) {
-    ofs << "</dataTypeMap>" << endl;
-  }
-  ofs.close();
-  string e;
-  if (unixutils::gdex_upload_dir(tempdir_name, "metadata/ParameterTables/",
-      "/data/web", metautils::directives.gdex_upload_key, e) < 0) {
-    log_warning("parameter map was not synced - error(s): '" + e + "'",
-        "nc2xml", USER);
-  }
-  mysystem2("/bin/cp " + scan_data.map_name + " " + metautils::directives.
-      parameter_map_path + "/netCDF." + metautils::args.dsid + ".xml", oss,
-      ess);
-  if (gatherxml::verbose_operation) {
-    cout << "...finished writing parameter map." << endl;
-  }
-}
-
 void scan_file(ScanData& scan_data, gatherxml::markup::ObML::ObservationData&
      obs_data) {
   static const string F = this_function_label(__func__);
@@ -5674,7 +5567,24 @@ void scan_file(ScanData& scan_data, gatherxml::markup::ObML::ObservationData&
   metautils::args.data_format = "netcdf";
   if (!metautils::args.inventory_only && !scan_data.netcdf_variables.empty() &&
       metautils::args.dsid != "test") {
-    write_parameter_map(tdir->name(), scan_data);
+    string map_type;
+    if (scan_data.write_type == ScanData::GrML_type) {
+      map_type = "parameter";
+    } else if (scan_data.write_type == ScanData::ObML_type) {
+      map_type = "dataType";
+    } else {
+      log_error2("unknown map type", F, "nc2xml", USER);
+    }
+    string warning;
+    auto error = metautils::NcParameter::write_parameter_map(scan_data.
+        netcdf_variables, scan_data.changed_variables, map_type, scan_data.
+        map_name, scan_data.found_map, warning);
+    if (!error.empty()) {
+      log_error2(error, F, "nc2xml", USER);
+    }
+    if (!warning.empty()) {
+      log_warning(warning, "nc2xml", USER);
+    }
   }
 }
 
