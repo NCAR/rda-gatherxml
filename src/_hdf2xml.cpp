@@ -2306,38 +2306,6 @@ void add_time_range_entries(const TimeData& time_data, const HDF5::DataArray&
   e.num_steps = nsteps;
 }
 
-DateTime compute_nc_time(const HDF5::DataArray& times, const TimeData&
-    time_data, size_t index) {
-  static const string F = this_function_label(__func__);
-  auto val = times.value(index);
-  DateTime dt;
-  if (time_data.units == "seconds") {
-    dt = time_data.reference.seconds_added(val);
-  } else if (time_data.units == "minutes") {
-    if (myequalf(val, static_cast<int>(val), 0.001)) {
-      dt = time_data.reference.minutes_added(val);
-    } else {
-      dt = time_data.reference.seconds_added(lround(val*60.));
-    }
-  } else if (time_data.units == "hours") {
-    if (myequalf(val, static_cast<int>(val), 0.001)) {
-      dt = time_data.reference.hours_added(val);
-    } else {
-      dt = time_data.reference.seconds_added(lround(val*3600.));
-    }
-  } else if (time_data.units == "days") {
-    if (myequalf(val, static_cast<int>(val), 0.001)) {
-      dt = time_data.reference.days_added(val);
-    } else {
-      dt = time_data.reference.seconds_added(lround(val*86400.));
-    }
-  } else {
-    log_error2("compute_nc_time() unable to set date/time for units '" +
-        time_data.units + "'", F, g_util_ident);
-  }
-  return dt;
-}
-
 void update_inventory(string pkey, string gkey, const GridData& grid_data) {
   if (g_inv.L.map.find(g_grml_data->l.key) == g_inv.L.map.end()) {
     g_inv.L.map.emplace(g_grml_data->l.key, make_pair(g_inv.L.map.size(), 0));
@@ -2640,7 +2608,8 @@ void scan_cf_point_hdf5nc4_file(InputHDF5Stream::Attributes& global_attributes,
       }
       for (size_t n = 0; n < time_vals.num_values; ++n) {
         if (n == date_times.size()) {
-          date_times.emplace_back(compute_nc_time(time_vals, time_data, n));
+          date_times.emplace_back(gatherxml::utils::compute_nc_time(time_vals.
+              value(n), time_data, USER));
         }
         if (n == ids.size()) {
 
@@ -2863,7 +2832,8 @@ log_error2("determining platforms is not implemented", F, g_util_ident);
             id_cache[n];
         for (size_t m = 0; m < time_vals.num_values; ++m) {
           if (dts.size() != time_vals.num_values) {
-            dts.emplace_back(compute_nc_time(time_vals, time_data, m));
+            dts.emplace_back(gatherxml::utils::compute_nc_time(time_vals.
+                value(m), time_data, USER));
           }
           if (!found_missing(time_vals.value(m), time_vals.type, &nc_ta_data.
               missing_value, var_vals, m, nc_va_data.missing_value)) {
@@ -3056,7 +3026,8 @@ id_types.emplace_back("unknown");
             }
             z_off += z_rowsize_vals.value(n);
             if (level_list.size() > 0 && lat > -999. && lon > -999.) {
-              auto dt = compute_nc_time(time_vals, time_data, n);
+              auto dt = gatherxml::utils::compute_nc_time(time_vals.
+                  value(n), time_data, USER);
               gatherxml::markup::ObML::IDEntry ientry;
               ientry.key = platform_types[n] + "[!]" + id_types[n] + "[!]";
               if (id_vals.type == HDF5::DataArray::Type::INT || id_vals.type ==
