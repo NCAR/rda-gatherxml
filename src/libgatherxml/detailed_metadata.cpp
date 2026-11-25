@@ -810,8 +810,8 @@ void generate_gridded_product_detail(Server& mysrv, string file_type, const
 #endif
   unordered_map<size_t, string> gdmap;
   for (const auto& r : q) {
-    gdmap.emplace(stoi(r[2]), gridutils::convert_grid_definition(r[0] + "<!>" +
-        r[1]));
+    gdmap.emplace(stoi(r[2]), ::gridutils::convert_grid_definition(r[0] + "<!>"
+        + r[1]));
   }
   ofstream ofs;
   open_output(ofs, tdir.name() + "/metadata/product-detail.html");
@@ -1183,12 +1183,12 @@ void generate_detailed_grid_summary(string file_type, ofstream& ofs, const
       ofs_p << "There is one product and one geographical coverage for all of "
           "the grids in this format:<ul class=\"paneltext\"><span class="
           "\"underline\">Product:</span> " << row[0] << "<br><span class="
-          "\"underline\">Geographical Coverage:</span> " << gridutils::
+          "\"underline\">Geographical Coverage:</span> " << ::gridutils::
           convert_grid_definition(row[1] + "<!>" + row[2]) << "</ul>";
       ofs_l << "There is one product and one geographical coverage for all of "
           "the grids in this format:<ul class=\"paneltext\"><span class="
           "\"underline\">Product:</span> " << row[0] << "<br><span class="
-          "\"underline\">Geographical Coverage:</span> " << gridutils::
+          "\"underline\">Geographical Coverage:</span> " << ::gridutils::
           convert_grid_definition(row[1] + "<!>" + row[2]) << "</ul>";
     } else {
       ofs_p << "There are multiple products and/or geographical coverages for "
