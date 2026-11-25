@@ -350,4 +350,25 @@ extern std::unordered_map<std::string, long long> pglocks;
 
 } // end namespace gatherxml::pglocks
 
+namespace gridutils {
+
+bool grid_is_centered_lambert_conformal(const std::vector<double>& lats, const
+    std::vector<double>& lons, Grid::GridDimensions& dims, Grid::GridDefinition&
+    def);
+bool grid_is_non_centered_lambert_conformal(const std::vector<double>& lats,
+    const std::vector<double>& lons, Grid::GridDimensions& dims, Grid::
+    GridDefinition& def);
+bool grid_is_lambert_conformal(const std::vector<double>& lats, const std::
+    vector<double>& lons, Grid::GridDimensions& dims, Grid::GridDefinition&
+    def);
+
+} // end namespace gatherxml::gridutils
+
+namespace utils {
+
+DateTime compute_nc_time(double time_val, const metautils::NcTime::TimeData&
+    time_data, const std::string& user);
+
+} // end namespace gatherxml::utils
+
 } // end namespace gatherxml
