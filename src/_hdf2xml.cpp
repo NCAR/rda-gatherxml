@@ -3640,6 +3640,10 @@ bool grid_is_2d_lat_lon(const GridData& grid_data, Grid::GridDimensions& dim,
 
 bool grid_is_polar_stereographic(const GridData& grid_data,
     Grid::GridDimensions& dim, Grid::GridDefinition& def) {
+  if (gatherxml::verbose_operation) {
+    cout << "    ...checking for a polar-stereographic projection..." <<
+        endl;
+  }
   auto center_x = dim.x / 2;
   auto center_y = dim.y / 2;
   auto xm = center_x - 1;
@@ -3729,6 +3733,14 @@ bool grid_is_polar_stereographic(const GridData& grid_data,
         rad) * cos(data_array_value(grid_data.lat.data_array, min_m +
         dim.x, grid_data.lat.ds.get()) * rad))) * 12745.6);
     return true;
+    if (gatherxml::verbose_operation) {
+      cout << "    ...confirmed a polar-stereographic projection." <<
+          endl;
+    }
+  }
+  if (gatherxml::verbose_operation) {
+    cout << "    ...projection is not polar-stereographic." <<
+        endl;
   }
   return false;
 }
@@ -4350,6 +4362,8 @@ if (!grid_data.reference_time.id.empty()) {
             // "This is a netCDF dimension but not a netCDF variable.xxxxxxxxxx"
             //     where xxxxxxxxxx is a right-justified integer of width 10
             dim.y = stoi(attr_parts[10]);
+          } else if (ds->dataspace.dimensionality == 1) {
+            dim.y = ds->dataspace.sizes[0];
           } else if (attr_parts.size() == 1 && string(reinterpret_cast<char *>(
               attr_it->second.array)) == rtp_it[0]->second && ds->data.sizes.
               size() == 1) {
@@ -4375,6 +4389,8 @@ if (!grid_data.reference_time.id.empty()) {
             // "This is a netCDF dimension but not a netCDF variable.xxxxxxxxxx"
             //     where xxxxxxxxxx is a right-justified integer of width 10
             dim.x = stoi(attr_parts[10]);
+          } else if (ds->dataspace.dimensionality == 1) {
+            dim.x = ds->dataspace.sizes[0];
           } else if (attr_parts.size() == 1 && string(reinterpret_cast<char *>(
               attr_it->second.array)) == rtp_it[2]->second && ds->data.sizes.
               size() == 1) {
