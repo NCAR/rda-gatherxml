@@ -104,7 +104,7 @@ struct ScanData {
   unique_ptr<TempDir> tdir;
   string map_name, platform_type;
   DataTypeMap datatype_map;
-  list<string> varlist;
+  vector<string> varlist;
   unordered_set<string> var_changes_table;
   bool found_map, convert_ids_to_upper_case;
 };
